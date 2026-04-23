@@ -29,6 +29,9 @@ describe('detectManualFallback', () => {
   it('does not flag unrelated claude.com URLs', () => {
     expect(detectManualFallback('See https://claude.com/docs for help')).toBe(false)
   })
+  it('does not flag non-platform oauth callback (subdomain matters)', () => {
+    expect(detectManualFallback('https://claude.com/oauth/code/callback')).toBe(false)
+  })
   it('returns false for empty input', () => {
     expect(detectManualFallback('')).toBe(false)
   })

@@ -8,6 +8,7 @@
 export function stripAnsi(s: string): string {
   return s
     .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
+    // OSC sequences split across PTY chunks are left verbatim — acceptable for display-only.
     .replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, '')
 }
 
