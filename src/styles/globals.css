@@ -4827,6 +4827,252 @@ a {
   cursor: default;
 }
 
+/* ── Connectors ── */
+.connector-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.connector-list {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.connector-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.connector-row:last-child {
+  border-bottom: none;
+}
+
+.connector-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t2);
+}
+
+.connector-icon--github { color: var(--t1); }
+.connector-icon--claude { color: var(--accent-text); }
+.connector-icon--custom { color: var(--t3); }
+
+.connector-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.connector-name {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t1);
+}
+
+.connector-desc {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: var(--t3);
+  margin-top: 2px;
+}
+
+.connector-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.connector-badge {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+.connector-badge.connected {
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+  color: var(--green);
+  border: 1px solid color-mix(in srgb, var(--green) 30%, transparent);
+}
+
+.connector-badge.error {
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+  color: var(--red);
+  border: 1px solid color-mix(in srgb, var(--red) 30%, transparent);
+}
+
+.connector-disconnect-btn {
+  font-size: 11px;
+  color: var(--t3);
+}
+
+.connector-status-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  color: var(--t3);
+}
+
+.connector-device-flow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.connector-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-text);
+  letter-spacing: 0.1em;
+  padding: 3px 8px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+}
+
+.connector-add-btn {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--bg3);
+  border: 1px dashed var(--border2);
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--t3);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.connector-add-btn:hover {
+  background: var(--bg3);
+  color: var(--t1);
+  border-color: var(--border2);
+}
+
+.connector-row--log {
+  display: block;
+  padding: 10px 16px;
+  background: var(--bg);
+}
+
+/* Modal-style add custom connector form */
+.connector-add-modal {
+  margin-top: 12px;
+  padding: 20px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.connector-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.connector-modal-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.connector-modal-beta {
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--t3);
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.connector-modal-desc {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--t3);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.connector-modal-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.connector-modal-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.connector-advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t2);
+  cursor: pointer;
+  width: fit-content;
+}
+
+.connector-advanced-toggle:hover {
+  color: var(--t1);
+}
+
+.connector-modal-warning {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: var(--t3);
+  line-height: 1.55;
+  margin: 0;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.connector-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.settings-btn--ghost {
+  background: transparent;
+  border-color: var(--border2);
+  color: var(--t2);
+}
+
+.settings-btn--ghost:hover:not(:disabled) {
+  background: var(--bg2);
+  color: var(--t1);
+}
+
 .install-btn.installed {
   background: var(--green-soft);
   border-color: var(--green-border);
@@ -10335,7 +10581,19 @@ a {
   display: flex;
   height: 100%;
   min-height: 0;
-  margin-left: 66px; /* account for fixed-position NavRail */
+}
+.library-root-v2 .sidebar-rail {
+  position: static;
+  width: 56px;
+  height: 100%;
+  flex-shrink: 0;
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid var(--glass-border);
+  box-shadow: none;
+  top: unset;
+  left: unset;
+  z-index: unset;
 }
 .library-main {
   flex: 1;
@@ -10352,15 +10610,12 @@ a {
   flex-direction: column;
 }
 
-/* Keep repo-detail full-screen for visual centering, but pass pointer-events
-   through the transparent left-margin area so the NavRail and sidebar remain
-   clickable. */
 .library-detail-area .repo-detail {
-  pointer-events: none;
-}
-.library-detail-area .repo-detail-install-error,
-.library-detail-area .repo-detail-panel {
-  pointer-events: auto;
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .library-detail-empty {
