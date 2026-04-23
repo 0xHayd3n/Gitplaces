@@ -571,7 +571,10 @@ export async function loginClaude(onProgress: (msg: string) => void): Promise<Lo
   const startPolling = () => {
     if (pollTimer) return // already polling
     console.log('[skill-gen] Starting auth status polling…')
+    let ticks = 0
     pollTimer = setInterval(async () => {
+      ticks++
+      if (ticks % 10 === 0) onProgress('Still verifying authentication…')
       console.log('[skill-gen] Polling auth status…')
       const ok = await checkAuthStatus().catch(() => false)
       console.log(`[skill-gen] Auth status poll result: ${ok}`)
@@ -621,6 +624,7 @@ export async function loginClaude(onProgress: (msg: string) => void): Promise<Lo
   const submitCode = (code: string) => {
     console.log(`[skill-gen] Submitting auth code (${code.length} chars)…`)
     if (proc.stdin.writable) {
+      onProgress('Verifying code with Claude…')
       proc.stdin.write(code.trim() + '\n', 'utf8')
       // Don't call stdin.end() immediately on Windows — the CLI may need the
       // pipe to stay open briefly while it processes the code. Instead, end it
@@ -633,6 +637,23 @@ export async function loginClaude(onProgress: (msg: string) => void): Promise<Lo
   }
 
   return { submitCode, done }
+}
+
+export async function logoutClaude(): Promise<void> {
+  const nodePath = await findNode()
+  if (!nodePath) return
+  const cliPath = findLocalCli()
+  if (!cliPath) return
+  await new Promise<void>((resolve) => {
+    const proc = spawn(nodePath, [cliPath, 'auth', 'logout'], {
+      stdio: 'ignore',
+      env: buildEnv(true),
+    })
+    const done = () => resolve()
+    proc.on('close', done)
+    proc.on('error', done)
+    setTimeout(() => { try { proc.kill() } catch { /* already dead */ } resolve() }, 5000)
+  })
 }
 
 // ── Claude Code install + auth ────────────────────────────────────
