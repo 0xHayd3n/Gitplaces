@@ -345,6 +345,7 @@ export default function Settings() {
   }
 
   const handleGitHubDisconnect = async () => {
+    setGithubError(null)
     setGithubDisconnecting(true)
     try {
       await window.api.github.disconnect()
