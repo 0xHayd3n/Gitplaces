@@ -110,6 +110,7 @@ export default function Settings() {
   const [githubUserCode, setGithubUserCode] = useState<string | null>(null)
   const [githubVerificationUri, setGithubVerificationUri] = useState<string | null>(null)
   const [githubDisconnecting, setGithubDisconnecting] = useState(false)
+  const [githubError, setGithubError] = useState<string | null>(null)
   const [claudeLoggingOut, setClaudeLoggingOut] = useState(false)
   const [connectorStatus, setConnectorStatus] = useState<Record<string, 'checking' | 'ok' | 'error'>>({})
   const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>([])
@@ -323,6 +324,7 @@ export default function Settings() {
     setGithubConnecting(true)
     setGithubUserCode(null)
     setGithubVerificationUri(null)
+    setGithubError(null)
     try {
       const flow = await window.api.github.startDeviceFlow()
       setGithubUserCode(flow.userCode)
@@ -330,8 +332,11 @@ export default function Settings() {
       await window.api.github.pollDeviceToken(flow.deviceCode, flow.interval)
       const user = await window.api.github.getUser()
       setGithubUsername(user.login)
-    } catch {
-      // cancelled or failed
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (!message.toLowerCase().includes('abort') && !message.toLowerCase().includes('cancel')) {
+        setGithubError('Connection failed — please try again.')
+      }
     } finally {
       setGithubConnecting(false)
       setGithubUserCode(null)
@@ -460,6 +465,12 @@ export default function Settings() {
               )}
             </div>
           </div>
+
+          {githubError && (
+            <div className="connector-row connector-row--log">
+              <p className="settings-hint error" style={{ margin: 0 }}>{githubError}</p>
+            </div>
+          )}
 
           {/* Claude */}
           <div className="connector-row">
