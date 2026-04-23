@@ -574,7 +574,7 @@ export async function loginClaude(onProgress: (msg: string) => void): Promise<Lo
     let ticks = 0
     pollTimer = setInterval(async () => {
       ticks++
-      if (ticks % 10 === 0) onProgress('Still verifying authentication…')
+      if (ticks % 10 === 0 && !settled) onProgress('Still verifying authentication…')
       console.log('[skill-gen] Polling auth status…')
       const ok = await checkAuthStatus().catch(() => false)
       console.log(`[skill-gen] Auth status poll result: ${ok}`)
