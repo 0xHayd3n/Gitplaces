@@ -111,7 +111,7 @@ export default function Settings() {
   const [githubVerificationUri, setGithubVerificationUri] = useState<string | null>(null)
   const [githubDisconnecting, setGithubDisconnecting] = useState(false)
   const [claudeLoggingOut, setClaudeLoggingOut] = useState(false)
-  const [connectorStatus, setConnectorStatus] = useState<Record<string, 'idle' | 'checking' | 'ok' | 'error'>>({})
+  const [connectorStatus, setConnectorStatus] = useState<Record<string, 'checking' | 'ok' | 'error'>>({})
   const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>([])
   const [showAddConnector, setShowAddConnector] = useState(false)
   const [newConnectorName, setNewConnectorName] = useState('')
@@ -368,6 +368,17 @@ export default function Settings() {
     setShowAddConnector(false)
   }
 
+  const testConnector = async (id: string, url: string) => {
+    if (!url) return
+    setConnectorStatus(prev => ({ ...prev, [id]: 'checking' }))
+    try {
+      const result = await window.api.connectors.test(url)
+      setConnectorStatus(prev => ({ ...prev, [id]: result.ok ? 'ok' : 'error' }))
+    } catch {
+      setConnectorStatus(prev => ({ ...prev, [id]: 'error' }))
+    }
+  }
+
   const handleAddConnector = async () => {
     if (!newConnectorName.trim()) return
     const connector: CustomConnector = {
@@ -389,17 +400,6 @@ export default function Settings() {
       delete next[id]
       return next
     })
-  }
-
-  const testConnector = async (id: string, url: string) => {
-    if (!url) return
-    setConnectorStatus(prev => ({ ...prev, [id]: 'checking' }))
-    try {
-      const result = await window.api.connectors.test(url)
-      setConnectorStatus(prev => ({ ...prev, [id]: result.ok ? 'ok' : 'error' }))
-    } catch {
-      setConnectorStatus(prev => ({ ...prev, [id]: 'error' }))
-    }
   }
 
   const renderConnectors = () => (
@@ -610,6 +610,7 @@ export default function Settings() {
                 </button>
                 <button
                   className="settings-btn settings-btn--link connector-disconnect-btn"
+                  disabled={connectorStatus[c.id] === 'checking'}
                   onClick={() => handleRemoveConnector(c.id)}
                 >
                   Remove
