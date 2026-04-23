@@ -262,14 +262,7 @@ export default function Settings() {
 
     let hadError = false
 
-    const loginTimeout = setTimeout(() => {
-      setLoginPhase('error')
-      setLoginLines(prev => [...prev, 'Login timed out — please try again.'])
-    }, 60_000)
-    timers.current.push(loginTimeout)
-
     const onProgress = ({ message, isError, done }: { message: string; isError?: boolean; done?: boolean }) => {
-      if (done || isError) clearTimeout(loginTimeout)
       if (message === '__NEED_CODE__') { setLoginNeedsCode(true); return }
       setLoginLines((prev) => [...prev, message])
       if (isError) { hadError = true; setLoginPhase('error') }
@@ -288,7 +281,6 @@ export default function Settings() {
     } catch {
       setLoginPhase('error')
     } finally {
-      clearTimeout(loginTimeout)
       window.api.skill.offLoginProgress(onProgress)
     }
   }, [])
