@@ -877,9 +877,14 @@ ipcMain.handle('skill:loginSubmitCode', (_, code: string) => {
 })
 
 ipcMain.handle('skill:logoutClaude', async () => {
-  const { logoutClaude } = await import('./skill-gen/legacy')
-  await logoutClaude()
-  return { success: true }
+  try {
+    const { logoutClaude } = await import('./skill-gen/legacy')
+    await logoutClaude()
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { success: false, error: message }
+  }
 })
 
 ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?: {
