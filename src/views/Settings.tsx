@@ -388,6 +388,8 @@ export default function Settings() {
 
   const testConnector = async (id: string, url: string) => {
     if (!url) return
+    try { new URL(url) } catch { return }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) return
     setConnectorStatus(prev => ({ ...prev, [id]: 'checking' }))
     try {
       const result = await window.api.connectors.test(url)

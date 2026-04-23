@@ -120,7 +120,7 @@ declare global {
         checkAuthStatus(): Promise<boolean>
         loginClaude(): Promise<{ success: boolean; error?: string }>
         loginSubmitCode(code: string): Promise<{ ok: boolean }>
-        logoutClaude(): Promise<{ success: boolean }>
+        logoutClaude(): Promise<void>
         onLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
         offLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
         getSubSkill(owner: string, name: string, skillType: string): Promise<SubSkillRow | null>

@@ -83,7 +83,7 @@ contextBridge.exposeInMainWorld('api', {
     checkAuthStatus: () => ipcRenderer.invoke('skill:checkAuthStatus'),
     loginClaude: () => ipcRenderer.invoke('skill:loginClaude'),
     loginSubmitCode: (code: string) => ipcRenderer.invoke('skill:loginSubmitCode', code) as Promise<{ ok: boolean }>,
-    logoutClaude: () => ipcRenderer.invoke('skill:logoutClaude') as Promise<{ success: boolean }>,
+    logoutClaude: () => ipcRenderer.invoke('skill:logoutClaude'),
     onLoginProgress: (cb: (event: { message: string; isError?: boolean; done?: boolean }) => void) => {
       const wrapper = (_: unknown, data: { message: string; isError?: boolean; done?: boolean }) => cb(data)
       callbackWrappers.set(cb, wrapper)

@@ -458,6 +458,10 @@ ipcMain.handle('github:disconnect', async () => {
 })
 
 ipcMain.handle('connectors:test', async (_event, url: string) => {
+  try { new URL(url) } catch { return { ok: false, latencyMs: 0, error: 'Invalid URL' } }
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return { ok: false, latencyMs: 0, error: 'Only http:// and https:// URLs are supported' }
+  }
   const start = Date.now()
   try {
     const controller = new AbortController()
@@ -877,14 +881,8 @@ ipcMain.handle('skill:loginSubmitCode', (_, code: string) => {
 })
 
 ipcMain.handle('skill:logoutClaude', async () => {
-  try {
-    const { logoutClaude } = await import('./skill-gen/legacy')
-    await logoutClaude()
-    return { success: true }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return { success: false, error: message }
-  }
+  const { logoutClaude } = await import('./skill-gen/legacy')
+  await logoutClaude()
 })
 
 ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?: {
