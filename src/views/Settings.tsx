@@ -3,7 +3,9 @@ import { useAppearance, type BackgroundMode } from '../contexts/Appearance'
 
 type SetupPhase = 'idle' | 'checking' | 'installing' | 'auth' | 'done' | 'error'
 type LoginPhase = 'idle' | 'logging-in' | 'done' | 'error'
-type CategoryId = 'general' | 'claude-desktop' | 'appearance' | 'language' | 'downloads' | 'projects'
+type CategoryId = 'claude-desktop' | 'appearance' | 'language' | 'downloads' | 'projects' | 'connectors'
+
+type CustomConnector = { id: string; name: string; url: string; oauthClientId: string; oauthClientSecret: string }
 
 const BACKGROUND_OPTIONS: { value: BackgroundMode; label: string }[] = [
   { value: 'none', label: 'Default' },
@@ -20,13 +22,6 @@ const iconProps = {
   strokeLinecap: 'round' as const,
   strokeLinejoin: 'round' as const,
 }
-
-const GeneralIcon = () => (
-  <svg {...iconProps}>
-    <circle cx="8" cy="8" r="2.2" />
-    <path d="M8 1.5v1.8 M8 12.7v1.8 M1.5 8h1.8 M12.7 8h1.8 M3.4 3.4l1.3 1.3 M11.3 11.3l1.3 1.3 M3.4 12.6l1.3-1.3 M11.3 4.7l1.3-1.3" />
-  </svg>
-)
 
 const DesktopIcon = () => (
   <svg {...iconProps}>
@@ -66,20 +61,26 @@ const ProjectsIcon = () => (
   </svg>
 )
 
+const ConnectorsIcon = () => (
+  <svg {...iconProps}>
+    <circle cx="3.5" cy="8" r="2" />
+    <circle cx="12.5" cy="8" r="2" />
+    <path d="M5.5 8h3.5 M7 6l2 2-2 2" />
+  </svg>
+)
+
 const CATEGORIES: { id: CategoryId; label: string; icon: ReactNode }[] = [
-  { id: 'general', label: 'General', icon: <GeneralIcon /> },
   { id: 'claude-desktop', label: 'Claude Desktop', icon: <DesktopIcon /> },
   { id: 'appearance', label: 'Appearance', icon: <PaletteIcon /> },
   { id: 'language', label: 'Language & Speech', icon: <GlobeIcon /> },
   { id: 'downloads', label: 'Downloads', icon: <DownloadIcon /> },
   { id: 'projects', label: 'Projects', icon: <ProjectsIcon /> },
+  { id: 'connectors', label: 'Connectors', icon: <ConnectorsIcon /> },
 ]
 
 export default function Settings() {
   const { background, setBackground } = useAppearance()
-  const [activeCategory, setActiveCategory] = useState<CategoryId>('general')
-  const [apiKey, setApiKeyState] = useState('')
-  const [saved, setSaved] = useState(false)
+  const [activeCategory, setActiveCategory] = useState<CategoryId>('connectors')
   const [claudeCodeInstalled, setClaudeCodeInstalled] = useState<boolean | null>(null)
   const [claudeCodeLoggedIn, setClaudeCodeLoggedIn] = useState<boolean | null>(null)
   const [preferredLanguage, setPreferredLanguage] = useState('en')
@@ -102,6 +103,22 @@ export default function Settings() {
   const [loginNeedsCode, setLoginNeedsCode] = useState(false)
   const [loginCode, setLoginCode] = useState('')
   const [loginCodeSubmitted, setLoginCodeSubmitted] = useState(false)
+
+  // Connectors state
+  const [githubUsername, setGithubUsername] = useState<string | null>(null)
+  const [githubConnecting, setGithubConnecting] = useState(false)
+  const [githubUserCode, setGithubUserCode] = useState<string | null>(null)
+  const [githubVerificationUri, setGithubVerificationUri] = useState<string | null>(null)
+  const [githubDisconnecting, setGithubDisconnecting] = useState(false)
+  const [claudeLoggingOut, setClaudeLoggingOut] = useState(false)
+  const [connectorStatus, setConnectorStatus] = useState<Record<string, 'idle' | 'checking' | 'ok' | 'error'>>({})
+  const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>([])
+  const [showAddConnector, setShowAddConnector] = useState(false)
+  const [newConnectorName, setNewConnectorName] = useState('')
+  const [newConnectorUrl, setNewConnectorUrl] = useState('')
+  const [newConnectorAdvanced, setNewConnectorAdvanced] = useState(false)
+  const [newConnectorOAuthId, setNewConnectorOAuthId] = useState('')
+  const [newConnectorOAuthSecret, setNewConnectorOAuthSecret] = useState('')
 
   // Claude Desktop MCP state
   const [mcpConfigured, setMcpConfigured] = useState(false)
@@ -126,9 +143,6 @@ export default function Settings() {
   }, [])
 
   useEffect(() => {
-    window.api.settings.getApiKey().then((key) => {
-      if (key) setApiKeyState(key)
-    })
     window.api.skill.detectClaudeCode().then(installed => {
       setClaudeCodeInstalled(installed)
       if (installed) window.api.skill.checkAuthStatus().then(setClaudeCodeLoggedIn)
@@ -153,6 +167,10 @@ export default function Settings() {
         })
       }
     }).catch(() => {})
+    window.api.github.getUser().then(u => setGithubUsername(u.login)).catch(() => setGithubUsername(null))
+    window.api.settings.get('customConnectors').then((raw: string | null) => {
+      try { if (raw) setCustomConnectors(JSON.parse(raw)) } catch { /* ignore */ }
+    })
   }, [loadMcpStatus])
 
   const handleChangeFolder = async () => {
@@ -214,12 +232,6 @@ export default function Settings() {
     } catch {
       setTtsPreviewPlaying(false)
     }
-  }
-
-  const handleUpdate = async () => {
-    await window.api.settings.setApiKey(apiKey)
-    setSaved(true)
-    timers.current.push(setTimeout(() => setSaved(false), 2000))
   }
 
   const handleSetup = useCallback(async () => {
@@ -302,182 +314,380 @@ export default function Settings() {
     timers.current.push(setTimeout(() => setTestResult(null), 4000))
   }
 
-  const renderGeneral = () => (
+  const saveCustomConnectors = async (list: CustomConnector[]) => {
+    setCustomConnectors(list)
+    await window.api.settings.set('customConnectors', JSON.stringify(list))
+  }
+
+  const handleGitHubConnect = async () => {
+    setGithubConnecting(true)
+    setGithubUserCode(null)
+    setGithubVerificationUri(null)
+    try {
+      const flow = await window.api.github.startDeviceFlow()
+      setGithubUserCode(flow.userCode)
+      setGithubVerificationUri(flow.verificationUri)
+      await window.api.github.pollDeviceToken(flow.deviceCode, flow.interval)
+      const user = await window.api.github.getUser()
+      setGithubUsername(user.login)
+    } catch {
+      // cancelled or failed
+    } finally {
+      setGithubConnecting(false)
+      setGithubUserCode(null)
+      setGithubVerificationUri(null)
+    }
+  }
+
+  const handleGitHubDisconnect = async () => {
+    setGithubDisconnecting(true)
+    try {
+      await window.api.github.disconnect()
+      setGithubUsername(null)
+    } finally {
+      setGithubDisconnecting(false)
+    }
+  }
+
+  const handleClaudeDisconnect = async () => {
+    setClaudeLoggingOut(true)
+    try {
+      await window.api.skill.logoutClaude()
+      setClaudeCodeLoggedIn(false)
+    } finally {
+      setClaudeLoggingOut(false)
+    }
+  }
+
+  const resetAddForm = () => {
+    setNewConnectorName('')
+    setNewConnectorUrl('')
+    setNewConnectorAdvanced(false)
+    setNewConnectorOAuthId('')
+    setNewConnectorOAuthSecret('')
+    setShowAddConnector(false)
+  }
+
+  const handleAddConnector = async () => {
+    if (!newConnectorName.trim()) return
+    const connector: CustomConnector = {
+      id: Date.now().toString(),
+      name: newConnectorName.trim(),
+      url: newConnectorUrl.trim(),
+      oauthClientId: newConnectorOAuthId.trim(),
+      oauthClientSecret: newConnectorOAuthSecret.trim(),
+    }
+    await saveCustomConnectors([...customConnectors, connector])
+    resetAddForm()
+    testConnector(connector.id, connector.url)
+  }
+
+  const handleRemoveConnector = async (id: string) => {
+    await saveCustomConnectors(customConnectors.filter(c => c.id !== id))
+    setConnectorStatus(prev => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }
+
+  const testConnector = async (id: string, url: string) => {
+    if (!url) return
+    setConnectorStatus(prev => ({ ...prev, [id]: 'checking' }))
+    try {
+      const result = await window.api.connectors.test(url)
+      setConnectorStatus(prev => ({ ...prev, [id]: result.ok ? 'ok' : 'error' }))
+    } catch {
+      setConnectorStatus(prev => ({ ...prev, [id]: 'error' }))
+    }
+  }
+
+  const renderConnectors = () => (
     <>
+      <div className="connector-section-header">
+        <p className="settings-hint" style={{ margin: 0, fontSize: 12.5, color: 'var(--t2)' }}>
+          Allow Git Suite to reference other apps and services for more context.
+        </p>
+      </div>
+
       <div className="settings-group">
-        <div className="settings-group-title">Claude</div>
-        <div className="settings-group-body">
-          <div className="settings-group-row">
-            <div className="settings-group-row-main">
-              <div className="settings-group-row-label">Status</div>
-              <div className="settings-group-row-sub">
-                <span className={`status-dot ${claudeCodeLoggedIn === true ? 'active' : claudeCodeLoggedIn === false ? 'inactive' : ''}`} />
-                {claudeCodeLoggedIn === null && 'Checking Claude…'}
-                {claudeCodeLoggedIn === true && 'Claude ready — skills generated via your subscription'}
-                {claudeCodeLoggedIn === false && !claudeCodeInstalled && 'Claude not installed'}
-                {claudeCodeLoggedIn === false && claudeCodeInstalled === true && 'Not logged in to Claude'}
+        <div className="settings-group-body connector-list">
+
+          {/* GitHub */}
+          <div className="connector-row">
+            <div className="connector-icon connector-icon--github">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836c.85.004 1.705.114 2.504.337 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
+              </svg>
+            </div>
+            <div className="connector-info">
+              <div className="connector-name">GitHub</div>
+              <div className="connector-desc">
+                {githubUsername ? `Connected as @${githubUsername}` : 'Connect your GitHub account'}
               </div>
             </div>
-            {claudeCodeInstalled === false && setupPhase === 'idle' && loginPhase === 'idle' && (
-              <button className="settings-btn" onClick={handleSetup}>Install</button>
-            )}
-            {claudeCodeInstalled === true && claudeCodeLoggedIn === false && loginPhase === 'idle' && setupPhase === 'idle' && (
-              <button className="settings-btn" onClick={handleLogin}>Log in</button>
-            )}
+            <div className="connector-actions">
+              {githubConnecting ? (
+                githubUserCode ? (
+                  <div className="connector-device-flow">
+                    <span className="connector-code">{githubUserCode}</span>
+                    <button className="settings-btn" onClick={() => window.api.openExternal(githubVerificationUri!)}>
+                      Open browser
+                    </button>
+                    <button
+                      className="settings-btn settings-btn--link"
+                      onClick={() => { window.api.github.cancelDeviceFlow(); setGithubConnecting(false); setGithubUserCode(null) }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <span className="connector-status-text">Connecting…</span>
+                )
+              ) : githubUsername ? (
+                <>
+                  <span className="connector-badge connected">Connected</span>
+                  <button
+                    className="settings-btn settings-btn--link connector-disconnect-btn"
+                    disabled={githubDisconnecting}
+                    onClick={handleGitHubDisconnect}
+                  >
+                    {githubDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+                  </button>
+                </>
+              ) : (
+                <button className="settings-btn" onClick={handleGitHubConnect}>Connect</button>
+              )}
+            </div>
           </div>
 
+          {/* Claude */}
+          <div className="connector-row">
+            <div className="connector-icon connector-icon--claude">
+              <svg width="20" height="20" viewBox="0 0 48 48" fill="currentColor">
+                <path d="M32.5 7H15.5L7 24l8.5 17h17l8.5-17L32.5 7zm-4.2 22.8h-8.6l-4.3-5.8 4.3-5.8h8.6l4.3 5.8-4.3 5.8z"/>
+              </svg>
+            </div>
+            <div className="connector-info">
+              <div className="connector-name">Claude</div>
+              <div className="connector-desc">
+                {claudeCodeLoggedIn === true
+                  ? 'Connected — skills use your subscription'
+                  : claudeCodeInstalled === false
+                    ? 'Claude Code not installed'
+                    : 'Not connected'}
+              </div>
+            </div>
+            <div className="connector-actions">
+              {(setupPhase !== 'idle' && setupPhase !== 'done') || loginPhase === 'logging-in' ? (
+                <span className="connector-status-text">
+                  {setupPhase !== 'idle' && setupPhase !== 'done' ? 'Installing…' : 'Connecting…'}
+                </span>
+              ) : claudeCodeLoggedIn === true ? (
+                <>
+                  <span className="connector-badge connected">Connected</span>
+                  <button
+                    className="settings-btn settings-btn--link connector-disconnect-btn"
+                    disabled={claudeLoggingOut}
+                    onClick={handleClaudeDisconnect}
+                  >
+                    {claudeLoggingOut ? 'Logging out…' : 'Disconnect'}
+                  </button>
+                </>
+              ) : claudeCodeInstalled === false && setupPhase === 'idle' ? (
+                <button className="settings-btn" onClick={handleSetup}>Install</button>
+              ) : claudeCodeLoggedIn === false && loginPhase === 'idle' ? (
+                <button className="settings-btn" onClick={handleLogin}>Connect</button>
+              ) : (
+                <span className="connector-status-text">Checking…</span>
+              )}
+            </div>
+          </div>
+
+          {/* Setup / login progress — expands below the Claude row */}
           {setupPhase !== 'idle' && setupPhase !== 'done' && (
-            <div className="settings-group-row settings-group-row--full">
-              <div className="settings-setup-log">
+            <div className="connector-row connector-row--log">
+              <div className="settings-setup-log" style={{ width: '100%' }}>
                 {setupLines.map((line, i) => (
-                  <div key={i} className={`settings-setup-line${setupPhase === 'error' && i === setupLines.length - 1 ? ' error' : ''}`}>
-                    {line}
-                  </div>
+                  <div key={i} className={`settings-setup-line${setupPhase === 'error' && i === setupLines.length - 1 ? ' error' : ''}`}>{line}</div>
                 ))}
-                {setupPhase !== 'error' && (
-                  <div className="settings-setup-line muted">…</div>
-                )}
+                {setupPhase !== 'error' && <div className="settings-setup-line muted">…</div>}
               </div>
             </div>
           )}
-
           {setupPhase === 'done' && (
-            <div className="settings-group-row settings-group-row--full">
-              <p className="settings-hint success">
-                Claude installed and authenticated — skills now use your subscription.
-              </p>
+            <div className="connector-row connector-row--log">
+              <p className="settings-hint success">Claude installed and authenticated.</p>
             </div>
           )}
-
           {loginPhase === 'logging-in' && (
-            <div className="settings-group-row settings-group-row--full">
-              <div className="settings-setup-log">
+            <div className="connector-row connector-row--log">
+              <div className="settings-setup-log" style={{ width: '100%' }}>
                 {loginLines.map((line, i) => {
                   const urlMatch = line.match(/(https:\/\/\S+)/)
                   return (
                     <div key={i} className="settings-setup-line">
                       {urlMatch ? (
-                        <>
-                          {line.slice(0, urlMatch.index)}
-                          <a
-                            href="#"
-                            style={{ color: 'var(--accent)', wordBreak: 'break-all' }}
-                            onClick={(e) => { e.preventDefault(); window.api.openExternal(urlMatch[1]) }}
-                          >
-                            {urlMatch[1]}
-                          </a>
-                          {line.slice((urlMatch.index ?? 0) + urlMatch[1].length)}
-                        </>
+                        <><span>{line.slice(0, urlMatch.index)}</span>
+                          <a href="#" style={{ color: 'var(--accent)', wordBreak: 'break-all' }} onClick={e => { e.preventDefault(); window.api.openExternal(urlMatch[1]) }}>{urlMatch[1]}</a>
+                          <span>{line.slice((urlMatch.index ?? 0) + urlMatch[1].length)}</span></>
                       ) : line}
                     </div>
                   )
                 })}
                 {loginNeedsCode ? (
                   <div style={{ marginTop: 8 }}>
-                    <p className="settings-hint" style={{ marginBottom: 6 }}>
-                      Your browser opened — authenticate, then paste the code shown back here:
-                    </p>
+                    <p className="settings-hint" style={{ marginBottom: 6 }}>Paste the code shown in your browser:</p>
                     <div className="settings-inline-row">
                       <input
-                        className="settings-input"
-                        type="text"
-                        value={loginCode}
-                        onChange={(e) => setLoginCode(e.target.value)}
-                        onKeyDown={async (e) => {
+                        className="settings-input" type="text" value={loginCode} autoFocus
+                        onChange={e => setLoginCode(e.target.value)}
+                        placeholder="Paste authentication code…"
+                        onKeyDown={async e => {
                           if (e.key === 'Enter' && loginCode.trim()) {
                             const { ok } = await window.api.skill.loginSubmitCode(loginCode.trim())
-                            setLoginCode('')
-                            setLoginNeedsCode(false)
-                            if (ok) {
-                              setLoginCodeSubmitted(true)
-                            } else {
-                              setLoginLines((prev) => [...prev, 'Session expired — please try again.'])
-                              setLoginPhase('error')
-                            }
+                            setLoginCode(''); setLoginNeedsCode(false)
+                            if (!ok) { setLoginLines(p => [...p, 'Session expired — please try again.']); setLoginPhase('error') }
+                            else setLoginCodeSubmitted(true)
                           }
                         }}
-                        placeholder="Paste authentication code…"
-                        autoFocus
                       />
-                      <button
-                        className="settings-btn"
-                        disabled={!loginCode.trim()}
-                        onClick={async () => {
-                          const { ok } = await window.api.skill.loginSubmitCode(loginCode.trim())
-                          setLoginCode('')
-                          setLoginNeedsCode(false)
-                          if (ok) {
-                            setLoginCodeSubmitted(true)
-                          } else {
-                            setLoginLines((prev) => [...prev, 'Session expired — please try again.'])
-                            setLoginPhase('error')
-                          }
-                        }}
-                      >
-                        Submit
-                      </button>
+                      <button className="settings-btn" disabled={!loginCode.trim()} onClick={async () => {
+                        const { ok } = await window.api.skill.loginSubmitCode(loginCode.trim())
+                        setLoginCode(''); setLoginNeedsCode(false)
+                        if (!ok) { setLoginLines(p => [...p, 'Session expired — please try again.']); setLoginPhase('error') }
+                        else setLoginCodeSubmitted(true)
+                      }}>Submit</button>
                     </div>
                   </div>
-                ) : (
-                  <div className="settings-setup-line muted">
-                    {loginCodeSubmitted ? 'Verifying code…' : 'Waiting for browser login…'}
-                  </div>
-                )}
+                ) : <div className="settings-setup-line muted">{loginCodeSubmitted ? 'Verifying…' : 'Waiting for browser login…'}</div>}
               </div>
             </div>
           )}
-
           {loginPhase === 'error' && (
-            <div className="settings-group-row settings-group-row--full">
-              <div className="settings-setup-log">
-                {loginLines.map((line, i) => (
-                  <div key={i} className={`settings-setup-line${i === loginLines.length - 1 ? ' error' : ''}`}>{line}</div>
-                ))}
+            <div className="connector-row connector-row--log">
+              <div className="settings-setup-log" style={{ width: '100%' }}>
+                {loginLines.map((line, i) => <div key={i} className={`settings-setup-line${i === loginLines.length - 1 ? ' error' : ''}`}>{line}</div>)}
                 <div className="settings-inline-row" style={{ marginTop: 8 }}>
-                  <button className="settings-btn" onClick={() => { setLoginPhase('idle'); setLoginLines([]); setLoginNeedsCode(false); setLoginCodeSubmitted(false) }}>
-                    Try again
-                  </button>
+                  <button className="settings-btn" onClick={() => { setLoginPhase('idle'); setLoginLines([]); setLoginNeedsCode(false); setLoginCodeSubmitted(false) }}>Try again</button>
                 </div>
               </div>
             </div>
           )}
-
           {loginPhase === 'done' && (
-            <div className="settings-group-row settings-group-row--full">
-              <p className="settings-hint success">
-                Logged in — skill generation now uses your Claude subscription.
-              </p>
+            <div className="connector-row connector-row--log">
+              <p className="settings-hint success">Logged in — skill generation now uses your Claude subscription.</p>
             </div>
           )}
+
+          {/* Custom connectors */}
+          {customConnectors.map(c => (
+            <div key={c.id} className="connector-row">
+              <div className="connector-icon connector-icon--custom">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
+                </svg>
+              </div>
+              <div className="connector-info">
+                <div className="connector-name">{c.name}</div>
+                {c.url && <div className="connector-desc">{c.url}</div>}
+              </div>
+              <div className="connector-actions">
+                {connectorStatus[c.id] === 'checking' ? (
+                  <span className="connector-status-text">Checking…</span>
+                ) : connectorStatus[c.id] === 'ok' ? (
+                  <span className="connector-badge connected">Connected</span>
+                ) : connectorStatus[c.id] === 'error' ? (
+                  <span className="connector-badge error">Error</span>
+                ) : null}
+                <button
+                  className="settings-btn settings-btn--link connector-disconnect-btn"
+                  disabled={connectorStatus[c.id] === 'checking'}
+                  onClick={() => testConnector(c.id, c.url)}
+                >
+                  Retest
+                </button>
+                <button
+                  className="settings-btn settings-btn--link connector-disconnect-btn"
+                  onClick={() => handleRemoveConnector(c.id)}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="settings-group">
-        <div className="settings-group-title">
-          Anthropic API key{claudeCodeLoggedIn === true && ' (optional)'}
-        </div>
-        <div className="settings-group-body">
-          <div className="settings-group-row settings-group-row--full">
-            <div className="settings-inline-row">
+      {/* Add custom connector */}
+      {showAddConnector ? (
+        <div className="connector-add-modal">
+          <div className="connector-modal-header">
+            <span className="connector-modal-title">Add custom connector</span>
+            <span className="connector-modal-beta">BETA</span>
+          </div>
+          <p className="connector-modal-desc">
+            Connect Git Suite to your data and tools via a remote MCP server.
+          </p>
+          <div className="connector-modal-fields">
+            <input
+              className="settings-input connector-modal-input"
+              type="text"
+              placeholder="Name"
+              value={newConnectorName}
+              onChange={e => setNewConnectorName(e.target.value)}
+              autoFocus
+            />
+            <input
+              className="settings-input connector-modal-input"
+              type="url"
+              placeholder="Remote MCP server URL"
+              value={newConnectorUrl}
+              onChange={e => setNewConnectorUrl(e.target.value)}
+            />
+          </div>
+          <button
+            className="connector-advanced-toggle"
+            onClick={() => setNewConnectorAdvanced(v => !v)}
+            type="button"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: newConnectorAdvanced ? 'rotate(180deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
+              <path d="M2 4l4 4 4-4"/>
+            </svg>
+            Advanced settings
+          </button>
+          {newConnectorAdvanced && (
+            <div className="connector-modal-fields">
               <input
-                className="settings-input"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKeyState(e.target.value)}
-                placeholder="sk-ant-…"
+                className="settings-input connector-modal-input"
+                type="text"
+                placeholder="OAuth Client ID (optional)"
+                value={newConnectorOAuthId}
+                onChange={e => setNewConnectorOAuthId(e.target.value)}
               />
-              <button className="settings-btn" onClick={handleUpdate}>
-                {saved ? 'Saved' : 'Update'}
-              </button>
+              <input
+                className="settings-input connector-modal-input"
+                type="password"
+                placeholder="OAuth Client Secret (optional)"
+                value={newConnectorOAuthSecret}
+                onChange={e => setNewConnectorOAuthSecret(e.target.value)}
+              />
             </div>
-            <p className="settings-hint">
-              {claudeCodeLoggedIn === true
-                ? 'Claude is active. This key is used as a fallback only.'
-                : 'Used to generate skill files with Claude Haiku. Your key is stored encrypted locally and never leaves your machine.'}
-            </p>
+          )}
+          <p className="connector-modal-warning">
+            Only use connectors from developers you trust. Git Suite cannot verify that connectors will work as intended or that they won&rsquo;t change.
+          </p>
+          <div className="connector-modal-actions">
+            <button className="settings-btn settings-btn--ghost" onClick={resetAddForm}>Cancel</button>
+            <button className="settings-btn" onClick={handleAddConnector} disabled={!newConnectorName.trim()}>Add</button>
           </div>
         </div>
-      </div>
+      ) : (
+        <button className="connector-add-btn" onClick={() => setShowAddConnector(true)}>
+          + Add custom connector
+        </button>
+      )}
     </>
   )
 
@@ -733,12 +943,12 @@ export default function Settings() {
       <main className="settings-content">
         <div key={activeCategory} className="settings-pane">
           <h2 className="settings-pane-title">{activeLabel}</h2>
-          {activeCategory === 'general' && renderGeneral()}
           {activeCategory === 'claude-desktop' && renderClaudeDesktop()}
           {activeCategory === 'appearance' && renderAppearance()}
           {activeCategory === 'language' && renderLanguage()}
           {activeCategory === 'downloads' && renderDownloads()}
           {activeCategory === 'projects' && renderProjects()}
+          {activeCategory === 'connectors' && renderConnectors()}
         </div>
       </main>
     </div>
