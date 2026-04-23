@@ -112,6 +112,7 @@ export default function Settings() {
   const [githubDisconnecting, setGithubDisconnecting] = useState(false)
   const [githubError, setGithubError] = useState<string | null>(null)
   const [claudeLoggingOut, setClaudeLoggingOut] = useState(false)
+  const [claudeDisconnectError, setClaudeDisconnectError] = useState<string | null>(null)
   const [connectorStatus, setConnectorStatus] = useState<Record<string, 'checking' | 'ok' | 'error'>>({})
   const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>([])
   const [showAddConnector, setShowAddConnector] = useState(false)
@@ -261,11 +262,18 @@ export default function Settings() {
 
     let hadError = false
 
+    const loginTimeout = setTimeout(() => {
+      setLoginPhase('error')
+      setLoginLines(prev => [...prev, 'Login timed out — please try again.'])
+    }, 60_000)
+    timers.current.push(loginTimeout)
+
     const onProgress = ({ message, isError, done }: { message: string; isError?: boolean; done?: boolean }) => {
+      if (done || isError) clearTimeout(loginTimeout)
       if (message === '__NEED_CODE__') { setLoginNeedsCode(true); return }
       setLoginLines((prev) => [...prev, message])
       if (isError) { hadError = true; setLoginPhase('error') }
-      if (done)    {
+      if (done) {
         setLoginNeedsCode(false)
         setLoginCodeSubmitted(false)
         setLoginPhase('done')
@@ -280,6 +288,7 @@ export default function Settings() {
     } catch {
       setLoginPhase('error')
     } finally {
+      clearTimeout(loginTimeout)
       window.api.skill.offLoginProgress(onProgress)
     }
   }, [])
@@ -357,9 +366,12 @@ export default function Settings() {
 
   const handleClaudeDisconnect = async () => {
     setClaudeLoggingOut(true)
+    setClaudeDisconnectError(null)
     try {
       await window.api.skill.logoutClaude()
       setClaudeCodeLoggedIn(false)
+    } catch {
+      setClaudeDisconnectError('Logout failed — please try again.')
     } finally {
       setClaudeLoggingOut(false)
     }
@@ -515,6 +527,12 @@ export default function Settings() {
               )}
             </div>
           </div>
+
+          {claudeDisconnectError && (
+            <div className="connector-row connector-row--log">
+              <p className="settings-hint error" style={{ margin: 0 }}>{claudeDisconnectError}</p>
+            </div>
+          )}
 
           {/* Setup / login progress — expands below the Claude row */}
           {setupPhase !== 'idle' && setupPhase !== 'done' && (
