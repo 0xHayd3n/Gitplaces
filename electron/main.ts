@@ -839,45 +839,18 @@ ipcMain.handle('skill:setup', async (event) => {
   }
 })
 
-// Holds the stdin write fn for the in-progress login process
-let _loginSubmitCode: ((code: string) => void) | null = null
-
 ipcMain.handle('skill:loginClaude', async (event) => {
   try {
-    const handle = await loginClaude((message) => {
+    await loginClaude((message) => {
       event.sender.send('skill:login-progress', { message })
-      // CLI prints "If the browser didn't open, visit: <url>" — open it for them
-      const urlMatch = message.match(/https:\/\/\S+/)
-      if (urlMatch) {
-        shell.openExternal(urlMatch[0]).catch((e) =>
-          console.error('[skill-gen] Failed to open auth URL:', e)
-        )
-        // Tell the renderer a code will be needed
-        event.sender.send('skill:login-progress', { message: '__NEED_CODE__' })
-      }
     })
-
-    _loginSubmitCode = handle.submitCode
-
-    await handle.done
-    _loginSubmitCode = null
     event.sender.send('skill:login-progress', { message: 'Logged in successfully!', done: true })
     return { success: true }
   } catch (err) {
-    _loginSubmitCode = null
     const msg = err instanceof Error ? err.message : String(err)
     event.sender.send('skill:login-progress', { message: msg, isError: true })
     return { success: false, error: msg }
   }
-})
-
-ipcMain.handle('skill:loginSubmitCode', (_, code: string) => {
-  if (_loginSubmitCode) {
-    _loginSubmitCode(code)
-    _loginSubmitCode = null
-    return { ok: true }
-  }
-  return { ok: false }
 })
 
 ipcMain.handle('skill:logoutClaude', async () => {

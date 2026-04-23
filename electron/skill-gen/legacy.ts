@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { spawn, execFile } from 'child_process'
 import { existsSync } from 'fs'
 import * as path from 'path'
+import { stripAnsi, detectManualFallback } from './login-helpers'
 
 export interface SkillGenInput {
   owner: string
@@ -507,23 +508,20 @@ export async function findNode(): Promise<string | null> {
 
 // ── Claude Code login ─────────────────────────────────────────────
 
-export interface LoginHandle {
-  /** Write the browser-provided auth code to the CLI's stdin and complete login. */
-  submitCode: (code: string) => void
-  /** Resolves when login succeeds; rejects on error. */
-  done: Promise<void>
-}
-
 /**
  * Start the Claude Code `auth login` flow.
  *
- * The CLI opens a browser for OAuth then waits for the auth code on stdin.
- * Returns a `LoginHandle` so the caller can pipe the code in later.
+ * Spawns the CLI through a pseudo-TTY (node-pty) so the CLI detects a TTY
+ * and picks its built-in loopback OAuth mode: it spins up a local HTTP
+ * server at http://127.0.0.1:<port>/callback, opens the user's browser,
+ * captures the callback, exchanges the code for tokens, and writes
+ * credentials to disk. We poll `auth status --json` to detect completion.
  *
- * Always uses `node cli.js` directly — avoids the global .ps1/.cmd wrapper
- * which misbehaves when spawned from Electron's main process.
+ * No manual code paste is ever required. If the CLI falls back to manual
+ * mode (rare — only if it can't bind a loopback port), we hard-fail with
+ * a clear error rather than re-introducing a paste UI.
  */
-export async function loginClaude(onProgress: (msg: string) => void): Promise<LoginHandle> {
+export async function loginClaude(onProgress: (msg: string) => void): Promise<void> {
   const nodePath = await findNode()
   if (!nodePath) throw new Error('Node.js not found. Please install Node.js first.')
 
@@ -534,25 +532,31 @@ export async function loginClaude(onProgress: (msg: string) => void): Promise<Lo
   const alreadyLoggedIn = await checkAuthStatus().catch(() => false)
   if (alreadyLoggedIn) {
     onProgress('Already logged in!')
-    return { submitCode: () => {}, done: Promise.resolve() }
+    return
   }
 
   console.log(`[skill-gen] loginClaude: node=${nodePath} cli=${cliPath}`)
   onProgress('Opening browser for Claude login…')
 
-  const proc = spawn(nodePath, [cliPath, 'auth', 'login', '--claudeai'], {
-    stdio: ['pipe', 'pipe', 'pipe'], // stdin is pipe so we can write the auth code
-    env: buildEnv(true),
-  })
-
-  const handleLine = (d: Buffer) => {
-    d.toString().split(/\r?\n/).filter(Boolean).forEach((line) => {
-      console.log(`[skill-gen] login output: ${line}`)
-      onProgress(line)
-    })
+  let pty: typeof import('node-pty')
+  try {
+    pty = await import('node-pty')
+  } catch (err) {
+    console.error('[skill-gen] Failed to load node-pty:', err)
+    throw new Error('Authentication helper unavailable. Please reinstall the app.')
   }
-  proc.stdout.on('data', handleLine)
-  proc.stderr.on('data', handleLine)
+
+  // node-pty's env type rejects undefined values; filter them out.
+  const env = Object.fromEntries(
+    Object.entries(buildEnv(true)).filter(([, v]) => v !== undefined)
+  ) as { [key: string]: string }
+
+  const proc = pty.spawn(nodePath, [cliPath, 'auth', 'login', '--claudeai'], {
+    name: 'xterm-256color',
+    cols: 120,
+    rows: 30,
+    env,
+  })
 
   let settled = false
   let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -565,43 +569,46 @@ export async function loginClaude(onProgress: (msg: string) => void): Promise<Lo
     if (settled) return
     settled = true
     if (pollTimer) clearInterval(pollTimer)
+    try { proc.kill() } catch { /* already dead */ }
     fn()
   }
 
+  proc.onData((data: string) => {
+    const clean = stripAnsi(data)
+    if (detectManualFallback(clean)) {
+      console.warn('[skill-gen] CLI fell back to manual-paste mode — aborting')
+      settle(() => rejectLogin(new Error("Couldn't start local auth server. Please try again.")))
+      return
+    }
+    clean.split(/\r?\n/).filter(Boolean).forEach((line) => {
+      console.log(`[skill-gen] login output: ${line}`)
+      onProgress(line)
+    })
+  })
+
   const startPolling = () => {
-    if (pollTimer) return // already polling
+    if (pollTimer) return
     console.log('[skill-gen] Starting auth status polling…')
     let ticks = 0
     pollTimer = setInterval(async () => {
       ticks++
       if (ticks % 10 === 0 && !settled) onProgress('Still verifying authentication…')
-      console.log('[skill-gen] Polling auth status…')
       const ok = await checkAuthStatus().catch(() => false)
-      console.log(`[skill-gen] Auth status poll result: ${ok}`)
-      if (ok) {
-        try { proc.kill() } catch { /* process may already be dead */ }
-        settle(resolveLogin)
-      }
+      if (ok) settle(resolveLogin)
     }, 2000)
   }
+  startPolling()
 
   const timeoutId = setTimeout(() => {
-    try { proc.kill() } catch { /* ignore */ }
     settle(() => rejectLogin(new Error('Login timed out. Please try again.')))
   }, 3 * 60 * 1000)
 
-  proc.on('error', (err) => {
-    clearTimeout(timeoutId)
-    settle(() => rejectLogin(new Error(`Failed to start login: ${err.message}`)))
-  })
-
-  proc.on('close', async (code) => {
-    console.log(`[skill-gen] Login process exited with code ${code}`)
+  proc.onExit(async ({ exitCode }) => {
+    console.log(`[skill-gen] Login process exited with code ${exitCode}`)
     clearTimeout(timeoutId)
     if (settled) return
 
-    // The CLI may exit before credentials are fully flushed to disk.
-    // Retry auth check with delays to give the filesystem time to sync.
+    // CLI may exit before credentials flush to disk — retry with delays.
     for (const delay of [500, 1500, 3000]) {
       await new Promise(r => setTimeout(r, delay))
       const ok = await checkAuthStatus().catch(() => false)
@@ -609,34 +616,17 @@ export async function loginClaude(onProgress: (msg: string) => void): Promise<Lo
       if (ok) { settle(resolveLogin); return }
     }
 
-    if (code === 0) {
-      // Process exited cleanly — maybe auth succeeded but status check failed
-      // (e.g. credentials stored in a location checkAuthStatus doesn't see)
+    if (exitCode === 0) {
       settle(() => rejectLogin(new Error(
         'Login process completed but auth could not be confirmed. ' +
         'This may mean login succeeded — please close and re-open Settings to check.'
       )))
     } else {
-      settle(() => rejectLogin(new Error(`Login failed (exit code ${code}). Please try again.`)))
+      settle(() => rejectLogin(new Error(`Login failed (exit code ${exitCode}). Please try again.`)))
     }
   })
 
-  const submitCode = (code: string) => {
-    console.log(`[skill-gen] Submitting auth code (${code.length} chars)…`)
-    if (proc.stdin.writable) {
-      onProgress('Verifying code with Claude…')
-      proc.stdin.write(code.trim() + '\n', 'utf8')
-      // Don't call stdin.end() immediately on Windows — the CLI may need the
-      // pipe to stay open briefly while it processes the code. Instead, end it
-      // after a short delay to ensure the data is flushed and read.
-      setTimeout(() => {
-        try { proc.stdin.end() } catch { /* already closed */ }
-      }, 500)
-    }
-    startPolling() // start checking auth status every 2s
-  }
-
-  return { submitCode, done }
+  await done
 }
 
 export async function logoutClaude(): Promise<void> {
