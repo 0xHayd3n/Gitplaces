@@ -840,15 +840,17 @@ ipcMain.handle('skill:setup', async (event) => {
 })
 
 ipcMain.handle('skill:loginClaude', async (event) => {
+  // Login can run up to 3 min; guard sends in case the window closes mid-flow.
+  const safeSend = (payload: { message: string; isError?: boolean; done?: boolean }) => {
+    if (!event.sender.isDestroyed()) event.sender.send('skill:login-progress', payload)
+  }
   try {
-    await loginClaude((message) => {
-      event.sender.send('skill:login-progress', { message })
-    })
-    event.sender.send('skill:login-progress', { message: 'Logged in successfully!', done: true })
+    await loginClaude((message) => safeSend({ message }))
+    safeSend({ message: 'Logged in successfully!', done: true })
     return { success: true }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    event.sender.send('skill:login-progress', { message: msg, isError: true })
+    safeSend({ message: msg, isError: true })
     return { success: false, error: msg }
   }
 })

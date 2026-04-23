@@ -574,6 +574,7 @@ export async function loginClaude(onProgress: (msg: string) => void): Promise<vo
   }
 
   proc.onData((data: string) => {
+    if (settled) return
     const clean = stripAnsi(data)
     if (detectManualFallback(clean)) {
       console.warn('[skill-gen] CLI fell back to manual-paste mode — aborting')
@@ -611,6 +612,7 @@ export async function loginClaude(onProgress: (msg: string) => void): Promise<vo
     // CLI may exit before credentials flush to disk — retry with delays.
     for (const delay of [500, 1500, 3000]) {
       await new Promise(r => setTimeout(r, delay))
+      if (settled) return
       const ok = await checkAuthStatus().catch(() => false)
       console.log(`[skill-gen] Post-exit auth check (after ${delay}ms): ${ok}`)
       if (ok) { settle(resolveLogin); return }
