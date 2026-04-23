@@ -10,8 +10,8 @@
     "preview": "electron-vite preview",
     "test": "npm rebuild better-sqlite3 && vitest run",
     "test:watch": "npm rebuild better-sqlite3 && vitest",
-    "posttest": "npx @electron/rebuild -f -w better-sqlite3,node-pty",
-    "postinstall": "npx @electron/rebuild -f -w better-sqlite3,node-pty"
+    "posttest": "npx @electron/rebuild -f -w better-sqlite3",
+    "postinstall": "npx @electron/rebuild -f -w better-sqlite3"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.87",
