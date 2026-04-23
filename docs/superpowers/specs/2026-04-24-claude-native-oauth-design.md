@@ -80,11 +80,16 @@ export async function loginClaude(onProgress: (msg: string) => void): Promise<vo
     throw new Error('Authentication helper unavailable. Please reinstall the app.')
   }
 
+  // node-pty's env type rejects undefined values; filter them out.
+  const env = Object.fromEntries(
+    Object.entries(buildEnv(true)).filter(([, v]) => v !== undefined)
+  ) as { [key: string]: string }
+
   const proc = pty.spawn(nodePath, [cliPath, 'auth', 'login', '--claudeai'], {
     name: 'xterm-256color',
     cols: 120,
     rows: 30,
-    env: buildEnv(true) as { [key: string]: string },
+    env,
   })
 
   let settled = false
