@@ -100,9 +100,6 @@ export default function Settings() {
   // Login flow state
   const [loginPhase, setLoginPhase] = useState<LoginPhase>('idle')
   const [loginLines, setLoginLines] = useState<string[]>([])
-  const [loginNeedsCode, setLoginNeedsCode] = useState(false)
-  const [loginCode, setLoginCode] = useState('')
-  const [loginCodeSubmitted, setLoginCodeSubmitted] = useState(false)
 
   // Connectors state
   const [githubUsername, setGithubUsername] = useState<string | null>(null)
@@ -263,12 +260,9 @@ export default function Settings() {
     let hadError = false
 
     const onProgress = ({ message, isError, done }: { message: string; isError?: boolean; done?: boolean }) => {
-      if (message === '__NEED_CODE__') { setLoginNeedsCode(true); return }
       setLoginLines((prev) => [...prev, message])
       if (isError) { hadError = true; setLoginPhase('error') }
       if (done) {
-        setLoginNeedsCode(false)
-        setLoginCodeSubmitted(false)
         setLoginPhase('done')
         window.api.skill.checkAuthStatus().then(setClaudeCodeLoggedIn)
       }
@@ -559,32 +553,7 @@ export default function Settings() {
                     </div>
                   )
                 })}
-                {loginNeedsCode ? (
-                  <div style={{ marginTop: 8 }}>
-                    <p className="settings-hint" style={{ marginBottom: 6 }}>Paste the code shown in your browser:</p>
-                    <div className="settings-inline-row">
-                      <input
-                        className="settings-input" type="text" value={loginCode} autoFocus
-                        onChange={e => setLoginCode(e.target.value)}
-                        placeholder="Paste authentication code…"
-                        onKeyDown={async e => {
-                          if (e.key === 'Enter' && loginCode.trim()) {
-                            const { ok } = await window.api.skill.loginSubmitCode(loginCode.trim())
-                            setLoginCode(''); setLoginNeedsCode(false)
-                            if (!ok) { setLoginLines(p => [...p, 'Session expired — please try again.']); setLoginPhase('error') }
-                            else setLoginCodeSubmitted(true)
-                          }
-                        }}
-                      />
-                      <button className="settings-btn" disabled={!loginCode.trim()} onClick={async () => {
-                        const { ok } = await window.api.skill.loginSubmitCode(loginCode.trim())
-                        setLoginCode(''); setLoginNeedsCode(false)
-                        if (!ok) { setLoginLines(p => [...p, 'Session expired — please try again.']); setLoginPhase('error') }
-                        else setLoginCodeSubmitted(true)
-                      }}>Submit</button>
-                    </div>
-                  </div>
-                ) : <div className="settings-setup-line muted">{loginCodeSubmitted ? 'Verifying…' : 'Waiting for browser login…'}</div>}
+                <div className="settings-setup-line muted">Waiting for browser login…</div>
               </div>
             </div>
           )}
@@ -593,7 +562,7 @@ export default function Settings() {
               <div className="settings-setup-log" style={{ width: '100%' }}>
                 {loginLines.map((line, i) => <div key={i} className={`settings-setup-line${i === loginLines.length - 1 ? ' error' : ''}`}>{line}</div>)}
                 <div className="settings-inline-row" style={{ marginTop: 8 }}>
-                  <button className="settings-btn" onClick={() => { setLoginPhase('idle'); setLoginLines([]); setLoginNeedsCode(false); setLoginCodeSubmitted(false) }}>Try again</button>
+                  <button className="settings-btn" onClick={() => { setLoginPhase('idle'); setLoginLines([]) }}>Try again</button>
                 </div>
               </div>
             </div>
