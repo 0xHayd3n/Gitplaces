@@ -120,6 +120,7 @@ declare global {
         checkAuthStatus(): Promise<boolean>
         loginClaude(): Promise<{ success: boolean; error?: string }>
         loginSubmitCode(code: string): Promise<{ ok: boolean }>
+        logoutClaude(): Promise<{ success: boolean }>
         onLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
         offLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
         getSubSkill(owner: string, name: string, skillType: string): Promise<SubSkillRow | null>
@@ -146,6 +147,9 @@ declare global {
         getConfigSnippet(): Promise<string>
         testConnection(): Promise<{ running: boolean; skillCount: number }>
         scanTools(owner: string, name: string): Promise<import('./types/mcp').McpScanResult>
+      }
+      connectors: {
+        test(url: string): Promise<{ ok: boolean; statusCode?: number; latencyMs: number; error?: string }>
       }
       search: {
         raw(query: string, language?: string, filters?: SearchFilters, page?: number): Promise<RepoRow[]>

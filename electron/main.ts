@@ -457,6 +457,19 @@ ipcMain.handle('github:disconnect', async () => {
   db.prepare('DELETE FROM settings WHERE key = ?').run('github_username')
 })
 
+ipcMain.handle('connectors:test', async (_event, url: string) => {
+  const start = Date.now()
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
+    const res = await net.fetch(url, { method: 'GET', signal: controller.signal })
+    clearTimeout(timeout)
+    return { ok: true, statusCode: res.status, latencyMs: Date.now() - start }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, latencyMs: Date.now() - start, error: message }
+  }
+})
 
 // In-memory cache for browse-tab search results (Popular / Forked / Rising).
 // Keyed by query+sort+order+page.  Survives tab switches within a session.
@@ -861,6 +874,12 @@ ipcMain.handle('skill:loginSubmitCode', (_, code: string) => {
     return { ok: true }
   }
   return { ok: false }
+})
+
+ipcMain.handle('skill:logoutClaude', async () => {
+  const { logoutClaude } = await import('./skill-gen/legacy')
+  await logoutClaude()
+  return { success: true }
 })
 
 ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?: {
