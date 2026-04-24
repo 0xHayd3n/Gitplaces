@@ -72,7 +72,7 @@ declare global {
         getStarred:    (force?: boolean) => Promise<void>
         disconnect:    () => Promise<void>
         searchRepos:   (query: string, sort?: string, order?: string, page?: number) => Promise<RepoRow[]>
-        getRepo:       (owner: string, name: string) => Promise<RepoRow>
+        getRepo:       (owner: string, name: string) => Promise<RepoRow | null>
         getReadme:        (owner: string, name: string) => Promise<string | null>
         getFileContent:   (owner: string, name: string, path: string) => Promise<string | null>
         getReleases:   (owner: string, name: string) => Promise<ReleaseRow[]>

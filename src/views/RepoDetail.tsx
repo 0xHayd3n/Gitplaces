@@ -596,6 +596,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
 
     window.api.github.getRepo(owner, name)
       .then((row) => {
+        if (!row) { setRepoError(true); return }
         setRepo(row)
         patchRepoCache(cacheKey, { repo: row })
         window.api.verification.getScore(row.id)

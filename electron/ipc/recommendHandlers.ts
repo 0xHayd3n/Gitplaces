@@ -129,7 +129,10 @@ function readBackRows(
 // ---------------------------------------------------------------------------
 export async function getRecommendedHandler(): Promise<RecommendationResponse> {
   const db = getDb(app.getPath('userData'))
-  const token = getToken() ?? null
+  const token = getToken()
+
+  // GitHub disconnected — return empty without calling the API.
+  if (!token) return { items: [], stale: false, coldStart: false }
 
   // 1. Load user repos
   const userRepos = db.prepare(

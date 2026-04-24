@@ -481,7 +481,8 @@ const searchReposCache = new LRUCache<string, { rows: unknown[]; ts: number }>(2
 const SEARCH_REPOS_TTL = 10 * 60 * 1000 // 10 minutes
 
 ipcMain.handle('github:searchRepos', async (_event, query: string, sort?: string, order?: string, page?: number) => {
-  const token = getToken() ?? null
+  const token = getToken()
+  if (!token) return [] // GitHub disconnected — skip API call
   const cacheKey = `${query}:${sort ?? 'stars'}:${order ?? 'desc'}:${page ?? 1}`
 
   const cached = searchReposCache.get(cacheKey)
@@ -567,7 +568,8 @@ ipcMain.handle('github:searchRepos', async (_event, query: string, sort?: string
 })
 
 ipcMain.handle('github:getRepo', async (_event, owner: string, name: string) => {
-  const token = getToken() ?? null
+  const token = getToken()
+  if (!token) return null // GitHub disconnected — skip API call
   const db = getDb(app.getPath('userData'))
   const repo = await getRepo(token, owner, name)
 

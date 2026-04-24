@@ -155,6 +155,25 @@ describe('getRecommendedHandler', () => {
     // We achieve cache isolation by always providing distinct DB states
   })
 
+  it('disconnected: returns empty response and skips fetchCandidates when no token', async () => {
+    vi.resetModules()
+
+    const { getDb } = await import('../db')
+    const { getToken } = await import('../store')
+    const { fetchCandidates } = await import('../services/recommendationFetcher')
+
+    vi.mocked(getToken).mockReturnValue(undefined)
+
+    const db = makeDbMock(() => makePreparedStmt([], undefined))
+    vi.mocked(getDb).mockReturnValue(db as never)
+
+    const { getRecommendedHandler } = await import('./recommendHandlers')
+    const result = await getRecommendedHandler()
+
+    expect(result).toEqual({ items: [], stale: false, coldStart: false })
+    expect(vi.mocked(fetchCandidates)).not.toHaveBeenCalled()
+  })
+
   it('cold start: returns coldStart:true with empty-anchor items when user has fewer than 3 repos', async () => {
     vi.resetModules()
 
