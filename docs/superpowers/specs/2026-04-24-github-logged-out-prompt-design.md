@@ -40,7 +40,7 @@ New context + hook:
 
 New hook: `src/hooks/useGitHubLogin.ts`.
 
-- Encapsulates the device-flow logic currently inlined in `Settings.tsx` (lines 322–330) and `Onboarding.tsx` (lines 122–138).
+- Encapsulates the device-flow logic currently inlined in `Settings.tsx` (`handleGitHubConnect`, around lines 318–340) and `Onboarding.tsx` (around lines 117–138).
 - API: `{ status, userCode, verificationUri, error, start, cancel }` where `status` is `'idle' | 'pending' | 'polling' | 'success' | 'error'`.
 - `start()` calls `window.api.github.startDeviceFlow()`, sets `userCode` + `verificationUri` (status `'pending'`), then `pollDeviceToken()` (status `'polling'`); on resolve, calls `auth.refresh()` (status `'success'`).
 - `cancel()` aborts polling and resets to `'idle'`.
@@ -60,7 +60,7 @@ function RequireGitHub({ children }: { children: ReactNode }) {
 ```
 
 Behavior:
-- `loading` → renders `null` (no skeleton, no flash). Auth probe is fast (single IPC); a brief blank is preferable to mounting chrome that may immediately unmount.
+- `loading` → renders `null` (no skeleton, no flash). Auth probe is fast (single IPC); a brief blank is preferable to mounting chrome that may immediately unmount. The route-level Suspense fallback (`AppLoadingFallback`) may already be visible during lazy-route mount; the guard's `null` then takes over until the probe resolves. If this two-stage transition flashes visibly during testing, fall back to rendering `<AppLoadingFallback />` from the guard during `'loading'` for visual continuity.
 - `disconnected` → renders `<GitHubLoginPrompt>` only. Because the guard wraps the entire view, none of the view's chrome (search bar, filters, sidebars, skeletons) mounts.
 - `connected` → renders the wrapped view as today.
 
@@ -84,19 +84,21 @@ No filters, no logo strip, no search bar — that's the whole point.
 
 ### 5. Where the guard applies
 
-| View | Guarded? | Reason |
-|---|---|---|
-| Discover | Yes | GitHub data |
-| Library | Yes | GitHub data |
-| Starred | Yes | GitHub data |
-| Profile | Yes | GitHub user |
-| Collections | Yes | GitHub data |
-| CollectionDetail | Yes | GitHub data |
-| RepoDetail | Yes | GitHub data |
-| Settings | No | User must be able to manage prefs / log in / disconnect |
-| Onboarding | No | Owns its own flow |
-| Create | No | Local-only |
-| LocalProjectDetail | No | Local-only |
+Top-level routes (declared in `App.tsx`):
+
+| Route | View | Guarded? | Reason |
+|---|---|---|---|
+| `/discover` | Discover | Yes | GitHub data |
+| `/library/*` | Library | Yes | GitHub data |
+| `/starred` | Starred | Yes | GitHub data |
+| `/profile` | Profile | Yes | GitHub user |
+| `/repo/:owner/:name` | RepoDetail | Yes | GitHub data |
+| `/settings` | Settings | No | User must be able to manage prefs / log in / disconnect |
+| `/onboarding` | Onboarding | No | Owns its own flow |
+| `/create` | Create | No | Local-only |
+| `/local-project` | LocalProjectDetail | No | Local-only |
+
+`/collections` is just a redirect to `/library` (`App.tsx:67`) and does not need its own guard. `CollectionDetail` and the nested collections list are rendered as child routes inside `Library` (`Library.tsx:103`), so they inherit Library's guard automatically — no separate guard needed.
 
 The Dock and Titlebar are rendered outside `<Routes>` in `App.tsx` and remain visible regardless of auth.
 
@@ -140,9 +142,9 @@ No E2E tests required — the contract (chrome hidden when disconnected, prompt 
 
 ## Migration of Existing Code
 
-- `Settings.tsx` lines 322–330 → replace inline device-flow with `useGitHubLogin()`.
-- `Onboarding.tsx` lines 122–138 → same, share the hook.
-- Per-view `getUser()` calls (e.g., `Starred.tsx:1`, `Settings.tsx:169`) → replace with `useGitHubAuth()` reads where the component just needs to know "is the user connected." Keep direct `getUser()` calls only where the component needs fresh user data for other reasons.
+- `Settings.tsx` `handleGitHubConnect` (around lines 318–340) → replace inline device-flow with `useGitHubLogin()`.
+- `Onboarding.tsx` device-flow block (around lines 117–138) → same, share the hook.
+- Per-view `getUser()` calls (e.g., `Starred.tsx:73`, `Settings.tsx:169`) → replace with `useGitHubAuth()` reads where the component just needs to know "is the user connected." Keep direct `getUser()` calls only where the component needs fresh user data for other reasons.
 - `App.tsx:46–55` `onboarding_complete` check is preserved (separate concern: onboarding completion ≠ GitHub connection).
 
 ## Open Questions
