@@ -643,7 +643,8 @@ ipcMain.handle('github:getFileContent', async (_event, owner: string, name: stri
 })
 
 ipcMain.handle('github:getReleases', async (_event, owner: string, name: string) => {
-  const token = getToken() ?? null
+  const token = getToken()
+  if (!token) return [] // GitHub disconnected — skip API call
   return getReleases(token, owner, name)  // errors propagate to renderer → "Failed to load releases." UI state
 })
 
