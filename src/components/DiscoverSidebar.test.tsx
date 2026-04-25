@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
-import DiscoverSidebar from './DiscoverSidebar'
+import DiscoverSidebar, { FilterPanel } from './DiscoverSidebar'
 
 const baseProps = {
   selectedSubtypes: [],
@@ -104,5 +104,49 @@ describe('DiscoverSidebar — itemCounts', () => {
     expect(screen.getByText(/Dev Tools \(1\)/)).toBeInTheDocument()
     // ai-ml was not in the map — its bucket-group header should be absent
     expect(screen.queryByText(/AI & ML/)).not.toBeInTheDocument()
+  })
+})
+
+const filterPanelProps = {
+  selectedLanguages: [],
+  onSelectedLanguagesChange: () => {},
+  selectedSubtypes: [],
+  onSelectedSubtypesChange: () => {},
+}
+
+describe('FilterPanel — grouping toggle', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('renders Domain and Ecosystem buttons', () => {
+    render(<FilterPanel {...filterPanelProps} />)
+    expect(screen.getByRole('button', { name: 'Domain' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ecosystem' })).toBeInTheDocument()
+  })
+
+  it('defaults to Domain mode', () => {
+    render(<FilterPanel {...filterPanelProps} />)
+    expect(screen.getByRole('button', { name: 'Domain' })).toHaveClass('active')
+    expect(screen.getByRole('button', { name: 'Ecosystem' })).not.toHaveClass('active')
+  })
+
+  it('switches to Ecosystem mode on click', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.click(screen.getByRole('button', { name: 'Ecosystem' }))
+    expect(screen.getByRole('button', { name: 'Ecosystem' })).toHaveClass('active')
+    expect(screen.getByRole('button', { name: 'Domain' })).not.toHaveClass('active')
+  })
+
+  it('persists mode to localStorage', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.click(screen.getByRole('button', { name: 'Ecosystem' }))
+    expect(JSON.parse(localStorage.getItem('discover:languageGrouping')!)).toBe('ecosystem')
+  })
+
+  it('reads mode from localStorage on mount', () => {
+    localStorage.setItem('discover:languageGrouping', JSON.stringify('ecosystem'))
+    render(<FilterPanel {...filterPanelProps} />)
+    expect(screen.getByRole('button', { name: 'Ecosystem' })).toHaveClass('active')
   })
 })

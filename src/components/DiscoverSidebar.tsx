@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useLocalStorage } from '../hooks/useLocalStorage'
 import { createPortal } from 'react-dom'
 import {
-  X, ShieldCheck, Shield, SlidersHorizontal, Search, ChevronDown, Star,
+  X, ShieldCheck, Shield, SlidersHorizontal, Star, Code2, Layers,
 } from 'lucide-react'
 import type { IconType } from 'react-icons'
 import {
@@ -13,11 +14,12 @@ import {
   PiGameControllerFill, PiBuildingsFill, PiPenNibFill, PiMonitorFill,
   PiBrainFill, PiGraduationCapFill, PiDesktopTowerFill, PiHardDrivesFill,
   PiStackFill,
+  PiGlobeFill, PiDevicesFill, PiStarFill,
 } from 'react-icons/pi'
 import { FaJava } from 'react-icons/fa6'
 import { SiJavascript } from 'react-icons/si'
 import { REPO_BUCKETS } from '../constants/repoTypes'
-import { LANG_CATEGORIES, getLangsByCategory, LANG_MAP, getLangColor } from '../lib/languages'
+import { LANG_CATEGORIES, getLangsByCategory, DOMAIN_CATEGORIES, getLangsByDomainCategory, LANG_MAP, getLangColor } from '../lib/languages'
 import { getSubTypeConfig } from '../config/repoTypeConfig'
 import LanguageIcon from './LanguageIcon'
 import logoSrc from '../assets/logo.png'
@@ -112,7 +114,7 @@ export interface DiscoverSidebarProps {
 
 /* (Language categories come from ../lib/languages.ts) */
 
-import type { LangCategory } from '../lib/languages'
+import type { LangCategory, DomainCategory, GroupingMode } from '../lib/languages'
 
 const LANG_CAT_ICONS: Record<LangCategory, IconType> = {
   'Systems': PiCpuFill, 'JVM': FaJava, 'Apple': PiAppleLogoFill, '.NET': PiCircleHalfFill,
@@ -121,6 +123,17 @@ const LANG_CAT_ICONS: Record<LangCategory, IconType> = {
   'Logic': PiAtomFill, 'Markup': PiFileCodeFill, 'Styling': PiPaletteFill, 'Typesetting': PiBookOpenFill,
   'Database': PiDatabaseFill, 'Config': PiWrenchFill, 'Blockchain': PiLinkSimpleFill, 'Hardware': PiCircuitryFill,
   'Game': PiGameControllerFill, 'Enterprise': PiBuildingsFill, 'Editor': PiPenNibFill, 'UI': PiMonitorFill,
+}
+
+const DOMAIN_CAT_ICONS: Record<DomainCategory, IconType> = {
+  'Systems':          PiCpuFill,
+  'Web':              PiGlobeFill,
+  'Data & Science':   PiChartBarFill,
+  'Functional':       PiFunctionFill,
+  'Mobile & Desktop': PiDevicesFill,
+  'DevOps & Config':  PiTerminalWindowFill,
+  'Hardware':         PiCircuitryFill,
+  'Specialty':        PiStarFill,
 }
 
 const BUCKET_NAV_ICONS: Record<string, IconType> = {
@@ -169,14 +182,17 @@ export function FilterPanel({
   selectedSubtypes,
   onSelectedSubtypesChange,
   itemCounts,
+  searchQuery = '',
+  view,
 }: Pick<DiscoverSidebarProps, 'selectedLanguages' | 'onSelectedLanguagesChange' | 'selectedSubtypes' | 'onSelectedSubtypesChange'> & {
   itemCounts?: DiscoverSidebarProps['itemCounts']
+  searchQuery?: string
+  view?: 'language' | 'type'
 }) {
-  const [activeTab, setActiveTab] = useState<FilterTab>('language')
-  const [search, setSearch] = useState('')
-  const [activeCategory, setActiveCategory] = useState<string | null>(null)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [activeTab, setActiveTab] = useState<FilterTab>(view ?? 'language')
+  const [groupingMode, setGroupingMode] = useLocalStorage<GroupingMode>('discover:languageGrouping', 'domain')
+
+  useEffect(() => { if (view) setActiveTab(view) }, [view])
 
   // ── Draft state — selections are staged locally until the user clicks Apply ──
   const [draftLanguages, setDraftLanguages] = useState(selectedLanguages)
@@ -190,18 +206,6 @@ export function FilterPanel({
 
   const langsDirty = draftLanguages.slice().sort().join(',') !== committedLangsKey
   const typesDirty = draftSubtypes.slice().sort().join(',') !== committedTypesKey
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!dropdownOpen) return
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [dropdownOpen])
 
   // Favourites
   const [favLangs, setFavLangs] = useState<Set<string>>(new Set())
@@ -221,7 +225,6 @@ export function FilterPanel({
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
-      if (next.size === 0 && activeCategory === '_fav') setActiveCategory(null)
       window.api.settings.set('fav_languages', JSON.stringify([...next])).catch(() => {})
       return next
     })
@@ -232,7 +235,6 @@ export function FilterPanel({
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
-      if (next.size === 0 && activeCategory === '_fav') setActiveCategory(null)
       window.api.settings.set('fav_subtypes', JSON.stringify([...next])).catch(() => {})
       return next
     })
@@ -257,114 +259,50 @@ export function FilterPanel({
     }
   }
 
-  const hasFavs = activeTab === 'language' ? favLangs.size > 0 : favTypes.size > 0
-
   return (
     <div className="discover-panel-content">
-      {/* Sticky header: title + search + tabs + category dropdown */}
-      <div className="blocks-sticky-header">
-      <div className="blocks-header">
-        <div className="blocks-title">Blocks</div>
-        <div className="blocks-search">
-          <Search size={12} />
-          <input
-            type="text"
-            placeholder={activeTab === 'language' ? 'Search languages...' : 'Search types...'}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-      </div>
-      <div className="panel-tab-bar">
-        <button className={`panel-tab${activeTab === 'language' ? ' active' : ''}`} onClick={() => { setActiveTab('language'); setSearch(''); setActiveCategory(null); setDropdownOpen(false) }}>
-          Language{draftLanguages.length > 0 ? ` (${draftLanguages.length})` : ''}
-        </button>
-        <button className={`panel-tab${activeTab === 'type' ? ' active' : ''}`} onClick={() => { setActiveTab('type'); setSearch(''); setActiveCategory(null); setDropdownOpen(false) }}>
-          Type{draftSubtypes.length > 0 ? ` (${draftSubtypes.length})` : ''}
-        </button>
-      </div>
-
-      {/* Category filter dropdown */}
-      {(() => {
-        const currentCat = activeCategory && activeCategory !== '_fav' ? activeCategory : null
-        const TriggerIcon = activeTab === 'language'
-          ? (currentCat ? LANG_CAT_ICONS[currentCat as LangCategory] : null)
-          : (currentCat ? BUCKET_NAV_ICONS[currentCat] : null)
-        const triggerLabel = activeTab === 'language'
-          ? (currentCat ?? 'All Languages')
-          : (currentCat ? REPO_BUCKETS.find(b => b.id === currentCat)?.label ?? currentCat : 'All Types')
-
-        return (
-          <div className="category-filter-row">
-            {hasFavs && (
-              <button
-                className={`category-fav-btn${activeCategory === '_fav' ? ' active' : ''}`}
-                onClick={() => { setActiveCategory(activeCategory === '_fav' ? null : '_fav'); setDropdownOpen(false) }}
-                title="Favourites"
-              >
-                <Star size={12} />
-              </button>
-            )}
-            <div className="category-dropdown" ref={dropdownRef}>
-              <button
-                className={`category-dropdown-trigger${dropdownOpen ? ' open' : ''}`}
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-              >
-                <span className="category-dropdown-value">
-                  {TriggerIcon && <TriggerIcon size={12} />}
-                  {triggerLabel}
-                </span>
-                <ChevronDown size={10} className="category-dropdown-chevron" />
-              </button>
-              {dropdownOpen && (
-                <div className="category-dropdown-menu">
-                  <button
-                    className={`category-dropdown-item${!currentCat ? ' active' : ''}`}
-                    onClick={() => { setActiveCategory(null); setDropdownOpen(false) }}
-                  >
-                    {activeTab === 'language' ? 'All Languages' : 'All Types'}
-                  </button>
-                  {activeTab === 'language'
-                    ? LANG_CATEGORIES.map(cat => {
-                        const CatIcon = LANG_CAT_ICONS[cat]
-                        return (
-                          <button
-                            key={cat}
-                            className={`category-dropdown-item${currentCat === cat ? ' active' : ''}`}
-                            onClick={() => { setActiveCategory(cat); setDropdownOpen(false) }}
-                          >
-                            <CatIcon size={12} />
-                            {cat}
-                          </button>
-                        )
-                      })
-                    : REPO_BUCKETS.map(bucket => {
-                        const BIcon = BUCKET_NAV_ICONS[bucket.id]
-                        return (
-                          <button
-                            key={bucket.id}
-                            className={`category-dropdown-item${currentCat === bucket.id ? ' active' : ''}`}
-                            onClick={() => { setActiveCategory(bucket.id); setDropdownOpen(false) }}
-                          >
-                            {BIcon && <BIcon size={12} />}
-                            {bucket.label}
-                          </button>
-                        )
-                      })
-                  }
-                </div>
-              )}
-            </div>
+      {!view && (
+        <div className="blocks-sticky-header">
+          <div className="blocks-header-row">
+            <span className="blocks-title">Blocks</span>
+            <button
+              className={`blocks-tab-icon${activeTab === 'language' ? ' active' : ''}`}
+              onClick={() => setActiveTab('language')}
+              title="Languages"
+            >
+              <Code2 size={14} />
+            </button>
+            <button
+              className={`blocks-tab-icon${activeTab === 'type' ? ' active' : ''}`}
+              onClick={() => setActiveTab('type')}
+              title="Types"
+            >
+              <Layers size={14} />
+            </button>
           </div>
-        )
-      })()}
-      </div>{/* end blocks-sticky-header */}
+        </div>
+      )}
 
       {/* Language tab */}
       {activeTab === 'language' && (
         <>
+          <div className="filter-grouping-toggle">
+            <button
+              className={`filter-grouping-btn${groupingMode === 'domain' ? ' active' : ''}`}
+              onClick={() => setGroupingMode('domain')}
+            >
+              Domain
+            </button>
+            <button
+              className={`filter-grouping-btn${groupingMode === 'ecosystem' ? ' active' : ''}`}
+              onClick={() => setGroupingMode('ecosystem')}
+            >
+              Ecosystem
+            </button>
+          </div>
+          <div className="categories-grid categories-grid--lang">
           {/* Favourites section */}
-          {favLangs.size > 0 && (!activeCategory || activeCategory === '_fav') && !search && (
+          {favLangs.size > 0 && !searchQuery && (
             <div className="bucket-group">
               <div className="bucket-label"><Star size={11} /> Favourites</div>
               {[...favLangs].map(key => {
@@ -388,41 +326,75 @@ export function FilterPanel({
               })}
             </div>
           )}
-          {LANG_CATEGORIES
-            .filter(cat => !activeCategory || (activeCategory !== '_fav' && activeCategory === cat))
-            .map(cat => {
-            const langs = getLangsByCategory(cat)
-              .filter(def => !search || def.name.toLowerCase().includes(search.toLowerCase()))
-              .filter(def => !itemCounts || (itemCounts.byLanguage.get(def.key) ?? 0) > 0)
-            if (!langs.length) return null
-            const CatIcon = LANG_CAT_ICONS[cat]
-            return (
-              <div key={cat} className="bucket-group">
-                <div className="bucket-label"><CatIcon size={11} /> {cat}</div>
-                {langs.map(def => {
-                  const selected = draftLanguages.includes(def.key)
-                  const isFav = favLangs.has(def.key)
-                  const langCount = itemCounts?.byLanguage.get(def.key)
-                  return (
-                    <button
-                      key={def.key}
-                      className={`subtype-row${selected ? ' selected' : ''}`}
-                      style={{ '--row-color': getLangColor(def.key) } as React.CSSProperties}
-                      onClick={() => toggleLanguage(def.key)}
-                    >
-                      <span className={`subtype-star${isFav ? ' starred' : ''}`} onClick={e => { e.stopPropagation(); toggleFavLang(def.key) }}>
-                        <Star size={10} />
-                      </span>
-                      <LanguageIcon lang={def.key} size={16} boxed />
-                      <span className="subtype-label">
-                        {def.name}{langCount != null && ` (${langCount})`}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
+          {groupingMode === 'domain'
+            ? DOMAIN_CATEGORIES.map(cat => {
+                const langs = getLangsByDomainCategory(cat)
+                  .filter(def => !searchQuery || def.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .filter(def => !itemCounts || (itemCounts.byLanguage.get(def.key) ?? 0) > 0)
+                if (!langs.length) return null
+                const CatIcon = DOMAIN_CAT_ICONS[cat]
+                return (
+                  <div key={cat} className="bucket-group">
+                    <div className="bucket-label"><CatIcon size={11} /> {cat}</div>
+                    {langs.map(def => {
+                      const selected = draftLanguages.includes(def.key)
+                      const isFav = favLangs.has(def.key)
+                      const langCount = itemCounts?.byLanguage.get(def.key)
+                      return (
+                        <button
+                          key={def.key}
+                          className={`subtype-row${selected ? ' selected' : ''}`}
+                          style={{ '--row-color': getLangColor(def.key) } as React.CSSProperties}
+                          onClick={() => toggleLanguage(def.key)}
+                        >
+                          <span className={`subtype-star${isFav ? ' starred' : ''}`} onClick={e => { e.stopPropagation(); toggleFavLang(def.key) }}>
+                            <Star size={10} />
+                          </span>
+                          <LanguageIcon lang={def.key} size={16} boxed />
+                          <span className="subtype-label">
+                            {def.name}{langCount != null && ` (${langCount})`}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })
+            : LANG_CATEGORIES.map(cat => {
+                const langs = getLangsByCategory(cat)
+                  .filter(def => !searchQuery || def.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .filter(def => !itemCounts || (itemCounts.byLanguage.get(def.key) ?? 0) > 0)
+                if (!langs.length) return null
+                const CatIcon = LANG_CAT_ICONS[cat]
+                return (
+                  <div key={cat} className="bucket-group">
+                    <div className="bucket-label"><CatIcon size={11} /> {cat}</div>
+                    {langs.map(def => {
+                      const selected = draftLanguages.includes(def.key)
+                      const isFav = favLangs.has(def.key)
+                      const langCount = itemCounts?.byLanguage.get(def.key)
+                      return (
+                        <button
+                          key={def.key}
+                          className={`subtype-row${selected ? ' selected' : ''}`}
+                          style={{ '--row-color': getLangColor(def.key) } as React.CSSProperties}
+                          onClick={() => toggleLanguage(def.key)}
+                        >
+                          <span className={`subtype-star${isFav ? ' starred' : ''}`} onClick={e => { e.stopPropagation(); toggleFavLang(def.key) }}>
+                            <Star size={10} />
+                          </span>
+                          <LanguageIcon lang={def.key} size={16} boxed />
+                          <span className="subtype-label">
+                            {def.name}{langCount != null && ` (${langCount})`}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })
+          }
+          </div>
 
           {(draftLanguages.length > 0 || langsDirty) && (
             <div className="discover-panel-summary">
@@ -467,8 +439,9 @@ export function FilterPanel({
       {/* Repo Type tab */}
       {activeTab === 'type' && (
         <>
+          <div className="categories-grid">
           {/* Favourites section */}
-          {favTypes.size > 0 && (!activeCategory || activeCategory === '_fav') && !search && (
+          {favTypes.size > 0 && !searchQuery && (
             <div className="bucket-group">
               <div className="bucket-label"><Star size={11} /> Favourites</div>
               {[...favTypes].map(id => {
@@ -499,11 +472,10 @@ export function FilterPanel({
             </div>
           )}
           {REPO_BUCKETS
-            .filter(bucket => !activeCategory || (activeCategory !== '_fav' && activeCategory === bucket.id))
             .filter(bucket => !itemCounts || (itemCounts.byBucket.get(bucket.id) ?? 0) > 0)
             .map(bucket => {
             const filtered = bucket.subTypes.filter(st =>
-              !search || st.label.toLowerCase().includes(search.toLowerCase())
+              !searchQuery || st.label.toLowerCase().includes(searchQuery.toLowerCase())
             )
             if (!filtered.length) return null
             const BIcon = BUCKET_NAV_ICONS[bucket.id]
@@ -542,6 +514,7 @@ export function FilterPanel({
             </div>
             )
           })}
+          </div>
 
           {(draftSubtypes.length > 0 || typesDirty) && (
             <div className="discover-panel-summary">
