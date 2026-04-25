@@ -77,7 +77,7 @@ import {
 import { BiSolidTerminal, BiLogoCss3 } from 'react-icons/bi'
 import { DiJava, DiGroovy, DiDlang, DiDotnet, DiPhp, DiPerl, DiErlang, DiDart, DiProlog, DiMsqlServer } from 'react-icons/di'
 
-export type LangCategory =
+export type EcosystemCategory =
   | 'Systems'
   | 'JVM'
   | 'Apple'
@@ -103,20 +103,29 @@ export type LangCategory =
   | 'Editor'
   | 'UI'
 
+/** Backward-compat alias — all existing consumers (GridHeader, RepoCard, etc.) require zero changes */
+export type LangCategory = EcosystemCategory
+
+export type DomainCategory =
+  | 'Systems'
+  | 'Web'
+  | 'Data & Science'
+  | 'Functional'
+  | 'Mobile & Desktop'
+  | 'DevOps & Config'
+  | 'Hardware'
+  | 'Specialty'
+
+export type GroupingMode = 'domain' | 'ecosystem'
+
 export interface LangDef {
-  /** Display name shown in tabs and labels */
   name: string
-  /** GitHub language filter value (exact case, as GitHub expects) */
   key: string
-  /** Language family / category */
-  category: LangCategory
-  /** Simple Icon component, or null if no icon available */
+  category: EcosystemCategory
+  domainCategory: DomainCategory
   icon: ComponentType<{ size?: number; color?: string }> | null
-  /** Hex colour for icon tinting and language dot */
   color: string
-  /** Optional size multiplier for icons that render smaller than others (default 1) */
   scale?: number
-  /** Render a solid-colour layer behind the icon so white detail is visible */
   doubleLayer?: boolean
 }
 
