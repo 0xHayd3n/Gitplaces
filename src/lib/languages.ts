@@ -120,6 +120,7 @@ export type GroupingMode = 'domain' | 'ecosystem'
 
 export interface LangDef {
   name: string
+  /** GitHub language filter value (exact case, as GitHub expects) */
   key: string
   category: EcosystemCategory
   domainCategory: DomainCategory
