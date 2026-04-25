@@ -1,17 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { SlidersHorizontal, Grid3X3, List } from 'lucide-react'
+import { ChevronUp, Grid3X3, List, Settings } from 'lucide-react'
 import { FilterPanel, AdvancedPanel, type DiscoverSidebarProps } from './DiscoverSidebar'
 import type { ListDensity } from './LayoutDropdown'
 import logoSrc from '../assets/logo.png'
 import './DiscoverTopNav.css'
-
-function BlocksIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z" />
-    </svg>
-  )
-}
 
 export default function DiscoverTopNav(props: DiscoverSidebarProps) {
   const {
@@ -26,36 +18,59 @@ export default function DiscoverTopNav(props: DiscoverSidebarProps) {
   } = props
 
   const wrapperRef = useRef<HTMLDivElement>(null)
-  const [layoutOpen, setLayoutOpen] = useState(false)
 
-  const resolvedPanel = activePanel === 'buckets' ? null : activePanel
+  const [filterOpen, setFilterOpen] = useState(
+    activePanel !== null && activePanel !== 'buckets'
+  )
+  const [filterTab, setFilterTab] = useState<'languages' | 'types' | 'advanced' | 'view'>(
+    activePanel === 'advanced' ? 'advanced' : 'languages'
+  )
+  const [filterSearch, setFilterSearch] = useState('')
 
-  const filterCount = selectedLanguages.length + selectedSubtypes.length
+  const languageCount = selectedLanguages.length
+  const typeCount = selectedSubtypes.length
+  const filterCount = languageCount + typeCount
   const advancedCount =
     (filters.stars    ? 1 : 0) +
     (filters.activity ? 1 : 0) +
     (filters.license  ? 1 : 0) +
     activeVerification.size
+  const totalCount = filterCount + advancedCount
 
-  const toggle = (panel: 'filters' | 'advanced') => {
-    onActivePanelChange(resolvedPanel === panel ? null : panel)
-    setLayoutOpen(false)
-  }
+  const isCategorySearch = filterOpen && (filterTab === 'languages' || filterTab === 'types')
 
   const onActivePanelChangeRef = useRef(onActivePanelChange)
   useEffect(() => { onActivePanelChangeRef.current = onActivePanelChange })
 
+  const toggleFilter = () => {
+    if (filterOpen) {
+      setFilterOpen(false)
+      setFilterSearch('')
+      onActivePanelChange(null)
+    } else {
+      setFilterOpen(true)
+      onActivePanelChange(filterTab === 'advanced' ? 'advanced' : 'filters')
+
+    }
+  }
+
+  const switchTab = (tab: 'languages' | 'types' | 'advanced' | 'view') => {
+    setFilterTab(tab)
+    onActivePanelChange(tab === 'advanced' ? 'advanced' : (tab === 'languages' || tab === 'types') ? 'filters' : null)
+  }
+
   useEffect(() => {
-    if (!resolvedPanel && !layoutOpen) return
+    if (!filterOpen) return
     const handler = (e: MouseEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setFilterOpen(false)
+        setFilterSearch('')
         onActivePanelChangeRef.current(null)
-        setLayoutOpen(false)
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [resolvedPanel, layoutOpen])
+  }, [filterOpen])
 
   const handleModeSwitch = (m: 'grid' | 'list') => {
     if (layoutPrefs && onLayoutChange) onLayoutChange({ ...layoutPrefs, mode: m })
@@ -84,150 +99,159 @@ export default function DiscoverTopNav(props: DiscoverSidebarProps) {
         </div>
       )}
 
-      {/* Search bar */}
-      <div className="dtn-search-bar" title="Search repositories">
-        <svg className="dtn-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8" />
-          <path d="M21 21l-4.35-4.35" />
-        </svg>
-        <input
-          ref={inputRef}
-          className="dtn-search-input"
-          placeholder="Search repos…"
-          value={query}
-          onChange={e => onQueryChange?.(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && onSearch?.()}
-        />
-      </div>
-
-      {/* Filter + View row */}
-      <div className="dtn-filter-row">
-        <button
-          type="button"
-          className={`dtn-filter-btn${resolvedPanel === 'filters' ? ' dtn-filter-btn-active' : ''}`}
-          onClick={() => toggle('filters')}
-          aria-label="Browse categories"
-          title="Browse categories"
-          aria-expanded={resolvedPanel === 'filters'}
-          aria-controls="dtn-filters-panel"
-        >
-          <BlocksIcon />
-          {filterCount > 0 && resolvedPanel !== 'filters' && (
-            <span className="dtn-badge">{filterCount}</span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          className={`dtn-filter-btn${resolvedPanel === 'advanced' ? ' dtn-filter-btn-active' : ''}`}
-          onClick={() => toggle('advanced')}
-          aria-label="Advanced filters"
-          title="Advanced filters"
-          aria-expanded={resolvedPanel === 'advanced'}
-          aria-controls="dtn-advanced-panel"
-        >
-          <SlidersHorizontal size={16} />
-          {advancedCount > 0 && resolvedPanel !== 'advanced' && (
-            <span className="dtn-badge">{advancedCount}</span>
-          )}
-        </button>
-
-        {layoutPrefs && onLayoutChange && (
-          <span className="dtn-settings-anchor">
+      {/* Unified search + filter panel */}
+      <div className={`dtn-search-panel${filterOpen ? ' open' : ''}`} title="">
+        <div className="dtn-search-bar">
+          <svg className="dtn-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            ref={inputRef}
+            className="dtn-search-input"
+            placeholder={filterTab === 'languages' && filterOpen ? 'Search languages…' : filterTab === 'types' && filterOpen ? 'Search types…' : 'Search repos…'}
+            value={isCategorySearch ? filterSearch : query}
+            onChange={e => isCategorySearch ? setFilterSearch(e.target.value) : onQueryChange?.(e.target.value)}
+            onKeyDown={e => !isCategorySearch && e.key === 'Enter' && onSearch?.()}
+          />
+          {!filterOpen && (
             <button
               type="button"
-              className={`dtn-filter-btn${layoutOpen ? ' dtn-filter-btn-active' : ''}`}
-              onMouseDown={(e) => { e.stopPropagation(); setLayoutOpen(o => !o); if (resolvedPanel) onActivePanelChange(null) }}
-              title={layoutPrefs.mode === 'grid' ? 'Grid view' : 'List view'}
+              className="dtn-search-filter-btn"
+              onMouseDown={e => { e.stopPropagation(); toggleFilter() }}
+              aria-expanded={false}
             >
-              {layoutPrefs.mode === 'list' ? <List size={16} /> : <Grid3X3 size={16} />}
+              <Settings size={13} />
+              {!compact && <span className="dtn-search-filter-label">Filter</span>}
+              {totalCount > 0 && <span className="dtn-filter-badge">{totalCount}</span>}
             </button>
-            {layoutOpen && (
-              <div className="dtn-panel dtn-layout-combined-panel">
-                <div className="dtn-layout-mode-row">
-                  <button
-                    className={`dtn-layout-mode-btn${layoutPrefs.mode === 'grid' ? ' active' : ''}`}
-                    onClick={() => handleModeSwitch('grid')}
-                  >
-                    <Grid3X3 size={13} />
-                    <span>Grid</span>
-                  </button>
-                  <button
-                    className={`dtn-layout-mode-btn${layoutPrefs.mode === 'list' ? ' active' : ''}`}
-                    onClick={() => handleModeSwitch('list')}
-                  >
-                    <List size={13} />
-                    <span>List</span>
-                  </button>
-                </div>
-                {layoutPrefs.mode === 'grid' ? (
-                  <>
-                    <div className="layout-popover-label">Columns</div>
-                    <div className="layout-popover-row">
-                      {[4, 5, 6, 7, 8].map(n => (
+          )}
+        </div>
+
+        {filterOpen && (
+          <>
+            <div className="dtn-panel-tabs">
+              <button
+                className={`dtn-panel-tab${filterTab === 'languages' ? ' active' : ''}`}
+                onClick={() => switchTab('languages')}
+              >
+                Languages
+                {languageCount > 0 && <span className="dtn-tab-badge">{languageCount}</span>}
+              </button>
+              <button
+                className={`dtn-panel-tab${filterTab === 'types' ? ' active' : ''}`}
+                onClick={() => switchTab('types')}
+              >
+                Types
+                {typeCount > 0 && <span className="dtn-tab-badge">{typeCount}</span>}
+              </button>
+              <button
+                className={`dtn-panel-tab${filterTab === 'advanced' ? ' active' : ''}`}
+                onClick={() => switchTab('advanced')}
+              >
+                Advanced Filters
+                {advancedCount > 0 && <span className="dtn-tab-badge">{advancedCount}</span>}
+              </button>
+              {layoutPrefs && onLayoutChange && (
+                <button
+                  className={`dtn-panel-tab${filterTab === 'view' ? ' active' : ''}`}
+                  onClick={() => switchTab('view')}
+                >
+                  View
+                </button>
+              )}
+            </div>
+
+            <div className="dtn-panel-content">
+              {(filterTab === 'languages' || filterTab === 'types') && (
+                <FilterPanel
+                  selectedLanguages={selectedLanguages}
+                  onSelectedLanguagesChange={onSelectedLanguagesChange}
+                  selectedSubtypes={selectedSubtypes}
+                  onSelectedSubtypesChange={onSelectedSubtypesChange}
+                  itemCounts={itemCounts}
+                />
+              )}
+              {filterTab === 'advanced' && (
+                <AdvancedPanel
+                  filters={filters}
+                  activeVerification={activeVerification}
+                  onFilterChange={onFilterChange}
+                  onVerificationToggle={onVerificationToggle}
+                  mode={mode}
+                  skillStatus={skillStatus}
+                  onSkillStatusChange={onSkillStatusChange}
+                />
+              )}
+              {filterTab === 'view' && layoutPrefs && onLayoutChange && (
+                <div className="dtn-view-panel">
+                  <div className="dtn-layout-mode-row">
+                    <button
+                      className={`dtn-layout-mode-btn${layoutPrefs.mode === 'grid' ? ' active' : ''}`}
+                      onClick={() => handleModeSwitch('grid')}
+                    >
+                      <Grid3X3 size={13} />
+                      <span>Grid</span>
+                    </button>
+                    <button
+                      className={`dtn-layout-mode-btn${layoutPrefs.mode === 'list' ? ' active' : ''}`}
+                      onClick={() => handleModeSwitch('list')}
+                    >
+                      <List size={13} />
+                      <span>List</span>
+                    </button>
+                  </div>
+                  {layoutPrefs.mode === 'grid' ? (
+                    <>
+                      <div className="layout-popover-label">Columns</div>
+                      <div className="layout-popover-row">
+                        {[4, 5, 6, 7, 8].map(n => (
+                          <button
+                            key={n}
+                            className={`layout-column-btn${layoutPrefs.columns === n ? ' active' : ''}`}
+                            onClick={() => setColumns(n)}
+                          >{n}</button>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="layout-popover-label">Density</div>
+                      <div className="layout-popover-row">
                         <button
-                          key={n}
-                          className={`layout-column-btn${layoutPrefs.columns === n ? ' active' : ''}`}
-                          onClick={() => setColumns(n)}
-                        >{n}</button>
+                          className={`layout-segment-btn${layoutPrefs.density === 'compact' ? ' active' : ''}`}
+                          onClick={() => setDensity('compact')}
+                        >Compact</button>
+                        <button
+                          className={`layout-segment-btn${layoutPrefs.density === 'comfortable' ? ' active' : ''}`}
+                          onClick={() => setDensity('comfortable')}
+                        >Comfortable</button>
+                      </div>
+                      <div className="layout-popover-label">Show</div>
+                      {(['description', 'tags', 'stats', 'type', 'verification'] as const).map(field => (
+                        <label key={field} className="layout-field-row">
+                          <input
+                            type="checkbox"
+                            checked={layoutPrefs.fields[field]}
+                            onChange={() => toggleField(field)}
+                          />
+                          {field.charAt(0).toUpperCase() + field.slice(1)}
+                        </label>
                       ))}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="layout-popover-label">Density</div>
-                    <div className="layout-popover-row">
-                      <button
-                        className={`layout-segment-btn${layoutPrefs.density === 'compact' ? ' active' : ''}`}
-                        onClick={() => setDensity('compact')}
-                      >Compact</button>
-                      <button
-                        className={`layout-segment-btn${layoutPrefs.density === 'comfortable' ? ' active' : ''}`}
-                        onClick={() => setDensity('comfortable')}
-                      >Comfortable</button>
-                    </div>
-                    <div className="layout-popover-label">Show</div>
-                    {(['description', 'tags', 'stats', 'type', 'verification'] as const).map(field => (
-                      <label key={field} className="layout-field-row">
-                        <input
-                          type="checkbox"
-                          checked={layoutPrefs.fields[field]}
-                          onChange={() => toggleField(field)}
-                        />
-                        {field.charAt(0).toUpperCase() + field.slice(1)}
-                      </label>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-          </span>
-        )}
-
-        {resolvedPanel === 'filters' && (
-          <div id="dtn-filters-panel" className="dtn-panel">
-            <FilterPanel
-              selectedLanguages={selectedLanguages}
-              onSelectedLanguagesChange={onSelectedLanguagesChange}
-              selectedSubtypes={selectedSubtypes}
-              onSelectedSubtypesChange={onSelectedSubtypesChange}
-              itemCounts={itemCounts}
-            />
-          </div>
-        )}
-
-        {resolvedPanel === 'advanced' && (
-          <div id="dtn-advanced-panel" className="dtn-panel">
-            <AdvancedPanel
-              filters={filters}
-              activeVerification={activeVerification}
-              onFilterChange={onFilterChange}
-              onVerificationToggle={onVerificationToggle}
-              mode={mode}
-              skillStatus={skillStatus}
-              onSkillStatusChange={onSkillStatusChange}
-            />
-          </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              className="dtn-panel-collapse-btn"
+              onMouseDown={e => { e.stopPropagation(); toggleFilter() }}
+              aria-label="Collapse filter panel"
+            >
+              <ChevronUp size={14} />
+            </button>
+          </>
         )}
       </div>
     </div>
