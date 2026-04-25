@@ -735,8 +735,8 @@
 
 .filter-grouping-toggle {
   display: flex;
-  background: var(--bg-secondary, #111);
-  border: 1px solid var(--border-color, #333);
+  background: var(--bg3, #111);
+  border: 1px solid var(--border, #333);
   border-radius: 6px;
   overflow: hidden;
   margin: 8px 12px 4px;
@@ -751,6 +751,11 @@
   background: transparent;
   color: var(--text-muted, #888);
   cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+
+.filter-grouping-btn:hover:not(.active) {
+  background: var(--bg3, #1a1a1a);
 }
 
 .filter-grouping-btn.active {
