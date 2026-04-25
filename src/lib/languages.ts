@@ -288,3 +288,20 @@ export const LANG_CATEGORIES: LangCategory[] = [...new Set(LANGUAGES.map(l => l.
 export function getLangsByCategory(cat: LangCategory): LangDef[] {
   return LANGUAGES.filter(l => l.category === cat)
 }
+
+/** Ordered list of domain categories (canonical sidebar order) */
+export const DOMAIN_CATEGORIES: DomainCategory[] = [
+  'Systems',
+  'Web',
+  'Data & Science',
+  'Functional',
+  'Mobile & Desktop',
+  'DevOps & Config',
+  'Hardware',
+  'Specialty',
+]
+
+/** Get all languages in a domain category */
+export function getLangsByDomainCategory(cat: DomainCategory): LangDef[] {
+  return LANGUAGES.filter(l => l.domainCategory === cat)
+}
