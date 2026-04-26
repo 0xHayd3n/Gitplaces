@@ -11,12 +11,18 @@
   gap: 6px;
   z-index: 200;
   -webkit-app-region: drag;
-  transition: top 0.3s cubic-bezier(0.4, 0, 0.2, 1), gap 0.3s ease;
+  transition: top 0.15s cubic-bezier(0.4, 0, 0.2, 1), gap 0.15s ease;
 }
 
+/* Compact: docked into the 32px title-bar strip. Note: when compact is
+   active, .discover-drag-strip is hidden (see globals.css) so this row
+   does NOT overlap any other drag region — its own children carve out
+   no-drag normally, no transform-vs-layout-box mismatch to worry about. */
 .discover-top-nav--compact {
-  top: 38px;
-  gap: 4px;
+  top: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
 }
 
 /* ── Branding ────────────────────────────────────────────────── */
@@ -51,11 +57,11 @@
   align-items: center;
   gap: 10px;
   width: 520px;
-  background: var(--glass-bg);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #252525;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  padding: 9px 14px;
-  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.07) inset;
+  padding: 9px 6px 9px 14px;
+  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
   -webkit-app-region: no-drag;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
               padding 0.3s ease,
@@ -66,14 +72,14 @@
 
 .dtn-search-bar:hover,
 .dtn-search-bar:focus-within {
-  background: rgba(0, 0, 0, 0.8);
+  background: #2d2d2d;
 }
 
 .discover-top-nav--compact .dtn-search-bar {
-  width: 380px;
-  padding: 6px 12px;
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  width: 320px;
+  padding: 3px 3px 3px 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
 }
 
 .dtn-search-icon {
@@ -91,6 +97,8 @@
   color: var(--t1);
   caret-color: var(--t1);
   transition: font-size 0.2s ease;
+  -webkit-app-region: no-drag;
+  min-width: 0;
 }
 
 .discover-top-nav--compact .dtn-search-input {
@@ -101,63 +109,55 @@
   color: rgba(255, 255, 255, 0.3);
 }
 
-/* ── Filter row ──────────────────────────────────────────────── */
+/* ── Filter button embedded in search bar ────────────────────── */
 
-.dtn-filter-row {
+.dtn-search-filter-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  padding: 5px 8px;
+  margin-left: 2px;
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  font-family: inherit;
+  border-radius: 0 8px 8px 0;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
   position: relative;
   -webkit-app-region: no-drag;
 }
 
-/* ── Filter / view buttons — square, icon-only ───────────────── */
-
-.dtn-filter-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  border-radius: 10px;
-  font-family: inherit;
-  color: rgba(255, 255, 255, 0.5);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
-  position: relative;
-  flex-shrink: 0;
+.dtn-search-filter-btn:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.dtn-filter-btn:hover {
-  background: rgba(0, 0, 0, 0.8);
-  color: rgba(255, 255, 255, 0.9);
+.dtn-search-filter-btn.active {
+  color: var(--t1);
+  background: rgba(255, 255, 255, 0.07);
 }
 
-.dtn-filter-btn.dtn-filter-btn-active {
-  background: rgba(0, 0, 0, 0.5);
-  color: rgba(255, 255, 255, 0.9);
+.dtn-search-filter-label {
+  font-size: 12px;
+  font-weight: 500;
 }
 
-.dtn-filter-btn.dtn-filter-btn-active:hover {
-  background: rgba(0, 0, 0, 0.8);
-  color: rgba(255, 255, 255, 0.9);
+.discover-top-nav--compact .dtn-search-filter-btn {
+  padding: 4px 6px;
+  gap: 4px;
 }
 
-/* ── Badge ───────────────────────────────────────────────────── */
+/* ── Filter count badge ──────────────────────────────────────── */
 
-.dtn-badge {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  min-width: 13px;
-  height: 13px;
+.dtn-filter-badge {
+  min-width: 14px;
+  height: 14px;
   border-radius: 7px;
-  background: var(--t1);
-  color: var(--bg);
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--t1);
   font-size: 8px;
   font-weight: 700;
   font-family: inherit;
@@ -166,46 +166,151 @@
   justify-content: center;
   padding: 0 3px;
   line-height: 1;
-  pointer-events: none;
 }
 
-/* ── Settings anchor ─────────────────────────────────────────── */
+/* ── Unified search + filter panel ──────────────────────────── */
 
-.dtn-settings-anchor {
-  position: relative;
+.dtn-search-panel {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  width: 520px;
+  -webkit-app-region: no-drag;
 }
 
-/* ── Drop panel ──────────────────────────────────────────────── */
+.discover-top-nav--compact .dtn-search-panel {
+  width: 320px;
+}
 
-.dtn-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: 300px;
-  max-height: calc(100vh - 160px);
-  overflow-y: overlay;
-  overflow-x: hidden;
-  padding: 0 14px;
+.dtn-search-panel.open {
+  width: calc(100vw - 200px);
+  height: calc(100vh - 300px);
   background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   border-radius: 14px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
-  z-index: 10;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
-/* ── Combined view + layout panel ───────────────────────────── */
-
-.dtn-layout-combined-panel {
-  width: 220px;
-  left: auto;
-  right: 0;
-  transform: none;
-  padding: 10px;
-  overflow-y: visible;
+.discover-top-nav--compact .dtn-search-panel.open {
+  height: calc(100vh - 110px);
 }
+
+/* Search bar becomes the panel header when open */
+.dtn-search-panel.open .dtn-search-bar {
+  width: 100%;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px 14px 0 0;
+  padding: 10px 14px;
+}
+
+/* Panel content scrolls; search bar + tabs stay fixed */
+.dtn-search-panel.open .dtn-panel-content {
+  overflow-y: overlay;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Force full-width grid layout inside the dropdown panel (Types) */
+.dtn-panel-content .categories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  align-items: start;
+  column-width: auto;
+  column-count: auto;
+}
+
+/* Restore column-stacking layout for Languages */
+.dtn-panel-content .categories-grid--lang {
+  display: block;
+  column-width: 180px;
+  column-gap: 8px;
+  grid-template-columns: unset;
+}
+
+.dtn-panel-tabs {
+  display: flex;
+  align-items: stretch;
+  padding: 8px 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  gap: 2px;
+}
+
+.dtn-panel-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 6px 0;
+  background: none;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.dtn-panel-collapse-btn:hover {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.dtn-panel-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.4);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+
+.dtn-panel-tab:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.dtn-panel-tab.active {
+  color: var(--t1);
+  border-bottom-color: rgba(255, 255, 255, 0.55);
+}
+
+.dtn-tab-badge {
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--t1);
+  font-size: 8px;
+  font-weight: 700;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+}
+
+.dtn-panel-content {
+  padding: 0 14px;
+}
+
+.dtn-view-panel {
+  padding: 10px 0;
+}
+
+/* ── Layout mode row (in view tab) ──────────────────────────── */
 
 .dtn-layout-mode-row {
   display: flex;
