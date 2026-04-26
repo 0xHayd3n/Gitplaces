@@ -128,6 +128,7 @@ const LANG_CAT_ICONS: Record<LangCategory, IconType> = {
 const DOMAIN_CAT_ICONS: Record<DomainCategory, IconType> = {
   'Systems':          PiCpuFill,
   'Web':              PiGlobeFill,
+  'Markup & Styling': PiPaletteFill,
   'Data & Science':   PiChartBarFill,
   'Functional':       PiFunctionFill,
   'Mobile & Desktop': PiDevicesFill,

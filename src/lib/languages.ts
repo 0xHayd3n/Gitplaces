@@ -109,6 +109,7 @@ export type LangCategory = EcosystemCategory
 export type DomainCategory =
   | 'Systems'
   | 'Web'
+  | 'Markup & Styling'
   | 'Data & Science'
   | 'Functional'
   | 'Mobile & Desktop'
@@ -216,17 +217,17 @@ export const LANGUAGES: LangDef[] = [
   { name: 'Prolog',     key: 'prolog',      category: 'Logic',      domainCategory: 'Specialty',       icon: DiProlog,        color: '#74283c', scale: 1.6 },
   { name: 'Lean',       key: 'lean',        category: 'Logic',      domainCategory: 'Specialty',       icon: null,            color: '#404040' },
   // --- Markup / Templating ---
-  { name: 'HTML',       key: 'html',        category: 'Markup',     domainCategory: 'Web',             icon: SiHtml5,         color: '#e74b22' },
-  { name: 'MDX',        key: 'mdx',         category: 'Markup',     domainCategory: 'Web',             icon: SiMdx,           color: '#fcb32c' },
-  { name: 'Blade',      key: 'blade',       category: 'Markup',     domainCategory: 'Web',             icon: SiLaravel,       color: '#f7523f' },
-  { name: 'EJS',        key: 'ejs',         category: 'Markup',     domainCategory: 'Web',             icon: SiEjs,           color: '#a91e50' },
-  { name: 'Handlebars', key: 'handlebars',  category: 'Markup',     domainCategory: 'Web',             icon: SiHandlebarsdotjs, color: '#f7931e' },
-  { name: 'Jinja',      key: 'jinja',       category: 'Markup',     domainCategory: 'Web',             icon: SiJinja,         color: '#a52a22' },
+  { name: 'HTML',       key: 'html',        category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiHtml5,         color: '#e74b22' },
+  { name: 'MDX',        key: 'mdx',         category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiMdx,           color: '#fcb32c' },
+  { name: 'Blade',      key: 'blade',       category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiLaravel,       color: '#f7523f' },
+  { name: 'EJS',        key: 'ejs',         category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiEjs,           color: '#a91e50' },
+  { name: 'Handlebars', key: 'handlebars',  category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiHandlebarsdotjs, color: '#f7931e' },
+  { name: 'Jinja',      key: 'jinja',       category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiJinja,         color: '#a52a22' },
   // --- Styling ---
-  { name: 'CSS',        key: 'css',         category: 'Styling',    domainCategory: 'Web',             icon: BiLogoCss3,      color: '#65309a', scale: 1.4 },
-  { name: 'SCSS',       key: 'scss',        category: 'Styling',    domainCategory: 'Web',             icon: SiSass,          color: '#c6538c' },
-  { name: 'Sass',       key: 'sass',        category: 'Styling',    domainCategory: 'Web',             icon: SiSass,          color: '#a53b70' },
-  { name: 'Less',       key: 'less',        category: 'Styling',    domainCategory: 'Web',             icon: SiLess,          color: '#1d365d' },
+  { name: 'CSS',        key: 'css',         category: 'Styling',    domainCategory: 'Markup & Styling', icon: BiLogoCss3,      color: '#65309a', scale: 1.4 },
+  { name: 'SCSS',       key: 'scss',        category: 'Styling',    domainCategory: 'Markup & Styling', icon: SiSass,          color: '#c6538c' },
+  { name: 'Sass',       key: 'sass',        category: 'Styling',    domainCategory: 'Markup & Styling', icon: SiSass,          color: '#a53b70' },
+  { name: 'Less',       key: 'less',        category: 'Styling',    domainCategory: 'Markup & Styling', icon: SiLess,          color: '#1d365d' },
   // --- Typesetting ---
   { name: 'TeX',        key: 'tex',         category: 'Typesetting', domainCategory: 'Specialty',      icon: SiLatex,         color: '#3D6117' },
   { name: 'Typst',      key: 'typst',       category: 'Typesetting', domainCategory: 'Specialty',      icon: SiTypst,         color: '#239DAD' },
@@ -294,6 +295,7 @@ export function getLangsByCategory(cat: LangCategory): LangDef[] {
 export const DOMAIN_CATEGORIES: DomainCategory[] = [
   'Systems',
   'Web',
+  'Markup & Styling',
   'Data & Science',
   'Functional',
   'Mobile & Desktop',
