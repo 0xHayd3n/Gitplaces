@@ -336,23 +336,21 @@ export function FilterPanel({
         </div>
       </div>
       <div className="panel-tab-bar">
-        <button className={`panel-tab${activeTab === 'language' ? ' active' : ''}`} onClick={() => { setActiveTab('language'); setSearch(''); setActiveCategory(null); setDropdownOpen(false) }}>
+        <button className={`panel-tab${activeTab === 'language' ? ' active' : ''}`} onClick={() => { setActiveTab('language'); setSearch(''); setActiveCategory(null); setDropdownOpen(false); setDrilledCategory(null) }}>
           Language{draftLanguages.length > 0 ? ` (${draftLanguages.length})` : ''}
         </button>
-        <button className={`panel-tab${activeTab === 'type' ? ' active' : ''}`} onClick={() => { setActiveTab('type'); setSearch(''); setActiveCategory(null); setDropdownOpen(false) }}>
+        <button className={`panel-tab${activeTab === 'type' ? ' active' : ''}`} onClick={() => { setActiveTab('type'); setSearch(''); setActiveCategory(null); setDropdownOpen(false); setDrilledCategory(null) }}>
           Type{draftSubtypes.length > 0 ? ` (${draftSubtypes.length})` : ''}
         </button>
       </div>
 
-      {/* Category filter dropdown */}
-      {(() => {
+      {/* Category filter dropdown — Type tab only (Language tab uses the tile grid instead) */}
+      {activeTab === 'type' && (() => {
         const currentCat = activeCategory && activeCategory !== '_fav' ? activeCategory : null
-        const TriggerIcon = activeTab === 'language'
-          ? (currentCat ? LANG_CAT_ICONS[currentCat as LangCategory] : null)
-          : (currentCat ? BUCKET_NAV_ICONS[currentCat] : null)
-        const triggerLabel = activeTab === 'language'
-          ? (currentCat ?? 'All Languages')
-          : (currentCat ? REPO_BUCKETS.find(b => b.id === currentCat)?.label ?? currentCat : 'All Types')
+        const TriggerIcon = currentCat ? BUCKET_NAV_ICONS[currentCat] : null
+        const triggerLabel = currentCat
+          ? REPO_BUCKETS.find(b => b.id === currentCat)?.label ?? currentCat
+          : 'All Types'
 
         return (
           <div className="category-filter-row">
@@ -382,36 +380,21 @@ export function FilterPanel({
                     className={`category-dropdown-item${!currentCat ? ' active' : ''}`}
                     onClick={() => { setActiveCategory(null); setDropdownOpen(false) }}
                   >
-                    {activeTab === 'language' ? 'All Languages' : 'All Types'}
+                    All Types
                   </button>
-                  {activeTab === 'language'
-                    ? LANG_CATEGORIES.map(cat => {
-                        const CatIcon = LANG_CAT_ICONS[cat]
-                        return (
-                          <button
-                            key={cat}
-                            className={`category-dropdown-item${currentCat === cat ? ' active' : ''}`}
-                            onClick={() => { setActiveCategory(cat); setDropdownOpen(false) }}
-                          >
-                            <CatIcon size={12} />
-                            {cat}
-                          </button>
-                        )
-                      })
-                    : REPO_BUCKETS.map(bucket => {
-                        const BIcon = BUCKET_NAV_ICONS[bucket.id]
-                        return (
-                          <button
-                            key={bucket.id}
-                            className={`category-dropdown-item${currentCat === bucket.id ? ' active' : ''}`}
-                            onClick={() => { setActiveCategory(bucket.id); setDropdownOpen(false) }}
-                          >
-                            {BIcon && <BIcon size={12} />}
-                            {bucket.label}
-                          </button>
-                        )
-                      })
-                  }
+                  {REPO_BUCKETS.map(bucket => {
+                    const BIcon = BUCKET_NAV_ICONS[bucket.id]
+                    return (
+                      <button
+                        key={bucket.id}
+                        className={`category-dropdown-item${currentCat === bucket.id ? ' active' : ''}`}
+                        onClick={() => { setActiveCategory(bucket.id); setDropdownOpen(false) }}
+                      >
+                        {BIcon && <BIcon size={12} />}
+                        {bucket.label}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>

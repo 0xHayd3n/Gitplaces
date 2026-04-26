@@ -272,6 +272,41 @@ describe('FilterPanel — language search results', () => {
   })
 })
 
+describe('FilterPanel — sticky header chrome', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('hides the category dropdown when the Language tab is active', () => {
+    render(<FilterPanel {...filterPanelProps} />)
+    expect(screen.queryByRole('button', { name: /All Languages/ })).not.toBeInTheDocument()
+  })
+
+  it('shows the category dropdown when the Type tab is active', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.click(screen.getByRole('button', { name: /^Type/ }))
+    expect(screen.getByRole('button', { name: /All Types/ })).toBeInTheDocument()
+  })
+})
+
+describe('FilterPanel — tab switching resets drill-in', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('switching from Language → Type → Language returns to the default tile grid', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.click(screen.getByRole('button', { name: /^Systems/ }))
+    expect(screen.getByRole('button', { name: /^Rust$/ })).toBeInTheDocument()
+    // Click the panel-tab buttons specifically (the Type tab also contains language-named subtypes)
+    const tabBar = screen.getByRole('button', { name: 'Language' }).parentElement!
+    const typeTab = tabBar.querySelector('button.panel-tab:nth-of-type(2)') as HTMLButtonElement
+    const langTab = tabBar.querySelector('button.panel-tab:nth-of-type(1)') as HTMLButtonElement
+    await user.click(typeTab)
+    await user.click(langTab)
+    expect(screen.getByRole('button', { name: /^Systems \(/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Rust$/ })).not.toBeInTheDocument()
+  })
+})
+
 describe('FilterPanel — embedded mode', () => {
   it('hides internal Blocks header / search / tabs / category dropdown when embedded', () => {
     render(<FilterPanel {...filterPanelProps} embedded activeTab="language" />)
