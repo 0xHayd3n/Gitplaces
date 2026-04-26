@@ -133,6 +133,7 @@ const DOMAIN_CAT_ICONS: Record<DomainCategory, IconType> = {
   'Mobile & Desktop': PiDevicesFill,
   'DevOps & Config':  PiTerminalWindowFill,
   'Hardware':         PiCircuitryFill,
+  'Game':             PiGameControllerFill,
   'Specialty':        PiStarFill,
 }
 

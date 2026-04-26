@@ -114,6 +114,7 @@ export type DomainCategory =
   | 'Mobile & Desktop'
   | 'DevOps & Config'
   | 'Hardware'
+  | 'Game'
   | 'Specialty'
 
 export type GroupingMode = 'domain' | 'ecosystem'
@@ -190,12 +191,12 @@ export const LANGUAGES: LangDef[] = [
   { name: 'Python',     key: 'python',      category: 'Scripting',  domainCategory: 'Data & Science',  icon: SiPython,        color: '#367ab3' },
   { name: 'Ruby',       key: 'ruby',        category: 'Scripting',  domainCategory: 'Web',             icon: SiRuby,          color: '#dc2626' },
   { name: 'PHP',        key: 'php',         category: 'Scripting',  domainCategory: 'Web',             icon: DiPhp,           color: '#4f5c93', scale: 1.6 },
-  { name: 'Perl',       key: 'perl',        category: 'Scripting',  domainCategory: 'DevOps & Config', icon: DiPerl,          color: '#0073a0', scale: 1.6 },
-  { name: 'Lua',        key: 'lua',         category: 'Scripting',  domainCategory: 'DevOps & Config', icon: SiLua,           color: '#010080' },
-  { name: 'Luau',       key: 'luau',        category: 'Scripting',  domainCategory: 'Specialty',       icon: SiLuau,          color: '#00A2FF' },
+  { name: 'Perl',       key: 'perl',        category: 'Scripting',  domainCategory: 'Specialty',       icon: DiPerl,          color: '#0073a0', scale: 1.6 },
+  { name: 'Lua',        key: 'lua',         category: 'Scripting',  domainCategory: 'Game',            icon: SiLua,           color: '#010080' },
+  { name: 'Luau',       key: 'luau',        category: 'Scripting',  domainCategory: 'Game',            icon: SiLuau,          color: '#00A2FF' },
   { name: 'Dart',       key: 'dart',        category: 'Scripting',  domainCategory: 'Mobile & Desktop', icon: DiDart,          color: '#0c6291', scale: 1.6 },
-  { name: 'Tcl',        key: 'tcl',         category: 'Scripting',  domainCategory: 'DevOps & Config', icon: null,            color: '#e4cc98' },
-  { name: 'Raku',       key: 'raku',        category: 'Scripting',  domainCategory: 'DevOps & Config', icon: null,            color: '#0000fb' },
+  { name: 'Tcl',        key: 'tcl',         category: 'Scripting',  domainCategory: 'Specialty',       icon: null,            color: '#e4cc98' },
+  { name: 'Raku',       key: 'raku',        category: 'Scripting',  domainCategory: 'Specialty',       icon: null,            color: '#0000fb' },
   { name: 'Hack',       key: 'hack',        category: 'Scripting',  domainCategory: 'Web',             icon: null,            color: '#878787' },
   { name: 'Smalltalk',  key: 'smalltalk',   category: 'Scripting',  domainCategory: 'Specialty',       icon: null,            color: '#596706' },
   // --- Shell / Automation ---
@@ -256,17 +257,17 @@ export const LANGUAGES: LangDef[] = [
   { name: 'Verilog',    key: 'verilog',     category: 'Hardware',   domainCategory: 'Hardware',        icon: null,            color: '#b2b7f8' },
   { name: 'SystemVerilog',key:'systemverilog', category: 'Hardware', domainCategory: 'Hardware',       icon: null,            color: '#DAE1C2' },
   // --- Game development ---
-  { name: 'GDScript',   key: 'gdscript',    category: 'Game',       domainCategory: 'Specialty',       icon: SiGodotengine,   color: '#355570' },
-  { name: 'Haxe',       key: 'haxe',        category: 'Game',       domainCategory: 'Specialty',       icon: SiHaxe,          color: '#df7900' },
+  { name: 'GDScript',   key: 'gdscript',    category: 'Game',       domainCategory: 'Game',            icon: SiGodotengine,   color: '#355570' },
+  { name: 'Haxe',       key: 'haxe',        category: 'Game',       domainCategory: 'Game',            icon: SiHaxe,          color: '#df7900' },
   // --- Enterprise / Legacy ---
   { name: 'COBOL',      key: 'cobol',       category: 'Enterprise', domainCategory: 'Specialty',       icon: null,            color: '#0070c0' },
   { name: 'ABAP',       key: 'abap',        category: 'Enterprise', domainCategory: 'Specialty',       icon: SiSap,           color: '#E8274B' },
-  { name: 'Apex',       key: 'apex',        category: 'Enterprise', domainCategory: 'Specialty',       icon: SiSalesforce,    color: '#1797c0' },
+  { name: 'Apex',       key: 'apex',        category: 'Enterprise', domainCategory: 'Mobile & Desktop', icon: SiSalesforce,    color: '#1797c0' },
   { name: 'ActionScript',key:'actionscript', category: 'Enterprise', domainCategory: 'Specialty',      icon: null,            color: '#882B0F' },
   // --- Editor scripting ---
   { name: 'Vim Script', key: 'vim script',  category: 'Editor',     domainCategory: 'Specialty',       icon: SiVim,           color: '#199f4b' },
   // --- UI frameworks ---
-  { name: 'QML',        key: 'qml',         category: 'UI',         domainCategory: 'Specialty',       icon: SiQt,            color: '#44a51c' },
+  { name: 'QML',        key: 'qml',         category: 'UI',         domainCategory: 'Mobile & Desktop', icon: SiQt,            color: '#44a51c' },
 ]
 
 /** Lookup by key (lowercase). Returns undefined if not in library. */
@@ -298,6 +299,7 @@ export const DOMAIN_CATEGORIES: DomainCategory[] = [
   'Mobile & Desktop',
   'DevOps & Config',
   'Hardware',
+  'Game',
   'Specialty',
 ]
 

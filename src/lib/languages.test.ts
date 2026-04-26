@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { DOMAIN_CATEGORIES, getLangsByDomainCategory, LANGUAGES } from './languages'
 
 describe('DOMAIN_CATEGORIES', () => {
-  it('has exactly 8 entries in canonical order', () => {
+  it('has exactly 9 entries in canonical order', () => {
     expect(DOMAIN_CATEGORIES).toEqual([
       'Systems',
       'Web',
@@ -11,6 +11,7 @@ describe('DOMAIN_CATEGORIES', () => {
       'Mobile & Desktop',
       'DevOps & Config',
       'Hardware',
+      'Game',
       'Specialty',
     ])
   })
