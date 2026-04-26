@@ -173,6 +173,49 @@ describe('FilterPanel — language tile grid (default view)', () => {
   })
 })
 
+describe('FilterPanel — language drill-in', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('clicking a category tile reveals that category\'s languages', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.click(screen.getByRole('button', { name: /^Systems/ }))
+    expect(screen.getByRole('button', { name: /^Rust$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Go$/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Web \(/ })).not.toBeInTheDocument()
+  })
+
+  it('clicking the Popular tile reveals popular languages', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.click(screen.getByRole('button', { name: /Popular/ }))
+    expect(screen.getByRole('button', { name: /^JavaScript$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Python$/ })).toBeInTheDocument()
+  })
+
+  it('back button returns to the tile grid', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.click(screen.getByRole('button', { name: /^Systems/ }))
+    // Pick the back button specifically (the dropdown trigger also reads "All Languages"
+    // until Task 6 scopes it to the Type tab).
+    const backBtn = screen.getAllByRole('button', { name: /All Languages/ })
+      .find(b => b.classList.contains('lang-drillin-back'))!
+    expect(backBtn).toBeDefined()
+    await user.click(backBtn)
+    expect(screen.getByRole('button', { name: /^Web/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Rust$/ })).not.toBeInTheDocument()
+  })
+
+  it('hides the grouping toggle while drilled in', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.click(screen.getByRole('button', { name: /^Systems/ }))
+    expect(screen.queryByRole('button', { name: 'Use Case' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Platform' })).not.toBeInTheDocument()
+  })
+})
+
 describe('FilterPanel — embedded mode', () => {
   it('hides internal Blocks header / search / tabs / category dropdown when embedded', () => {
     render(<FilterPanel {...filterPanelProps} embedded activeTab="language" />)

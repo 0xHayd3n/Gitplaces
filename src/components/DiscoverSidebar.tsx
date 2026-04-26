@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { createPortal } from 'react-dom'
 import {
-  X, ShieldCheck, Shield, SlidersHorizontal, Search, ChevronDown, Star,
+  X, ShieldCheck, Shield, SlidersHorizontal, Search, ChevronDown, ChevronLeft, Star,
 } from 'lucide-react'
 import type { IconType } from 'react-icons'
 import {
@@ -517,8 +517,16 @@ export function FilterPanel({
               </div>
             )}
 
-            {/* DRILLED-IN VIEW — placeholder, replaced in Task 4 */}
+            {/* DRILLED-IN VIEW — back-nav header + language list */}
             {drilledCategory && !search && (() => {
+              const drillTitle = drilledCategory.kind === 'popular'
+                ? 'Popular'
+                : drilledCategory.cat
+              const DrillIcon = drilledCategory.kind === 'popular'
+                ? PiStarFill
+                : drilledCategory.kind === 'domain'
+                  ? DOMAIN_CAT_ICONS[drilledCategory.cat]
+                  : LANG_CAT_ICONS[drilledCategory.cat]
               const langs = drilledCategory.kind === 'popular'
                 ? getPopularLangs()
                 : drilledCategory.kind === 'domain'
@@ -528,15 +536,24 @@ export function FilterPanel({
                 ? langs.filter(l => (itemCounts.byLanguage.get(l.key) ?? 0) > 0)
                 : langs
               return (
-                <div className="bucket-group">
-                  <div className="bucket-label">
+                <div className="lang-drillin">
+                  <div className="lang-drillin-header">
                     <button
+                      className="lang-drillin-back"
                       onClick={() => setDrilledCategory(null)}
-                      style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, marginRight: 8 }}
-                    >← All</button>
-                    {drilledCategory.kind === 'popular' ? 'Popular' : drilledCategory.cat}
+                      aria-label="All Languages"
+                    >
+                      <ChevronLeft size={14} />
+                      <span>All Languages</span>
+                    </button>
+                    <span className="lang-drillin-title">
+                      <DrillIcon size={14} />
+                      {drillTitle}
+                    </span>
                   </div>
-                  {visible.map(def => renderLangRow(def))}
+                  <div className="lang-drillin-list">
+                    {visible.map(def => renderLangRow(def))}
+                  </div>
                 </div>
               )
             })()}
