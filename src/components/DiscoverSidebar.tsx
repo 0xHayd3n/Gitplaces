@@ -616,7 +616,7 @@ export function FilterPanel({
                     </span>
                     {cfg.icon ? (
                       <span className="subtype-icon-box" style={{ backgroundColor: cfg.accentColor }}>
-                        <cfg.icon size={12} fill="#fff" stroke="#fff" strokeWidth={0.75} />
+                        <cfg.icon size={18} fill="#fff" stroke="#fff" strokeWidth={0.75} />
                       </span>
                     ) : (
                       <span className="subtype-dot" style={{ background: cfg.accentColor }} />
@@ -659,7 +659,7 @@ export function FilterPanel({
                     </span>
                     {cfg?.icon ? (
                       <span className="subtype-icon-box" style={{ backgroundColor: bucket.color }}>
-                        <cfg.icon size={12} fill="#fff" stroke="#fff" strokeWidth={0.75} />
+                        <cfg.icon size={18} fill="#fff" stroke="#fff" strokeWidth={0.75} />
                       </span>
                     ) : (
                       <span className="subtype-dot" style={{ background: bucket.color }} />
