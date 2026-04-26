@@ -73,6 +73,9 @@ import {
   SiSap,
   SiLuau,
   SiRescript,
+  SiMarkdown,
+  SiGraphql,
+  SiAssemblyscript,
 } from 'react-icons/si'
 import { BiSolidTerminal, BiLogoCss3 } from 'react-icons/bi'
 import { DiJava, DiGroovy, DiDlang, DiDotnet, DiPhp, DiPerl, DiErlang, DiDart, DiProlog, DiMsqlServer } from 'react-icons/di'
@@ -159,6 +162,7 @@ export const LANGUAGES: LangDef[] = [
   { name: 'Swift',      key: 'swift',       category: 'Apple',      domainCategory: 'Mobile & Desktop', icon: SiSwift,         color: '#ef503b' },
   { name: 'Objective-C',key: 'objective-c', category: 'Apple',      domainCategory: 'Mobile & Desktop', icon: null,            color: '#438eff' },
   { name: 'Objective-C++',key:'objective-c++', category: 'Apple',   domainCategory: 'Mobile & Desktop', icon: null,            color: '#6866fb' },
+  { name: 'AppleScript',key:'applescript', category: 'Apple',       domainCategory: 'Mobile & Desktop', icon: null,            color: '#101f1f' },
   // --- .NET ---
   { name: 'C#',         key: 'c#',          category: '.NET',       domainCategory: 'Mobile & Desktop', icon: SiSharp,         color: '#6d28d9' },
   { name: 'F#',         key: 'f#',          category: '.NET',       domainCategory: 'Functional',      icon: SiFsharp,        color: '#378bba' },
@@ -169,6 +173,7 @@ export const LANGUAGES: LangDef[] = [
   { name: 'CoffeeScript',key:'coffeescript',category: 'JavaScript', domainCategory: 'Web',             icon: SiCoffeescript,  color: '#3e2622' },
   { name: 'ReScript',   key: 'rescript',    category: 'JavaScript', domainCategory: 'Web',             icon: SiRescript,      color: '#ed5051' },
   { name: 'WebAssembly',key: 'webassembly', category: 'JavaScript', domainCategory: 'Web',             icon: SiWebassembly,   color: '#04133b' },
+  { name: 'AssemblyScript',key:'assemblyscript', category: 'JavaScript', domainCategory: 'Web',         icon: SiAssemblyscript, color: '#007acc' },
   // --- Web frameworks ---
   { name: 'Vue',        key: 'vue',         category: 'Web Frameworks', domainCategory: 'Web',         icon: SiVuedotjs,      color: '#3fb883' },
   { name: 'Svelte',     key: 'svelte',      category: 'Web Frameworks', domainCategory: 'Web',         icon: SiSvelte,        color: '#fb3c06' },
@@ -179,6 +184,7 @@ export const LANGUAGES: LangDef[] = [
   { name: 'Elm',        key: 'elm',         category: 'Pure Functional', domainCategory: 'Functional',      icon: SiElm,           color: '#0ea5e9' },
   { name: 'PureScript', key: 'purescript',  category: 'Pure Functional', domainCategory: 'Functional',      icon: SiPurescript,    color: '#1D222D' },
   { name: 'Roc',        key: 'roc',         category: 'Pure Functional', domainCategory: 'Functional',      icon: null,            color: '#7c38f5' },
+  { name: 'Idris',      key: 'idris',       category: 'Pure Functional', domainCategory: 'Functional',      icon: null,            color: '#b30000' },
   // --- BEAM ecosystem ---
   { name: 'Elixir',     key: 'elixir',      category: 'BEAM',       domainCategory: 'Functional',      icon: SiElixir,        color: '#4a3560' },
   { name: 'Erlang',     key: 'erlang',      category: 'BEAM',       domainCategory: 'Functional',      icon: DiErlang,        color: '#ab0130', scale: 1.6 },
@@ -213,9 +219,13 @@ export const LANGUAGES: LangDef[] = [
   { name: 'SAS',        key: 'sas',         category: 'Data',       domainCategory: 'Data & Science',  icon: null,            color: '#B34936' },
   { name: 'Jupyter Notebook', key: 'jupyter notebook', category: 'Data', domainCategory: 'Data & Science', icon: SiJupyter, color: '#DA5B0B' },
   { name: 'Mojo',       key: 'mojo',        category: 'Data',       domainCategory: 'Data & Science',  icon: null,            color: '#ff4c1a' },
+  { name: 'Wolfram',    key: 'wolfram',     category: 'Data',       domainCategory: 'Data & Science',  icon: null,            color: '#dd1100' },
+  { name: 'Q',          key: 'q',           category: 'Data',       domainCategory: 'Data & Science',  icon: null,            color: '#0040cd' },
+  { name: 'Stata',      key: 'stata',       category: 'Data',       domainCategory: 'Data & Science',  icon: null,            color: '#1a5694' },
   // --- Logic / Proof ---
   { name: 'Prolog',     key: 'prolog',      category: 'Logic Programming', domainCategory: 'Specialty',       icon: DiProlog,        color: '#74283c', scale: 1.6 },
   { name: 'Lean',       key: 'lean',        category: 'Logic Programming', domainCategory: 'Specialty',       icon: null,            color: '#404040' },
+  { name: 'Coq',        key: 'coq',         category: 'Logic Programming', domainCategory: 'Specialty',       icon: null,            color: '#d0b68c' },
   // --- Markup / Templating ---
   { name: 'HTML',       key: 'html',        category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiHtml5,         color: '#e74b22' },
   { name: 'MDX',        key: 'mdx',         category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiMdx,           color: '#fcb32c' },
@@ -223,6 +233,7 @@ export const LANGUAGES: LangDef[] = [
   { name: 'EJS',        key: 'ejs',         category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiEjs,           color: '#a91e50' },
   { name: 'Handlebars', key: 'handlebars',  category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiHandlebarsdotjs, color: '#f7931e' },
   { name: 'Jinja',      key: 'jinja',       category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiJinja,         color: '#a52a22' },
+  { name: 'Markdown',   key: 'markdown',    category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiMarkdown,      color: '#083fa1' },
   // --- Styling ---
   { name: 'CSS',        key: 'css',         category: 'Styling',    domainCategory: 'Markup & Styling', icon: BiLogoCss3,      color: '#65309a', scale: 1.4 },
   { name: 'SCSS',       key: 'scss',        category: 'Styling',    domainCategory: 'Markup & Styling', icon: SiSass,          color: '#c6538c' },
@@ -234,6 +245,7 @@ export const LANGUAGES: LangDef[] = [
   // --- Database / Query ---
   { name: 'TSQL',       key: 'tsql',        category: 'Database',   domainCategory: 'Data & Science',  icon: DiMsqlServer,    color: '#e38c00', scale: 1.6 },
   { name: 'PLpgSQL',    key: 'plpgsql',     category: 'Database',   domainCategory: 'Data & Science',  icon: SiPostgresql,    color: '#336790' },
+  { name: 'GraphQL',    key: 'graphql',     category: 'Database',   domainCategory: 'Web',             icon: SiGraphql,       color: '#e10098' },
   // --- Build / Config / IaC ---
   { name: 'Makefile',   key: 'makefile',    category: 'Config',     domainCategory: 'DevOps & Config', icon: SiMake,          color: '#427819' },
   { name: 'CMake',      key: 'cmake',       category: 'Config',     domainCategory: 'DevOps & Config', icon: SiCmake,         color: '#DA3434' },
@@ -246,6 +258,8 @@ export const LANGUAGES: LangDef[] = [
   { name: 'Just',       key: 'just',        category: 'Config',     domainCategory: 'DevOps & Config', icon: null,            color: '#384d54' },
   { name: 'Puppet',     key: 'puppet',      category: 'Config',     domainCategory: 'DevOps & Config', icon: SiPuppet,        color: '#302B6D' },
   { name: 'Pkl',        key: 'pkl',         category: 'Config',     domainCategory: 'DevOps & Config', icon: null,            color: '#6b9543' },
+  { name: 'CUE',        key: 'cue',         category: 'Config',     domainCategory: 'DevOps & Config', icon: null,            color: '#5886e1' },
+  { name: 'Dhall',      key: 'dhall',       category: 'Config',     domainCategory: 'DevOps & Config', icon: null,            color: '#dfafff' },
   // --- Blockchain / Smart contracts ---
   { name: 'Solidity',   key: 'solidity',    category: 'Blockchain', domainCategory: 'Specialty',       icon: SiSolidity,      color: '#2a247c' },
   { name: 'Vyper',      key: 'vyper',       category: 'Blockchain', domainCategory: 'Specialty',       icon: null,            color: '#2980b9' },
@@ -266,6 +280,7 @@ export const LANGUAGES: LangDef[] = [
   { name: 'VHDL',       key: 'vhdl',        category: 'Shaders & HDL', domainCategory: 'Hardware',        icon: null,            color: '#adb2cb' },
   { name: 'Verilog',    key: 'verilog',     category: 'Shaders & HDL', domainCategory: 'Hardware',        icon: null,            color: '#b2b7f8' },
   { name: 'SystemVerilog',key:'systemverilog', category: 'Shaders & HDL', domainCategory: 'Hardware',       icon: null,            color: '#DAE1C2' },
+  { name: 'OpenCL',     key: 'opencl',      category: 'Shaders & HDL', domainCategory: 'Hardware',     icon: null,            color: '#ed1c24' },
   // --- Game development ---
   { name: 'GDScript',   key: 'gdscript',    category: 'Game Scripting', domainCategory: 'Game',            icon: SiGodotengine,   color: '#355570' },
   { name: 'Haxe',       key: 'haxe',        category: 'Game Scripting', domainCategory: 'Game',            icon: SiHaxe,          color: '#df7900' },
@@ -278,6 +293,7 @@ export const LANGUAGES: LangDef[] = [
   { name: 'Vim Script', key: 'vim script',  category: 'Editor',     domainCategory: 'Specialty',       icon: SiVim,           color: '#199f4b' },
   // --- UI frameworks ---
   { name: 'QML',        key: 'qml',         category: 'UI',         domainCategory: 'Mobile & Desktop', icon: SiQt,            color: '#44a51c' },
+  { name: 'XAML',       key: 'xaml',        category: 'UI',         domainCategory: 'Mobile & Desktop', icon: null,            color: '#5b277d' },
 ]
 
 /** Lookup by key (lowercase). Returns undefined if not in library. */
