@@ -334,3 +334,17 @@ export const DOMAIN_CATEGORIES: DomainCategory[] = [
 export function getLangsByDomainCategory(cat: DomainCategory): LangDef[] {
   return LANGUAGES.filter(l => l.domainCategory === cat)
 }
+
+/** Curated set of broadly popular languages, surfaced via the "Popular" tile in FilterPanel. */
+export const POPULAR_LANGUAGES: string[] = [
+  'javascript', 'typescript', 'python', 'go', 'rust',
+  'java', 'c++', 'c', 'c#', 'ruby', 'php',
+  'swift', 'kotlin', 'html', 'css',
+]
+
+/** Get LangDef[] for the popular tile, in the order defined above. Silently skips missing keys. */
+export function getPopularLangs(): LangDef[] {
+  return POPULAR_LANGUAGES
+    .map(key => LANG_MAP.get(key))
+    .filter((l): l is LangDef => l != null)
+}
