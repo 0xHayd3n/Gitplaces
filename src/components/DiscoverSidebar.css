@@ -775,10 +775,10 @@
 
 .lang-tile-column {
   flex-shrink: 0;
-  width: 200px;
+  width: 150px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .lang-content-column {
@@ -788,17 +788,31 @@
   padding-left: 12px;
 }
 
+/* 3-column grid of language rows; rows themselves get bumped up below. */
 .lang-content-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+/* Bigger language rows inside the content column.
+   Scoped to .lang-content-list so the Type tab's subtype rows stay unchanged. */
+.lang-content-list .subtype-row {
+  padding: 8px 12px;
+  font-size: var(--text-base);
+  gap: 10px;
+}
+
+.lang-content-list .subtype-row .subtype-icon-box {
+  width: 24px;
+  height: 24px;
 }
 
 .lang-tile {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
+  gap: 5px;
+  padding: 6px 8px;
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
