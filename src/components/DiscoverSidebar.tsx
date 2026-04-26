@@ -401,7 +401,7 @@ export function FilterPanel({
               Ecosystem
             </button>
           </div>
-          <div className="categories-grid categories-grid--lang">
+          <div className={`categories-grid categories-grid--lang categories-grid--lang-${groupingMode}`}>
           {/* Favourites section */}
           {favLangs.size > 0 && (!activeCategory || activeCategory === '_fav') && !search && (
             <div className="bucket-group">

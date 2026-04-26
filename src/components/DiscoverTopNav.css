@@ -225,12 +225,25 @@
   column-count: auto;
 }
 
-/* Restore column-stacking layout for Languages */
+/* Restore column-stacking layout for Languages (Ecosystem mode — many small
+   groups balance naturally across columns) */
 .dtn-panel-content .categories-grid--lang {
   display: block;
   column-width: 180px;
   column-gap: 8px;
   grid-template-columns: unset;
+}
+
+/* Domain mode has 8 large groups; CSS-column balancing collapses them into
+   ~4 wide columns. Switch to grid auto-fill so each group occupies its own
+   cell and the row spans the full panel width. */
+.dtn-panel-content .categories-grid--lang.categories-grid--lang-domain {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  align-items: start;
+  column-width: auto;
+  column-count: auto;
 }
 
 .dtn-panel-tabs {
