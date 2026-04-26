@@ -401,6 +401,7 @@ export function FilterPanel({
               Ecosystem
             </button>
           </div>
+          <div className="categories-grid categories-grid--lang">
           {/* Favourites section */}
           {favLangs.size > 0 && (!activeCategory || activeCategory === '_fav') && !search && (
             <div className="bucket-group">
@@ -496,6 +497,7 @@ export function FilterPanel({
                 )
               })
           }
+          </div>
 
           {(draftLanguages.length > 0 || langsDirty) && (
             <div className="discover-panel-summary">
@@ -540,6 +542,7 @@ export function FilterPanel({
       {/* Repo Type tab */}
       {activeTab === 'type' && (
         <>
+          <div className="categories-grid">
           {/* Favourites section */}
           {favTypes.size > 0 && (!activeCategory || activeCategory === '_fav') && !search && (
             <div className="bucket-group">
@@ -615,6 +618,7 @@ export function FilterPanel({
             </div>
             )
           })}
+          </div>
 
           {(draftSubtypes.length > 0 || typesDirty) && (
             <div className="discover-panel-summary">
