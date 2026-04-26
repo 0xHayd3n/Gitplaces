@@ -19,7 +19,7 @@ import {
 import { FaJava } from 'react-icons/fa6'
 import { SiJavascript } from 'react-icons/si'
 import { REPO_BUCKETS } from '../constants/repoTypes'
-import { LANG_CATEGORIES, getLangsByCategory, DOMAIN_CATEGORIES, getLangsByDomainCategory, LANG_MAP, getLangColor, getPopularLangs, type LangDef } from '../lib/languages'
+import { LANG_CATEGORIES, getLangsByCategory, DOMAIN_CATEGORIES, getLangsByDomainCategory, LANG_MAP, getLangColor, getPopularLangs, LANGUAGES, type LangDef } from '../lib/languages'
 import { getSubTypeConfig } from '../config/repoTypeConfig'
 import LanguageIcon from './LanguageIcon'
 import logoSrc from '../assets/logo.png'
@@ -558,24 +558,41 @@ export function FilterPanel({
               )
             })()}
 
-            {/* SEARCH RESULTS VIEW — placeholder, replaced in Task 5 */}
-            {search && (
-              (groupingMode === 'domain'
-                ? DOMAIN_CATEGORIES.map(cat => ({ cat: cat as DomainCategory | LangCategory, langs: getLangsByDomainCategory(cat) }))
-                : LANG_CATEGORIES.map(cat => ({ cat: cat as DomainCategory | LangCategory, langs: getLangsByCategory(cat) }))
-              ).map(({ cat, langs }) => {
-                const filtered = langs
-                  .filter(def => def.name.toLowerCase().includes(search.toLowerCase()))
-                  .filter(def => !itemCounts || (itemCounts.byLanguage.get(def.key) ?? 0) > 0)
-                if (!filtered.length) return null
-                return (
-                  <div key={cat} className="bucket-group">
-                    <div className="bucket-label">{cat}</div>
-                    {filtered.map(def => renderLangRow(def))}
-                  </div>
-                )
-              })
-            )}
+            {/* SEARCH RESULTS VIEW — flat ranked list across all languages */}
+            {search && (() => {
+              const q = search.toLowerCase()
+              const startsWith: LangDef[] = []
+              const contains: LangDef[] = []
+              const keyContains: LangDef[] = []
+              const seen = new Set<string>()
+              for (const def of LANGUAGES) {
+                if (itemCounts && (itemCounts.byLanguage.get(def.key) ?? 0) === 0) continue
+                if (seen.has(def.key)) continue
+                const name = def.name.toLowerCase()
+                const key = def.key.toLowerCase()
+                if (name.startsWith(q)) {
+                  startsWith.push(def); seen.add(def.key)
+                } else if (name.includes(q)) {
+                  contains.push(def); seen.add(def.key)
+                } else if (key.includes(q)) {
+                  keyContains.push(def); seen.add(def.key)
+                }
+              }
+              const matches = [...startsWith, ...contains, ...keyContains]
+              if (matches.length === 0) {
+                return <div className="lang-search-empty">No languages match "{search}"</div>
+              }
+              return (
+                <div className="lang-search-results">
+                  {matches.map(def => {
+                    const caption = groupingMode === 'domain'
+                      ? def.domainCategory
+                      : def.category
+                    return renderLangRow(def, { caption })
+                  })}
+                </div>
+              )
+            })()}
           </div>
 
           {(draftLanguages.length > 0 || langsDirty) && (

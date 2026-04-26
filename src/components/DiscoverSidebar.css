@@ -882,3 +882,26 @@
   flex-direction: column;
   gap: 1px;
 }
+
+/* ── Language search results ─────────────────────────── */
+
+.lang-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px 8px 8px;
+}
+
+.lang-row-caption {
+  color: var(--t3);
+  font-weight: var(--weight-normal);
+  font-size: var(--text-xs);
+  margin-left: 4px;
+}
+
+.lang-search-empty {
+  padding: 16px 12px;
+  color: var(--t3);
+  font-size: var(--text-sm);
+  text-align: center;
+}

@@ -216,6 +216,62 @@ describe('FilterPanel — language drill-in', () => {
   })
 })
 
+describe('FilterPanel — language search results', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('shows a flat list of matching languages when search has text', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.type(screen.getByPlaceholderText('Search languages...'), 'rust')
+    expect(screen.getByRole('button', { name: /^Rust/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Systems \(/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Use Case' })).not.toBeInTheDocument()
+  })
+
+  it('ranks name-starts-with matches before name-contains matches', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    // Query "el" — prefix matches: Elixir, Elm, EJS. Contains matches: Haskell.
+    await user.type(screen.getByPlaceholderText('Search languages...'), 'el')
+    const langButtons = screen.getAllByRole('button').filter(b => {
+      const t = b.textContent || ''
+      return /^(Elixir|Elm|EJS|Haskell)\b/.test(t)
+    })
+    const prefixIdx = langButtons.findIndex(b => /^Elixir\b/.test(b.textContent || ''))
+    const containsIdx = langButtons.findIndex(b => /^Haskell\b/.test(b.textContent || ''))
+    expect(prefixIdx).toBeGreaterThanOrEqual(0)
+    expect(containsIdx).toBeGreaterThanOrEqual(0)
+    expect(prefixIdx, 'Elixir (prefix match) should rank before Haskell (contains match)').toBeLessThan(containsIdx)
+  })
+
+  it('shows category caption (· in <Category>) on each row', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.type(screen.getByPlaceholderText('Search languages...'), 'rust')
+    expect(screen.getByText(/· Systems/)).toBeInTheDocument()
+  })
+
+  it('shows empty state when no language matches', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.type(screen.getByPlaceholderText('Search languages...'), 'zzznosuchlang')
+    expect(screen.getByText(/No languages match/)).toBeInTheDocument()
+  })
+
+  it('does not reset drilledCategory when typing a search', async () => {
+    const user = userEvent.setup()
+    render(<FilterPanel {...filterPanelProps} />)
+    await user.click(screen.getByRole('button', { name: /^Systems/ }))
+    expect(screen.getByRole('button', { name: /^Rust$/ })).toBeInTheDocument()
+    await user.type(screen.getByPlaceholderText('Search languages...'), 'python')
+    expect(screen.getByRole('button', { name: /^Python/ })).toBeInTheDocument()
+    const input = screen.getByPlaceholderText('Search languages...') as HTMLInputElement
+    await user.clear(input)
+    expect(screen.getByRole('button', { name: /^Rust$/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Web \(/ })).not.toBeInTheDocument()
+  })
+})
+
 describe('FilterPanel — embedded mode', () => {
   it('hides internal Blocks header / search / tabs / category dropdown when embedded', () => {
     render(<FilterPanel {...filterPanelProps} embedded activeTab="language" />)
@@ -239,7 +295,7 @@ describe('FilterPanel — embedded mode', () => {
     expect(screen.queryByRole('button', { name: 'Domain' })).not.toBeInTheDocument()
   })
 
-  it('filters bucket-groups by controlled search prop', () => {
+  it('filters to a flat list of matching languages by controlled search prop', () => {
     render(<FilterPanel {...filterPanelProps} embedded activeTab="language" search="rust" />)
     expect(screen.getByText(/^Rust$/)).toBeInTheDocument()
     // Python should be filtered out
