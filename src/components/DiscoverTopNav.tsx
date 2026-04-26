@@ -170,6 +170,9 @@ export default function DiscoverTopNav(props: DiscoverSidebarProps) {
                   selectedSubtypes={selectedSubtypes}
                   onSelectedSubtypesChange={onSelectedSubtypesChange}
                   itemCounts={itemCounts}
+                  embedded
+                  activeTab={filterTab === 'languages' ? 'language' : 'type'}
+                  search={filterSearch}
                 />
               )}
               {filterTab === 'advanced' && (

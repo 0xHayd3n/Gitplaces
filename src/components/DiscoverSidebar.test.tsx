@@ -150,3 +150,34 @@ describe('FilterPanel — grouping toggle', () => {
     expect(screen.getByRole('button', { name: 'Ecosystem' })).toHaveClass('active')
   })
 })
+
+describe('FilterPanel — embedded mode', () => {
+  it('hides internal Blocks header / search / tabs / category dropdown when embedded', () => {
+    render(<FilterPanel {...filterPanelProps} embedded activeTab="language" />)
+    expect(screen.queryByText('Blocks')).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('Search languages...')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Language(\s|$)/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /All Languages/ })).not.toBeInTheDocument()
+  })
+
+  it('renders the internal header by default (non-embedded)', () => {
+    render(<FilterPanel {...filterPanelProps} />)
+    expect(screen.getByText('Blocks')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search languages...')).toBeInTheDocument()
+  })
+
+  it('renders Type tab content when controlled activeTab="type"', () => {
+    render(<FilterPanel {...filterPanelProps} embedded activeTab="type" />)
+    // A known repo-type bucket label should be visible
+    expect(screen.getByText(/Frameworks/)).toBeInTheDocument()
+    // Domain/Ecosystem toggle is language-only — should be hidden in type tab
+    expect(screen.queryByRole('button', { name: 'Domain' })).not.toBeInTheDocument()
+  })
+
+  it('filters bucket-groups by controlled search prop', () => {
+    render(<FilterPanel {...filterPanelProps} embedded activeTab="language" search="rust" />)
+    expect(screen.getByText(/^Rust$/)).toBeInTheDocument()
+    // Python should be filtered out
+    expect(screen.queryByText(/^Python$/)).not.toBeInTheDocument()
+  })
+})

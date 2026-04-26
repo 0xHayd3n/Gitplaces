@@ -182,11 +182,19 @@ export function FilterPanel({
   selectedSubtypes,
   onSelectedSubtypesChange,
   itemCounts,
+  embedded = false,
+  activeTab: controlledActiveTab,
+  search: controlledSearch,
 }: Pick<DiscoverSidebarProps, 'selectedLanguages' | 'onSelectedLanguagesChange' | 'selectedSubtypes' | 'onSelectedSubtypesChange'> & {
   itemCounts?: DiscoverSidebarProps['itemCounts']
+  embedded?: boolean
+  activeTab?: FilterTab
+  search?: string
 }) {
-  const [activeTab, setActiveTab] = useState<FilterTab>('language')
-  const [search, setSearch] = useState('')
+  const [internalActiveTab, setActiveTab] = useState<FilterTab>('language')
+  const activeTab = controlledActiveTab ?? internalActiveTab
+  const [internalSearch, setSearch] = useState('')
+  const search = controlledSearch ?? internalSearch
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -276,6 +284,7 @@ export function FilterPanel({
   return (
     <div className="discover-panel-content">
       {/* Sticky header: title + search + tabs + category dropdown */}
+      {!embedded && (
       <div className="blocks-sticky-header">
       <div className="blocks-header">
         <div className="blocks-title">Blocks</div>
@@ -372,7 +381,8 @@ export function FilterPanel({
           </div>
         )
       })()}
-      </div>{/* end blocks-sticky-header */}
+      </div>
+      )}{/* end blocks-sticky-header */}
 
       {/* Language tab */}
       {activeTab === 'language' && (
