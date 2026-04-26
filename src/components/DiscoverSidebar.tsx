@@ -19,7 +19,7 @@ import {
 import { FaJava } from 'react-icons/fa6'
 import { SiJavascript } from 'react-icons/si'
 import { REPO_BUCKETS } from '../constants/repoTypes'
-import { LANG_CATEGORIES, getLangsByCategory, DOMAIN_CATEGORIES, getLangsByDomainCategory, LANG_MAP, getLangColor, type LangDef } from '../lib/languages'
+import { LANG_CATEGORIES, getLangsByCategory, DOMAIN_CATEGORIES, getLangsByDomainCategory, LANG_MAP, getLangColor, getPopularLangs, type LangDef } from '../lib/languages'
 import { getSubTypeConfig } from '../config/repoTypeConfig'
 import LanguageIcon from './LanguageIcon'
 import logoSrc from '../assets/logo.png'
@@ -201,6 +201,14 @@ export function FilterPanel({
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const [groupingMode, setGroupingMode] = useLocalStorage<GroupingMode>('discover:languageGrouping', 'domain')
+
+  // Language tab drill-in: which category's contents are showing inside the Language tab.
+  // null = default tile grid; non-null = drilled into a specific category (or Popular).
+  type DrilledCategory =
+    | { kind: 'popular' }
+    | { kind: 'domain', cat: DomainCategory }
+    | { kind: 'ecosystem', cat: LangCategory }
+  const [drilledCategory, setDrilledCategory] = useState<DrilledCategory | null>(null)
 
   // ── Draft state — selections are staged locally until the user clicks Apply ──
   const [draftLanguages, setDraftLanguages] = useState(selectedLanguages)
@@ -416,61 +424,141 @@ export function FilterPanel({
       {/* Language tab */}
       {activeTab === 'language' && (
         <>
-          <div className="filter-grouping-toggle">
-            <button
-              className={`filter-grouping-btn${groupingMode === 'domain' ? ' active' : ''}`}
-              onClick={() => setGroupingMode('domain')}
-            >
-              Use Case
-            </button>
-            <button
-              className={`filter-grouping-btn${groupingMode === 'ecosystem' ? ' active' : ''}`}
-              onClick={() => setGroupingMode('ecosystem')}
-            >
-              Platform
-            </button>
-          </div>
-          <div className="categories-grid categories-grid--lang">
-          {/* Favourites section */}
-          {favLangs.size > 0 && (!activeCategory || activeCategory === '_fav') && !search && (
-            <div className="bucket-group" style={{ '--rows': favLangs.size + 2 } as React.CSSProperties}>
-              <div className="bucket-label"><Star size={11} /> Favourites</div>
-              {[...favLangs].map(key => {
-                const def = LANG_MAP.get(key)
-                return def ? renderLangRow(def) : null
-              })}
+          {/* Grouping toggle — visible only in the default grid view */}
+          {!drilledCategory && !search && (
+            <div className="filter-grouping-toggle">
+              <button
+                className={`filter-grouping-btn${groupingMode === 'domain' ? ' active' : ''}`}
+                onClick={() => setGroupingMode('domain')}
+              >
+                Use Case
+              </button>
+              <button
+                className={`filter-grouping-btn${groupingMode === 'ecosystem' ? ' active' : ''}`}
+                onClick={() => setGroupingMode('ecosystem')}
+              >
+                Platform
+              </button>
             </div>
           )}
-          {groupingMode === 'domain'
-            ? DOMAIN_CATEGORIES.map(cat => {
-                const langs = getLangsByDomainCategory(cat)
-                  .filter(def => !search || def.name.toLowerCase().includes(search.toLowerCase()))
+
+          <div className="categories-grid categories-grid--lang">
+            {/* Favourites — always above the tile grid (default view only) */}
+            {!drilledCategory && !search && favLangs.size > 0 && (
+              <div className="bucket-group" style={{ '--rows': favLangs.size + 2 } as React.CSSProperties}>
+                <div className="bucket-label"><Star size={11} /> Favourites</div>
+                {[...favLangs].map(key => {
+                  const def = LANG_MAP.get(key)
+                  return def ? renderLangRow(def) : null
+                })}
+              </div>
+            )}
+
+            {/* DEFAULT VIEW — tile grid (Popular + categories) */}
+            {!drilledCategory && !search && (
+              <div className="lang-tile-grid">
+                {/* Popular tile */}
+                {(() => {
+                  const popularCount = itemCounts
+                    ? getPopularLangs().filter(l => (itemCounts.byLanguage.get(l.key) ?? 0) > 0).length
+                    : getPopularLangs().length
+                  if (popularCount === 0) return null
+                  return (
+                    <button
+                      className="lang-tile lang-tile--popular"
+                      onClick={() => setDrilledCategory({ kind: 'popular' })}
+                    >
+                      <PiStarFill size={16} />
+                      <span className="lang-tile-name">Popular</span>
+                      <span className="lang-tile-count">({popularCount})</span>
+                    </button>
+                  )
+                })()}
+
+                {/* Category tiles */}
+                {groupingMode === 'domain'
+                  ? DOMAIN_CATEGORIES.map(cat => {
+                      const count = (itemCounts
+                        ? getLangsByDomainCategory(cat).filter(l => (itemCounts.byLanguage.get(l.key) ?? 0) > 0)
+                        : getLangsByDomainCategory(cat)).length
+                      if (count === 0) return null
+                      const Icon = DOMAIN_CAT_ICONS[cat]
+                      return (
+                        <button
+                          key={cat}
+                          className="lang-tile"
+                          onClick={() => setDrilledCategory({ kind: 'domain', cat })}
+                        >
+                          <Icon size={16} />
+                          <span className="lang-tile-name">{cat}</span>
+                          <span className="lang-tile-count">({count})</span>
+                        </button>
+                      )
+                    })
+                  : LANG_CATEGORIES.map(cat => {
+                      const count = (itemCounts
+                        ? getLangsByCategory(cat).filter(l => (itemCounts.byLanguage.get(l.key) ?? 0) > 0)
+                        : getLangsByCategory(cat)).length
+                      if (count === 0) return null
+                      const Icon = LANG_CAT_ICONS[cat]
+                      return (
+                        <button
+                          key={cat}
+                          className="lang-tile"
+                          onClick={() => setDrilledCategory({ kind: 'ecosystem', cat })}
+                        >
+                          <Icon size={16} />
+                          <span className="lang-tile-name">{cat}</span>
+                          <span className="lang-tile-count">({count})</span>
+                        </button>
+                      )
+                    })
+                }
+              </div>
+            )}
+
+            {/* DRILLED-IN VIEW — placeholder, replaced in Task 4 */}
+            {drilledCategory && !search && (() => {
+              const langs = drilledCategory.kind === 'popular'
+                ? getPopularLangs()
+                : drilledCategory.kind === 'domain'
+                  ? getLangsByDomainCategory(drilledCategory.cat)
+                  : getLangsByCategory(drilledCategory.cat)
+              const visible = itemCounts
+                ? langs.filter(l => (itemCounts.byLanguage.get(l.key) ?? 0) > 0)
+                : langs
+              return (
+                <div className="bucket-group">
+                  <div className="bucket-label">
+                    <button
+                      onClick={() => setDrilledCategory(null)}
+                      style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, marginRight: 8 }}
+                    >← All</button>
+                    {drilledCategory.kind === 'popular' ? 'Popular' : drilledCategory.cat}
+                  </div>
+                  {visible.map(def => renderLangRow(def))}
+                </div>
+              )
+            })()}
+
+            {/* SEARCH RESULTS VIEW — placeholder, replaced in Task 5 */}
+            {search && (
+              (groupingMode === 'domain'
+                ? DOMAIN_CATEGORIES.map(cat => ({ cat: cat as DomainCategory | LangCategory, langs: getLangsByDomainCategory(cat) }))
+                : LANG_CATEGORIES.map(cat => ({ cat: cat as DomainCategory | LangCategory, langs: getLangsByCategory(cat) }))
+              ).map(({ cat, langs }) => {
+                const filtered = langs
+                  .filter(def => def.name.toLowerCase().includes(search.toLowerCase()))
                   .filter(def => !itemCounts || (itemCounts.byLanguage.get(def.key) ?? 0) > 0)
-                if (!langs.length) return null
-                const CatIcon = DOMAIN_CAT_ICONS[cat]
+                if (!filtered.length) return null
                 return (
-                  <div key={cat} className="bucket-group" style={{ '--rows': langs.length + 2 } as React.CSSProperties}>
-                    <div className="bucket-label"><CatIcon size={11} /> {cat}</div>
-                    {langs.map(def => renderLangRow(def))}
+                  <div key={cat} className="bucket-group">
+                    <div className="bucket-label">{cat}</div>
+                    {filtered.map(def => renderLangRow(def))}
                   </div>
                 )
               })
-            : LANG_CATEGORIES
-                .filter(cat => !activeCategory || (activeCategory !== '_fav' && activeCategory === cat))
-                .map(cat => {
-                const langs = getLangsByCategory(cat)
-                  .filter(def => !search || def.name.toLowerCase().includes(search.toLowerCase()))
-                  .filter(def => !itemCounts || (itemCounts.byLanguage.get(def.key) ?? 0) > 0)
-                if (!langs.length) return null
-                const CatIcon = LANG_CAT_ICONS[cat]
-                return (
-                  <div key={cat} className="bucket-group" style={{ '--rows': langs.length + 2 } as React.CSSProperties}>
-                    <div className="bucket-label"><CatIcon size={11} /> {cat}</div>
-                    {langs.map(def => renderLangRow(def))}
-                  </div>
-                )
-              })
-          }
+            )}
           </div>
 
           {(draftLanguages.length > 0 || langsDirty) && (

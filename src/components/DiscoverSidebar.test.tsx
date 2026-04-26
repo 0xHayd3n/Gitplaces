@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import DiscoverSidebar, { FilterPanel } from './DiscoverSidebar'
 
@@ -148,6 +148,28 @@ describe('FilterPanel — grouping toggle', () => {
     localStorage.setItem('discover:languageGrouping', JSON.stringify('ecosystem'))
     render(<FilterPanel {...filterPanelProps} />)
     expect(screen.getByRole('button', { name: 'Platform' })).toHaveClass('active')
+  })
+})
+
+describe('FilterPanel — language tile grid (default view)', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('renders Popular tile and category tiles, not language rows, when no search and no drill-in', () => {
+    render(<FilterPanel {...filterPanelProps} />)
+    // Popular tile is always visible
+    expect(screen.getByRole('button', { name: /Popular/ })).toBeInTheDocument()
+    // Domain category tiles are visible (Use Case is the default mode)
+    expect(screen.getByRole('button', { name: /^Systems/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Web/ })).toBeInTheDocument()
+    // Individual language rows should NOT be in the default view
+    expect(screen.queryByRole('button', { name: /^Rust$/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Python$/ })).not.toBeInTheDocument()
+  })
+
+  it('shows tile counts that match the catalogue', () => {
+    render(<FilterPanel {...filterPanelProps} />)
+    // The Systems domain has 15 languages in the catalogue (catalogue-derived; update if catalogue changes)
+    expect(screen.getByRole('button', { name: /Systems.*\(15\)/ })).toBeInTheDocument()
   })
 })
 
