@@ -117,12 +117,12 @@ export interface DiscoverSidebarProps {
 import type { LangCategory, DomainCategory, GroupingMode } from '../lib/languages'
 
 const LANG_CAT_ICONS: Record<LangCategory, IconType> = {
-  'Systems': PiCpuFill, 'JVM': FaJava, 'Apple': PiAppleLogoFill, '.NET': PiCircleHalfFill,
-  'JavaScript': SiJavascript, 'Web Frameworks': PiGridFourFill, 'Functional': PiFunctionFill, 'BEAM': PiBroadcastFill,
+  'Native': PiCpuFill, 'JVM': FaJava, 'Apple': PiAppleLogoFill, '.NET': PiCircleHalfFill,
+  'JavaScript': SiJavascript, 'Web Frameworks': PiGridFourFill, 'Pure Functional': PiFunctionFill, 'BEAM': PiBroadcastFill,
   'Lisp': PiBracketsCurlyFill, 'Scripting': PiScrollFill, 'Shell': PiTerminalWindowFill, 'Data': PiChartBarFill,
-  'Logic': PiAtomFill, 'Markup': PiFileCodeFill, 'Styling': PiPaletteFill, 'Typesetting': PiBookOpenFill,
-  'Database': PiDatabaseFill, 'Config': PiWrenchFill, 'Blockchain': PiLinkSimpleFill, 'Hardware': PiCircuitryFill,
-  'Game': PiGameControllerFill, 'Enterprise': PiBuildingsFill, 'Editor': PiPenNibFill, 'UI': PiMonitorFill,
+  'Logic Programming': PiAtomFill, 'Markup': PiFileCodeFill, 'Styling': PiPaletteFill, 'Typesetting': PiBookOpenFill,
+  'Database': PiDatabaseFill, 'Config': PiWrenchFill, 'Blockchain': PiLinkSimpleFill, 'Shaders & HDL': PiCircuitryFill,
+  'Game Scripting': PiGameControllerFill, 'Enterprise': PiBuildingsFill, 'Editor': PiPenNibFill, 'UI': PiMonitorFill,
 }
 
 const DOMAIN_CAT_ICONS: Record<DomainCategory, IconType> = {
@@ -394,13 +394,13 @@ export function FilterPanel({
               className={`filter-grouping-btn${groupingMode === 'domain' ? ' active' : ''}`}
               onClick={() => setGroupingMode('domain')}
             >
-              Domain
+              Use Case
             </button>
             <button
               className={`filter-grouping-btn${groupingMode === 'ecosystem' ? ' active' : ''}`}
               onClick={() => setGroupingMode('ecosystem')}
             >
-              Ecosystem
+              Platform
             </button>
           </div>
           <div className="categories-grid categories-grid--lang">

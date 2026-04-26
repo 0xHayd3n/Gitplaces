@@ -78,27 +78,27 @@ import { BiSolidTerminal, BiLogoCss3 } from 'react-icons/bi'
 import { DiJava, DiGroovy, DiDlang, DiDotnet, DiPhp, DiPerl, DiErlang, DiDart, DiProlog, DiMsqlServer } from 'react-icons/di'
 
 export type EcosystemCategory =
-  | 'Systems'
+  | 'Native'
   | 'JVM'
   | 'Apple'
   | '.NET'
   | 'JavaScript'
   | 'Web Frameworks'
-  | 'Functional'
+  | 'Pure Functional'
   | 'BEAM'
   | 'Lisp'
   | 'Scripting'
   | 'Shell'
   | 'Data'
-  | 'Logic'
+  | 'Logic Programming'
   | 'Markup'
   | 'Styling'
   | 'Typesetting'
   | 'Database'
   | 'Config'
   | 'Blockchain'
-  | 'Hardware'
-  | 'Game'
+  | 'Shaders & HDL'
+  | 'Game Scripting'
   | 'Enterprise'
   | 'Editor'
   | 'UI'
@@ -134,21 +134,21 @@ export interface LangDef {
 
 export const LANGUAGES: LangDef[] = [
   // --- Systems / Low-level ---
-  { name: 'C',          key: 'c',           category: 'Systems',    domainCategory: 'Systems',         icon: SiC,             color: '#649bd3' },
-  { name: 'C++',        key: 'c++',         category: 'Systems',    domainCategory: 'Systems',         icon: SiCplusplus,     color: '#649bd3' },
-  { name: 'Rust',       key: 'rust',        category: 'Systems',    domainCategory: 'Systems',         icon: SiRust,          color: '#000000' },
-  { name: 'Go',         key: 'go',          category: 'Systems',    domainCategory: 'Systems',         icon: SiGo,            color: '#02aed4', scale: 1.6 },
-  { name: 'Zig',        key: 'zig',         category: 'Systems',    domainCategory: 'Systems',         icon: SiZig,           color: '#f6a615' },
-  { name: 'D',          key: 'd',           category: 'Systems',    domainCategory: 'Systems',         icon: DiDlang,         color: '#b03931', scale: 1.6 },
-  { name: 'Nim',        key: 'nim',         category: 'Systems',    domainCategory: 'Systems',         icon: SiNim,           color: '#1e212a' },
-  { name: 'V',          key: 'v',           category: 'Systems',    domainCategory: 'Systems',         icon: SiV,             color: '#5d87bf' },
-  { name: 'Crystal',    key: 'crystal',     category: 'Systems',    domainCategory: 'Systems',         icon: SiCrystal,       color: '#000000' },
-  { name: 'Odin',       key: 'odin',        category: 'Systems',    domainCategory: 'Systems',         icon: SiOdin,          color: '#60AFFE' },
-  { name: 'Carbon',     key: 'carbon',      category: 'Systems',    domainCategory: 'Systems',         icon: null,            color: '#222222' },
-  { name: 'Assembly',   key: 'assembly',    category: 'Systems',    domainCategory: 'Systems',         icon: null,            color: '#6b7280' },
-  { name: 'Ada',        key: 'ada',         category: 'Systems',    domainCategory: 'Systems',         icon: SiAda,           color: '#02f88c' },
-  { name: 'Fortran',    key: 'fortran',     category: 'Systems',    domainCategory: 'Systems',         icon: SiFortran,       color: '#734f97' },
-  { name: 'Pascal',     key: 'pascal',      category: 'Systems',    domainCategory: 'Systems',         icon: null,            color: '#E3F171' },
+  { name: 'C',          key: 'c',           category: 'Native', domainCategory: 'Systems',         icon: SiC,             color: '#649bd3' },
+  { name: 'C++',        key: 'c++',         category: 'Native', domainCategory: 'Systems',         icon: SiCplusplus,     color: '#649bd3' },
+  { name: 'Rust',       key: 'rust',        category: 'Native', domainCategory: 'Systems',         icon: SiRust,          color: '#000000' },
+  { name: 'Go',         key: 'go',          category: 'Native', domainCategory: 'Systems',         icon: SiGo,            color: '#02aed4', scale: 1.6 },
+  { name: 'Zig',        key: 'zig',         category: 'Native', domainCategory: 'Systems',         icon: SiZig,           color: '#f6a615' },
+  { name: 'D',          key: 'd',           category: 'Native', domainCategory: 'Systems',         icon: DiDlang,         color: '#b03931', scale: 1.6 },
+  { name: 'Nim',        key: 'nim',         category: 'Native', domainCategory: 'Systems',         icon: SiNim,           color: '#1e212a' },
+  { name: 'V',          key: 'v',           category: 'Native', domainCategory: 'Systems',         icon: SiV,             color: '#5d87bf' },
+  { name: 'Crystal',    key: 'crystal',     category: 'Native', domainCategory: 'Systems',         icon: SiCrystal,       color: '#000000' },
+  { name: 'Odin',       key: 'odin',        category: 'Native', domainCategory: 'Systems',         icon: SiOdin,          color: '#60AFFE' },
+  { name: 'Carbon',     key: 'carbon',      category: 'Native', domainCategory: 'Systems',         icon: null,            color: '#222222' },
+  { name: 'Assembly',   key: 'assembly',    category: 'Native', domainCategory: 'Systems',         icon: null,            color: '#6b7280' },
+  { name: 'Ada',        key: 'ada',         category: 'Native', domainCategory: 'Systems',         icon: SiAda,           color: '#02f88c' },
+  { name: 'Fortran',    key: 'fortran',     category: 'Native', domainCategory: 'Systems',         icon: SiFortran,       color: '#734f97' },
+  { name: 'Pascal',     key: 'pascal',      category: 'Native', domainCategory: 'Systems',         icon: null,            color: '#E3F171' },
   // --- JVM ---
   { name: 'Java',       key: 'java',        category: 'JVM',        domainCategory: 'Mobile & Desktop', icon: DiJava,          color: '#dc2626', scale: 1.6, doubleLayer: true },
   { name: 'Kotlin',     key: 'kotlin',      category: 'JVM',        domainCategory: 'Mobile & Desktop', icon: SiKotlin,        color: '#7c3aed' },
@@ -174,11 +174,11 @@ export const LANGUAGES: LangDef[] = [
   { name: 'Svelte',     key: 'svelte',      category: 'Web Frameworks', domainCategory: 'Web',         icon: SiSvelte,        color: '#fb3c06' },
   { name: 'Astro',      key: 'astro',       category: 'Web Frameworks', domainCategory: 'Web',         icon: SiAstro,         color: '#ff5a03' },
   // --- Functional / ML ---
-  { name: 'Haskell',    key: 'haskell',     category: 'Functional', domainCategory: 'Functional',      icon: SiHaskell,       color: '#9c3c90' },
-  { name: 'OCaml',      key: 'ocaml',       category: 'Functional', domainCategory: 'Functional',      icon: SiOcaml,         color: '#c1501e' },
-  { name: 'Elm',        key: 'elm',         category: 'Functional', domainCategory: 'Functional',      icon: SiElm,           color: '#0ea5e9' },
-  { name: 'PureScript', key: 'purescript',  category: 'Functional', domainCategory: 'Functional',      icon: SiPurescript,    color: '#1D222D' },
-  { name: 'Roc',        key: 'roc',         category: 'Functional', domainCategory: 'Functional',      icon: null,            color: '#7c38f5' },
+  { name: 'Haskell',    key: 'haskell',     category: 'Pure Functional', domainCategory: 'Functional',      icon: SiHaskell,       color: '#9c3c90' },
+  { name: 'OCaml',      key: 'ocaml',       category: 'Pure Functional', domainCategory: 'Functional',      icon: SiOcaml,         color: '#c1501e' },
+  { name: 'Elm',        key: 'elm',         category: 'Pure Functional', domainCategory: 'Functional',      icon: SiElm,           color: '#0ea5e9' },
+  { name: 'PureScript', key: 'purescript',  category: 'Pure Functional', domainCategory: 'Functional',      icon: SiPurescript,    color: '#1D222D' },
+  { name: 'Roc',        key: 'roc',         category: 'Pure Functional', domainCategory: 'Functional',      icon: null,            color: '#7c38f5' },
   // --- BEAM ecosystem ---
   { name: 'Elixir',     key: 'elixir',      category: 'BEAM',       domainCategory: 'Functional',      icon: SiElixir,        color: '#4a3560' },
   { name: 'Erlang',     key: 'erlang',      category: 'BEAM',       domainCategory: 'Functional',      icon: DiErlang,        color: '#ab0130', scale: 1.6 },
@@ -214,8 +214,8 @@ export const LANGUAGES: LangDef[] = [
   { name: 'Jupyter Notebook', key: 'jupyter notebook', category: 'Data', domainCategory: 'Data & Science', icon: SiJupyter, color: '#DA5B0B' },
   { name: 'Mojo',       key: 'mojo',        category: 'Data',       domainCategory: 'Data & Science',  icon: null,            color: '#ff4c1a' },
   // --- Logic / Proof ---
-  { name: 'Prolog',     key: 'prolog',      category: 'Logic',      domainCategory: 'Specialty',       icon: DiProlog,        color: '#74283c', scale: 1.6 },
-  { name: 'Lean',       key: 'lean',        category: 'Logic',      domainCategory: 'Specialty',       icon: null,            color: '#404040' },
+  { name: 'Prolog',     key: 'prolog',      category: 'Logic Programming', domainCategory: 'Specialty',       icon: DiProlog,        color: '#74283c', scale: 1.6 },
+  { name: 'Lean',       key: 'lean',        category: 'Logic Programming', domainCategory: 'Specialty',       icon: null,            color: '#404040' },
   // --- Markup / Templating ---
   { name: 'HTML',       key: 'html',        category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiHtml5,         color: '#e74b22' },
   { name: 'MDX',        key: 'mdx',         category: 'Markup',     domainCategory: 'Markup & Styling', icon: SiMdx,           color: '#fcb32c' },
@@ -251,15 +251,15 @@ export const LANGUAGES: LangDef[] = [
   { name: 'Cairo',      key: 'cairo',       category: 'Blockchain', domainCategory: 'Specialty',       icon: null,            color: '#ff4a48' },
   { name: 'Move',       key: 'move',        category: 'Blockchain', domainCategory: 'Specialty',       icon: null,            color: '#4a137a' },
   // --- Shader / GPU / Hardware ---
-  { name: 'GLSL',       key: 'glsl',        category: 'Hardware',   domainCategory: 'Hardware',        icon: null,            color: '#5686a5' },
-  { name: 'HLSL',       key: 'hlsl',        category: 'Hardware',   domainCategory: 'Hardware',        icon: null,            color: '#aace60' },
-  { name: 'CUDA',       key: 'cuda',        category: 'Hardware',   domainCategory: 'Hardware',        icon: SiNvidia,        color: '#3A4E3A' },
-  { name: 'VHDL',       key: 'vhdl',        category: 'Hardware',   domainCategory: 'Hardware',        icon: null,            color: '#adb2cb' },
-  { name: 'Verilog',    key: 'verilog',     category: 'Hardware',   domainCategory: 'Hardware',        icon: null,            color: '#b2b7f8' },
-  { name: 'SystemVerilog',key:'systemverilog', category: 'Hardware', domainCategory: 'Hardware',       icon: null,            color: '#DAE1C2' },
+  { name: 'GLSL',       key: 'glsl',        category: 'Shaders & HDL', domainCategory: 'Hardware',        icon: null,            color: '#5686a5' },
+  { name: 'HLSL',       key: 'hlsl',        category: 'Shaders & HDL', domainCategory: 'Hardware',        icon: null,            color: '#aace60' },
+  { name: 'CUDA',       key: 'cuda',        category: 'Shaders & HDL', domainCategory: 'Hardware',        icon: SiNvidia,        color: '#3A4E3A' },
+  { name: 'VHDL',       key: 'vhdl',        category: 'Shaders & HDL', domainCategory: 'Hardware',        icon: null,            color: '#adb2cb' },
+  { name: 'Verilog',    key: 'verilog',     category: 'Shaders & HDL', domainCategory: 'Hardware',        icon: null,            color: '#b2b7f8' },
+  { name: 'SystemVerilog',key:'systemverilog', category: 'Shaders & HDL', domainCategory: 'Hardware',       icon: null,            color: '#DAE1C2' },
   // --- Game development ---
-  { name: 'GDScript',   key: 'gdscript',    category: 'Game',       domainCategory: 'Game',            icon: SiGodotengine,   color: '#355570' },
-  { name: 'Haxe',       key: 'haxe',        category: 'Game',       domainCategory: 'Game',            icon: SiHaxe,          color: '#df7900' },
+  { name: 'GDScript',   key: 'gdscript',    category: 'Game Scripting', domainCategory: 'Game',            icon: SiGodotengine,   color: '#355570' },
+  { name: 'Haxe',       key: 'haxe',        category: 'Game Scripting', domainCategory: 'Game',            icon: SiHaxe,          color: '#df7900' },
   // --- Enterprise / Legacy ---
   { name: 'COBOL',      key: 'cobol',       category: 'Enterprise', domainCategory: 'Specialty',       icon: null,            color: '#0070c0' },
   { name: 'ABAP',       key: 'abap',        category: 'Enterprise', domainCategory: 'Specialty',       icon: SiSap,           color: '#E8274B' },

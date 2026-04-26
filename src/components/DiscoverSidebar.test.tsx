@@ -117,37 +117,37 @@ const filterPanelProps = {
 describe('FilterPanel — grouping toggle', () => {
   beforeEach(() => localStorage.clear())
 
-  it('renders Domain and Ecosystem buttons', () => {
+  it('renders Use Case and Platform buttons', () => {
     render(<FilterPanel {...filterPanelProps} />)
-    expect(screen.getByRole('button', { name: 'Domain' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Ecosystem' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Use Case' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Platform' })).toBeInTheDocument()
   })
 
-  it('defaults to Domain mode', () => {
+  it('defaults to Use Case mode (domain)', () => {
     render(<FilterPanel {...filterPanelProps} />)
-    expect(screen.getByRole('button', { name: 'Domain' })).toHaveClass('active')
-    expect(screen.getByRole('button', { name: 'Ecosystem' })).not.toHaveClass('active')
+    expect(screen.getByRole('button', { name: 'Use Case' })).toHaveClass('active')
+    expect(screen.getByRole('button', { name: 'Platform' })).not.toHaveClass('active')
   })
 
-  it('switches to Ecosystem mode on click', async () => {
+  it('switches to Platform mode (ecosystem) on click', async () => {
     const user = userEvent.setup()
     render(<FilterPanel {...filterPanelProps} />)
-    await user.click(screen.getByRole('button', { name: 'Ecosystem' }))
-    expect(screen.getByRole('button', { name: 'Ecosystem' })).toHaveClass('active')
-    expect(screen.getByRole('button', { name: 'Domain' })).not.toHaveClass('active')
+    await user.click(screen.getByRole('button', { name: 'Platform' }))
+    expect(screen.getByRole('button', { name: 'Platform' })).toHaveClass('active')
+    expect(screen.getByRole('button', { name: 'Use Case' })).not.toHaveClass('active')
   })
 
   it('persists mode to localStorage', async () => {
     const user = userEvent.setup()
     render(<FilterPanel {...filterPanelProps} />)
-    await user.click(screen.getByRole('button', { name: 'Ecosystem' }))
+    await user.click(screen.getByRole('button', { name: 'Platform' }))
     expect(JSON.parse(localStorage.getItem('discover:languageGrouping')!)).toBe('ecosystem')
   })
 
   it('reads mode from localStorage on mount', () => {
     localStorage.setItem('discover:languageGrouping', JSON.stringify('ecosystem'))
     render(<FilterPanel {...filterPanelProps} />)
-    expect(screen.getByRole('button', { name: 'Ecosystem' })).toHaveClass('active')
+    expect(screen.getByRole('button', { name: 'Platform' })).toHaveClass('active')
   })
 })
 
