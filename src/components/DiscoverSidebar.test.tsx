@@ -197,12 +197,7 @@ describe('FilterPanel — language drill-in', () => {
     const user = userEvent.setup()
     render(<FilterPanel {...filterPanelProps} />)
     await user.click(screen.getByRole('button', { name: /^Systems/ }))
-    // Pick the back button specifically (the dropdown trigger also reads "All Languages"
-    // until Task 6 scopes it to the Type tab).
-    const backBtn = screen.getAllByRole('button', { name: /All Languages/ })
-      .find(b => b.classList.contains('lang-drillin-back'))!
-    expect(backBtn).toBeDefined()
-    await user.click(backBtn)
+    await user.click(screen.getByRole('button', { name: /All Languages/ }))
     expect(screen.getByRole('button', { name: /^Web/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Rust$/ })).not.toBeInTheDocument()
   })

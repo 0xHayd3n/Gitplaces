@@ -116,6 +116,12 @@ export interface DiscoverSidebarProps {
 
 import type { LangCategory, DomainCategory, GroupingMode } from '../lib/languages'
 
+/** Active drill-in within the Language tab. null = default tile grid. */
+type DrilledCategory =
+  | { kind: 'popular' }
+  | { kind: 'domain', cat: DomainCategory }
+  | { kind: 'ecosystem', cat: LangCategory }
+
 const LANG_CAT_ICONS: Record<LangCategory, IconType> = {
   'Native': PiCpuFill, 'JVM': FaJava, 'Apple': PiAppleLogoFill, '.NET': PiCircleHalfFill,
   'JavaScript': SiJavascript, 'Web Frameworks': PiGridFourFill, 'Pure Functional': PiFunctionFill, 'BEAM': PiBroadcastFill,
@@ -204,10 +210,6 @@ export function FilterPanel({
 
   // Language tab drill-in: which category's contents are showing inside the Language tab.
   // null = default tile grid; non-null = drilled into a specific category (or Popular).
-  type DrilledCategory =
-    | { kind: 'popular' }
-    | { kind: 'domain', cat: DomainCategory }
-    | { kind: 'ecosystem', cat: LangCategory }
   const [drilledCategory, setDrilledCategory] = useState<DrilledCategory | null>(null)
 
   // ── Draft state — selections are staged locally until the user clicks Apply ──
@@ -442,9 +444,10 @@ export function FilterPanel({
               <div className="lang-tile-grid">
                 {/* Popular tile */}
                 {(() => {
+                  const popular = getPopularLangs()
                   const popularCount = itemCounts
-                    ? getPopularLangs().filter(l => (itemCounts.byLanguage.get(l.key) ?? 0) > 0).length
-                    : getPopularLangs().length
+                    ? popular.filter(l => (itemCounts.byLanguage.get(l.key) ?? 0) > 0).length
+                    : popular.length
                   if (popularCount === 0) return null
                   return (
                     <button
