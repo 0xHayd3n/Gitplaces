@@ -401,10 +401,10 @@ export function FilterPanel({
               Ecosystem
             </button>
           </div>
-          <div className={`categories-grid categories-grid--lang categories-grid--lang-${groupingMode}`}>
+          <div className="categories-grid categories-grid--lang">
           {/* Favourites section */}
           {favLangs.size > 0 && (!activeCategory || activeCategory === '_fav') && !search && (
-            <div className="bucket-group">
+            <div className="bucket-group" style={{ '--rows': favLangs.size + 2 } as React.CSSProperties}>
               <div className="bucket-label"><Star size={11} /> Favourites</div>
               {[...favLangs].map(key => {
                 const def = LANG_MAP.get(key)
@@ -435,7 +435,7 @@ export function FilterPanel({
                 if (!langs.length) return null
                 const CatIcon = DOMAIN_CAT_ICONS[cat]
                 return (
-                  <div key={cat} className="bucket-group">
+                  <div key={cat} className="bucket-group" style={{ '--rows': langs.length + 2 } as React.CSSProperties}>
                     <div className="bucket-label"><CatIcon size={11} /> {cat}</div>
                     {langs.map(def => {
                       const selected = draftLanguages.includes(def.key)
@@ -470,7 +470,7 @@ export function FilterPanel({
                 if (!langs.length) return null
                 const CatIcon = LANG_CAT_ICONS[cat]
                 return (
-                  <div key={cat} className="bucket-group">
+                  <div key={cat} className="bucket-group" style={{ '--rows': langs.length + 2 } as React.CSSProperties}>
                     <div className="bucket-label"><CatIcon size={11} /> {cat}</div>
                     {langs.map(def => {
                       const selected = draftLanguages.includes(def.key)
