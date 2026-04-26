@@ -19,7 +19,7 @@ import {
 import { FaJava } from 'react-icons/fa6'
 import { SiJavascript } from 'react-icons/si'
 import { REPO_BUCKETS } from '../constants/repoTypes'
-import { LANG_CATEGORIES, getLangsByCategory, DOMAIN_CATEGORIES, getLangsByDomainCategory, LANG_MAP, getLangColor } from '../lib/languages'
+import { LANG_CATEGORIES, getLangsByCategory, DOMAIN_CATEGORIES, getLangsByDomainCategory, LANG_MAP, getLangColor, type LangDef } from '../lib/languages'
 import { getSubTypeConfig } from '../config/repoTypeConfig'
 import LanguageIcon from './LanguageIcon'
 import logoSrc from '../assets/logo.png'
@@ -283,6 +283,33 @@ export function FilterPanel({
 
   const hasFavs = activeTab === 'language' ? favLangs.size > 0 : favTypes.size > 0
 
+  /** Renders one selectable language row. Used by Favourites, drilled-in view, and search results. */
+  const renderLangRow = (def: LangDef, opts?: { caption?: string }) => {
+    const selected = draftLanguages.includes(def.key)
+    const isFav = favLangs.has(def.key)
+    const langCount = itemCounts?.byLanguage.get(def.key)
+    return (
+      <button
+        key={def.key}
+        className={`subtype-row${selected ? ' selected' : ''}`}
+        style={{ '--row-color': getLangColor(def.key) } as React.CSSProperties}
+        onClick={() => toggleLanguage(def.key)}
+      >
+        <span
+          className={`subtype-star${isFav ? ' starred' : ''}`}
+          onClick={e => { e.stopPropagation(); toggleFavLang(def.key) }}
+        >
+          <Star size={10} />
+        </span>
+        <LanguageIcon lang={def.key} size={16} boxed />
+        <span className="subtype-label">
+          {def.name}{langCount != null && ` (${langCount})`}
+          {opts?.caption && <span className="lang-row-caption"> · {opts.caption}</span>}
+        </span>
+      </button>
+    )
+  }
+
   return (
     <div className="discover-panel-content">
       {/* Sticky header: title + search + tabs + category dropdown */}
@@ -410,22 +437,7 @@ export function FilterPanel({
               <div className="bucket-label"><Star size={11} /> Favourites</div>
               {[...favLangs].map(key => {
                 const def = LANG_MAP.get(key)
-                if (!def) return null
-                const selected = draftLanguages.includes(def.key)
-                return (
-                  <button
-                    key={def.key}
-                    className={`subtype-row${selected ? ' selected' : ''}`}
-                    style={{ '--row-color': getLangColor(def.key) } as React.CSSProperties}
-                    onClick={() => toggleLanguage(def.key)}
-                  >
-                    <span className="subtype-star starred" onClick={e => { e.stopPropagation(); toggleFavLang(def.key) }}>
-                      <Star size={10} />
-                    </span>
-                    <LanguageIcon lang={def.key} size={16} boxed />
-                    <span className="subtype-label">{def.name}</span>
-                  </button>
-                )
+                return def ? renderLangRow(def) : null
               })}
             </div>
           )}
@@ -439,27 +451,7 @@ export function FilterPanel({
                 return (
                   <div key={cat} className="bucket-group" style={{ '--rows': langs.length + 2 } as React.CSSProperties}>
                     <div className="bucket-label"><CatIcon size={11} /> {cat}</div>
-                    {langs.map(def => {
-                      const selected = draftLanguages.includes(def.key)
-                      const isFav = favLangs.has(def.key)
-                      const langCount = itemCounts?.byLanguage.get(def.key)
-                      return (
-                        <button
-                          key={def.key}
-                          className={`subtype-row${selected ? ' selected' : ''}`}
-                          style={{ '--row-color': getLangColor(def.key) } as React.CSSProperties}
-                          onClick={() => toggleLanguage(def.key)}
-                        >
-                          <span className={`subtype-star${isFav ? ' starred' : ''}`} onClick={e => { e.stopPropagation(); toggleFavLang(def.key) }}>
-                            <Star size={10} />
-                          </span>
-                          <LanguageIcon lang={def.key} size={16} boxed />
-                          <span className="subtype-label">
-                            {def.name}{langCount != null && ` (${langCount})`}
-                          </span>
-                        </button>
-                      )
-                    })}
+                    {langs.map(def => renderLangRow(def))}
                   </div>
                 )
               })
@@ -474,27 +466,7 @@ export function FilterPanel({
                 return (
                   <div key={cat} className="bucket-group" style={{ '--rows': langs.length + 2 } as React.CSSProperties}>
                     <div className="bucket-label"><CatIcon size={11} /> {cat}</div>
-                    {langs.map(def => {
-                      const selected = draftLanguages.includes(def.key)
-                      const isFav = favLangs.has(def.key)
-                      const langCount = itemCounts?.byLanguage.get(def.key)
-                      return (
-                        <button
-                          key={def.key}
-                          className={`subtype-row${selected ? ' selected' : ''}`}
-                          style={{ '--row-color': getLangColor(def.key) } as React.CSSProperties}
-                          onClick={() => toggleLanguage(def.key)}
-                        >
-                          <span className={`subtype-star${isFav ? ' starred' : ''}`} onClick={e => { e.stopPropagation(); toggleFavLang(def.key) }}>
-                            <Star size={10} />
-                          </span>
-                          <LanguageIcon lang={def.key} size={16} boxed />
-                          <span className="subtype-label">
-                            {def.name}{langCount != null && ` (${langCount})`}
-                          </span>
-                        </button>
-                      )
-                    })}
+                    {langs.map(def => renderLangRow(def))}
                   </div>
                 )
               })
