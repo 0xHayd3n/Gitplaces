@@ -427,7 +427,7 @@ export function FilterPanel({
             </div>
           )}
 
-          <div className="categories-grid categories-grid--lang">
+          <div className="lang-tab-body">
             {/* SEARCH RESULTS VIEW — flat ranked list across all languages */}
             {search ? (() => {
               const q = search.toLowerCase()

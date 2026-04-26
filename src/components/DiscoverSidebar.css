@@ -272,12 +272,6 @@
   column-gap: 8px;
 }
 
-/* Language tab uses a flat block layout (tile grid + drill-in + search results
-   handle their own internal layout). Override the masonry columns. */
-.categories-grid.categories-grid--lang {
-  column-count: 1;
-  column-width: auto;
-}
 
 .subtype-row {
   display: flex;
