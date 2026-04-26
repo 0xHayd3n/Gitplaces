@@ -248,8 +248,12 @@ export const LANGUAGES: LangDef[] = [
   { name: 'Pkl',        key: 'pkl',         category: 'Config',     domainCategory: 'DevOps & Config', icon: null,            color: '#6b9543' },
   // --- Blockchain / Smart contracts ---
   { name: 'Solidity',   key: 'solidity',    category: 'Blockchain', domainCategory: 'Specialty',       icon: SiSolidity,      color: '#2a247c' },
+  { name: 'Vyper',      key: 'vyper',       category: 'Blockchain', domainCategory: 'Specialty',       icon: null,            color: '#2980b9' },
   { name: 'Cairo',      key: 'cairo',       category: 'Blockchain', domainCategory: 'Specialty',       icon: null,            color: '#ff4a48' },
   { name: 'Move',       key: 'move',        category: 'Blockchain', domainCategory: 'Specialty',       icon: null,            color: '#4a137a' },
+  { name: 'Clarity',    key: 'clarity',     category: 'Blockchain', domainCategory: 'Specialty',       icon: null,            color: '#5546ff' },
+  { name: 'Cadence',    key: 'cadence',     category: 'Blockchain', domainCategory: 'Specialty',       icon: null,            color: '#00ef8b' },
+  { name: 'FunC',       key: 'func',        category: 'Blockchain', domainCategory: 'Specialty',       icon: null,            color: '#0098ea' },
   // --- Shader / GPU / Hardware ---
   { name: 'GLSL',       key: 'glsl',        category: 'Shaders & HDL', domainCategory: 'Hardware',        icon: null,            color: '#5686a5' },
   { name: 'HLSL',       key: 'hlsl',        category: 'Shaders & HDL', domainCategory: 'Hardware',        icon: null,            color: '#aace60' },
