@@ -311,7 +311,7 @@ export function FilterPanel({
         >
           <Star size={10} />
         </span>
-        <LanguageIcon lang={def.key} size={16} boxed />
+        <LanguageIcon lang={def.key} size={22} boxed />
         <span className="subtype-label">
           {def.name}{langCount != null && ` (${langCount})`}
           {opts?.caption && <span className="lang-row-caption"> · {opts.caption}</span>}

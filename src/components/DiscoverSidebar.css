@@ -803,11 +803,6 @@
   gap: 10px;
 }
 
-.lang-content-list .subtype-row .subtype-icon-box {
-  width: 24px;
-  height: 24px;
-}
-
 .lang-tile {
   display: flex;
   align-items: center;
