@@ -6,6 +6,11 @@ import { getSubTypeKeyword } from '../../src/lib/discoverQueries'
 
 export interface QueryPlan {
   topic: string
+  // `language` retained on the discriminator so historical `QueryPlan` literals
+  // (e.g. cold-start fallbacks, deserialized cache entries) still typecheck;
+  // `planQueries` no longer emits it because the standalone language query was
+  // a major noise source — top-by-stars TS repos are topically orthogonal.
+  // Language affinity is still captured in scoring via `categorySignal`.
   kind: 'topic' | 'pair' | 'subType' | 'engagement' | 'language' | 'coldStart' | 'longTail' | 'rareTopic'
   coldStart: boolean
   perPage: number
@@ -97,11 +102,11 @@ export function planQueries(profile: UserProfile, corpus?: CorpusStats): QueryPl
     }
   }
 
-  // Language query — #1 language
-  const langEntries = [...profile.languageWeights.entries()].sort((a, b) => b[1] - a[1])
-  if (langEntries.length > 0) {
-    plans.push({ topic: langEntries[0][0], kind: 'language', coldStart: false, perPage: 25, sort: 'stars' })
-  }
+  // No standalone `language` query: `language:X stars:>50 sort=stars` returns
+  // top-by-stars repos in language X regardless of topic, which empirically
+  // dominated the candidate pool with topically-irrelevant noise (microsoft/
+  // TypeScript itself, iptv, vscode, etc. for TS users). Language affinity is
+  // still captured in scoring via `categorySignal`.
 
   return plans
 }

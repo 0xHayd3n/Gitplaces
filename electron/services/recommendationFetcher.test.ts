@@ -166,15 +166,13 @@ describe('planQueries (extended)', () => {
     expect(subPlans.length).toBe(2)
   })
 
-  it('emits a language query for #1 language', () => {
+  it('does not emit a standalone language query (Fix E: noise source removed)', () => {
     const profile = makeProfile({
       languageWeights: new Map([['Rust', 0.6], ['Python', 0.4]]),
       topicAffinity: new Map([['x', 1]]),
     })
     const plans = planQueries(profile)
-    const langPlans = plans.filter(p => p.kind === 'language')
-    expect(langPlans.length).toBe(1)
-    expect(langPlans[0].topic).toBe('Rust')
+    expect(plans.filter(p => p.kind === 'language').length).toBe(0)
   })
 
   it('skips engagement queries when clickCount is 0', () => {
