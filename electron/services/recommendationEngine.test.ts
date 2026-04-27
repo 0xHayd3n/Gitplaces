@@ -86,6 +86,18 @@ describe('rankCandidates (orchestrator)', () => {
     expect(ranked[0].repo.id).toBe(2)
   })
 
+  it('filters out candidates with no anchors (Fix G: drop unexplainable recs)', () => {
+    const userRepos = [userRepo({ id: 1, topics: ['rust'] })] as any
+    const corpus = computeCorpusStats(userRepos)
+    const profile = buildUserProfile({ userRepos, corpus, engagementEvents: [], clickedReposById: new Map(), now: NOW })
+    const candidates = [
+      ghRepo({ id: 1, topics: ['rust'] }),                  // matches → anchor
+      ghRepo({ id: 2, topics: ['totally-unrelated-xyz'] }), // no topic/bucket/lang match → no anchor
+    ]
+    const ranked = rankCandidates(candidates, profile, corpus, NOW)
+    expect(ranked.map(r => r.repo.id)).toEqual([1])
+  })
+
   it('applies MMR rerank — diverse pick beats near-duplicate', () => {
     const userRepos = [userRepo({ id: 1, topics: ['rust', 'cli'] })] as any
     const corpus = computeCorpusStats(userRepos)

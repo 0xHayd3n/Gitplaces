@@ -156,7 +156,12 @@ export function rankCandidates(
     item.primaryAnchor = anchors[0] ?? null
   }
 
-  return reranked
+  // Drop candidates we have no anchor for: if no user repo was similar enough
+  // to the candidate to clear the anchor threshold, we can't credibly explain
+  // why we're surfacing it ("Because you starred …" would be empty). Better to
+  // omit than to show a hollow rec. Cold-start path uses a separate code path
+  // and is not affected.
+  return reranked.filter((item) => item.anchors.length > 0)
 }
 
 export function findAnchors(
