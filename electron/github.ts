@@ -535,11 +535,11 @@ export async function createRepo(
 ): Promise<{ html_url: string }> {
   const res = await fetch(`${BASE}/user/repos`, {
     method: 'POST',
-    headers: githubHeaders(token),
+    headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, private: true, auto_init: true })
   })
   if (!res.ok) throw new Error(`createRepo failed: ${res.status}`)
-  return res.json()
+  return res.json() as Promise<{ html_url: string }>
 }
 
 export async function putFileContents(
@@ -559,9 +559,9 @@ export async function putFileContents(
   // Do NOT encodeURIComponent(path) — that encodes '/' as '%2F' causing a 404
   const res = await fetch(`${BASE}/repos/${repoOwner}/${repoName}/contents/${path}`, {
     method: 'PUT',
-    headers: githubHeaders(token),
+    headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   })
   if (!res.ok) throw new Error(`putFileContents failed: ${res.status}`)
-  return res.json()
+  return res.json() as Promise<{ content: { sha: string } }>
 }
