@@ -39,6 +39,17 @@ function makeProfile(overrides: Partial<UserProfile> = {}): UserProfile {
   return emptyProfile(overrides)
 }
 
+import type { CorpusStats } from '../../src/types/recommendation'
+function makeCorpus(idfMap: Record<string, number>): CorpusStats {
+  return {
+    topicDocFrequency: new Map(),
+    topicIdf: new Map(Object.entries(idfMap)),
+    descriptionDocFrequency: new Map(),
+    descriptionIdf: new Map(),
+    totalRepos: 1000,
+  }
+}
+
 function ghRepo(overrides: Partial<GitHubRepo>): GitHubRepo {
   return {
     id: 1, node_id: 'n', owner: { login: 'o' }, name: 'n',
@@ -237,6 +248,51 @@ describe('planQueries (extended)', () => {
     expect(plans.filter(p => p.kind === 'pair').length).toBe(0)
   })
 
+  // Fix D: high-IDF topic injection — rare topics from the user's stars
+  // get their own query even when affinity ranking shadows them.
+  it('emits rare-topic queries for top-IDF topics not in affinity top-4', () => {
+    const profile = makeProfile({
+      // Affinity top-4: a, b, c, d (high frequency × moderate IDF)
+      // Rare topics: x, y (low frequency, present in user stars but ranked low by affinity)
+      topicAffinity: new Map([
+        ['a', 0.3], ['b', 0.25], ['c', 0.2], ['d', 0.1],
+        ['x', 0.05], ['y', 0.04], ['common', 0.02],
+      ]),
+    })
+    const corpus = makeCorpus({
+      a: 2, b: 2, c: 2, d: 2,
+      x: 9.5, y: 9.0, common: 0.5,
+    })
+    const plans = planQueries(profile, corpus)
+    const rarePlans = plans.filter(p => p.kind === 'rareTopic')
+    expect(rarePlans.length).toBe(2)
+    expect(rarePlans.map(p => p.topic).sort()).toEqual(['x', 'y'])
+  })
+
+  it('rare-topic injection dedupes against affinity-picked topics', () => {
+    const profile = makeProfile({
+      // x is BOTH high-affinity (top-4) AND high-IDF — it should not double-emit.
+      topicAffinity: new Map([
+        ['x', 0.4], ['b', 0.25], ['c', 0.2], ['d', 0.1], ['y', 0.05],
+      ]),
+    })
+    const corpus = makeCorpus({
+      x: 9, y: 8.5, b: 2, c: 2, d: 2,
+    })
+    const plans = planQueries(profile, corpus)
+    const rarePlans = plans.filter(p => p.kind === 'rareTopic')
+    // x is already in top-4 affinity, so only y should be emitted
+    expect(rarePlans.map(p => p.topic)).toEqual(['y'])
+  })
+
+  it('skips rare-topic injection when corpus is omitted', () => {
+    const profile = makeProfile({
+      topicAffinity: new Map([['a', 0.3], ['x', 0.05]]),
+    })
+    const plans = planQueries(profile)  // no corpus
+    expect(plans.filter(p => p.kind === 'rareTopic').length).toBe(0)
+  })
+
   // Fix A: long-tail queries inject niche candidates by capping stars on the upside.
   it('emits long-tail queries for top-2 topics', () => {
     const profile = makeProfile({
@@ -283,5 +339,15 @@ describe('fetchCandidates — query string composition', () => {
     await fetchCandidates('token', queries)
     const call = mockSearch.mock.calls[0]
     expect(call[1]).toBe('topic:rust stars:10..500')
+  })
+
+  it('rareTopic uses topic:X stars:>10 (same as topic kind)', async () => {
+    mockSearch.mockResolvedValue([])
+    const queries: QueryPlan[] = [
+      { topic: 'openclaw', kind: 'rareTopic', coldStart: false, perPage: 20, sort: '' },
+    ]
+    await fetchCandidates('token', queries)
+    const call = mockSearch.mock.calls[0]
+    expect(call[1]).toBe('topic:openclaw stars:>10')
   })
 })

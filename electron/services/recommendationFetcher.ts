@@ -1,12 +1,12 @@
 // electron/services/recommendationFetcher.ts
 import { searchRepos } from '../github'
 import type { GitHubRepo } from '../github'
-import type { UserProfile } from '../../src/types/recommendation'
+import type { CorpusStats, UserProfile } from '../../src/types/recommendation'
 import { getSubTypeKeyword } from '../../src/lib/discoverQueries'
 
 export interface QueryPlan {
   topic: string
-  kind: 'topic' | 'pair' | 'subType' | 'engagement' | 'language' | 'coldStart' | 'longTail'
+  kind: 'topic' | 'pair' | 'subType' | 'engagement' | 'language' | 'coldStart' | 'longTail' | 'rareTopic'
   coldStart: boolean
   perPage: number
   sort: string
@@ -17,6 +17,7 @@ export interface QueryPlan {
 const TOP_TOPICS_COUNT = 4
 const TOP_SUBTYPES_COUNT = 2
 const TOP_LONGTAIL_TOPICS_COUNT = 2
+const TOP_RARE_TOPICS_COUNT = 2
 const TOP_ENGAGEMENT_TOPICS_COUNT = 2
 const ENGAGEMENT_MIN_CLICKS = 1
 const PAIR_MIN_AFFINITY = 0.15
@@ -26,17 +27,34 @@ const LONGTAIL_CEILING_FLOOR = 500
 const COLD_START_THRESHOLD = 50000
 const COLD_START_RESULTS = 100
 
-export function planQueries(profile: UserProfile): QueryPlan[] {
+export function planQueries(profile: UserProfile, corpus?: CorpusStats): QueryPlan[] {
   const topicEntries = [...profile.topicAffinity.entries()].sort((a, b) => b[1] - a[1])
   if (topicEntries.length === 0) {
     return [{ topic: '', kind: 'coldStart', coldStart: true, perPage: COLD_START_RESULTS, sort: 'stars' }]
   }
 
   const plans: QueryPlan[] = []
+  const affinityTopics = new Set(topicEntries.slice(0, TOP_TOPICS_COUNT).map(([t]) => t))
 
   // Topic queries
-  for (const [topic] of topicEntries.slice(0, TOP_TOPICS_COUNT)) {
+  for (const topic of affinityTopics) {
     plans.push({ topic, kind: 'topic', coldStart: false, perPage: 30, sort: '' })
+  }
+
+  // Rare-topic queries — pick the highest-IDF topics from the user's stars
+  // that didn't make the affinity top-4. Surfaces niche communities that
+  // affinity ranking shadows when rare topics have low frequency.
+  if (corpus) {
+    const userTopics = [...profile.topicAffinity.keys()]
+    const rare = userTopics
+      .filter((t) => !affinityTopics.has(t))
+      .map((t) => ({ topic: t, idf: corpus.topicIdf.get(t) ?? 0 }))
+      .filter((x) => x.idf > 0)
+      .sort((a, b) => b.idf - a.idf)
+      .slice(0, TOP_RARE_TOPICS_COUNT)
+    for (const { topic } of rare) {
+      plans.push({ topic, kind: 'rareTopic', coldStart: false, perPage: 20, sort: '' })
+    }
   }
 
   // Long-tail topic queries — caps stars on the upside so niche repos can enter the pool.
@@ -91,6 +109,7 @@ function buildSearchQuery(plan: QueryPlan): string {
       return `stars:>${COLD_START_THRESHOLD}`
     case 'topic':
     case 'engagement':
+    case 'rareTopic':
       return `topic:${plan.topic} stars:>${STAR_THRESHOLD}`
     case 'longTail': {
       const ceiling = plan.starCeiling ?? LONGTAIL_CEILING_FLOOR

@@ -210,7 +210,7 @@ export async function getRecommendedHandler(): Promise<RecommendationResponse> {
   const corpusRows = db.prepare('SELECT topics, description FROM repos').all() as { topics: string | null; description: string | null }[]
   const corpus = computeCorpusStats(corpusRows)
   const profile = buildUserProfile({ userRepos, corpus, engagementEvents, clickedReposById })
-  const queries = planQueries(profile)
+  const queries = planQueries(profile, corpus)
   let candidates = await fetchCandidates(token, queries)
 
   // Filter: not user-owned, not already user's, not recently clicked
