@@ -458,7 +458,7 @@ export default function Settings() {
             </p>
             <div className="coll-modal-actions">
               <button className="coll-modal-cancel" onClick={() => setSyncConfirmOpen(false)}>Cancel</button>
-              <button className="coll-modal-create" onClick={handleSyncConfirm}>Create &amp; Connect</button>
+              <button className="coll-modal-create" onClick={handleSyncConfirm}>{syncStatus?.repoOwner ? 'Connect' : 'Create & Connect'}</button>
             </div>
           </div>
         </div>
@@ -580,9 +580,14 @@ export default function Settings() {
                   Connect
                 </button>
               )}
-              {syncError && <div className="connector-error">{syncError}</div>}
             </div>
           </div>
+
+          {syncError && (
+            <div className="connector-row connector-row--log">
+              <p className="settings-hint error" style={{ margin: 0 }}>{syncError}</p>
+            </div>
+          )}
 
           {/* Claude */}
           <div className="connector-row">
