@@ -91,7 +91,24 @@ export async function getStarred(token: string): Promise<GitHubStarredRepo[]> {
 
   while (url && pagesFetched < 10) {
     const res: Response = await fetch(url, { headers })
-    if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
+    if (!res.ok) {
+      // DIAGNOSTIC: capture rate-limit headers + body so we can tell rate
+      // limit vs. scope vs. token-revocation 403s apart.
+      const body = await res.text().catch(() => '<unreadable>')
+      console.error('[getStarred 403/error]', {
+        status:    res.status,
+        url,
+        scopes:    res.headers.get('x-oauth-scopes'),
+        accepted:  res.headers.get('x-accepted-oauth-scopes'),
+        rlLimit:   res.headers.get('x-ratelimit-limit'),
+        rlRemain:  res.headers.get('x-ratelimit-remaining'),
+        rlReset:   res.headers.get('x-ratelimit-reset'),
+        rlResource:res.headers.get('x-ratelimit-resource'),
+        retryAfter:res.headers.get('retry-after'),
+        body:      body.slice(0, 400),
+      })
+      throw new Error(`GitHub API error: ${res.status}`)
+    }
     const data = (await res.json()) as GitHubStarredRepo[]
     results.push(...data)
     pagesFetched++
@@ -510,4 +527,41 @@ export async function getBlobBySha(
   const raw = data.content.replace(/\s/g, '')
   const content = Buffer.from(raw, 'base64').toString('utf-8')
   return { content, rawBase64: raw, size: data.size }
+}
+
+export async function createRepo(
+  token: string,
+  name: string
+): Promise<{ html_url: string }> {
+  const res = await fetch(`${BASE}/user/repos`, {
+    method: 'POST',
+    headers: githubHeaders(token),
+    body: JSON.stringify({ name, private: true, auto_init: true })
+  })
+  if (!res.ok) throw new Error(`createRepo failed: ${res.status}`)
+  return res.json()
+}
+
+export async function putFileContents(
+  token: string,
+  repoOwner: string,
+  repoName: string,
+  path: string,
+  content: string,
+  message: string,
+  sha?: string
+): Promise<{ content: { sha: string } }> {
+  const body: Record<string, string> = {
+    message,
+    content: Buffer.from(content).toString('base64')
+  }
+  if (sha) body.sha = sha
+  // Do NOT encodeURIComponent(path) — that encodes '/' as '%2F' causing a 404
+  const res = await fetch(`${BASE}/repos/${repoOwner}/${repoName}/contents/${path}`, {
+    method: 'PUT',
+    headers: githubHeaders(token),
+    body: JSON.stringify(body)
+  })
+  if (!res.ok) throw new Error(`putFileContents failed: ${res.status}`)
+  return res.json()
 }
