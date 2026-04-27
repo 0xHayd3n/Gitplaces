@@ -73,6 +73,7 @@ export async function push(
 
 export async function pushAll(statusFilter?: 'pending' | 'failed' | 'all'): Promise<void> {
   if (!getSyncEnabled()) return
+  if (!_db) return
 
   const buildWhere = (filter?: 'pending' | 'failed' | 'all') => {
     if (filter === 'all') return '1=1'
@@ -153,8 +154,8 @@ export async function setupRepo(
     "UPDATE sub_skills SET sync_status = 'pending' WHERE sync_status IS NULL"
   ).run()
 
-  // Fire-and-forget initial bulk sync
-  void pushAll('all')
+  // Fire-and-forget initial bulk sync — only push pending/failed rows
+  void pushAll()
 
   return { ok: true, repoUrl }
 }
