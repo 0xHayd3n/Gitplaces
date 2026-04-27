@@ -96,6 +96,7 @@ export default function FileContentPanel({
 
 
   const rawUrl = `https://raw.githubusercontent.com/${owner}/${name}/${branch}/${selectedPath}`
+  const isSvg = filename.split('.').pop()?.toLowerCase() === 'svg'
   const isCodeFile = selectedEntry?.type === 'blob' && blobContent !== null && !isBinaryContent(blobContent) && !isImageFile(filename) && !isVideoFile(filename) && !isPdfFile(filename) && !isMarkdownFile(filename) && !blobLoading
   const lang = isCodeFile ? detectLanguage(filename) : 'text'
 
@@ -132,7 +133,13 @@ export default function FileContentPanel({
           <span className="spin-ring" style={{ width: 14, height: 14 }} />
         </div>
       ) : isImageFile(filename) ? (
-        <ImagePreview rawUrl={rawUrl} filename={filename} />
+        isSvg && blobLoading ? (
+          <div className="file-content-panel__loading">
+            <span className="spin-ring" style={{ width: 14, height: 14 }} />
+          </div>
+        ) : (
+          <ImagePreview rawUrl={rawUrl} filename={filename} blobContent={blobContent} />
+        )
       ) : isVideoFile(filename) ? (
         <VideoPlayer rawUrl={rawUrl} filename={filename} />
       ) : isPdfFile(filename) && selectedPath ? (

@@ -10,6 +10,7 @@ import { isVideoFile, isPdfFile } from './DirectoryListing'
 import { ChevronRight } from 'lucide-react'
 import ContextMenu from './ContextMenu'
 import type { ContextMenuTarget } from './ContextMenu'
+import { populateSvgCache } from './SvgThumb'
 
 interface TreeEntry {
   path: string
@@ -64,6 +65,13 @@ export default function FilesTab({ owner, name, branch, initialPath }: Props) {
     minWidth: 180,
     maxWidth: 600,
   })
+
+  // ── Load persisted SVG cache so SvgThumb renders instantly ──
+  useEffect(() => {
+    window.api.svgCache.read(owner, name).then(data => {
+      if (data) populateSvgCache(data)
+    }).catch(() => {})
+  }, [owner, name])
 
   // ── RepoNav context (published below after goBack/goForward/handleBreadcrumbNavigate) ──
   const repoNav = useRepoNav()
@@ -584,6 +592,8 @@ export default function FilesTab({ owner, name, branch, initialPath }: Props) {
                 selectedPath={selectedPath}
                 basePath=""
                 depth={0}
+                owner={owner}
+                name={name}
                 onToggleDir={handleToggleDir}
                 onSelectFile={handleSelectFile}
                 filterText={filterText}

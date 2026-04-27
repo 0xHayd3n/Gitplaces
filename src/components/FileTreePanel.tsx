@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { ChevronRight, Folder, BookOpen } from 'lucide-react'
 import FileIcon from './FileIcon'
+import SvgThumb from './SvgThumb'
 
 interface TreeEntry {
   path: string
@@ -19,6 +20,8 @@ interface Props {
   selectedPath: string | null
   basePath: string                    // '' for root
   depth: number
+  owner: string
+  name: string
   onToggleDir: (path: string, sha: string) => void
   onSelectFile: (entry: TreeEntry, fullPath: string) => void
   filterText?: string
@@ -62,7 +65,7 @@ function sortEntries(entries: TreeEntry[]): TreeEntry[] {
 
 function FileTreePanel({
   entries, expandedDirs, treeData, treeLoading, errorDirs, selectedPath,
-  basePath, depth, onToggleDir, onSelectFile, filterText, onContextMenu,
+  basePath, depth, owner, name, onToggleDir, onSelectFile, filterText, onContextMenu,
 }: Props) {
   const sorted = sortEntries(entries)
 
@@ -131,7 +134,11 @@ function FileTreePanel({
                   <Folder size={14} className="file-tree__icon file-tree__icon--folder" />
                 )
               ) : (
-                <FileIcon filename={entry.path} size={14} className="file-tree__icon" />
+                entry.path.split('.').pop()?.toLowerCase() === 'svg' ? (
+                  <SvgThumb owner={owner} name={name} sha={entry.sha} filename={entry.path} size={14} className="file-tree__icon" />
+                ) : (
+                  <FileIcon filename={entry.path} size={14} className="file-tree__icon" />
+                )
               )}
               {isDir ? (
                 <>
@@ -156,6 +163,8 @@ function FileTreePanel({
                 selectedPath={selectedPath}
                 basePath={fullPath}
                 depth={depth + 1}
+                owner={owner}
+                name={name}
                 onToggleDir={onToggleDir}
                 onSelectFile={onSelectFile}
                 filterText={filterText}

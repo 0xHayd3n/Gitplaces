@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Folder, ChevronRight, Image as ImageIcon, FileQuestion, Play, BookOpen } from 'lucide-react'
 import FileIcon from './FileIcon'
+import SvgThumb from './SvgThumb'
 import type { ViewMode, SortField, SortDirection } from './ViewModeBar'
 
 interface TreeEntry {
@@ -122,6 +123,14 @@ export function DirectoryListing({ entries, onSelect, basePath, viewMode = 'deta
       ? <BookOpen size={size} className="dir-listing__icon" style={{ color: '#3b82f6' }} />
       : <Folder size={size} className="dir-listing__icon dir-listing__icon--folder" />
 
+  const fileIcon = (entry: TreeEntry, size: number, cls: string) => {
+    const isSvg = entry.path.split('.').pop()?.toLowerCase() === 'svg'
+    if (isSvg && owner && name) {
+      return <SvgThumb owner={owner} name={name} sha={entry.sha} filename={entry.path} size={size} className={cls} />
+    }
+    return <FileIcon filename={entry.path} size={size} className={cls} />
+  }
+
   if (sorted.length === 0 && filterText) {
     return (
       <div className="dir-listing dir-listing--empty">
@@ -155,7 +164,7 @@ export function DirectoryListing({ entries, onSelect, basePath, viewMode = 'deta
               {isDir ? (
                 folderIcon(entry, 14)
               ) : (
-                <FileIcon filename={entry.path} size={14} className="dir-listing__icon" />
+                fileIcon(entry, 14, 'dir-listing__icon')
               )}
               <span className="dir-listing__name">{entry.path}</span>
             </button>
@@ -183,7 +192,7 @@ export function DirectoryListing({ entries, onSelect, basePath, viewMode = 'deta
               {isDir ? (
                 folderIcon(entry, 16)
               ) : (
-                <FileIcon filename={entry.path} size={16} className="dir-listing__icon" />
+                fileIcon(entry, 16, 'dir-listing__icon')
               )}
               <span className="dir-listing__icon-label">{entry.path}</span>
             </button>
@@ -201,8 +210,9 @@ export function DirectoryListing({ entries, onSelect, basePath, viewMode = 'deta
           const fullPath = basePath ? `${basePath}/${entry.path}` : entry.path
           const isDir = entry.type === 'tree'
           const ext = entry.path.split('.').pop()?.toLowerCase() ?? ''
-          const isImage = !isDir && IMAGE_EXTENSIONS_SET.has(ext)
-          const rawUrl = isImage && owner && name && branch
+          const isSvg = ext === 'svg'
+          const isOtherImage = !isDir && !isSvg && IMAGE_EXTENSIONS_SET.has(ext)
+          const rawUrl = isOtherImage && owner && name && branch
             ? `https://raw.githubusercontent.com/${owner}/${name}/${branch}/${fullPath}`
             : null
           return (
@@ -214,13 +224,14 @@ export function DirectoryListing({ entries, onSelect, basePath, viewMode = 'deta
             >
               {isDir ? (
                 folderIcon(entry, 48)
+              ) : isSvg && owner && name ? (
+                <SvgThumb owner={owner} name={name} sha={entry.sha} filename={entry.path} size={48} className="dir-listing__thumb" />
               ) : rawUrl ? (
                 <img
                   src={rawUrl}
                   alt={entry.path}
                   className="dir-listing__thumb"
                   onError={e => {
-                    // Fallback to FileIcon on load error
                     const target = e.currentTarget
                     target.style.display = 'none'
                     const fallback = target.nextElementSibling as HTMLElement
@@ -264,7 +275,7 @@ export function DirectoryListing({ entries, onSelect, basePath, viewMode = 'deta
             {isDir ? (
               folderIcon(entry, 14)
             ) : (
-              <FileIcon filename={entry.path} size={14} className="dir-listing__icon" />
+              fileIcon(entry, 14, 'dir-listing__icon')
             )}
             <span className="dir-listing__name">{entry.path}</span>
             <span className="dir-listing__type">{isDir ? 'Folder' : getFileType(entry.path)}</span>
@@ -313,9 +324,26 @@ export function isImageFile(filename: string): boolean {
 interface ImagePreviewProps {
   rawUrl: string
   filename: string
+  blobContent?: string | null
 }
 
-export function ImagePreview({ rawUrl, filename }: ImagePreviewProps) {
+export function ImagePreview({ rawUrl, filename, blobContent }: ImagePreviewProps) {
+  const isSvg = filename.split('.').pop()?.toLowerCase() === 'svg'
+
+  if (isSvg && blobContent) {
+    return (
+      <div className="file-image-preview">
+        <div className="file-image-preview__container">
+          <img
+            src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(blobContent)}`}
+            alt={filename}
+            className="file-image-preview__img"
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="file-image-preview">
       <ImageIcon size={14} style={{ color: 'var(--t3)' }} />
