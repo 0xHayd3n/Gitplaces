@@ -1,14 +1,14 @@
-import { BrowserWindow } from 'electron'
-import type { Database } from 'better-sqlite3'
+import type { BrowserWindow } from 'electron'
+import type Database from 'better-sqlite3'
 import { getToken, getSyncEnabled, getSyncRepoOwner, setSyncEnabled, setSyncRepoOwner } from '../store'
 import { createRepo, putFileContents, getRepo } from '../github'
 
 export const SKILLS_BACKUP_REPO = 'gitsuite-skills'
 
 let _win: BrowserWindow | null = null
-let _db: Database | null = null
+let _db: Database.Database | null = null
 
-export function startSkillSyncService(db: Database, win: BrowserWindow): void {
+export function startSkillSyncService(db: Database.Database, win: BrowserWindow): void {
   _db = db
   _win = win
 }
@@ -77,6 +77,7 @@ export async function pushAll(statusFilter?: 'pending' | 'failed' | 'all'): Prom
   const buildWhere = (filter?: 'pending' | 'failed' | 'all') => {
     if (filter === 'all') return '1=1'
     if (filter === 'failed') return "sync_status = 'failed'"
+    if (filter === 'pending') return "(sync_status = 'pending' OR sync_status IS NULL)"
     return "(sync_status = 'pending' OR sync_status IS NULL OR sync_status = 'failed')"
   }
   const where = buildWhere(statusFilter)

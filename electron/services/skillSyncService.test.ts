@@ -18,7 +18,7 @@ vi.mock('../store', () => ({
 }))
 
 import { createRepo, putFileContents, getRepo } from '../github'
-import { getSyncEnabled, getSyncRepoOwner, getToken } from '../store'
+import { getSyncEnabled, getSyncRepoOwner, getToken, setSyncEnabled, setSyncRepoOwner } from '../store'
 import { startSkillSyncService, push, setupRepo } from './skillSyncService'
 
 function makeDb(rows: Record<string, unknown> = {}) {
@@ -39,6 +39,20 @@ describe('push', () => {
 
   it('bails if sync disabled', async () => {
     vi.mocked(getSyncEnabled).mockReturnValue(false)
+    startSkillSyncService(makeDb(), makeWin())
+    await push('repo-1', 'ms', 'vscode.skill.md', 'content')
+    expect(putFileContents).not.toHaveBeenCalled()
+  })
+
+  it('bails if no token', async () => {
+    vi.mocked(getToken).mockReturnValue(undefined)
+    startSkillSyncService(makeDb(), makeWin())
+    await push('repo-1', 'ms', 'vscode.skill.md', 'content')
+    expect(putFileContents).not.toHaveBeenCalled()
+  })
+
+  it('bails if no repoOwner', async () => {
+    vi.mocked(getSyncRepoOwner).mockReturnValue(undefined)
     startSkillSyncService(makeDb(), makeWin())
     await push('repo-1', 'ms', 'vscode.skill.md', 'content')
     expect(putFileContents).not.toHaveBeenCalled()
@@ -100,6 +114,8 @@ describe('setupRepo', () => {
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.repoUrl).toContain('gitsuite-skills')
     expect(createRepo).not.toHaveBeenCalled()
+    expect(vi.mocked(setSyncEnabled)).toHaveBeenCalledWith(true)
+    expect(vi.mocked(setSyncRepoOwner)).toHaveBeenCalledWith('alice')
   })
 
   it('creates repo when getRepo throws (404)', async () => {
@@ -109,6 +125,8 @@ describe('setupRepo', () => {
     const result = await setupRepo('alice')
     expect(result.ok).toBe(true)
     expect(createRepo).toHaveBeenCalledWith('tok', 'gitsuite-skills')
+    expect(vi.mocked(setSyncEnabled)).toHaveBeenCalledWith(true)
+    expect(vi.mocked(setSyncRepoOwner)).toHaveBeenCalledWith('alice')
   })
 
   it('returns ok:false on createRepo failure', async () => {
