@@ -703,10 +703,9 @@ ipcMain.handle('github:starRepo', async (_event, owner: string, name: string) =>
   await starRepo(token, owner, name)
   const db = getDb(app.getPath('userData'))
   const now = new Date().toISOString()
-  // Try to update existing row first (may have numeric GitHub ID)
-  const updated = db.prepare('UPDATE repos SET starred_at = ? WHERE owner = ? AND name = ?').run(now, owner, name)
+  // Re-starring also clears unstarred_at so the row leaves the Unstarred filter.
+  const updated = db.prepare('UPDATE repos SET starred_at = ?, unstarred_at = NULL WHERE owner = ? AND name = ?').run(now, owner, name)
   if (updated.changes === 0) {
-    // No existing row — insert a minimal placeholder
     db.prepare(`
       INSERT INTO repos (id, owner, name, description, language, topics, stars, forks,
                          license, homepage, updated_at, saved_at, type, banner_svg, starred_at)
@@ -720,7 +719,8 @@ ipcMain.handle('github:unstarRepo', async (_event, owner: string, name: string) 
   if (!token) throw new Error('Not connected')
   await unstarRepo(token, owner, name)
   const db = getDb(app.getPath('userData'))
-  db.prepare('UPDATE repos SET starred_at = NULL WHERE owner = ? AND name = ?').run(owner, name)
+  const now = new Date().toISOString()
+  db.prepare('UPDATE repos SET starred_at = NULL, unstarred_at = ? WHERE owner = ? AND name = ?').run(now, owner, name)
 })
 
 ipcMain.handle('github:isStarred', async (_event, owner: string, name: string) => {
@@ -900,6 +900,20 @@ ipcMain.handle('starred:getAll', async () => {
     WHERE repos.starred_at IS NOT NULL
     ORDER BY repos.starred_at DESC
   `).all()
+})
+
+ipcMain.handle('starred:getRecentlyUnstarred', async () => {
+  const db = getDb(app.getPath('userData'))
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  return db.prepare(`
+    SELECT
+      repos.*,
+      CASE WHEN skills.repo_id IS NOT NULL THEN 1 ELSE 0 END AS installed
+    FROM repos
+    LEFT JOIN skills ON repos.id = skills.repo_id
+    WHERE repos.unstarred_at IS NOT NULL AND repos.unstarred_at >= ?
+    ORDER BY repos.unstarred_at DESC
+  `).all(cutoff)
 })
 
 // ── Skill IPC ───────────────────────────────────────────────────

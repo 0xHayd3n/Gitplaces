@@ -21,6 +21,7 @@ export interface RepoRow {
   size: number | null
   open_issues: number | null
   starred_at: string | null
+  unstarred_at: string | null  // Set when user unstars; cleared on re-star. Powers the Unstarred filter (last 30 days).
   default_branch: string | null
   avatar_url: string | null    // owner avatar URL from GitHub API
   og_image_url: string | null

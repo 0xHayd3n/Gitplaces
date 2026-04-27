@@ -23,7 +23,7 @@ const repo: RepoRow = {
   description: 'The React Framework', language: 'JavaScript',
   stars: 128000, forks: 27000, topics: '[]',
   avatar_url: 'https://example.com/avatar.png',
-  starred_at: null, pushed_at: '2024-01-01T00:00:00Z',
+  starred_at: null, unstarred_at: null, pushed_at: '2024-01-01T00:00:00Z',
   license: null, homepage: null, updated_at: null, saved_at: null,
   type: null, banner_svg: null, discovered_at: null, discover_query: null,
   watchers: null, size: null, open_issues: null, default_branch: null,

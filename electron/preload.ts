@@ -121,7 +121,8 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   starred: {
-    getAll: () => ipcRenderer.invoke('starred:getAll'),
+    getAll:                () => ipcRenderer.invoke('starred:getAll'),
+    getRecentlyUnstarred:  () => ipcRenderer.invoke('starred:getRecentlyUnstarred'),
   },
 
   svgCache: {

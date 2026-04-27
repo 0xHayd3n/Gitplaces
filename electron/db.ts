@@ -166,6 +166,9 @@ export function initSchema(db: Database.Database): void {
   // Phase 19 migration — repo creation date for Rising view badges
   try { db.exec(`ALTER TABLE repos ADD COLUMN created_at TEXT`) } catch {}
 
+  // Phase 22 migration — recently-unstarred tracking (powers the Unstarred filter)
+  try { db.exec(`ALTER TABLE repos ADD COLUMN unstarred_at TEXT`) } catch {}
+
   // Phase 20 – AI chat history
   db.exec(`CREATE TABLE IF NOT EXISTS ai_chats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -187,6 +190,7 @@ export function initSchema(db: Database.Database): void {
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`
     CREATE INDEX IF NOT EXISTS repos_starred_at   ON repos(starred_at);
+    CREATE INDEX IF NOT EXISTS repos_unstarred_at ON repos(unstarred_at);
     CREATE INDEX IF NOT EXISTS repos_type_bucket  ON repos(type_bucket);
     CREATE INDEX IF NOT EXISTS idx_engagement_ts   ON engagement_events(ts DESC);
     CREATE INDEX IF NOT EXISTS idx_engagement_repo ON engagement_events(repo_id);

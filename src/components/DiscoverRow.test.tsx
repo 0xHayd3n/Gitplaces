@@ -22,7 +22,7 @@ function makeRepo(owner: string, name: string): RepoRow {
   return {
     id: `${owner}/${name}`, owner, name,
     description: null, language: 'TypeScript', stars: 1000, forks: 100,
-    topics: '[]', avatar_url: null, starred_at: null, pushed_at: null,
+    topics: '[]', avatar_url: null, starred_at: null, unstarred_at: null, pushed_at: null,
     license: null, homepage: null, updated_at: null, saved_at: null,
     type: null, banner_svg: null, discovered_at: null, discover_query: null,
     watchers: null, size: null, open_issues: null, default_branch: null,

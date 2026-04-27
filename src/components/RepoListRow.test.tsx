@@ -74,6 +74,7 @@ const baseRepo: RepoRow = {
   updated_at: '2024-01-01',
   saved_at: null,
   starred_at: null,
+  unstarred_at: null,
   banner_color: null,
   discovered_at: null,
   verification_score: null,

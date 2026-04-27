@@ -28,6 +28,7 @@ function makeRepo(overrides: Partial<RepoRow>): RepoRow {
     avatar_url: null,
     banner_color: null,
     starred_at: null,
+    unstarred_at: null,
     translated_description: null,
     translated_description_lang: null,
     translated_readme: null,

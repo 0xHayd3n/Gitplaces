@@ -58,6 +58,7 @@ function apiRepoToRow(r: GithubApiRepo) {
     size:           r.size ?? null,
     open_issues:    r.open_issues_count ?? null,
     starred_at:     null,
+    unstarred_at:   null,
     default_branch: r.default_branch ?? 'main',
     avatar_url:     r.owner?.avatar_url ?? null,
     banner_color:   null,

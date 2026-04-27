@@ -40,7 +40,7 @@ function apiRepoToRow(r: GithubApiRepo) {
     saved_at: null, type: null, banner_svg: null, discovered_at: null,
     discover_query: null, watchers: r.watchers_count ?? null,
     size: r.size ?? null, open_issues: r.open_issues_count ?? null,
-    starred_at: null, default_branch: r.default_branch ?? 'main',
+    starred_at: null, unstarred_at: null, default_branch: r.default_branch ?? 'main',
     avatar_url: r.owner?.avatar_url ?? null, banner_color: null,
     translated_description: null, translated_description_lang: null,
     translated_readme: null, translated_readme_lang: null,

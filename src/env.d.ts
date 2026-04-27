@@ -142,6 +142,7 @@ declare global {
       }
       starred: {
         getAll(): Promise<StarredRepoRow[]>
+        getRecentlyUnstarred(): Promise<StarredRepoRow[]>
       }
       svgCache: {
         prefetch(owner: string, name: string, branch: string): Promise<void>
