@@ -106,7 +106,7 @@ describe('fetchCandidates', () => {
     expect(mockSearch).toHaveBeenCalledTimes(2)
     // Verify sort is empty/best-match and query format
     const call1 = mockSearch.mock.calls[0]
-    expect(call1[1]).toBe('topic:rust stars:>10')
+    expect(call1[1]).toBe('topic:rust stars:10..5000')
     expect(call1[3]).toBe('')  // sort: best-match
   })
 
@@ -313,16 +313,22 @@ describe('planQueries (extended)', () => {
     expect(lt[0].perPage).toBe(25)
   })
 
-  it('long-tail starCeiling = max(500, p75)', () => {
+  it('long-tail starCeiling = min(MAX, max(500, p75))', () => {
     const profileLow = makeProfile({
       topicAffinity: new Map([['rust', 0.4]]),
       starScale: { median: 100, p25: 50, p75: 200 },  // p75 below floor
     })
     expect(planQueries(profileLow).find(p => p.kind === 'longTail')!.starCeiling).toBe(500)
 
+    const profileMid = makeProfile({
+      topicAffinity: new Map([['rust', 0.4]]),
+      starScale: { median: 500, p25: 200, p75: 3000 },  // p75 between floor and global cap
+    })
+    expect(planQueries(profileMid).find(p => p.kind === 'longTail')!.starCeiling).toBe(3000)
+
     const profileHigh = makeProfile({
       topicAffinity: new Map([['rust', 0.4]]),
-      starScale: { median: 1000, p25: 500, p75: 5000 },  // p75 above floor
+      starScale: { median: 5000, p25: 1000, p75: 12000 },  // p75 above global cap
     })
     expect(planQueries(profileHigh).find(p => p.kind === 'longTail')!.starCeiling).toBe(5000)
   })
@@ -361,13 +367,49 @@ describe('fetchCandidates — query string composition', () => {
     expect(call[1]).toBe('topic:rust stars:10..500')
   })
 
-  it('rareTopic uses topic:X stars:>10 (same as topic kind)', async () => {
+  it('rareTopic uses topic:X stars:10..MAX (same as topic kind)', async () => {
     mockSearch.mockResolvedValue([])
     const queries: QueryPlan[] = [
       { topic: 'openclaw', kind: 'rareTopic', coldStart: false, perPage: 20, sort: '' },
     ]
     await fetchCandidates('token', queries)
     const call = mockSearch.mock.calls[0]
-    expect(call[1]).toBe('topic:openclaw stars:>10')
+    expect(call[1]).toBe('topic:openclaw stars:10..5000')
+  })
+
+  it('global MAX_STAR_CEILING is applied to topic, pair, subType, engagement, rareTopic', async () => {
+    mockSearch.mockResolvedValue([])
+    const queries: QueryPlan[] = [
+      { topic: 'rust', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
+      { topic: 'a b', kind: 'pair', coldStart: false, perPage: 25, sort: '' },
+      { topic: 'cli tool', kind: 'subType', coldStart: false, perPage: 25, sort: '' },
+      { topic: 'ai', kind: 'engagement', coldStart: false, perPage: 20, sort: '' },
+      { topic: 'rare', kind: 'rareTopic', coldStart: false, perPage: 20, sort: '' },
+    ]
+    await fetchCandidates('token', queries)
+    expect(mockSearch.mock.calls[0][1]).toBe('topic:rust stars:10..5000')
+    expect(mockSearch.mock.calls[1][1]).toBe('topic:a topic:b stars:10..5000')
+    expect(mockSearch.mock.calls[2][1]).toBe('cli tool stars:10..5000')
+    expect(mockSearch.mock.calls[3][1]).toBe('topic:ai stars:10..5000')
+    expect(mockSearch.mock.calls[4][1]).toBe('topic:rare stars:10..5000')
+  })
+
+  it('long-tail starCeiling clamps at the global MAX even for high-p75 users', async () => {
+    mockSearch.mockResolvedValue([])
+    // user p75 well above 5000; longTail should still cap at 5000
+    const queries: QueryPlan[] = [
+      { topic: 'rust', kind: 'longTail', coldStart: false, perPage: 25, sort: '', starCeiling: 5000 },
+    ]
+    await fetchCandidates('token', queries)
+    expect(mockSearch.mock.calls[0][1]).toBe('topic:rust stars:10..5000')
+  })
+
+  it('cold-start is exempt from the global cap', async () => {
+    mockSearch.mockResolvedValue([])
+    const queries: QueryPlan[] = [
+      { topic: '', kind: 'coldStart', coldStart: true, perPage: 100, sort: 'stars' },
+    ]
+    await fetchCandidates('token', queries)
+    expect(mockSearch.mock.calls[0][1]).toBe('stars:>50000')
   })
 })

@@ -29,6 +29,12 @@ const PAIR_MIN_AFFINITY = 0.15
 const STAR_THRESHOLD = 10
 const LANGUAGE_STAR_THRESHOLD = 50
 const LONGTAIL_CEILING_FLOOR = 500
+// Global hard cap on candidate stars. Every non-cold-start query is bounded
+// at `stars:10..MAX_STAR_CEILING` so the recommendation pool is always more
+// niche than mainstream — anything more popular than this never enters the
+// candidate set. Cold-start uses a separate code path (popular fallback for
+// users with no preference data) and is not subject to this cap.
+const MAX_STAR_CEILING = 5000
 const COLD_START_THRESHOLD = 50000
 const COLD_START_RESULTS = 100
 
@@ -63,12 +69,10 @@ export function planQueries(profile: UserProfile, corpus?: CorpusStats): QueryPl
   }
 
   // Long-tail topic queries — caps stars on the upside so niche repos can enter the pool.
-  // Ceiling adapts to the user's taste tier (p75) but never below 500.
-  // The nominal star ranges of `topic` (>10) and `longTail` (10..N) overlap, but
-  // GitHub's best-match sort favors higher stars within each filter, so the two
-  // queries return effectively disjoint working sets — `topic` skews 10k+, while
-  // `longTail` is bounded at N. Both calls add distinct candidates.
-  const starCeiling = Math.max(LONGTAIL_CEILING_FLOOR, profile.starScale.p75)
+  // Ceiling adapts to the user's taste tier (p75), floored at LONGTAIL_CEILING_FLOOR
+  // and clamped at the global MAX_STAR_CEILING so longTail is never less strict
+  // than the regular topic queries below.
+  const starCeiling = Math.min(MAX_STAR_CEILING, Math.max(LONGTAIL_CEILING_FLOOR, profile.starScale.p75))
   for (const [topic] of topicEntries.slice(0, TOP_LONGTAIL_TOPICS_COUNT)) {
     plans.push({ topic, kind: 'longTail', coldStart: false, perPage: 25, sort: '', starCeiling })
   }
@@ -118,19 +122,19 @@ function buildSearchQuery(plan: QueryPlan): string {
     case 'topic':
     case 'engagement':
     case 'rareTopic':
-      return `topic:${plan.topic} stars:>${STAR_THRESHOLD}`
+      return `topic:${plan.topic} stars:${STAR_THRESHOLD}..${MAX_STAR_CEILING}`
     case 'longTail': {
       const ceiling = plan.starCeiling ?? LONGTAIL_CEILING_FLOOR
       return `topic:${plan.topic} stars:${STAR_THRESHOLD}..${ceiling}`
     }
     case 'pair': {
       const [a, b] = plan.topic.split(' ')
-      return `topic:${a} topic:${b} stars:>${STAR_THRESHOLD}`
+      return `topic:${a} topic:${b} stars:${STAR_THRESHOLD}..${MAX_STAR_CEILING}`
     }
     case 'subType':
-      return `${plan.topic} stars:>${STAR_THRESHOLD}`
+      return `${plan.topic} stars:${STAR_THRESHOLD}..${MAX_STAR_CEILING}`
     case 'language':
-      return `language:${plan.topic} stars:>${LANGUAGE_STAR_THRESHOLD}`
+      return `language:${plan.topic} stars:${LANGUAGE_STAR_THRESHOLD}..${MAX_STAR_CEILING}`
   }
 }
 
