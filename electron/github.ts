@@ -34,6 +34,7 @@ export interface GitHubRepo {
   pushed_at: string
   created_at: string
   default_branch: string
+  archived: boolean
 }
 
 export interface GitHubReleaseAsset {

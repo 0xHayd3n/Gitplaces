@@ -80,6 +80,7 @@ function makeGitHubRepo(id: number): GitHubRepo {
     pushed_at: '2024-01-01T00:00:00Z',
     created_at: '2023-01-01T00:00:00Z',
     default_branch: 'main',
+    archived: false,
   }
 }
 
