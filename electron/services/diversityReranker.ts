@@ -5,6 +5,14 @@ interface SimRepo {
   bucket: string | null
   sub: string | null
   language: string | null
+  /** log10(stars+1) bucket — same-tier repos get a similarity bump so MMR picks across tiers. */
+  tier: number
+}
+
+/** Bucket a star count into a log10 tier (0..5+). */
+export function starTier(stars: number): number {
+  if (stars < 1) return 0
+  return Math.floor(Math.log10(stars))
 }
 
 export function repoSimilarity(a: SimRepo, b: SimRepo): number {
@@ -19,7 +27,8 @@ export function repoSimilarity(a: SimRepo, b: SimRepo): number {
   if (a.bucket && a.bucket === b.bucket) score += 0.25
   if (a.sub    && a.sub    === b.sub)    score += 0.20
   if (a.language && a.language === b.language) score += 0.05
-  return score
+  if (a.tier === b.tier) score += 0.15
+  return Math.min(1, score)
 }
 
 interface RerankItem {

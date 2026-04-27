@@ -8,7 +8,7 @@ import { scoreCategory } from './signals/categorySignal'
 import { scoreScale } from './signals/scaleSignal'
 import { scoreFreshness } from './signals/freshnessSignal'
 import { scoreEngagement } from './signals/engagementSignal'
-import { mmrRerank } from './diversityReranker'
+import { mmrRerank, starTier } from './diversityReranker'
 
 const WEIGHTS = {
   topic:       0.22,
@@ -120,6 +120,7 @@ export function rankCandidates(
       bucket: sc.type_bucket,
       sub:    sc.type_sub,
       language: sc.language,
+      tier: starTier(sc.stars),
     }
 
     return {
