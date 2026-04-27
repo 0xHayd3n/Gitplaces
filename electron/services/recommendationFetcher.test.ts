@@ -313,24 +313,26 @@ describe('planQueries (extended)', () => {
     expect(lt[0].perPage).toBe(25)
   })
 
-  it('long-tail starCeiling = min(MAX, max(500, p75))', () => {
+  it('long-tail emits with starCeiling = min(MAX, max(500, p75)) when strictly below cap', () => {
     const profileLow = makeProfile({
       topicAffinity: new Map([['rust', 0.4]]),
-      starScale: { median: 100, p25: 50, p75: 200 },  // p75 below floor
+      starScale: { median: 100, p25: 50, p75: 200 },  // p75 below floor → ceiling = 500
     })
     expect(planQueries(profileLow).find(p => p.kind === 'longTail')!.starCeiling).toBe(500)
 
     const profileMid = makeProfile({
       topicAffinity: new Map([['rust', 0.4]]),
-      starScale: { median: 500, p25: 200, p75: 3000 },  // p75 between floor and global cap
+      starScale: { median: 500, p25: 200, p75: 3000 },  // p75 between floor and cap → ceiling = 3000
     })
     expect(planQueries(profileMid).find(p => p.kind === 'longTail')!.starCeiling).toBe(3000)
+  })
 
+  it('long-tail is NOT emitted when p75 ≥ MAX (would duplicate the topic query at the cap)', () => {
     const profileHigh = makeProfile({
       topicAffinity: new Map([['rust', 0.4]]),
       starScale: { median: 5000, p25: 1000, p75: 12000 },  // p75 above global cap
     })
-    expect(planQueries(profileHigh).find(p => p.kind === 'longTail')!.starCeiling).toBe(5000)
+    expect(planQueries(profileHigh).filter(p => p.kind === 'longTail').length).toBe(0)
   })
 
   it('emits exactly 1 long-tail when user has only 1 topic', () => {

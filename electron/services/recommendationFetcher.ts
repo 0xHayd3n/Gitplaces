@@ -68,13 +68,16 @@ export function planQueries(profile: UserProfile, corpus?: CorpusStats): QueryPl
     }
   }
 
-  // Long-tail topic queries — caps stars on the upside so niche repos can enter the pool.
-  // Ceiling adapts to the user's taste tier (p75), floored at LONGTAIL_CEILING_FLOOR
-  // and clamped at the global MAX_STAR_CEILING so longTail is never less strict
-  // than the regular topic queries below.
+  // Long-tail topic queries — tighter ceiling than the regular topic queries.
+  // Skipped when the user's adapted ceiling equals the global cap: at that
+  // point longTail and topic emit the same `stars:10..5000` query and only
+  // produce duplicate API calls. Only emitted when p75 puts longTail strictly
+  // below the global cap (i.e. niche-leaning users get an extra-strict pass).
   const starCeiling = Math.min(MAX_STAR_CEILING, Math.max(LONGTAIL_CEILING_FLOOR, profile.starScale.p75))
-  for (const [topic] of topicEntries.slice(0, TOP_LONGTAIL_TOPICS_COUNT)) {
-    plans.push({ topic, kind: 'longTail', coldStart: false, perPage: 25, sort: '', starCeiling })
+  if (starCeiling < MAX_STAR_CEILING) {
+    for (const [topic] of topicEntries.slice(0, TOP_LONGTAIL_TOPICS_COUNT)) {
+      plans.push({ topic, kind: 'longTail', coldStart: false, perPage: 25, sort: '', starCeiling })
+    }
   }
 
   // Pair query — top-2 if both >= threshold
