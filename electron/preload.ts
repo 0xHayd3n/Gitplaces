@@ -321,4 +321,9 @@ contextBridge.exposeInMainWorld('api', {
     writeFile:     (folderPath: string, filename: string, content: string) => ipcRenderer.invoke('projects:writeFile', folderPath, filename, content),
   },
 
+  engagement: {
+    logClick: (repoId: string, source: string) =>
+      ipcRenderer.invoke('engagement:logClick', repoId, source),
+  },
+
 })

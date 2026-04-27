@@ -60,6 +60,7 @@ function makeDiscoverApi(overrides?: {
         getRecommended: vi.fn().mockResolvedValue({
           items: [{
             repo: {
+              id: '12345',
               owner: 'vercel', name: 'next.js', description: 'The React framework',
               language: 'TypeScript', stars: 100000, forks: 20000, open_issues: 500,
               watchers: 100000, size: 50000, license: 'MIT', topics: '[]',
@@ -101,14 +102,27 @@ function makeDiscoverApi(overrides?: {
         getVerified: vi.fn().mockResolvedValue(false),
       },
       verification: {
-        prioritise:  vi.fn().mockResolvedValue(undefined),
-        getScore:    vi.fn().mockResolvedValue(null),
-        onUpdated:   vi.fn(),
-        offUpdated:  vi.fn(),
+        prioritise:     vi.fn().mockResolvedValue(undefined),
+        getScore:       vi.fn().mockResolvedValue(null),
+        getBatchScores: vi.fn().mockResolvedValue({}),
+        onUpdated:      vi.fn(),
+        offUpdated:     vi.fn(),
       },
       translate: {
         check: vi.fn().mockResolvedValue(null),
         get: vi.fn().mockResolvedValue(null),
+      },
+      engagement: {
+        logClick: vi.fn().mockResolvedValue(undefined),
+      },
+      ai: {
+        getChats:       vi.fn().mockResolvedValue([]),
+        getChat:        vi.fn().mockResolvedValue(null),
+        saveChat:       vi.fn().mockResolvedValue(1),
+        deleteChat:     vi.fn().mockResolvedValue(undefined),
+        sendMessage:    vi.fn().mockResolvedValue({ text: '', html: '' }),
+        onStreamToken:  vi.fn(),
+        offStreamToken: vi.fn(),
       },
     },
     writable: true, configurable: true,
@@ -318,6 +332,26 @@ describe('Recommended tab', () => {
     renderDiscover()
     await waitFor(() => {
       expect(window.api.github.getRecommended).toHaveBeenCalled()
+    })
+  })
+})
+
+describe('Engagement tracking', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    makeDiscoverApi()
+  })
+
+  it('logs an engagement click when navigating to a repo from the recommended view', async () => {
+    renderDiscover('/discover?view=recommended')
+    // Wait for the recommended repo to appear
+    await waitFor(() => screen.getByText('next.js'))
+    // Click the repo card (repo.name text is rendered inside the card's clickable root)
+    const nameEl = screen.getByText('next.js')
+    const card = nameEl.closest('.repo-card') as HTMLElement
+    fireEvent.click(card)
+    await waitFor(() => {
+      expect((window.api.engagement.logClick as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('12345', 'recommended')
     })
   })
 })

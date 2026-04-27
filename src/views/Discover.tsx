@@ -769,6 +769,10 @@ export default function Discover() {
     if (snap) saveDiscoverSnapshot({ ...snap, scrollTop: scrollRef.current?.scrollTop ?? 0 })
     const match = path.match(/^\/repo\/([^/]+)\/([^/]+)/)
     const repo = snap?.repos && match ? snap.repos.find(r => r.owner === match[1] && r.name === match[2]) : null
+    if (repo?.id) {
+      window.api.engagement.logClick(repo.id, snap?.viewMode === 'recommended' ? 'recommended' : 'discover')
+        .catch(() => { /* non-critical */ })
+    }
     navigate(path, { state: { fromDiscoverView: snap?.viewMode, fromDiscoverPath: location.pathname + location.search, repoAvatarUrl: repo?.avatar_url ?? null } })
   }, [navigate, location.pathname, location.search])
 

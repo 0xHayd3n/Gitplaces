@@ -258,6 +258,9 @@ declare global {
         renameFolder: (folderPath: string, newName: string) => Promise<string>
         writeFile: (folderPath: string, filename: string, content: string) => Promise<void>
       }
+      engagement: {
+        logClick: (repoId: string, source: string) => Promise<void>
+      }
     }
   }
 }

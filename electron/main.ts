@@ -36,6 +36,7 @@ import { registerDownloadHandlers } from './ipc/downloadHandlers'
 import { registerAiChatHandlers } from './ipc/aiChatHandlers'
 import { registerTtsHandlers } from './ipc/ttsHandlers'
 import { registerRecommendHandlers } from './ipc/recommendHandlers'
+import { registerEngagementHandlers } from './ipc/engagementHandlers'
 import { registerCreateHandlers, closeAllOnQuit } from './ipc/createHandlers'
 import { startVerificationService, enqueueRepo } from './services/verificationService'
 import { parseOgImage, isGenericGitHubOg } from './services/ogImageService'
@@ -1645,6 +1646,7 @@ registerDownloadHandlers()
 registerAiChatHandlers()
 registerTtsHandlers()
 registerRecommendHandlers()
+registerEngagementHandlers()
 registerCreateHandlers()
 
 // ── Profile IPC ──────────────────────────────────────────────────
