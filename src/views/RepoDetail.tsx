@@ -842,6 +842,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
         setStarred(true)
         window.api.svgCache.prefetch(owner, name, repo?.default_branch ?? 'main').catch(() => {})
       }
+      window.dispatchEvent(new CustomEvent('library:changed'))
     } catch { /* silently ignore */ }
     finally { setStarWorking(false) }
   }
