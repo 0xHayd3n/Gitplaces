@@ -131,7 +131,7 @@ export async function setupRepo(
   let repoUrl: string
   try {
     // getRepo throws on 404 — use catch to distinguish exists vs. needs creating
-    const existing = await getRepo(token ?? null, username, SKILLS_BACKUP_REPO) as { html_url: string }
+    const existing = await getRepo(token ?? null, username, SKILLS_BACKUP_REPO)
     repoUrl = existing.html_url
   } catch {
     try {

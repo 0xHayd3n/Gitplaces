@@ -30,6 +30,7 @@ function userRepo(o: any) {
 function ghRepo(o: any): GitHubRepo {
   return {
     id: o.id, full_name: `${o.owner ?? 'oo'}/${o.name ?? 'rr'}`, name: o.name ?? 'rr',
+    html_url: `https://github.com/${o.owner ?? 'oo'}/${o.name ?? 'rr'}`,
     owner: { login: o.owner ?? 'oo', avatar_url: '' },
     description: o.description ?? null, language: o.language ?? null,
     topics: o.topics ?? [], stargazers_count: o.stars ?? 100,

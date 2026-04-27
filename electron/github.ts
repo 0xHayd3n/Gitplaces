@@ -19,6 +19,7 @@ export interface GitHubRepo {
   id: number
   full_name: string
   name: string
+  html_url: string
   owner: { login: string; avatar_url: string }
   description: string | null
   language: string | null

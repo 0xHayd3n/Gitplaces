@@ -108,7 +108,7 @@ describe('setupRepo', () => {
   })
 
   it('returns repoUrl when repo already exists', async () => {
-    vi.mocked(getRepo).mockResolvedValue({ html_url: 'https://github.com/alice/gitsuite-skills' })
+    vi.mocked(getRepo).mockResolvedValue({ html_url: 'https://github.com/alice/gitsuite-skills' } as Awaited<ReturnType<typeof getRepo>>)
     startSkillSyncService(makeDb(), makeWin())
     const result = await setupRepo('alice')
     expect(result.ok).toBe(true)

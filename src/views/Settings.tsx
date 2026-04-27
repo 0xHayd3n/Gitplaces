@@ -152,6 +152,8 @@ export default function Settings() {
 
   const handleSyncRetry = useCallback(async () => {
     await window.api.skillSync.retryFailed()
+    const status = await window.api.skillSync.getStatus()
+    setSyncStatus(status)
   }, [])
 
   // Connectors state
@@ -450,7 +452,9 @@ export default function Settings() {
           <div className="coll-modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
             <div className="coll-modal-title">Connect Skills Backup</div>
             <p className="settings-hint" style={{ marginTop: 8, marginBottom: 16 }}>
-              This will create a private repo <strong>gitsuite-skills</strong> on your GitHub account (or connect to an existing one). Your skills will be pushed there automatically after each generation.
+              {syncStatus?.repoOwner
+                ? <>Connect to your existing <strong>gitsuite-skills</strong> repo.</>
+                : <>This will create a private repo <strong>gitsuite-skills</strong> on your GitHub account. Your skills will be pushed there automatically after each generation.</>}
             </p>
             <div className="coll-modal-actions">
               <button className="coll-modal-cancel" onClick={() => setSyncConfirmOpen(false)}>Cancel</button>
@@ -540,10 +544,17 @@ export default function Settings() {
               <div className="connector-desc">
                 {syncStatus?.enabled
                   ? syncStatus.failedCount > 0
-                    ? `${syncStatus.failedCount} skill${syncStatus.failedCount > 1 ? 's' : ''} failed to sync`
+                    ? 'Last sync failed.'
                     : syncStatus.lastSynced
-                      ? `Last synced ${new Date(syncStatus.lastSynced).toLocaleString()}`
-                      : 'Connected — waiting for first skill'
+                      ? <>
+                          <a href="#" onClick={e => { e.preventDefault(); void window.api.openExternal(`https://github.com/${syncStatus.repoOwner}/gitsuite-skills`) }}>
+                            {syncStatus.repoOwner}/gitsuite-skills
+                          </a>
+                          {' — '}Last synced {new Date(syncStatus.lastSynced).toLocaleString()}
+                        </>
+                      : <a href="#" onClick={e => { e.preventDefault(); void window.api.openExternal(`https://github.com/${syncStatus.repoOwner}/gitsuite-skills`) }}>
+                          {syncStatus.repoOwner}/gitsuite-skills
+                        </a>
                   : 'Back up your skills to GitHub'}
               </div>
             </div>

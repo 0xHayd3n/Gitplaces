@@ -74,6 +74,7 @@ function makeGitHubRepo(id: number): GitHubRepo {
     id,
     full_name: `owner/repo-${id}`,
     name: `repo-${id}`,
+    html_url: `https://github.com/owner/repo-${id}`,
     owner: { login: 'owner', avatar_url: '' },
     description: 'test repo',
     language: 'TypeScript',
