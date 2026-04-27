@@ -175,10 +175,21 @@ export function initSchema(db: Database.Database): void {
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`)
 
+  // Phase 21 – engagement tracking
+  db.exec(`CREATE TABLE IF NOT EXISTS engagement_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    repo_id     TEXT NOT NULL,
+    event_type  TEXT NOT NULL,
+    source      TEXT NOT NULL,
+    ts          INTEGER NOT NULL
+  )`)
+
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`
-    CREATE INDEX IF NOT EXISTS repos_starred_at  ON repos(starred_at);
-    CREATE INDEX IF NOT EXISTS repos_type_bucket ON repos(type_bucket);
+    CREATE INDEX IF NOT EXISTS repos_starred_at   ON repos(starred_at);
+    CREATE INDEX IF NOT EXISTS repos_type_bucket  ON repos(type_bucket);
+    CREATE INDEX IF NOT EXISTS idx_engagement_ts   ON engagement_events(ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_engagement_repo ON engagement_events(repo_id);
   `)
 }
 
