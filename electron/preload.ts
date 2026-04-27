@@ -42,7 +42,8 @@ contextBridge.exposeInMainWorld('api', {
     starRepo:   (owner: string, name: string) => ipcRenderer.invoke('github:starRepo', owner, name),
     unstarRepo: (owner: string, name: string) => ipcRenderer.invoke('github:unstarRepo', owner, name),
     isStarred:  (owner: string, name: string) => ipcRenderer.invoke('github:isStarred', owner, name),
-    getRecommended: () => ipcRenderer.invoke('github:getRecommended'),
+    getRecommended: (page?: number, excludeIds?: string[]) =>
+      ipcRenderer.invoke('github:getRecommended', page, excludeIds),
     getBranch:  (owner: string, name: string, branch: string) => ipcRenderer.invoke('github:getBranch', owner, name, branch),
     getTree:    (owner: string, name: string, treeSha: string) => ipcRenderer.invoke('github:getTree', owner, name, treeSha),
     getBlob:    (owner: string, name: string, blobSha: string) => ipcRenderer.invoke('github:getBlob', owner, name, blobSha),
@@ -332,6 +333,25 @@ contextBridge.exposeInMainWorld('api', {
   engagement: {
     logClick: (repoId: string, source: string) =>
       ipcRenderer.invoke('engagement:logClick', repoId, source),
+  },
+
+  skillSync: {
+    setup: () => ipcRenderer.invoke('skillSync:setup'),
+    disconnect: () => ipcRenderer.invoke('skillSync:disconnect'),
+    retryFailed: () => ipcRenderer.invoke('skillSync:retryFailed'),
+    getStatus: () => ipcRenderer.invoke('skillSync:getStatus'),
+    onSyncFailed: (cb: (payload: { owner?: string; filename?: string; summary?: boolean; failCount?: number }) => void) => {
+      const wrapped = ((_e: unknown, payload: unknown) => cb(payload as Parameters<typeof cb>[0])) as (...args: unknown[]) => void
+      ipcRenderer.on('skillSync:syncFailed', wrapped)
+      callbackWrappers.set(cb, wrapped)
+    },
+    offSyncFailed: (cb: (...args: unknown[]) => void) => {
+      const wrapped = callbackWrappers.get(cb)
+      if (wrapped) {
+        ipcRenderer.removeListener('skillSync:syncFailed', wrapped)
+        callbackWrappers.delete(cb)
+      }
+    },
   },
 
 })
