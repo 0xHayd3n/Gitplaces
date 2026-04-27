@@ -314,6 +314,28 @@ describe('planQueries (extended)', () => {
     expect(lt[0].sort).toBe('')
     expect(lt[0].perPage).toBe(25)
   })
+
+  it('long-tail starCeiling = max(500, p75)', () => {
+    const profileLow = makeProfile({
+      topicAffinity: new Map([['rust', 0.4]]),
+      starScale: { median: 100, p25: 50, p75: 200 },  // p75 below floor
+    })
+    expect(planQueries(profileLow).find(p => p.kind === 'longTail')!.starCeiling).toBe(500)
+
+    const profileHigh = makeProfile({
+      topicAffinity: new Map([['rust', 0.4]]),
+      starScale: { median: 1000, p25: 500, p75: 5000 },  // p75 above floor
+    })
+    expect(planQueries(profileHigh).find(p => p.kind === 'longTail')!.starCeiling).toBe(5000)
+  })
+
+  it('emits exactly 1 long-tail when user has only 1 topic', () => {
+    const profile = makeProfile({
+      topicAffinity: new Map([['rust', 1.0]]),
+    })
+    const plans = planQueries(profile)
+    expect(plans.filter(p => p.kind === 'longTail').length).toBe(1)
+  })
 })
 
 // ── buildSearchQuery branches ──────────────────────────────────────────────────

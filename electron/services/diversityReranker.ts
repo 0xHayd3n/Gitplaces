@@ -27,6 +27,10 @@ export function repoSimilarity(a: SimRepo, b: SimRepo): number {
   if (a.bucket && a.bucket === b.bucket) score += 0.25
   if (a.sub    && a.sub    === b.sub)    score += 0.20
   if (a.language && a.language === b.language) score += 0.05
+  // Tier bonus only differentiates in the mid-similarity cohort (~0.4-0.85);
+  // for repos already nearly identical on topic/bucket/sub/lang, the clamp
+  // absorbs the bump and tier becomes inert. That's the realistic case for
+  // typical candidate pools — full-overlap pairs are rare.
   if (a.tier === b.tier) score += 0.15
   return Math.min(1, score)
 }

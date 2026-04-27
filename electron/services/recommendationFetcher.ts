@@ -59,6 +59,10 @@ export function planQueries(profile: UserProfile, corpus?: CorpusStats): QueryPl
 
   // Long-tail topic queries — caps stars on the upside so niche repos can enter the pool.
   // Ceiling adapts to the user's taste tier (p75) but never below 500.
+  // The nominal star ranges of `topic` (>10) and `longTail` (10..N) overlap, but
+  // GitHub's best-match sort favors higher stars within each filter, so the two
+  // queries return effectively disjoint working sets — `topic` skews 10k+, while
+  // `longTail` is bounded at N. Both calls add distinct candidates.
   const starCeiling = Math.max(LONGTAIL_CEILING_FLOOR, profile.starScale.p75)
   for (const [topic] of topicEntries.slice(0, TOP_LONGTAIL_TOPICS_COUNT)) {
     plans.push({ topic, kind: 'longTail', coldStart: false, perPage: 25, sort: '', starCeiling })
@@ -84,10 +88,9 @@ export function planQueries(profile: UserProfile, corpus?: CorpusStats): QueryPl
 
   // Engagement queries (only if enough click data)
   if (profile.engagement.clickCount >= ENGAGEMENT_MIN_CLICKS) {
-    const userTopTopics = new Set(topicEntries.slice(0, TOP_TOPICS_COUNT).map(([t]) => t))
     const clickedEntries = [...profile.engagement.clickedTopicAffinity.entries()]
       .sort((a, b) => b[1] - a[1])
-      .filter(([t]) => !userTopTopics.has(t))
+      .filter(([t]) => !affinityTopics.has(t))
       .slice(0, TOP_ENGAGEMENT_TOPICS_COUNT)
     for (const [topic] of clickedEntries) {
       plans.push({ topic, kind: 'engagement', coldStart: false, perPage: 20, sort: '' })
