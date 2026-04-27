@@ -157,7 +157,7 @@ export default function NavBar() {
   const inFilesTab = isRepo && nav.activeTab === 'files' && nav.filePath !== null
 
   function handleBack() {
-    if (inFilesTab && nav.onGoBack) { nav.onGoBack(); return }
+    if (inFilesTab && nav.canGoBack && nav.onGoBack) { nav.onGoBack(); return }
     navigate(-1)
   }
 
@@ -167,7 +167,7 @@ export default function NavBar() {
         <button
           className="app-navbar-btn"
           onClick={handleBack}
-          disabled={inFilesTab ? !nav.canGoBack : false}
+          disabled={false}
           aria-label="Go back"
           title="Back"
         >
