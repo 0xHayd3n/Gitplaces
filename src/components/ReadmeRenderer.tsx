@@ -11,6 +11,7 @@ import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import { visit, SKIP } from 'unist-util-visit'
 import type { Root, Element, ElementContent, Text } from 'hast'
 import { classifyImage } from '../utils/imageClassifier'
+import { detectImageNeedsInvert } from '../utils/detectImageNeedsInvert'
 import { classifyLink } from '../utils/filePaths'
 import { BADGE_DOMAINS, looksLikeBadgeUrl } from '../utils/badgeParser'
 import { extractVideoId, fetchYouTubeOEmbed, type YouTubeVideoData } from '../utils/youtubeParser'
@@ -752,6 +753,55 @@ function collapseHeroBlanks(src: string): string {
   return out.join('\n')
 }
 
+// ── Markdown preprocessing: convert markdown inside HTML blocks ──
+// CommonMark does NOT process markdown inside HTML blocks (e.g. the content
+// of `<div align="center">...</div>` is treated as raw HTML). GitHub's
+// renderer deviates and DOES process markdown there; this rewrites the
+// common patterns inside container blocks so the rendered output matches:
+//   • image-in-link  `[![alt](img)](href)` → `<a href><img/></a>`  (badges)
+//   • standalone img `![alt](url)`         → `<img/>`
+//   • simple link    `[text](url)`         → `<a href>text</a>`
+//   • atx heading    `# text`              → `<h1>text</h1>`       (line-anchored)
+// Order matters: image-in-link first so the inner `![](...)` doesn't get
+// matched as a standalone image, and links last so any remaining `[](url)`
+// patterns aren't confused with image syntax.
+function convertMdInHtmlBlocks(src: string): string {
+  const blockPattern = /(<(p|div|center|h[1-6]|sub|sup|td|th)(?:\s[^>]*)?>)([\s\S]*?)(<\/\2>)/gi
+  return src.replace(blockPattern, (full, openTag, _tag, content: string, closeTag) => {
+    // Quick reject: skip if the content has no markdown markers we'd convert
+    if (!/\[[^\]]*\]\([^)]+\)|^[ \t]*#{1,6} /m.test(content)) return full
+
+    let processed = content
+
+    // 1. Image-in-link: [![alt](img)](href)
+    processed = processed.replace(
+      /\[!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g,
+      (_m, alt: string, imgUrl: string, linkUrl: string) =>
+        `<a href="${linkUrl}"><img src="${imgUrl}" alt="${alt}" /></a>`
+    )
+
+    // 2. Standalone image: ![alt](url)
+    processed = processed.replace(
+      /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g,
+      (_m, alt: string, url: string) => `<img src="${url}" alt="${alt}" />`
+    )
+
+    // 3. Simple link: [text](url)
+    processed = processed.replace(
+      /\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g,
+      (_m, text: string, url: string) => `<a href="${url}">${text}</a>`
+    )
+
+    // 4. ATX heading at line start: `# text`, `## text`, ... `###### text`
+    processed = processed.replace(
+      /^[ \t]*(#{1,6})[ \t]+([^\n]+?)[ \t]*$/gm,
+      (_m, hashes: string, text: string) => `<h${hashes.length}>${text}</h${hashes.length}>`
+    )
+
+    return openTag + processed + closeTag
+  })
+}
+
 // ── Rehype plugin: stamp image-only <a> elements ──────────────────────────
 // Runs BEFORE rehype-sanitize so data-* properties survive sanitization.
 // Purpose: lets the `a` component override skip the link preview popover
@@ -1039,9 +1089,10 @@ interface Props {
   onNavigateToFile?: (path: string) => void
   onTocReady?: (headings: TocItem[]) => void
   readmeBodyRef?: React.RefObject<HTMLDivElement>
+  invertDarkImages?: boolean
 }
 
-function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePath = '', onNavigateToFile, onTocReady, readmeBodyRef }: Props) {
+function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePath = '', onNavigateToFile, onTocReady, readmeBodyRef, invertDarkImages = false }: Props) {
   const [lightbox, setLightbox] = useState<LightboxState | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -1292,8 +1343,13 @@ function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePat
     // h1/h3/p siblings end up outside the div and cannot be reliably reattached.
     const heroCollapsed = collapseHeroBlanks(noPreamble)
 
+    // Step 0d: rewrite markdown inside HTML blocks (links, images, image-in-link
+    // badges, atx headings) to HTML so they actually render — CommonMark doesn't
+    // process markdown inside HTML blocks, but GitHub's renderer does.
+    const linksRewritten = convertMdInHtmlBlocks(heroCollapsed)
+
     // Step 1: fix relative image paths → absolute GitHub raw URLs
-    const fixedContent = heroCollapsed
+    const fixedContent = linksRewritten
       .replace(
         /!\[([^\]]*)\]\((?!https?:\/\/)([^)]+)\)/g,
         (_, alt, src) =>
@@ -1407,32 +1463,40 @@ function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePat
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mdComponents = useMemo<Record<string, any>>(() => ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    h1: ({ children, id }: any) => (
-      <h1 id={id} className="rm-h1 tts-heading-wrap">
-        {children}
-        {ttsReady && ttsOutput.current.sentences.length > 0 && (
-          <button
-            className="tts-heading-btn"
-            onClick={() => tts.play(0)}
-            title="Read aloud"
-          >
-            <Volume2 size={18} />
-          </button>
-        )}
-      </h1>
-    ),
+    h1: ({ children, id }: any) => {
+      // Apply the flex wrap class only when a TTS button is actually rendered.
+      // Unconditional `display: flex` on every heading breaks centered layouts
+      // (e.g. `<div align="center"># <img> Taiga UI</div>`) because flex
+      // ignores `text-align: center`.
+      const showTts = ttsReady && ttsOutput.current.sentences.length > 0
+      return (
+        <h1 id={id} className={`rm-h1${showTts ? ' tts-heading-wrap' : ''}`}>
+          {children}
+          {showTts && (
+            <button
+              className="tts-heading-btn"
+              onClick={() => tts.play(0)}
+              title="Read aloud"
+            >
+              <Volume2 size={18} />
+            </button>
+          )}
+        </h1>
+      )
+    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     h2: ({ children, id, className: extraClass }: any) => {
       const text = extractChildText(children)
       const section = ttsOutput.current.sections.find(s => s.headingText === text)
-      const cls = ['rm-h2 tts-heading-wrap', extraClass].filter(Boolean).join(' ')
+      const showTts = ttsReady && Boolean(section)
+      const cls = ['rm-h2', showTts ? 'tts-heading-wrap' : null, extraClass].filter(Boolean).join(' ')
       return (
         <h2 id={id} className={cls}>
           {children}
-          {ttsReady && section && (
+          {showTts && (
             <button
               className="tts-heading-btn"
-              onClick={() => tts.play(section.sentenceIndex)}
+              onClick={() => tts.play(section!.sentenceIndex)}
               title="Read from here"
             >
               <Volume2 size={14} />
@@ -1445,13 +1509,14 @@ function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePat
     h3: ({ children, id }: any) => {
       const text = extractChildText(children)
       const section = ttsOutput.current.sections.find(s => s.headingText === text)
+      const showTts = ttsReady && Boolean(section)
       return (
-        <h3 id={id} className="rm-h3 tts-heading-wrap">
+        <h3 id={id} className={`rm-h3${showTts ? ' tts-heading-wrap' : ''}`}>
           {children}
-          {ttsReady && section && (
+          {showTts && (
             <button
               className="tts-heading-btn"
-              onClick={() => tts.play(section.sentenceIndex)}
+              onClick={() => tts.play(section!.sentenceIndex)}
               title="Read from here"
             >
               <Volume2 size={14} />
@@ -1783,6 +1848,10 @@ function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePat
             style={pctStyle}
             {...(declaredHeight ? { height: declaredHeight } : {})}
             {...(!isPctW && declaredWidth ? { width: declaredWidth } : {})}
+            onLoad={invertDarkImages ? (e) => {
+              const el = e.target as HTMLImageElement
+              if (detectImageNeedsInvert(el)) el.setAttribute('data-needs-invert', 'true')
+            } : undefined}
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
         )
       }
@@ -1800,6 +1869,9 @@ function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePat
               el.className = 'rm-img-logo'
               el.onclick = null
             }
+            if (invertDarkImages && detectImageNeedsInvert(el)) {
+              el.setAttribute('data-needs-invert', 'true')
+            }
           }}
         />
       )
@@ -1814,7 +1886,7 @@ function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePat
   // navigate, setHoverGhRepo, setHoverGhRepoRect: stable references (React Router / useState setters) — intentionally excluded
   // tts.play/pause/etc are stable useCallback references; ttsReady changes once (voices loaded)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [fnHistory, activeVideo, hoverVideo, ttsReady]) // only re-create when footnote, YouTube, or TTS-ready state changes
+  }), [fnHistory, activeVideo, hoverVideo, ttsReady, invertDarkImages]) // only re-create when footnote, YouTube, or TTS-ready state changes
 
   return (
     <div className={`readme-body${tts.status !== 'idle' ? ' tts-playing' : ''}`} ref={setContainerRef}>
@@ -1939,5 +2011,6 @@ export default memo(ReadmeRenderer, (prev, next) =>
   prev.branch === next.branch &&
   prev.onNavigateToFile === next.onNavigateToFile &&
   prev.onTocReady === next.onTocReady &&
-  prev.readmeBodyRef === next.readmeBodyRef
+  prev.readmeBodyRef === next.readmeBodyRef &&
+  prev.invertDarkImages === next.invertDarkImages
 )
