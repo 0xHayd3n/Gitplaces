@@ -502,7 +502,11 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   const [selectedSkillFile, setSelectedSkillFile] = useState<string>('master')
   const [relearningTarget, setRelearningTarget] = useState<'master' | 'components' | null>(null)
   const [hoveredBox, setHoveredBox] = useState<'master' | 'components' | null>(null)
-  const [cloneOpen, setCloneOpen] = useState(false)
+  const [cloneOpen, setCloneOpen] = useState<boolean>(() => {
+    // Honour `navigate(path, { state: { openClone: true } })` from the sidebar context menu.
+    const s = location.state as { openClone?: boolean } | null
+    return s?.openClone === true
+  })
 
   // Video state
   const [videoLinks, setVideoLinks]   = useState<YouTubeLink[]>([])

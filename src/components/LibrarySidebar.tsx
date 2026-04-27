@@ -52,7 +52,7 @@ export default function LibrarySidebar({
   // - 'unstarred': use unstarredRows directly (already ordered by unstarred_at DESC).
   const entries: SidebarEntry[] = (() => {
     if (activeSegment === 'unstarred') {
-      return unstarredRows.map(row => ({ row, isInstalled: false, isStarred: false }))
+      return unstarredRows.map(row => ({ row, isInstalled: row.installed === 1, isStarred: false }))
     }
     const map = new Map<string, SidebarEntry>()
     for (const row of installedRows) {
@@ -67,8 +67,7 @@ export default function LibrarySidebar({
   })()
 
   const visible = entries.filter(({ row, isInstalled }) => {
-    if (activeSegment === 'all') return true
-    if (activeSegment === 'unstarred') return true
+    if (activeSegment === 'all' || activeSegment === 'unstarred') return true
     if (activeSegment === 'active') return isInstalled && (row as LibraryRow).active === 1
     return false
   })

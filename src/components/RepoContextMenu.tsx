@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Star, StarOff, Brain, GitBranch, GitFork } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '../contexts/Toast'
 
 export interface RepoContextMenuTarget {
   owner: string
@@ -18,6 +19,7 @@ interface Props {
 export default function RepoContextMenu({ x, y, target, onClose }: Props) {
   const menuRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+  const { toast } = useToast()
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -46,8 +48,10 @@ export default function RepoContextMenu({ x, y, target, onClose }: Props) {
         await window.api.github.starRepo(target.owner, target.name)
       }
       window.dispatchEvent(new CustomEvent('library:changed'))
-    } catch { /* swallow — rate limit / network errors are non-actionable here */ }
-    onClose()
+      onClose()
+    } catch {
+      toast(target.isStarred ? 'Failed to unstar — check connection' : 'Failed to star — check connection', 'error')
+    }
   }
 
   const handleLearn = () => {
@@ -56,7 +60,7 @@ export default function RepoContextMenu({ x, y, target, onClose }: Props) {
   }
 
   const handleClone = () => {
-    navigate(`/library/repo/${target.owner}/${target.name}`)
+    navigate(`/library/repo/${target.owner}/${target.name}`, { state: { openClone: true } })
     onClose()
   }
 
