@@ -81,7 +81,7 @@ const CATEGORIES: { id: CategoryId; label: string; icon: ReactNode }[] = [
 ]
 
 export default function Settings() {
-  const { background, setBackground } = useAppearance()
+  const { background, setBackground, invertDarkImages, setInvertDarkImages } = useAppearance()
   const [activeCategory, setActiveCategory] = useState<CategoryId>('connectors')
   const [claudeCodeInstalled, setClaudeCodeInstalled] = useState<boolean | null>(null)
   const [claudeCodeLoggedIn, setClaudeCodeLoggedIn] = useState<boolean | null>(null)
@@ -768,6 +768,26 @@ export default function Settings() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="settings-group">
+        <div className="settings-group-title">Images</div>
+        <div className="settings-group-body">
+          <div className="settings-group-row">
+            <div className="settings-group-row-main">
+              <div className="settings-group-row-label">Invert dark images</div>
+              <div className="settings-group-row-sub">
+                Automatically inverts logos and banners with dark content so they&rsquo;re readable on dark backgrounds.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={invertDarkImages}
+              onChange={(e) => setInvertDarkImages(e.target.checked)}
+              aria-label="Invert dark images"
+            />
           </div>
         </div>
       </div>
