@@ -10,7 +10,7 @@ import CollectionsSidebar from '../components/CollectionsSidebar'
 import RepoDetail from './RepoDetail'
 import CollectionDetail from './CollectionDetail'
 
-type ActivePanel = 'repos' | 'collections' | null
+type ActivePanel = 'repos' | 'collections'
 
 export default function Library() {
   const { toast } = useToast()
@@ -56,7 +56,7 @@ export default function Library() {
   const collSelectedId = collMatch?.params.id ?? null
 
   const handlePanelToggle = useCallback((panel: 'repos' | 'collections') => {
-    setActivePanel(prev => prev === panel ? null : panel)
+    setActivePanel(panel)
   }, [])
 
   const handleRepoSelect = useCallback((row: RepoRow, _isInstalled: boolean) => {

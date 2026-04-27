@@ -8,10 +8,12 @@ import { SearchProvider } from './contexts/Search'
 import { ToastProvider } from './contexts/Toast'
 import { RepoNavProvider } from './contexts/RepoNav'
 import { AppearanceProvider, useAppearance } from './contexts/Appearance'
+import { GitHubAuthProvider } from './contexts/GitHubAuth'
 import ProfileOverlay from './components/ProfileOverlay'
 import Titlebar from './components/Titlebar'
 import Dock from './components/Dock'
 import AppLoadingFallback from './components/AppLoadingFallback'
+import RequireGitHub from './components/RequireGitHub'
 
 const AiDialogue = lazy(() => import('./components/AiDialogue'))
 
@@ -37,7 +39,7 @@ function AppContent() {
   const { background } = useAppearance()
   const [aiOpen, setAiOpen] = useState(false)
   const { text: tooltipText, nodeRef: tooltipRef } = useTooltip()
-  const isDiscoverPage = location.pathname === '/' || location.pathname.startsWith('/discover') || location.pathname.startsWith('/library') || location.pathname.startsWith('/repo/')
+  const isDiscoverPage = location.pathname === '/' || location.pathname.startsWith('/discover') || location.pathname.startsWith('/library') || location.pathname.startsWith('/repo/') || location.pathname.startsWith('/create')
 
   const toggleAi = useCallback(() => setAiOpen(o => !o), [])
   const closeAi = useCallback(() => setAiOpen(false), [])
@@ -62,15 +64,15 @@ function AppContent() {
           <Suspense fallback={<AppLoadingFallback />}>
             <Routes>
               <Route path="/" element={<Navigate to="/library" replace />} />
-              <Route path="/discover" element={<Discover />} />
-              <Route path="/library/*" element={<Library />} />
+              <Route path="/discover" element={<RequireGitHub><Discover /></RequireGitHub>} />
+              <Route path="/library/*" element={<RequireGitHub><Library /></RequireGitHub>} />
               <Route path="/collections" element={<Navigate to="/library" replace />} />
               <Route path="/local-project" element={<LocalProjectDetail />} />
               <Route path="/create" element={<Create />} />
               <Route path="/create/:sessionId" element={<Create />} />
-              <Route path="/starred" element={<Starred />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/repo/:owner/:name" element={<RepoDetail />} />
+              <Route path="/starred" element={<RequireGitHub><Starred /></RequireGitHub>} />
+              <Route path="/profile" element={<RequireGitHub><Profile /></RequireGitHub>} />
+              <Route path="/repo/:owner/:name" element={<RequireGitHub><RepoDetail /></RequireGitHub>} />
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
@@ -99,17 +101,19 @@ export default function App() {
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <AppearanceProvider>
-        <ProfileOverlayProvider>
-          <SavedReposProvider>
-            <SearchProvider>
-              <ToastProvider>
-                <RepoNavProvider>
-                  <AppContent />
-                </RepoNavProvider>
-              </ToastProvider>
-            </SearchProvider>
-          </SavedReposProvider>
-        </ProfileOverlayProvider>
+        <GitHubAuthProvider>
+          <ProfileOverlayProvider>
+            <SavedReposProvider>
+              <SearchProvider>
+                <ToastProvider>
+                  <RepoNavProvider>
+                    <AppContent />
+                  </RepoNavProvider>
+                </ToastProvider>
+              </SearchProvider>
+            </SavedReposProvider>
+          </ProfileOverlayProvider>
+        </GitHubAuthProvider>
       </AppearanceProvider>
     </MemoryRouter>
   )

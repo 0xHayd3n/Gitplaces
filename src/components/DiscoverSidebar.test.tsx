@@ -114,103 +114,32 @@ const filterPanelProps = {
   onSelectedSubtypesChange: () => {},
 }
 
-describe('FilterPanel — grouping toggle', () => {
-  beforeEach(() => localStorage.clear())
-
-  it('renders Use Case and Platform buttons', () => {
+describe('FilterPanel — language sectioned view (default)', () => {
+  it('renders Popular section first, then platform sections, all visible at once', () => {
     render(<FilterPanel {...filterPanelProps} />)
-    expect(screen.getByRole('button', { name: 'Use Case' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Platform' })).toBeInTheDocument()
+    // Popular header
+    expect(screen.getByRole('heading', { name: /Popular/ })).toBeInTheDocument()
+    // At least a couple of platform headers are visible simultaneously
+    expect(screen.getByRole('heading', { name: /Native/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /JVM/ })).toBeInTheDocument()
+    // No Use Case / Platform toggle anymore
+    expect(screen.queryByRole('button', { name: 'Use Case' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Platform' })).not.toBeInTheDocument()
   })
 
-  it('defaults to Use Case mode (domain)', () => {
+  it('shows all platform sections’ languages on one page (no drill-in click required)', () => {
     render(<FilterPanel {...filterPanelProps} />)
-    expect(screen.getByRole('button', { name: 'Use Case' })).toHaveClass('active')
-    expect(screen.getByRole('button', { name: 'Platform' })).not.toHaveClass('active')
-  })
-
-  it('switches to Platform mode (ecosystem) on click', async () => {
-    const user = userEvent.setup()
-    render(<FilterPanel {...filterPanelProps} />)
-    await user.click(screen.getByRole('button', { name: 'Platform' }))
-    expect(screen.getByRole('button', { name: 'Platform' })).toHaveClass('active')
-    expect(screen.getByRole('button', { name: 'Use Case' })).not.toHaveClass('active')
-  })
-
-  it('persists mode to localStorage', async () => {
-    const user = userEvent.setup()
-    render(<FilterPanel {...filterPanelProps} />)
-    await user.click(screen.getByRole('button', { name: 'Platform' }))
-    expect(JSON.parse(localStorage.getItem('discover:languageGrouping')!)).toBe('ecosystem')
-  })
-
-  it('reads mode from localStorage on mount', () => {
-    localStorage.setItem('discover:languageGrouping', JSON.stringify('ecosystem'))
-    render(<FilterPanel {...filterPanelProps} />)
-    expect(screen.getByRole('button', { name: 'Platform' })).toHaveClass('active')
-  })
-})
-
-describe('FilterPanel — language master-detail (default view)', () => {
-  beforeEach(() => localStorage.clear())
-
-  it('shows tiles + Popular languages by default (Popular auto-selected)', () => {
-    render(<FilterPanel {...filterPanelProps} />)
-    // Tile column visible
-    expect(screen.getByRole('button', { name: /Popular/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Systems/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Web/ })).toBeInTheDocument()
-    // Popular's languages visible in the content column by default
-    expect(screen.getByRole('button', { name: /^JavaScript$/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Python$/ })).toBeInTheDocument()
-  })
-
-  it('shows tile counts that match the catalogue', () => {
-    render(<FilterPanel {...filterPanelProps} />)
-    expect(screen.getByRole('button', { name: /Systems.*\(15\)/ })).toBeInTheDocument()
-  })
-
-  it('marks Popular tile as active by default', () => {
-    render(<FilterPanel {...filterPanelProps} />)
-    const popularTile = screen.getByRole('button', { name: /Popular/ })
-    expect(popularTile.classList.contains('active')).toBe(true)
-  })
-})
-
-describe('FilterPanel — switching active category in master-detail', () => {
-  beforeEach(() => localStorage.clear())
-
-  it('clicking a category tile updates the content column to show that category\'s languages', async () => {
-    const user = userEvent.setup()
-    render(<FilterPanel {...filterPanelProps} />)
-    // Default content is Popular — JavaScript visible, Zig not (Zig is in Systems but not in Popular)
-    expect(screen.getByRole('button', { name: /^JavaScript$/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Zig$/ })).not.toBeInTheDocument()
-    // Click Systems tile
-    await user.click(screen.getByRole('button', { name: /^Systems/ }))
-    // Now Systems-only languages visible
+    // Popular language (also appears in its platform section, so allow multiple)
+    expect(screen.getAllByRole('button', { name: /^JavaScript$/ }).length).toBeGreaterThanOrEqual(1)
+    // Native-only language (not in Popular) — visible without clicking
     expect(screen.getByRole('button', { name: /^Zig$/ })).toBeInTheDocument()
+    // Another platform's language — also visible without clicking
     expect(screen.getByRole('button', { name: /^Crystal$/ })).toBeInTheDocument()
-    // Tiles are still visible (master-detail)
-    expect(screen.getByRole('button', { name: /^Web \(/ })).toBeInTheDocument()
   })
 
-  it('marks the clicked tile as active and unmarks the previous one', async () => {
-    const user = userEvent.setup()
+  it('shows section counts that match the catalogue', () => {
     render(<FilterPanel {...filterPanelProps} />)
-    expect(screen.getByRole('button', { name: /Popular/ }).classList.contains('active')).toBe(true)
-    await user.click(screen.getByRole('button', { name: /^Systems/ }))
-    expect(screen.getByRole('button', { name: /Popular/ }).classList.contains('active')).toBe(false)
-    expect(screen.getByRole('button', { name: /^Systems/ }).classList.contains('active')).toBe(true)
-  })
-
-  it('keeps the grouping toggle visible across tile selections', async () => {
-    const user = userEvent.setup()
-    render(<FilterPanel {...filterPanelProps} />)
-    expect(screen.getByRole('button', { name: 'Use Case' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /^Systems/ }))
-    expect(screen.getByRole('button', { name: 'Use Case' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Platform' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Native.*\(/ })).toBeInTheDocument()
   })
 })
 
@@ -222,10 +151,8 @@ describe('FilterPanel — language search results', () => {
     render(<FilterPanel {...filterPanelProps} />)
     await user.type(screen.getByPlaceholderText('Search languages...'), 'rust')
     expect(screen.getByRole('button', { name: /^Rust/ })).toBeInTheDocument()
-    // Tile column is hidden during search
-    expect(screen.queryByRole('button', { name: /^Systems \(/ })).not.toBeInTheDocument()
-    // Grouping toggle is hidden during search
-    expect(screen.queryByRole('button', { name: 'Use Case' })).not.toBeInTheDocument()
+    // Section headers are hidden during search
+    expect(screen.queryByRole('heading', { name: /^Native/ })).not.toBeInTheDocument()
   })
 
   it('ranks name-starts-with matches before name-contains matches', async () => {
@@ -244,11 +171,11 @@ describe('FilterPanel — language search results', () => {
     expect(prefixIdx, 'Elixir (prefix match) should rank before Haskell (contains match)').toBeLessThan(containsIdx)
   })
 
-  it('shows category caption (· in <Category>) on each row', async () => {
+  it('shows platform caption (· <Platform>) on each row', async () => {
     const user = userEvent.setup()
     render(<FilterPanel {...filterPanelProps} />)
     await user.type(screen.getByPlaceholderText('Search languages...'), 'rust')
-    expect(screen.getByText(/· Systems/)).toBeInTheDocument()
+    expect(screen.getByText(/· Native/)).toBeInTheDocument()
   })
 
   it('shows empty state when no language matches', async () => {
@@ -258,20 +185,16 @@ describe('FilterPanel — language search results', () => {
     expect(screen.getByText(/No languages match/)).toBeInTheDocument()
   })
 
-  it('preserves the active tile selection across a search-and-clear cycle', async () => {
+  it('returns to the full sectioned view after clearing the search', async () => {
     const user = userEvent.setup()
     render(<FilterPanel {...filterPanelProps} />)
-    // Switch from default Popular to Systems (Zig is Systems-only, not in Popular)
-    await user.click(screen.getByRole('button', { name: /^Systems/ }))
-    expect(screen.getByRole('button', { name: /^Zig$/ })).toBeInTheDocument()
-    // Type a search — search overrides the master-detail
     await user.type(screen.getByPlaceholderText('Search languages...'), 'python')
     expect(screen.getByRole('button', { name: /^Python/ })).toBeInTheDocument()
-    // Clear the search — should return to Systems (not Popular)
     const input = screen.getByPlaceholderText('Search languages...') as HTMLInputElement
     await user.clear(input)
+    // All platform sections back, Zig (Native-only) visible again
+    expect(screen.getByRole('heading', { name: /Native/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Zig$/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Systems/ }).classList.contains('active')).toBe(true)
   })
 })
 
@@ -290,28 +213,6 @@ describe('FilterPanel — sticky header chrome', () => {
     const typeTab = container.querySelector('button.panel-tab:nth-of-type(2)') as HTMLButtonElement
     await user.click(typeTab)
     expect(screen.getByRole('button', { name: /All Types/ })).toBeInTheDocument()
-  })
-})
-
-describe('FilterPanel — tab switching resets active tile to Popular', () => {
-  beforeEach(() => localStorage.clear())
-
-  it('switching from Language → Type → Language resets the active tile to Popular', async () => {
-    const user = userEvent.setup()
-    render(<FilterPanel {...filterPanelProps} />)
-    // Switch to Systems (Zig is Systems-only, not in Popular)
-    await user.click(screen.getByRole('button', { name: /^Systems/ }))
-    expect(screen.getByRole('button', { name: /^Zig$/ })).toBeInTheDocument()
-    // Tab switch (panel-tab buttons specifically; the Type tab also contains language-named subtypes)
-    const tabBar = screen.getByRole('button', { name: 'Language' }).parentElement!
-    const typeTab = tabBar.querySelector('button.panel-tab:nth-of-type(2)') as HTMLButtonElement
-    const langTab = tabBar.querySelector('button.panel-tab:nth-of-type(1)') as HTMLButtonElement
-    await user.click(typeTab)
-    await user.click(langTab)
-    // Popular content shown again (JavaScript visible, Zig not)
-    expect(screen.getByRole('button', { name: /^JavaScript$/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^Zig$/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Popular/ }).classList.contains('active')).toBe(true)
   })
 })
 
@@ -334,8 +235,6 @@ describe('FilterPanel — embedded mode', () => {
     render(<FilterPanel {...filterPanelProps} embedded activeTab="type" />)
     // A known repo-type bucket label should be visible
     expect(screen.getByText(/Frameworks/)).toBeInTheDocument()
-    // Domain/Ecosystem toggle is language-only — should be hidden in type tab
-    expect(screen.queryByRole('button', { name: 'Domain' })).not.toBeInTheDocument()
   })
 
   it('filters to a flat list of matching languages by controlled search prop', () => {

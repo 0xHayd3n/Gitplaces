@@ -206,6 +206,7 @@ export default function TemplateGallery() {
 
   return (
     <div className="projects-gallery">
+      <div className="discover-drag-strip" aria-hidden="true" />
       {/* Hero */}
       <div className="projects-hero">
         <h1 className="projects-hero-title">What will you build today?</h1>

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
-import { flushSync } from 'react-dom'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useGitHubAuth } from '../contexts/GitHubAuth'
+import { useGitHubLogin } from '../hooks/useGitHubLogin'
 
 // ── Background SVG for Screen 0 ─────────────────────────────────
 function BackgroundSVG() {
@@ -100,41 +101,23 @@ function ConnectScreen({
   onBack: () => void
   onContinue: () => void
 }) {
-  const [connectState, setConnectState] = useState<ConnectState>('idle')
-  const [connectedUser, setConnectedUser] = useState<string | null>(null)
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [userCode, setUserCode] = useState<string | null>(null)
-  const [verificationUri, setVerificationUri] = useState<string | null>(null)
+  const auth = useGitHubAuth()
+  const login = useGitHubLogin()
   const [copied, setCopied] = useState(false)
 
-  // Cancel any in-flight device-flow poll if the user leaves the screen.
-  useEffect(() => {
-    return () => {
-      window.api.github.cancelDeviceFlow().catch(() => {})
-    }
-  }, [])
+  const userCode = login.userCode
+  const verificationUri = login.verificationUri
+  const verificationUriComplete = login.verificationUriComplete
+  const connectedUser = auth.user?.login ?? null
+  const connectState: ConnectState =
+    auth.status === 'connected' ? 'connected'
+    : login.status === 'pending' || login.status === 'polling' ? 'awaiting'
+    : 'idle'
+  const errorMsg = login.error
 
   async function handleConnect() {
-    setErrorMsg(null)
     setCopied(false)
-    setConnectState('awaiting')
-    try {
-      const flow = await window.api.github.startDeviceFlow()
-      setUserCode(flow.userCode)
-      setVerificationUri(flow.verificationUri)
-      await window.api.github.pollDeviceToken(flow.deviceCode, flow.interval)
-      const user = await window.api.github.getUser()
-      await window.api.settings.set('github_username', user.login)
-      flushSync(() => {
-        setConnectedUser(user.login)
-        setConnectState('connected')
-        setUserCode(null)
-      })
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Failed to complete sign-in')
-      setConnectState('idle')
-      setUserCode(null)
-    }
+    await login.start()
   }
 
   async function handleCopyCode() {
@@ -149,7 +132,8 @@ function ConnectScreen({
   }
 
   function handleOpenVerification() {
-    if (verificationUri) window.api.openExternal(verificationUri)
+    const url = verificationUriComplete ?? verificationUri
+    if (url) window.api.github.openLoginPopup(url).catch(() => {})
   }
 
   const btnLabel =

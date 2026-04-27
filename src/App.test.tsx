@@ -7,6 +7,7 @@ function makeApi(overrides: Partial<typeof window.api> = {}) {
     windowControls: { minimize: vi.fn(), maximize: vi.fn(), close: vi.fn() },
     github: {
       startDeviceFlow: vi.fn(), pollDeviceToken: vi.fn(), cancelDeviceFlow: vi.fn(),
+      openLoginPopup: vi.fn().mockResolvedValue(undefined),
       getUser: vi.fn(), getStarred: vi.fn().mockResolvedValue(undefined),
       disconnect: vi.fn(),
       getSavedRepos: vi.fn().mockResolvedValue([]),

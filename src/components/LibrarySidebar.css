@@ -146,26 +146,17 @@
 /* ── Collapsible panel wrapper ───────────────────────── */
 
 .library-panel {
-  position: fixed;
-  left: 74px;
-  top: 10px;
-  bottom: 96px;
   width: 220px;
+  height: 100%;
+  flex-shrink: 0;
   background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 14px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  border-right: 1px solid var(--glass-border);
   overflow: hidden;
-  z-index: 199;
-  opacity: 1;
-  transform: translateX(0);
-  visibility: visible;
-  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease, width 0.2s ease;
+  transition: width 0.2s ease;
 }
 
 .library-panel.mini {
   width: 78px;
-  bottom: 96px;
 }
 
 .library-panel.mini .library-sidebar-filter {
@@ -204,8 +195,5 @@
 }
 
 .library-panel.collapsed {
-  opacity: 0;
-  transform: translateX(-8px);
-  visibility: hidden;
-  pointer-events: none;
+  display: none;
 }

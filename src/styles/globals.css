@@ -255,44 +255,46 @@ a {
 
 /* Controls are portalled to document.body via createPortal so they live
    outside every stacking context.  position:fixed + max z-index guarantees
-   they are always painted on top and always receive pointer events. */
+   they are always painted on top and always receive pointer events.
+   Visually matches .dtn-filter-btn (compact size: 26x26, #252525 surface,
+   subtle border + shadow) so the controls feel like part of the same row
+   when docked alongside the compact Discover top-nav. */
 .titlebar-controls {
   position: fixed;
-  top: 10px;
-  right: 10px;
+  top: 3px;
+  right: 6px;
   z-index: 2147483647;
   display: flex;
   align-items: center;
-  gap: 0;
-  background: #252525;
-  border-radius: 20px;
-  padding: 0 2px;
-  overflow: hidden;
+  gap: 4px;
   -webkit-app-region: no-drag;
 }
 .titlebar-ctrl {
   -webkit-app-region: no-drag;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  color: #ffffff;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  background: #252525;
+  color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .titlebar-ctrl:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  background: #2d2d2d;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .titlebar-ctrl-close:hover {
   background: rgba(255, 80, 80, 0.25);
   color: #ff6b6b;
+  border-color: rgba(255, 80, 80, 0.35);
 }
 
 .titlebar-wordmark {
@@ -1455,6 +1457,17 @@ a {
   height: 32px;
   z-index: 3;
   -webkit-app-region: drag;
+}
+
+/* When the top-nav is docked into the title-bar strip (compact mode), the
+   nav and the drag strip would otherwise compete for the same area and the
+   drag region wins via Chromium's hit-test, making the buttons unclickable.
+   Hide the strip in compact mode — on Windows the OS-level titleBarOverlay
+   still provides the drag area for window movement; on macOS the user can
+   drag from the empty parts of the compact nav itself (which has
+   -webkit-app-region: drag on the wrapper). */
+.discover-layout:has(.discover-top-nav--compact) .discover-drag-strip {
+  display: none;
 }
 
 /* ── Grid Header ───────────────────────────────────────────────── */

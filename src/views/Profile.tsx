@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
+import { useGitHubAuth } from '../contexts/GitHubAuth'
 import RepoCard, { formatCount } from '../components/RepoCard'
 import PersonRow from '../components/PersonRow'
 import React from 'react'
@@ -77,28 +78,23 @@ type Tab = typeof TABS[number]
 // ── Profile view ──────────────────────────────────────────────────
 
 export default function Profile() {
-  const [login, setLogin]             = useState<string>('')
+  const auth = useGitHubAuth()
+  const login = auth.user?.login ?? ''
   const [user, setUser]               = useState<GitHubUser | null>(null)
   const [loadingUser, setLoadingUser] = useState(true)
   const [userError, setUserError]     = useState(false)
   const [activeTab, setActiveTab]     = useState<Tab>('Repos')
   const [visited, setVisited]         = useState<Set<Tab>>(new Set(['Repos']))
 
-  // Fetch authenticated login then full profile
   useEffect(() => {
+    if (!login) return
     let isMounted = true
-    window.api.github.getUser()
-      .then((u: { login: string; avatarUrl: string; publicRepos: number }) => {
-        if (!isMounted) return
-        const lg = u?.login ?? ''
-        setLogin(lg)
-        return window.api.profile.getUser(lg)
-      })
+    window.api.profile.getUser(login)
       .then((data: GitHubUser) => { if (isMounted) setUser(data) })
       .catch(() => { if (isMounted) setUserError(true) })
       .finally(() => { if (isMounted) setLoadingUser(false) })
     return () => { isMounted = false }
-  }, [])
+  }, [login])
 
   const counts: Partial<Record<Tab, number>> = {
     Repos:     user?.public_repos,

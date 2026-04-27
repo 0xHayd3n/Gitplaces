@@ -732,143 +732,102 @@
   font-weight: 500;
 }
 
-/* ── Language grouping toggle ──────────────────────────── */
+/* ── Language sectioned view ─────────────────────────── */
 
-.filter-grouping-toggle {
-  display: flex;
-  background: var(--bg3, #111);
-  border: 1px solid var(--border, #333);
-  border-radius: 6px;
-  overflow: hidden;
-  margin: 8px 12px 4px;
+/* Auto-fill column grid — each platform is its own column with languages listed downwards. */
+.lang-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px 16px;
+  padding: 14px 4px 8px 4px;
+  align-items: start;
 }
 
-.filter-grouping-btn {
-  flex: 1;
-  padding: 4px 0;
-  font-size: 11px;
-  font-weight: 600;
+.lang-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.lang-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 4px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--t2);
+}
+
+.lang-section-header svg {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.lang-section-name {
+  white-space: nowrap;
+}
+
+.lang-section-count {
+  font-weight: var(--weight-normal);
+  color: var(--t3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Vertical list of languages within a column — plain rows, no pill. */
+.lang-section-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.lang-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 6px;
   border: none;
   background: transparent;
-  color: var(--text-muted, #888);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-normal);
+  color: var(--t2);
   cursor: pointer;
-  transition: color 0.12s, background 0.12s;
+  text-align: left;
+  min-width: 0;
+  transition: background 0.1s, color 0.1s;
 }
 
-.filter-grouping-btn:hover:not(.active) {
-  background: var(--bg3, #1a1a1a);
+.lang-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--t1);
 }
 
-.filter-grouping-btn.active {
-  background: var(--accent, #6c47ff);
+.lang-item.selected {
+  background: var(--row-color);
   color: #fff;
 }
 
-/* ── Language master-detail view ─────────────────────── */
-
-.lang-master-detail {
-  display: flex;
-  gap: 12px;
-  padding: 4px 8px 8px 8px;
-  align-items: flex-start;
-}
-
-.lang-tile-column {
+.lang-item svg {
   flex-shrink: 0;
-  width: 150px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
 }
 
-.lang-content-column {
-  flex: 1;
-  min-width: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
-  padding-left: 12px;
-}
-
-/* 3-column grid of language rows; rows themselves get bumped up below. */
-.lang-content-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-}
-
-/* Bigger language rows inside the content column.
-   Scoped to .lang-content-list so the Type tab's subtype rows stay unchanged. */
-.lang-content-list .subtype-row {
-  padding: 8px 12px;
-  font-size: var(--text-base);
-  gap: 10px;
-}
-
-.lang-tile {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 8px;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  color: var(--t2);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: background 0.1s, border-color 0.1s, color 0.1s;
-  text-align: left;
-  min-width: 0;
-}
-
-.lang-tile:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: var(--t1);
-}
-
-.lang-tile.active {
-  background: rgba(255, 255, 255, 0.10);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: var(--t1);
-}
-
-.lang-tile svg {
-  flex-shrink: 0;
-  opacity: 0.75;
-}
-
-.lang-tile.active svg {
-  opacity: 1;
-}
-
-.lang-tile-name {
-  flex: 1;
-  white-space: nowrap;
+.lang-item-label {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.lang-tile-count {
-  font-size: var(--text-xs);
-  color: var(--t3);
-  flex-shrink: 0;
+.lang-section--popular .lang-section-header {
+  color: #fbbf24;
 }
 
-.lang-tile--popular {
-  border-color: rgba(251, 191, 36, 0.4);
-  background: rgba(251, 191, 36, 0.08);
-}
-
-.lang-tile--popular:hover {
-  border-color: rgba(251, 191, 36, 0.6);
-  background: rgba(251, 191, 36, 0.14);
-}
-
-.lang-tile--popular.active {
-  border-color: rgba(251, 191, 36, 0.7);
-  background: rgba(251, 191, 36, 0.18);
-}
-
-.lang-tile--popular svg {
+.lang-section--popular .lang-section-header svg {
   color: #fbbf24;
   opacity: 1;
 }

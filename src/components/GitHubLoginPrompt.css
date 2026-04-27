@@ -1,0 +1,143 @@
+.gh-login-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  -webkit-app-region: drag;
+}
+
+.gh-login-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  max-width: 360px;
+  padding: 36px 32px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  text-align: center;
+  -webkit-app-region: no-drag;
+}
+
+.gh-login-icon {
+  color: var(--t2);
+  width: 36px;
+  height: 36px;
+}
+
+.gh-login-heading {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.gh-login-sub {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--t3);
+  line-height: 1.5;
+}
+
+.gh-login-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  margin-top: 4px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.gh-login-btn:hover:not(:disabled) {
+  background: var(--accent-light);
+}
+
+.gh-login-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.gh-login-btn-secondary {
+  background: transparent;
+  color: var(--t2);
+  border: 1px solid var(--glass-border);
+}
+
+.gh-login-btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--t1);
+}
+
+.gh-login-code-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+}
+
+.gh-login-code-label {
+  font-size: var(--text-xs);
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.gh-login-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--t1);
+  user-select: all;
+  cursor: pointer;
+}
+
+.gh-login-code-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.gh-login-code-actions .gh-login-btn {
+  margin-top: 0;
+  flex: 1;
+}
+
+.gh-login-error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--red-text);
+}
+
+.gh-login-cancel {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--text-sm);
+  color: var(--t3);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.gh-login-cancel:hover {
+  color: var(--t2);
+}

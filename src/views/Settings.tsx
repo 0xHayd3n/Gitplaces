@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useAppearance, type BackgroundMode } from '../contexts/Appearance'
+import { useGitHubAuth } from '../contexts/GitHubAuth'
+import { useGitHubLogin } from '../hooks/useGitHubLogin'
 
 type SetupPhase = 'idle' | 'checking' | 'installing' | 'auth' | 'done' | 'error'
 type LoginPhase = 'idle' | 'logging-in' | 'done' | 'error'
@@ -102,12 +104,15 @@ export default function Settings() {
   const [loginLines, setLoginLines] = useState<string[]>([])
 
   // Connectors state
-  const [githubUsername, setGithubUsername] = useState<string | null>(null)
-  const [githubConnecting, setGithubConnecting] = useState(false)
-  const [githubUserCode, setGithubUserCode] = useState<string | null>(null)
-  const [githubVerificationUri, setGithubVerificationUri] = useState<string | null>(null)
+  const auth = useGitHubAuth()
+  const githubLogin = useGitHubLogin()
+  const githubUsername = auth.user?.login ?? null
+  const githubConnecting = githubLogin.status === 'pending' || githubLogin.status === 'polling'
+  const githubUserCode = githubLogin.userCode
+  const githubVerificationUri = githubLogin.verificationUri
+  const githubVerificationUriComplete = githubLogin.verificationUriComplete
+  const githubError = githubLogin.error
   const [githubDisconnecting, setGithubDisconnecting] = useState(false)
-  const [githubError, setGithubError] = useState<string | null>(null)
   const [claudeLoggingOut, setClaudeLoggingOut] = useState(false)
   const [claudeDisconnectError, setClaudeDisconnectError] = useState<string | null>(null)
   const [connectorStatus, setConnectorStatus] = useState<Record<string, 'checking' | 'ok' | 'error'>>({})
@@ -166,7 +171,6 @@ export default function Settings() {
         })
       }
     }).catch(() => {})
-    window.api.github.getUser().then(u => setGithubUsername(u.login)).catch(() => setGithubUsername(null))
     window.api.settings.get('customConnectors').then((raw: string | null) => {
       try { if (raw) setCustomConnectors(JSON.parse(raw)) } catch { /* ignore */ }
     })
@@ -315,36 +319,16 @@ export default function Settings() {
     await window.api.settings.set('customConnectors', JSON.stringify(list))
   }
 
-  const handleGitHubConnect = async () => {
-    setGithubConnecting(true)
-    setGithubUserCode(null)
-    setGithubVerificationUri(null)
-    setGithubError(null)
-    try {
-      const flow = await window.api.github.startDeviceFlow()
-      setGithubUserCode(flow.userCode)
-      setGithubVerificationUri(flow.verificationUri)
-      await window.api.github.pollDeviceToken(flow.deviceCode, flow.interval)
-      const user = await window.api.github.getUser()
-      setGithubUsername(user.login)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      if (!message.toLowerCase().includes('abort') && !message.toLowerCase().includes('cancel')) {
-        setGithubError('Connection failed — please try again.')
-      }
-    } finally {
-      setGithubConnecting(false)
-      setGithubUserCode(null)
-      setGithubVerificationUri(null)
-    }
+  const handleGitHubConnect = () => {
+    githubLogin.start()
   }
 
   const handleGitHubDisconnect = async () => {
-    setGithubError(null)
+    githubLogin.reset()
     setGithubDisconnecting(true)
     try {
       await window.api.github.disconnect()
-      setGithubUsername(null)
+      await auth.refresh()
     } finally {
       setGithubDisconnecting(false)
     }
@@ -437,12 +421,15 @@ export default function Settings() {
                 githubUserCode ? (
                   <div className="connector-device-flow">
                     <span className="connector-code">{githubUserCode}</span>
-                    <button className="settings-btn" onClick={() => window.api.openExternal(githubVerificationUri!)}>
-                      Open browser
+                    <button className="settings-btn" onClick={() => {
+                      const url = githubVerificationUriComplete ?? githubVerificationUri
+                      if (url) window.api.github.openLoginPopup(url).catch(() => {})
+                    }}>
+                      Open login window
                     </button>
                     <button
                       className="settings-btn settings-btn--link"
-                      onClick={() => { window.api.github.cancelDeviceFlow(); setGithubConnecting(false); setGithubUserCode(null) }}
+                      onClick={() => githubLogin.cancel()}
                     >
                       Cancel
                     </button>

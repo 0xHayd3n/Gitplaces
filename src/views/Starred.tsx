@@ -5,6 +5,7 @@ import { formatStars } from '../types/repo'
 import { useSavedRepos } from '../contexts/SavedRepos'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
 import { useSearch } from '../contexts/Search'
+import { useGitHubAuth } from '../contexts/GitHubAuth'
 import VerifiedBadge from '../components/VerifiedBadge'
 import LanguageIcon from '../components/LanguageIcon'
 import { useKeyboardNav } from '../hooks/useKeyboardNav'
@@ -22,7 +23,8 @@ export default function Starred() {
   const [loading, setLoading] = useState(true)
 
   // Account bar
-  const [userLogin, setUserLogin] = useState<string | null>(null)
+  const auth = useGitHubAuth()
+  const userLogin = auth.user?.login ?? null
   const [syncedAgo, setSyncedAgo] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
 
@@ -70,9 +72,6 @@ export default function Starred() {
   }, [])
 
   useEffect(() => {
-    window.api.github.getUser().then(({ login }) => {
-      setUserLogin(login)
-    }).catch(() => {})
     loadSyncedAgo()
     loadRows()
   }, [loadRows, loadSyncedAgo])

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
+import { useGitHubAuth } from '../contexts/GitHubAuth'
 import RepoCard, { formatCount } from './RepoCard'
 import PersonRow from './PersonRow'
 import VerifiedBadge from './VerifiedBadge'
@@ -201,17 +202,10 @@ export default function ProfileOverlay() {
 
 // ── ProfileHeader ─────────────────────────────────────────────────
 function ProfileHeader({ user, currentUsername, isVerified }: { user: any; currentUsername: string; isVerified: boolean }) {
-  const [loggedInUsername, setLoggedInUsername] = useState<string>('')
+  const auth = useGitHubAuth()
+  const loggedInUsername = auth.user?.login ?? ''
   const [following, setFollowing] = useState(false)
   const [followLoading, setFollowLoading] = useState(true)
-
-  useEffect(() => {
-    let isMounted = true
-    window.api.github.getUser()
-      .then((u: any) => { if (isMounted) setLoggedInUsername(u?.login ?? '') })
-      .catch(() => {})
-    return () => { isMounted = false }
-  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -383,18 +377,11 @@ function PeopleTab({ username, kind, onOpenProfile }: {
   kind: 'following' | 'followers'
   onOpenProfile: (u: string) => void
 }) {
+  const auth = useGitHubAuth()
+  const loggedInUser = auth.user?.login ?? ''
   const [people, setPeople]             = useState<any[]>([])
   const [loading, setLoading]           = useState(true)
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set())
-  const [loggedInUser, setLoggedInUser] = useState<string>('')
-
-  useEffect(() => {
-    let isMounted = true
-    window.api.github.getUser()
-      .then((u: any) => { if (isMounted) setLoggedInUser(u?.login ?? '') })
-      .catch(() => {})
-    return () => { isMounted = false }
-  }, [])
 
   useEffect(() => {
     let isMounted = true

@@ -52,6 +52,8 @@ declare global {
     api: {
       openExternal: (url: string) => Promise<void>
 
+      platform: 'win32' | 'darwin' | 'linux' | string
+
       windowControls: {
         minimize: () => void
         maximize: () => void
@@ -68,6 +70,7 @@ declare global {
         }>
         pollDeviceToken: (deviceCode: string, interval: number) => Promise<void>
         cancelDeviceFlow: () => Promise<void>
+        openLoginPopup: (url: string) => Promise<void>
         getUser:       () => Promise<{ login: string; avatarUrl: string; publicRepos: number }>
         getStarred:    (force?: boolean) => Promise<void>
         disconnect:    () => Promise<void>

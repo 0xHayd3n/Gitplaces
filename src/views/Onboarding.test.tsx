@@ -2,6 +2,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import Onboarding from './Onboarding'
+import { GitHubAuthProvider } from '../contexts/GitHubAuth'
 
 let navigatedTo = ''
 
@@ -14,6 +15,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 })
 
 function makeApi(overrides = {}) {
+  let connected = false
   return {
     openExternal: vi.fn().mockResolvedValue(undefined),
     windowControls: { minimize: vi.fn(), maximize: vi.fn(), close: vi.fn() },
@@ -26,9 +28,13 @@ function makeApi(overrides = {}) {
         expiresIn: 900,
         interval: 5,
       }),
-      pollDeviceToken: vi.fn().mockResolvedValue(undefined),
+      pollDeviceToken: vi.fn(async () => { connected = true }),
       cancelDeviceFlow: vi.fn().mockResolvedValue(undefined),
-      getUser: vi.fn().mockResolvedValue({ login: 'alice', avatarUrl: '', publicRepos: 5 }),
+      openLoginPopup: vi.fn().mockResolvedValue(undefined),
+      getUser: vi.fn(async () => {
+        if (!connected) throw new Error('not connected')
+        return { login: 'alice', avatarUrl: '', publicRepos: 5 }
+      }),
       getStarred: vi.fn().mockResolvedValue(undefined),
       disconnect: vi.fn(),
     },
@@ -42,11 +48,13 @@ function makeApi(overrides = {}) {
 
 function renderOnboarding() {
   return render(
-    <MemoryRouter>
-      <Routes>
-        <Route path="*" element={<Onboarding />} />
-      </Routes>
-    </MemoryRouter>
+    <GitHubAuthProvider>
+      <MemoryRouter>
+        <Routes>
+          <Route path="*" element={<Onboarding />} />
+        </Routes>
+      </MemoryRouter>
+    </GitHubAuthProvider>
   )
 }
 
@@ -143,9 +151,15 @@ describe('Screen 1 — Connect GitHub', () => {
     expect(screen.getByTestId('onboarding-screen-2')).toBeInTheDocument()
   })
 
-  it('cancels device flow on unmount', () => {
+})
+
+describe('Device flow cleanup', () => {
+  it('cancels in-flight device flow on unmount', async () => {
+    window.api.github.pollDeviceToken = vi.fn(() => new Promise(() => {})) // never resolves
     const { unmount } = renderOnboarding()
-    fireEvent.click(screen.getByText('Connect GitHub →')) // go to screen 1
+    fireEvent.click(screen.getByText('Connect GitHub →'))
+    fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
+    await waitFor(() => expect(window.api.github.startDeviceFlow).toHaveBeenCalled())
     unmount()
     expect(window.api.github.cancelDeviceFlow).toHaveBeenCalled()
   })

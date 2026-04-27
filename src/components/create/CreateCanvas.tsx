@@ -70,6 +70,7 @@ export default function CreateCanvas({ sessionId }: Props) {
 
   return (
     <div className="create-canvas">
+      <div className="discover-drag-strip" aria-hidden="true" />
       <CreateMetaBar
         session={session}
         onNameChange={name => { window.api.create.updateName(sessionId, name); setSession(prev => prev ? { ...prev, name } : prev) }}

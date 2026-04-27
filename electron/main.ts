@@ -8,6 +8,7 @@ import type Database from 'better-sqlite3'
 import { getDb, closeDb } from './db'
 import { getToken, setToken, clearToken, setGitHubUser, clearGitHubUser, getApiKey, setApiKey } from './store'
 import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree } from './github'
+import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
 import { scanFromSources } from './mcp-scanner'
 import type { McpScanResult } from '../src/types/mcp'
 import { extractTags } from './tag-extractor'
@@ -262,6 +263,12 @@ function createWindow(): void {
     // keep the frameless setup on non-Windows platforms.
     frame: process.platform !== 'win32' ? false : undefined,
     titleBarStyle: 'hidden',
+    // Windows: render the native min/max/close as a themed overlay in the
+    // top-right corner. Keeps Aero snap (frame is preserved above) while
+    // letting the rest of the title-bar area be ours to fill with custom UI.
+    // titleBarOverlay intentionally omitted: we render custom React controls
+    // (see src/components/Titlebar.tsx) so they can match the filter-button
+    // styling exactly. titleBarStyle: 'hidden' alone preserves Aero snap.
     backgroundColor: '#0a0a0e',
     icon: path.join(__dirname, '../../resources/icon.png'),
     webPreferences: {
@@ -336,21 +343,31 @@ ipcMain.handle('github:startDeviceFlow', async () => {
   deviceFlowAbort?.abort()
   deviceFlowAbort = new AbortController()
   const start = await startDeviceFlow()
-  // Auto-open the browser at the pre-filled verification page.
-  shell.openExternal(start.verificationUriComplete).catch(() => {})
+  // Auto-open a small in-app popup at the pre-filled verification page.
+  openLoginPopup(start.verificationUriComplete, mainWindow)
   return start
 })
 
 ipcMain.handle('github:pollDeviceToken', async (_event, deviceCode: string, interval: number) => {
   const controller = deviceFlowAbort ?? new AbortController()
-  const token = await pollDeviceToken(deviceCode, interval, controller.signal)
-  setToken(token)
-  initTopicCache(token).catch(() => {}) // Non-blocking
+  try {
+    const token = await pollDeviceToken(deviceCode, interval, controller.signal)
+    setToken(token)
+    initTopicCache(token).catch(() => {}) // Non-blocking
+  } finally {
+    closeLoginPopup()
+  }
 })
 
 ipcMain.handle('github:cancelDeviceFlow', () => {
   deviceFlowAbort?.abort()
   deviceFlowAbort = null
+  closeLoginPopup()
+})
+
+ipcMain.handle('github:openLoginPopup', (_event, url: string) => {
+  if (typeof url !== 'string' || !url.startsWith('https://')) return
+  openLoginPopup(url, mainWindow)
 })
 
 ipcMain.handle('github:getUser', async () => {

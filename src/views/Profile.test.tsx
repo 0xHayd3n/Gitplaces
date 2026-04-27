@@ -2,6 +2,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { vi, describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
+import { GitHubAuthProvider } from '../contexts/GitHubAuth'
 import Profile from './Profile'
 
 // jsdom does not provide ResizeObserver — needed by DitherBackground inside RepoCard
@@ -69,6 +70,8 @@ function makeApi(overrides: Record<string, unknown> = {}) {
       getVerified: vi.fn().mockResolvedValue(false),
     },
     settings: {
+      get: vi.fn().mockResolvedValue(null),
+      set: vi.fn().mockResolvedValue(undefined),
       getPreferredLanguage: vi.fn().mockResolvedValue('en'),
     },
     translate: {
@@ -81,13 +84,15 @@ function makeApi(overrides: Record<string, unknown> = {}) {
 
 function renderProfile() {
   return render(
-    <ProfileOverlayProvider>
-      <MemoryRouter initialEntries={['/profile']}>
-        <Routes>
-          <Route path="/profile" element={<Profile />} />
-        </Routes>
-      </MemoryRouter>
-    </ProfileOverlayProvider>
+    <GitHubAuthProvider>
+      <ProfileOverlayProvider>
+        <MemoryRouter initialEntries={['/profile']}>
+          <Routes>
+            <Route path="/profile" element={<Profile />} />
+          </Routes>
+        </MemoryRouter>
+      </ProfileOverlayProvider>
+    </GitHubAuthProvider>
   )
 }
 

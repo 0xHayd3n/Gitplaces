@@ -5,6 +5,8 @@ const callbackWrappers = new Map<Function, (...args: unknown[]) => void>()
 contextBridge.exposeInMainWorld('api', {
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
 
+  platform: process.platform,
+
   windowControls: {
     minimize: () => ipcRenderer.send('window:minimize'),
     maximize: () => ipcRenderer.send('window:maximize'),
@@ -23,6 +25,7 @@ contextBridge.exposeInMainWorld('api', {
     pollDeviceToken: (deviceCode: string, interval: number) =>
       ipcRenderer.invoke('github:pollDeviceToken', deviceCode, interval),
     cancelDeviceFlow: () => ipcRenderer.invoke('github:cancelDeviceFlow'),
+    openLoginPopup: (url: string) => ipcRenderer.invoke('github:openLoginPopup', url),
     getUser:       () => ipcRenderer.invoke('github:getUser'),
     getStarred:    (force?: boolean) => ipcRenderer.invoke('github:getStarred', force),
     disconnect:    () => ipcRenderer.invoke('github:disconnect'),

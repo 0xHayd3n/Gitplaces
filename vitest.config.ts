@@ -12,10 +12,10 @@ export default defineConfig({
     clearMocks: true,
   },
   resolve: {
-    alias: {
-      // resolve() with a relative path resolves from process.cwd() (project root)
-      // Avoids __dirname which is unavailable in ESM contexts
-      '@renderer': resolve('src')
-    }
+    alias: [
+      { find: '@renderer', replacement: resolve('src') },
+      // unplugin-icons is ESM-only and can't load in CJS vitest config — stub all ~icons/* imports
+      { find: /^~icons\/.*/, replacement: resolve('src/test/iconStub.tsx') },
+    ]
   }
 })

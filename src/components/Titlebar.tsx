@@ -1,12 +1,13 @@
 import { createPortal } from 'react-dom'
 
 /**
- * Window controls are portalled to document.body so they live outside every
- * stacking context in the app.  This guarantees they are always clickable
- * regardless of z-index changes elsewhere (sidebar, modals, overlays, etc.).
+ * Custom min/max/close rendered as three rounded buttons styled to match
+ * the Discover filter buttons (.dtn-filter-btn). Portalled to document.body
+ * so they live outside every stacking context and stay clickable across all
+ * views.
  *
- * The <header className="titlebar"> remains in-tree purely as a drag region
- * and layout spacer; it never renders the buttons itself.
+ * The <header className="titlebar"> remains in-tree as the drag region and
+ * layout spacer.
  */
 export default function Titlebar() {
   const { minimize, maximize, close } = window.api.windowControls

@@ -44,6 +44,13 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^3.6.0",
+    "@iconify-json/devicon": "^1.2.62",
+    "@iconify-json/file-icons": "^1.2.2",
+    "@iconify-json/logos": "^1.2.11",
+    "@iconify-json/simple-icons": "^1.2.79",
+    "@iconify-json/vscode-icons": "^1.2.46",
+    "@svgr/core": "^8.1.0",
+    "@svgr/plugin-jsx": "^8.1.0",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.3.1",
     "@testing-library/user-event": "^14.5.2",
@@ -59,6 +66,7 @@
     "rehype-parse": "^9.0.1",
     "rehype-stringify": "^10.0.1",
     "typescript": "^5.4.5",
+    "unplugin-icons": "^23.0.1",
     "vite": "^5.2.11",
     "vitest": "^1.6.0"
   }
