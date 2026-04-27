@@ -3487,12 +3487,26 @@ a {
 .readme-body center {
   text-align: center;
 }
-/* Block images inside centered containers need margin:auto to center as blocks */
-.readme-body div[align="center"] img,
-.readme-body p[align="center"] img,
-.readme-body center img {
+/* Block images that are *direct* children need margin:auto to center as blocks.
+   Direct-child only — applying to nested imgs (e.g. logo inside <h1>) breaks
+   the heading's flex layout because `margin:auto` on a flex item consumes all
+   free space, pushing siblings to the opposite end. */
+.readme-body div[align="center"] > img,
+.readme-body p[align="center"] > img,
+.readme-body center > img {
   margin-left: auto;
   margin-right: auto;
+}
+/* Headings inside centered containers use display:flex (for the TTS button),
+   which ignores text-align. Explicitly center the flex content so a heading
+   like `# <img> Taiga UI` keeps its logo and text together in the middle. */
+.readme-body div[align="center"] .rm-h1,
+.readme-body div[align="center"] .rm-h2,
+.readme-body p[align="center"] .rm-h1,
+.readme-body p[align="center"] .rm-h2,
+.readme-body center .rm-h1,
+.readme-body center .rm-h2 {
+  justify-content: center;
 }
 .rm-img-clickable { cursor: zoom-in; transition: opacity 0.15s; }
 .rm-img-clickable:hover { opacity: 0.88; }
@@ -3507,6 +3521,10 @@ a {
   object-fit: contain;
   vertical-align: middle;
   margin: 4px 4px 4px 0;
+}
+
+.invert-dark-images img[data-needs-invert="true"] {
+  filter: invert(1);
 }
 
 /* ── Content treatment: block, subtle framing, zoom cursor ── */
