@@ -166,18 +166,34 @@ describe('planQueries (extended)', () => {
     expect(langPlans[0].topic).toBe('Rust')
   })
 
-  it('skips engagement queries when clickCount < 3', () => {
+  it('skips engagement queries when clickCount is 0', () => {
     const profile = makeProfile({
       topicAffinity: new Map([['rust', 1]]),
       engagement: {
         clickedTopicAffinity: new Map([['ai', 1]]),
         clickedOwnerAffinity: new Map(),
         clickedRepoIds: new Set(),
-        clickCount: 2,
+        clickCount: 0,
       },
     })
     const plans = planQueries(profile)
     expect(plans.filter(p => p.kind === 'engagement').length).toBe(0)
+  })
+
+  it('emits engagement queries from a single click (gate lowered to 1)', () => {
+    const profile = makeProfile({
+      topicAffinity: new Map([['rust', 1]]),
+      engagement: {
+        clickedTopicAffinity: new Map([['ai', 1]]),
+        clickedOwnerAffinity: new Map(),
+        clickedRepoIds: new Set(),
+        clickCount: 1,
+      },
+    })
+    const plans = planQueries(profile)
+    const engagementPlans = plans.filter(p => p.kind === 'engagement')
+    expect(engagementPlans.length).toBe(1)
+    expect(engagementPlans[0].topic).toBe('ai')
   })
 
   it('emits engagement queries for top clicked topics not in user-affinity top', () => {
