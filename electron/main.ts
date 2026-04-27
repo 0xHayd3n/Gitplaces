@@ -6,7 +6,7 @@ import os from 'os'
 import Store from 'electron-store'
 import type Database from 'better-sqlite3'
 import { getDb, closeDb } from './db'
-import { getToken, setToken, clearToken, setGitHubUser, clearGitHubUser, getApiKey, setApiKey } from './store'
+import { getToken, setToken, clearToken, setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner, setSyncRepoOwner } from './store'
 import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree } from './github'
 import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
 import { scanFromSources } from './mcp-scanner'
@@ -39,6 +39,7 @@ import { registerRecommendHandlers } from './ipc/recommendHandlers'
 import { registerEngagementHandlers } from './ipc/engagementHandlers'
 import { registerCreateHandlers, closeAllOnQuit } from './ipc/createHandlers'
 import { startVerificationService, enqueueRepo } from './services/verificationService'
+import { startSkillSyncService, push as skillSyncPush, pushAll as skillSyncPushAll, setupRepo as skillSyncSetupRepo } from './services/skillSyncService'
 import { parseOgImage, isGenericGitHubOg } from './services/ogImageService'
 import { sanitiseRef } from './sanitiseRef'
 import type { CollectionRow, CollectionRepoRow } from '../src/types/repo'
@@ -1174,6 +1175,9 @@ ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?
     await fs.writeFile(practicePath, finalPractice, 'utf8')
     upsertSubSkill.run(repo.id, 'system',   systemFilename,   finalSystem,   version, generated_at)
     upsertSubSkill.run(repo.id, 'practice', practiceFilename, finalPractice, version, generated_at)
+    // fire-and-forget; failure surfaces as toast, never blocks generation
+    void skillSyncPush(repo.id, owner, systemFilename,   finalSystem,   'system')
+    void skillSyncPush(repo.id, owner, practiceFilename, finalPractice, 'practice')
     return { system: finalSystem, practice: finalPractice, version, generated_at, warnings: pipelineWarnings }
   }
 
@@ -1192,6 +1196,8 @@ ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?
           version      = excluded.version,
           generated_at = excluded.generated_at
       `).run(repo.id, `version:${safe}`, filename, content, version, generated_at)
+      // fire-and-forget; failure surfaces as toast, never blocks generation
+      void skillSyncPush(repo.id, owner, filename, content, `version:${safe}`)
     } else {
       if (componentsContent) {
         content += `\n\n## [SKILLS]\ncomponents: ${name}.components.skill.md\n`
@@ -1219,6 +1225,8 @@ ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?
           tier         = excluded.tier
       `).run(repo.id, `${name}.skill.md`, final, version, generated_at)
       content = final
+      // fire-and-forget; failure surfaces as toast, never blocks generation
+      void skillSyncPush(repo.id, owner, `${name}.skill.md`, final)
     }
   }
 
@@ -1234,6 +1242,8 @@ ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?
         version      = excluded.version,
         generated_at = excluded.generated_at
     `).run(repo.id, compFilename, componentsContent, version, generated_at)
+    // fire-and-forget; failure surfaces as toast, never blocks generation
+    void skillSyncPush(repo.id, owner, compFilename, componentsContent, 'components')
   }
 
   return { content: content ?? null, version, generated_at, warnings: pipelineWarnings }
@@ -1288,6 +1298,39 @@ ipcMain.handle('skill:getSubSkill', (_event, owner: string, name: string, skillT
     JOIN repos r ON ss.repo_id = r.id
     WHERE r.owner = ? AND r.name = ? AND ss.skill_type = ?
   `).get(owner, name, skillType) ?? null
+})
+
+// ── Skill Sync IPC ──────────────────────────────────────────────
+ipcMain.handle('skillSync:setup', async () => {
+  const user = getGitHubUser()
+  if (!user?.username) return { ok: false, error: 'Not authenticated' }
+  return skillSyncSetupRepo(user.username)
+})
+
+ipcMain.handle('skillSync:disconnect', async () => {
+  setSyncEnabled(false)
+  return { ok: true }
+})
+
+ipcMain.handle('skillSync:retryFailed', async () => {
+  void skillSyncPushAll('failed')
+  return { ok: true }
+})
+
+ipcMain.handle('skillSync:getStatus', async () => {
+  const db = getDb(app.getPath('userData'))
+  const failedCount =
+    (db.prepare("SELECT COUNT(*) as n FROM skills WHERE sync_status = 'failed'").get() as { n: number }).n +
+    (db.prepare("SELECT COUNT(*) as n FROM sub_skills WHERE sync_status = 'failed'").get() as { n: number }).n
+  const lastSynced = (db.prepare(
+    "SELECT MAX(synced_at) as t FROM skills WHERE synced_at IS NOT NULL"
+  ).get() as { t: number | null }).t
+  return {
+    enabled: getSyncEnabled(),
+    repoOwner: getSyncRepoOwner(),
+    failedCount,
+    lastSynced
+  }
 })
 
 // ── Library IPC ─────────────────────────────────────────────────
@@ -2202,6 +2245,7 @@ app.whenReady().then(() => {
   createWindow()
   if (mainWindow) {
     startVerificationService(db, mainWindow)
+    startSkillSyncService(db, mainWindow)
   }
   const existingToken = getToken()
   if (existingToken) initTopicCache(existingToken).catch(() => {}) // Non-blocking
