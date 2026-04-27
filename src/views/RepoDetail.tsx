@@ -23,6 +23,7 @@ import { useSavedRepos } from '../contexts/SavedRepos'
 import { parseTopics, formatStars, type RepoRow, type ReleaseRow, type SkillRow, type SubSkillRow } from '../types/repo'
 import { parseSkillDepths } from '../utils/skillParse'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
+import { useAppearance } from '../contexts/Appearance'
 import { formatCount } from '../components/RepoCard'
 import {
   extractBadges,
@@ -457,6 +458,7 @@ export default function RepoDetail() {
   const flavour = inLibrary ? 'library' as const : 'domain' as const
   const { saveRepo } = useSavedRepos()
   const { openProfile } = useProfileOverlay()
+  const { invertDarkImages } = useAppearance()
   const verification = useVerification()
   const repoNav = useRepoNav()
   const [seedTier, setSeedTier]       = useState<'verified' | 'likely' | null>(null)
@@ -838,6 +840,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
       } else {
         await window.api.github.starRepo(owner, name)
         setStarred(true)
+        window.api.svgCache.prefetch(owner, name, repo?.default_branch ?? 'main').catch(() => {})
       }
     } catch { /* silently ignore */ }
     finally { setStarWorking(false) }
@@ -856,6 +859,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
       setComponentsSkillRow(freshComp)
       setLearnState('LEARNED')
       window.dispatchEvent(new CustomEvent('library:changed'))
+      window.api.svgCache.prefetch(owner ?? '', name ?? '', repo?.default_branch ?? 'main').catch(() => {})
     } catch (err) {
       setLearnState('UNLEARNED')
       const msg = err instanceof Error ? err.message : ''
@@ -1311,6 +1315,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                         onNavigateToFile={handleNavigateToFile}
                         onTocReady={handleTocReady}
                         readmeBodyRef={readmeBodyRef}
+                        invertDarkImages={invertDarkImages}
                       />
                     </Suspense>
                   )
@@ -1711,6 +1716,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
               )
             }
             fullBleedBody={isFullBleedTab}
+            collapsedHeader={activeTab === 'files'}
           />
         )}
           </div>
