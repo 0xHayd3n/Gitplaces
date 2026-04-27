@@ -187,6 +187,14 @@ export function initSchema(db: Database.Database): void {
     ts          INTEGER NOT NULL
   )`)
 
+  // Skill GitHub sync columns
+  try { db.exec(`ALTER TABLE skills ADD COLUMN github_sha TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE skills ADD COLUMN synced_at INTEGER`) } catch {}
+  try { db.exec(`ALTER TABLE skills ADD COLUMN sync_status TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE sub_skills ADD COLUMN github_sha TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE sub_skills ADD COLUMN synced_at INTEGER`) } catch {}
+  try { db.exec(`ALTER TABLE sub_skills ADD COLUMN sync_status TEXT`) } catch {}
+
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`
     CREATE INDEX IF NOT EXISTS repos_starred_at   ON repos(starred_at);
