@@ -4,7 +4,7 @@ const DARK_THRESHOLD = 80
 const LIGHT_THRESHOLD = 200
 const DARK_RATIO_MIN = 0.25
 const CORNER_LIGHT_MIN = 0.5
-const COLOUR_VARIANCE_MAX = 30
+const SATURATION_PROXY_MAX = 30
 
 export function detectImageNeedsInvert(img: HTMLImageElement): boolean {
   if (img.naturalWidth < 32 || img.naturalHeight < 32) return false
@@ -21,7 +21,7 @@ export function detectImageNeedsInvert(img: HTMLImageElement): boolean {
 
     let darkCount = 0
     let totalOpaque = 0
-    let colourVarianceSum = 0
+    let saturationProxySum = 0
 
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3]
@@ -29,18 +29,17 @@ export function detectImageNeedsInvert(img: HTMLImageElement): boolean {
       const lum = 0.299 * r + 0.587 * g + 0.114 * b
       totalOpaque++
       if (lum < DARK_THRESHOLD) darkCount++
-      colourVarianceSum += Math.max(Math.abs(r - lum), Math.abs(g - lum), Math.abs(b - lum))
+      saturationProxySum += Math.max(Math.abs(r - lum), Math.abs(g - lum), Math.abs(b - lum))
     }
 
     if (totalOpaque === 0) return false
 
     const darkRatio = darkCount / totalOpaque
-    const avgColourVariance = colourVarianceSum / totalOpaque
-    if (avgColourVariance > COLOUR_VARIANCE_MAX) return false
+    const avgSaturationProxy = saturationProxySum / totalOpaque
+    if (avgSaturationProxy > SATURATION_PROXY_MAX) return false
 
     // Check the four corner regions for light/transparent background
     let cornerLightTotal = 0
-    let cornerRegions = 0
     const corners = [
       [0, 0],
       [SAMPLE_SIZE - CORNER_SIZE, 0],
@@ -59,9 +58,8 @@ export function detectImageNeedsInvert(img: HTMLImageElement): boolean {
         }
       }
       cornerLightTotal += lightInRegion / regionSize
-      cornerRegions++
     }
-    const cornerLightRatio = cornerLightTotal / cornerRegions
+    const cornerLightRatio = cornerLightTotal / corners.length
 
     return darkRatio > DARK_RATIO_MIN && cornerLightRatio > CORNER_LIGHT_MIN
   } catch {
