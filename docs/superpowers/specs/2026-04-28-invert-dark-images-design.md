@@ -79,10 +79,12 @@ Scoped to `.invert-dark-images` so it is a no-op when the setting is off.
 
 - Accept new prop `invertDarkImages: boolean`
 - In the `img` component handler inside `mdComponents`:
-  - For the `rm-img-logo` path: add an `onLoad` that calls `detectImageNeedsInvert` and stamps the attribute if `invertDarkImages` is true
-  - For the `rm-img-content` path: the existing `onLoad` already upgrades images with wide aspect ratios to `rm-img-logo`; append the same detection step after the existing logic
+  - For the `rm-img-logo` path (line ~1843): this branch currently has **no `onLoad` handler**; add one from scratch that calls `detectImageNeedsInvert` and stamps the attribute if `invertDarkImages` is true
+  - For the `rm-img-content` path (line ~1860): the existing `onLoad` upgrades wide-short images to `rm-img-logo`; append the detection step after the existing logic in the same handler
   - The detection only runs when `invertDarkImages === true` (prop gate)
 - `mdComponents` is memoised; add `invertDarkImages` to its dependency array so it picks up the new prop
+- **The `memo` comparator** at the bottom of the file (lines ~1998–2005) uses a custom equality function listing every prop explicitly. Add `prev.invertDarkImages === next.invertDarkImages` to it — without this, the component will never re-render when the setting changes and the `mdComponents` closure will hold a stale value
+- **Lightbox invariant**: the lightbox (lines ~1914–1925) creates a fresh `<img src={lightbox.src}>` — it does not copy attributes from the source element, so `data-needs-invert` never carries into the lightbox. Do not add the attribute to the lightbox `<img>`; the existing behaviour is correct
 
 ---
 
