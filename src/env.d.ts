@@ -282,7 +282,7 @@ declare global {
           summary?: boolean
           failCount?: number
         }) => void): void
-        offSyncFailed(cb: (...args: unknown[]) => void): void
+        offSyncFailed(cb: (payload: { owner?: string; filename?: string; summary?: boolean; failCount?: number }) => void): void
       }
     }
   }

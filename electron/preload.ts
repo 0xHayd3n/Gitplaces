@@ -341,11 +341,11 @@ contextBridge.exposeInMainWorld('api', {
     retryFailed: () => ipcRenderer.invoke('skillSync:retryFailed'),
     getStatus: () => ipcRenderer.invoke('skillSync:getStatus'),
     onSyncFailed: (cb: (payload: { owner?: string; filename?: string; summary?: boolean; failCount?: number }) => void) => {
-      const wrapped = ((_e: unknown, payload: unknown) => cb(payload as Parameters<typeof cb>[0])) as (...args: unknown[]) => void
-      ipcRenderer.on('skillSync:syncFailed', wrapped)
+      const wrapped = ((_: unknown, payload: { owner?: string; filename?: string; summary?: boolean; failCount?: number }) => cb(payload)) as (...args: unknown[]) => void
       callbackWrappers.set(cb, wrapped)
+      ipcRenderer.on('skillSync:syncFailed', wrapped)
     },
-    offSyncFailed: (cb: (...args: unknown[]) => void) => {
+    offSyncFailed: (cb: (payload: { owner?: string; filename?: string; summary?: boolean; failCount?: number }) => void) => {
       const wrapped = callbackWrappers.get(cb)
       if (wrapped) {
         ipcRenderer.removeListener('skillSync:syncFailed', wrapped)
