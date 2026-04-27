@@ -131,6 +131,28 @@ describe('rankCandidates (orchestrator)', () => {
   })
 })
 
+describe('anchor diversification', () => {
+  it('spreads primaryAnchor across the result set when many user repos match', () => {
+    // 5 user repos all tagged 'ai' — every candidate could anchor to any.
+    // Without diversification, the most recent / most signal-rich repo wins
+    // every time. With diversification, the anchor identities should spread.
+    const userRepos = Array.from({ length: 5 }, (_, i) =>
+      userRepo({ id: 100 + i, owner: `u${i}`, name: `r${i}`, topics: ['ai'] }),
+    ) as any
+    const corpus = computeCorpusStats(userRepos)
+    const profile = buildUserProfile({ userRepos, corpus, engagementEvents: [], clickedReposById: new Map(), now: NOW })
+    // 10 candidates all tagged 'ai' — without diversification all 10 would
+    // anchor to the same single user repo.
+    const candidates = Array.from({ length: 10 }, (_, i) =>
+      ghRepo({ id: i + 1, owner: `c${i}`, name: `cand-${i}`, topics: ['ai'] }),
+    )
+    const ranked = rankCandidates(candidates, profile, corpus, NOW)
+    const distinctPrimary = new Set(ranked.map(r => r.primaryAnchor && `${r.primaryAnchor.owner}/${r.primaryAnchor.name}`))
+    // Without Fix I this would be 1 (same anchor for every card).
+    expect(distinctPrimary.size).toBeGreaterThan(1)
+  })
+})
+
 describe('findAnchors', () => {
   it('returns up to 3 anchors sorted by similarity', () => {
     const userRepos = [

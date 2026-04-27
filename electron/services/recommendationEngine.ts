@@ -27,6 +27,16 @@ const LAMBDA = 0.7
 
 const ANCHOR_THRESHOLD = 0.2
 const MAX_ANCHORS = 3
+// `findAnchors` is called per candidate with a generous pool size so the
+// diversification pass has alternatives to pick from. The pool is sliced down
+// to MAX_ANCHORS after diversification.
+const ANCHOR_DIVERSIFY_POOL = 10
+// Each prior use of an anchor in the result set divides its effective
+// similarity by (1 + ANCHOR_USAGE_PENALTY × usage_count). 0.3 is gentle: a
+// strong anchor still wins after a few uses if no comparable alternative
+// exists, but weaker anchors get to surface when the strong one has already
+// explained several cards.
+const ANCHOR_USAGE_PENALTY = 0.3
 
 export interface RankedItem {
   repo: GitHubRepo
@@ -148,13 +158,16 @@ export function rankCandidates(
   }))
   const reranked = mmrRerank(window, { topK: TOP_K, lambda: LAMBDA }).map(r => (r as any)._orig as RankedItem)
 
-  // Anchors computed on reranked output
+  // Anchors computed on reranked output. Request a generous pool per item so
+  // the diversification pass has alternatives to choose from when the
+  // raw-similarity top anchor has already explained several other cards.
   for (const item of reranked) {
     const sc = toScoringCandidate(item.repo)
-    const anchors = findAnchors(sc, profile, corpus)
-    item.anchors = anchors
-    item.primaryAnchor = anchors[0] ?? null
+    item.anchors = findAnchors(sc, profile, corpus, ANCHOR_DIVERSIFY_POOL)
+    item.primaryAnchor = item.anchors[0] ?? null
   }
+
+  diversifyAnchors(reranked)
 
   // Drop candidates we have no anchor for: if no user repo was similar enough
   // to the candidate to clear the anchor threshold, we can't credibly explain
@@ -170,10 +183,43 @@ export function rankCandidates(
   return anchored.length > 0 ? anchored : reranked.slice(0, 10)
 }
 
+/**
+ * Spread anchor usage across the result set so a few rich-tag user repos
+ * (e.g. one tagged `ai`+`ui`+`agent`) don't anchor every single card. Iterates
+ * items in display order; for each item, sorts its candidate anchor pool by
+ * `similarity / (1 + 0.3 × prior_usage)` and keeps the top MAX_ANCHORS. Strong
+ * anchors still win when the alternatives are much weaker; weaker anchors win
+ * only when the strong ones have already been used several times.
+ *
+ * Mutates each item's `anchors` and `primaryAnchor` in place.
+ */
+export function diversifyAnchors(items: RankedItem[]): void {
+  const usage = new Map<string, number>()
+  for (const item of items) {
+    if (item.anchors.length === 0) continue
+    const ranked = item.anchors
+      .map((a) => {
+        const key = `${a.owner}/${a.name}`
+        const adjusted = a.similarity / (1 + ANCHOR_USAGE_PENALTY * (usage.get(key) ?? 0))
+        return { anchor: a, adjusted }
+      })
+      .sort((x, y) => y.adjusted - x.adjusted)
+
+    const top = ranked.slice(0, MAX_ANCHORS).map((r) => r.anchor)
+    item.anchors = top
+    item.primaryAnchor = top[0] ?? null
+    for (const a of top) {
+      const key = `${a.owner}/${a.name}`
+      usage.set(key, (usage.get(key) ?? 0) + 1)
+    }
+  }
+}
+
 export function findAnchors(
   candidate: { topics: string[]; type_bucket: string | null; type_sub: string | null; language: string | null },
   profile: UserProfile,
   corpus: CorpusStats,
+  maxAnchors: number = MAX_ANCHORS,
 ): Anchor[] {
   const candidateTopics = new Set(candidate.topics)
   const results: Anchor[] = []
@@ -206,5 +252,5 @@ export function findAnchors(
   }
 
   results.sort((a, b) => b.similarity - a.similarity)
-  return results.slice(0, MAX_ANCHORS)
+  return results.slice(0, maxAnchors)
 }
