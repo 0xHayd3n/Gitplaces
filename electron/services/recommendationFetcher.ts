@@ -6,19 +6,23 @@ import { getSubTypeKeyword } from '../../src/lib/discoverQueries'
 
 export interface QueryPlan {
   topic: string
-  kind: 'topic' | 'pair' | 'subType' | 'engagement' | 'language' | 'coldStart'
+  kind: 'topic' | 'pair' | 'subType' | 'engagement' | 'language' | 'coldStart' | 'longTail'
   coldStart: boolean
   perPage: number
   sort: string
+  /** Upper-bound stars filter for `longTail` queries; ignored by other kinds. */
+  starCeiling?: number
 }
 
 const TOP_TOPICS_COUNT = 4
 const TOP_SUBTYPES_COUNT = 2
+const TOP_LONGTAIL_TOPICS_COUNT = 2
 const TOP_ENGAGEMENT_TOPICS_COUNT = 2
 const ENGAGEMENT_MIN_CLICKS = 3
 const PAIR_MIN_AFFINITY = 0.15
 const STAR_THRESHOLD = 10
 const LANGUAGE_STAR_THRESHOLD = 50
+const LONGTAIL_CEILING_FLOOR = 500
 const COLD_START_THRESHOLD = 50000
 const COLD_START_RESULTS = 100
 
@@ -33,6 +37,13 @@ export function planQueries(profile: UserProfile): QueryPlan[] {
   // Topic queries
   for (const [topic] of topicEntries.slice(0, TOP_TOPICS_COUNT)) {
     plans.push({ topic, kind: 'topic', coldStart: false, perPage: 30, sort: '' })
+  }
+
+  // Long-tail topic queries — caps stars on the upside so niche repos can enter the pool.
+  // Ceiling adapts to the user's taste tier (p75) but never below 500.
+  const starCeiling = Math.max(LONGTAIL_CEILING_FLOOR, profile.starScale.p75)
+  for (const [topic] of topicEntries.slice(0, TOP_LONGTAIL_TOPICS_COUNT)) {
+    plans.push({ topic, kind: 'longTail', coldStart: false, perPage: 25, sort: '', starCeiling })
   }
 
   // Pair query — top-2 if both >= threshold
@@ -81,6 +92,10 @@ function buildSearchQuery(plan: QueryPlan): string {
     case 'topic':
     case 'engagement':
       return `topic:${plan.topic} stars:>${STAR_THRESHOLD}`
+    case 'longTail': {
+      const ceiling = plan.starCeiling ?? LONGTAIL_CEILING_FLOOR
+      return `topic:${plan.topic} stars:${STAR_THRESHOLD}..${ceiling}`
+    }
     case 'pair': {
       const [a, b] = plan.topic.split(' ')
       return `topic:${a} topic:${b} stars:>${STAR_THRESHOLD}`

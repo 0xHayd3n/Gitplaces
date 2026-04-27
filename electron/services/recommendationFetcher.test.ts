@@ -220,4 +220,52 @@ describe('planQueries (extended)', () => {
     const plans = planQueries(profile)
     expect(plans.filter(p => p.kind === 'pair').length).toBe(0)
   })
+
+  // Fix A: long-tail queries inject niche candidates by capping stars on the upside.
+  it('emits long-tail queries for top-2 topics', () => {
+    const profile = makeProfile({
+      topicAffinity: new Map([['rust', 0.4], ['cli', 0.3], ['parser', 0.2], ['async', 0.1]]),
+    })
+    const plans = planQueries(profile)
+    const longTailPlans = plans.filter(p => p.kind === 'longTail')
+    expect(longTailPlans.length).toBe(2)
+    expect(longTailPlans.map(p => p.topic).sort()).toEqual(['cli', 'rust'])
+  })
+
+  it('long-tail uses best-match sort and small perPage', () => {
+    const profile = makeProfile({
+      topicAffinity: new Map([['rust', 0.4]]),
+    })
+    const plans = planQueries(profile)
+    const lt = plans.filter(p => p.kind === 'longTail')
+    expect(lt.length).toBe(1)
+    expect(lt[0].sort).toBe('')
+    expect(lt[0].perPage).toBe(25)
+  })
+})
+
+// ── buildSearchQuery branches ──────────────────────────────────────────────────
+
+describe('fetchCandidates — query string composition', () => {
+  it('long-tail emits stars:10..N where N = max(500, p75)', async () => {
+    mockSearch.mockResolvedValue([])
+    // p75 = 800 → ceiling = max(500, 800) = 800
+    const queries: QueryPlan[] = [
+      { topic: 'rust', kind: 'longTail', coldStart: false, perPage: 25, sort: '', starCeiling: 800 },
+    ]
+    await fetchCandidates('token', queries)
+    const call = mockSearch.mock.calls[0]
+    expect(call[1]).toBe('topic:rust stars:10..800')
+    expect(call[3]).toBe('')  // best-match
+  })
+
+  it('long-tail floors ceiling at 500 when p75 is small', async () => {
+    mockSearch.mockResolvedValue([])
+    const queries: QueryPlan[] = [
+      { topic: 'rust', kind: 'longTail', coldStart: false, perPage: 25, sort: '', starCeiling: 500 },
+    ]
+    await fetchCandidates('token', queries)
+    const call = mockSearch.mock.calls[0]
+    expect(call[1]).toBe('topic:rust stars:10..500')
+  })
 })
