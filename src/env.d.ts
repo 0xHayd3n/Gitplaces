@@ -143,6 +143,10 @@ declare global {
       starred: {
         getAll(): Promise<StarredRepoRow[]>
       }
+      svgCache: {
+        prefetch(owner: string, name: string, branch: string): Promise<void>
+        read(owner: string, name: string): Promise<Record<string, string> | null>
+      }
       mcp: {
         getStatus(): Promise<{ configured: boolean; configPath: string | null }>
         autoConfigure(): Promise<{ success: boolean; error?: string }>

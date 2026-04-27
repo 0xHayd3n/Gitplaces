@@ -508,7 +508,38 @@ ipcMain.handle('github:searchRepos', async (_event, query: string, sort?: string
     return cached.rows
   }
 
-  const items = await searchRepos(token, query, 100, sort ?? 'stars', order ?? 'desc', page ?? 1)
+  // Graceful 403/429 fallback: GitHub's secondary rate limit 403s every endpoint
+  // (incl. search). Rather than crashing Discover with an unhelpful error, fall
+  // through to the most-recent data we already have so the user still sees
+  // something while the lock-out clears.
+  //   1. stale in-memory cache for this exact query (past TTL but valid data)
+  //   2. language-filtered DB rows when the query carries `language:X`
+  //   3. top-100-by-stars DB rows
+  //   4. anything in the DB at all (last resort)
+  let items: import('./github').GitHubRepo[]
+  try {
+    items = await searchRepos(token, query, 100, sort ?? 'stars', order ?? 'desc', page ?? 1)
+  } catch (err) {
+    const msg = String(err)
+    if (/\b(403|429)\b/.test(msg)) {
+      if (cached) return cached.rows
+      const db = getDb(app.getPath('userData'))
+      const langMatch = query.match(/\blanguage:([^\s]+)/i)
+      const lang = langMatch ? langMatch[1] : null
+      let rows: unknown[] = []
+      if (lang) {
+        rows = db.prepare('SELECT * FROM repos WHERE LOWER(language) = LOWER(?) ORDER BY stars DESC LIMIT 100').all(lang)
+      }
+      if (rows.length === 0) {
+        rows = db.prepare('SELECT * FROM repos WHERE stars IS NOT NULL ORDER BY stars DESC LIMIT 100').all()
+      }
+      if (rows.length === 0) {
+        rows = db.prepare('SELECT * FROM repos ORDER BY discovered_at DESC LIMIT 100').all()
+      }
+      return rows
+    }
+    throw err
+  }
   if (items.length === 0) return []
 
   const db = getDb(app.getPath('userData'))
@@ -781,6 +812,63 @@ ipcMain.handle('github:getBlob', async (_event, owner: string, name: string, blo
   const result = await getBlobBySha(token, owner, name, blobSha)
   blobCache.set(blobSha, result)
   return result
+})
+
+// ── SVG cache IPC ────────────────────────────────────────────────
+
+function svgCacheFile(owner: string, name: string): string {
+  return path.join(app.getPath('userData'), 'svg-cache', `${sanitiseRef(owner)}_${sanitiseRef(name)}.json`)
+}
+
+ipcMain.handle('svg-cache:prefetch', async (_event, owner: string, name: string, branch: string) => {
+  const token = getToken() ?? null
+  const allFiles = await getRepoTree(token, owner, name, branch).catch(() => [] as { path: string; type: string; sha: string }[])
+  const svgFiles = allFiles.filter(f => f.type === 'blob' && f.path.toLowerCase().endsWith('.svg'))
+  if (svgFiles.length === 0) return
+
+  const result: Record<string, string> = {}
+  // Conservative: small batches with a delay between them. GitHub trips the
+  // secondary rate limit on bursty/parallel traffic, and that lock-out 403s
+  // *all* subsequent requests (including search), breaking Discover. Concurrency
+  // 3 + 250ms between batches keeps a 600-SVG repo well below the threshold.
+  const CONCURRENCY = 3
+  const DELAY_MS = 250
+  let aborted = false
+
+  for (let i = 0; i < svgFiles.length && !aborted; i += CONCURRENCY) {
+    const batch = svgFiles.slice(i, i + CONCURRENCY)
+    const settled = await Promise.allSettled(batch.map(async (file) => {
+      const blob = await getBlobBySha(token, owner, name, file.sha)
+      return { sha: file.sha, blob }
+    }))
+    for (const r of settled) {
+      if (r.status === 'fulfilled') {
+        result[r.value.sha] = r.value.blob.content
+        blobCache.set(r.value.sha, r.value.blob)
+      } else if (/\b(403|429)\b/.test(String(r.reason))) {
+        // Hit rate limit — bail out, save what we have
+        aborted = true
+      }
+    }
+    if (!aborted && i + CONCURRENCY < svgFiles.length) {
+      await new Promise(r => setTimeout(r, DELAY_MS))
+    }
+  }
+
+  if (Object.keys(result).length === 0) return
+
+  const dir = path.join(app.getPath('userData'), 'svg-cache')
+  await fs.mkdir(dir, { recursive: true })
+  await fs.writeFile(svgCacheFile(owner, name), JSON.stringify(result), 'utf-8')
+})
+
+ipcMain.handle('svg-cache:read', async (_event, owner: string, name: string) => {
+  try {
+    const raw = await fs.readFile(svgCacheFile(owner, name), 'utf-8')
+    return JSON.parse(raw) as Record<string, string>
+  } catch {
+    return null
+  }
 })
 
 // ── Settings IPC ────────────────────────────────────────────────

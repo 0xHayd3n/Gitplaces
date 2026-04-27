@@ -124,6 +124,13 @@ contextBridge.exposeInMainWorld('api', {
     getAll: () => ipcRenderer.invoke('starred:getAll'),
   },
 
+  svgCache: {
+    prefetch: (owner: string, name: string, branch: string) =>
+      ipcRenderer.invoke('svg-cache:prefetch', owner, name, branch),
+    read: (owner: string, name: string) =>
+      ipcRenderer.invoke('svg-cache:read', owner, name),
+  },
+
   mcp: {
     getStatus:        () => ipcRenderer.invoke('mcp:getStatus'),
     autoConfigure:    () => ipcRenderer.invoke('mcp:autoConfigure'),

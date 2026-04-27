@@ -236,6 +236,33 @@ export async function getRecommendedHandler(): Promise<RecommendationResponse> {
     })
     .filter((i): i is RecommendationItem => i !== null)
 
+  // Fallback: if the niche-only candidate pool yielded nothing (e.g. user's
+  // topics are dominated by repos above MAX_STAR_CEILING), fall back to the
+  // cold-start popular pool so the UI is never empty.
+  if (items.length === 0) {
+    const coldCandidates = await fetchCandidates(token, [{
+      topic: '', kind: 'coldStart', coldStart: true, perPage: 100, sort: 'stars',
+    }])
+    if (coldCandidates.length > 0) {
+      upsertCandidates(db, coldCandidates, profileHash)
+      const coldByIdMap = readBackRows(db, coldCandidates)
+      const fallbackItems: RecommendationItem[] = coldCandidates
+        .map((repo): RecommendationItem | null => {
+          const row = coldByIdMap.get(String(repo.id))
+          if (!row) return null
+          return {
+            repo: row, score: 0,
+            scoreBreakdown: { topic: 0, description: 0, bucket: 0, subType: 0, language: 0, scale: 0, freshness: 0, engagement: 0 },
+            anchors: [], primaryAnchor: null,
+          }
+        })
+        .filter((i): i is RecommendationItem => i !== null)
+      const response: RecommendationResponse = { items: fallbackItems, stale: false, coldStart: true }
+      l1Cache.set(profileHash, { timestamp: Date.now(), response })
+      return response
+    }
+  }
+
   const response: RecommendationResponse = { items, stale: false, coldStart: false }
   l1Cache.set(profileHash, { timestamp: Date.now(), response })
   db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(`recommended_cache_ts:${profileHash}`, String(Date.now()))
