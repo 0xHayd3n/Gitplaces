@@ -2,24 +2,94 @@
 import { searchRepos } from '../github'
 import type { GitHubRepo } from '../github'
 import type { UserProfile } from '../../src/types/recommendation'
+import { getSubTypeKeyword } from '../../src/lib/discoverQueries'
 
 export interface QueryPlan {
   topic: string
+  kind: 'topic' | 'pair' | 'subType' | 'engagement' | 'language' | 'coldStart'
   coldStart: boolean
+  perPage: number
+  sort: string
 }
 
-const TOP_TOPICS_COUNT = 5
-const PER_TOPIC_RESULTS = 25
+const TOP_TOPICS_COUNT = 4
+const TOP_SUBTYPES_COUNT = 2
+const TOP_ENGAGEMENT_TOPICS_COUNT = 2
+const ENGAGEMENT_MIN_CLICKS = 3
+const PAIR_MIN_AFFINITY = 0.15
 const STAR_THRESHOLD = 10
+const LANGUAGE_STAR_THRESHOLD = 50
 const COLD_START_THRESHOLD = 50000
 const COLD_START_RESULTS = 100
 
 export function planQueries(profile: UserProfile): QueryPlan[] {
-  const entries = [...profile.topicAffinity.entries()].sort((a, b) => b[1] - a[1])
-  if (entries.length === 0) {
-    return [{ topic: '', coldStart: true }]
+  const topicEntries = [...profile.topicAffinity.entries()].sort((a, b) => b[1] - a[1])
+  if (topicEntries.length === 0) {
+    return [{ topic: '', kind: 'coldStart', coldStart: true, perPage: COLD_START_RESULTS, sort: 'stars' }]
   }
-  return entries.slice(0, TOP_TOPICS_COUNT).map(([topic]) => ({ topic, coldStart: false }))
+
+  const plans: QueryPlan[] = []
+
+  // Topic queries
+  for (const [topic] of topicEntries.slice(0, TOP_TOPICS_COUNT)) {
+    plans.push({ topic, kind: 'topic', coldStart: false, perPage: 30, sort: '' })
+  }
+
+  // Pair query — top-2 if both >= threshold
+  if (topicEntries.length >= 2 && topicEntries[1][1] >= PAIR_MIN_AFFINITY) {
+    plans.push({
+      topic: `${topicEntries[0][0]} ${topicEntries[1][0]}`,
+      kind: 'pair',
+      coldStart: false,
+      perPage: 25,
+      sort: '',
+    })
+  }
+
+  // SubType queries
+  const subTypeEntries = [...profile.subTypeDistribution.entries()].sort((a, b) => b[1] - a[1])
+  for (const [subTypeId] of subTypeEntries.slice(0, TOP_SUBTYPES_COUNT)) {
+    const kw = getSubTypeKeyword(subTypeId)
+    if (kw) plans.push({ topic: kw, kind: 'subType', coldStart: false, perPage: 25, sort: '' })
+  }
+
+  // Engagement queries (only if enough click data)
+  if (profile.engagement.clickCount >= ENGAGEMENT_MIN_CLICKS) {
+    const userTopTopics = new Set(topicEntries.slice(0, TOP_TOPICS_COUNT).map(([t]) => t))
+    const clickedEntries = [...profile.engagement.clickedTopicAffinity.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .filter(([t]) => !userTopTopics.has(t))
+      .slice(0, TOP_ENGAGEMENT_TOPICS_COUNT)
+    for (const [topic] of clickedEntries) {
+      plans.push({ topic, kind: 'engagement', coldStart: false, perPage: 20, sort: '' })
+    }
+  }
+
+  // Language query — #1 language
+  const langEntries = [...profile.languageWeights.entries()].sort((a, b) => b[1] - a[1])
+  if (langEntries.length > 0) {
+    plans.push({ topic: langEntries[0][0], kind: 'language', coldStart: false, perPage: 25, sort: 'stars' })
+  }
+
+  return plans
+}
+
+function buildSearchQuery(plan: QueryPlan): string {
+  switch (plan.kind) {
+    case 'coldStart':
+      return `stars:>${COLD_START_THRESHOLD}`
+    case 'topic':
+    case 'engagement':
+      return `topic:${plan.topic} stars:>${STAR_THRESHOLD}`
+    case 'pair': {
+      const [a, b] = plan.topic.split(' ')
+      return `topic:${a} topic:${b} stars:>${STAR_THRESHOLD}`
+    }
+    case 'subType':
+      return `${plan.topic} stars:>${STAR_THRESHOLD}`
+    case 'language':
+      return `language:${plan.topic} stars:>${LANGUAGE_STAR_THRESHOLD}`
+  }
 }
 
 export async function fetchCandidates(
@@ -30,13 +100,7 @@ export async function fetchCandidates(
   const merged: GitHubRepo[] = []
 
   const results = await Promise.allSettled(
-    queries.map(async (q) => {
-      if (q.coldStart) {
-        return searchRepos(token, `stars:>${COLD_START_THRESHOLD}`, COLD_START_RESULTS, 'stars', 'desc', 1)
-      }
-      // Empty sort = GitHub default best-match ranking
-      return searchRepos(token, `topic:${q.topic} stars:>${STAR_THRESHOLD}`, PER_TOPIC_RESULTS, '', 'desc', 1)
-    })
+    queries.map(async (q) => searchRepos(token, buildSearchQuery(q), q.perPage, q.sort, 'desc', 1))
   )
 
   for (const r of results) {

@@ -9,6 +9,7 @@ vi.mock('../github', () => ({
 }))
 import { searchRepos } from '../github'
 import { planQueries, fetchCandidates } from './recommendationFetcher'
+import type { QueryPlan } from './recommendationFetcher'
 
 const mockSearch = searchRepos as unknown as ReturnType<typeof vi.fn>
 
@@ -33,6 +34,11 @@ function emptyProfile(overrides: Partial<UserProfile> = {}): UserProfile {
   }
 }
 
+// Alias used by the new test groups
+function makeProfile(overrides: Partial<UserProfile> = {}): UserProfile {
+  return emptyProfile(overrides)
+}
+
 function ghRepo(overrides: Partial<GitHubRepo>): GitHubRepo {
   return {
     id: 1, node_id: 'n', owner: { login: 'o' }, name: 'n',
@@ -50,8 +56,10 @@ beforeEach(() => {
   mockSearch.mockReset()
 })
 
-describe('planQueries', () => {
-  it('returns top 5 topics by affinity value', () => {
+// ── Legacy planQueries tests (adapted for new shape) ─────────────────────────
+
+describe('planQueries (legacy)', () => {
+  it('returns top 4 topics by affinity value', () => {
     const profile = emptyProfile({
       topicAffinity: new Map([
         ['a', 0.30], ['b', 0.25], ['c', 0.20], ['d', 0.10],
@@ -59,25 +67,29 @@ describe('planQueries', () => {
       ]),
     })
     const queries = planQueries(profile)
-    expect(queries.length).toBe(5)
-    expect(queries.map((q) => q.topic)).toEqual(['a', 'b', 'c', 'd', 'e'])
+    const topicPlans = queries.filter(q => q.kind === 'topic')
+    expect(topicPlans.length).toBe(4)
+    expect(topicPlans.map((q) => q.topic)).toEqual(['a', 'b', 'c', 'd'])
   })
 
   it('returns cold-start query when topicAffinity is empty', () => {
     const queries = planQueries(emptyProfile())
     expect(queries.length).toBe(1)
     expect(queries[0].coldStart).toBe(true)
+    expect(queries[0].kind).toBe('coldStart')
   })
 })
 
+// ── fetchCandidates tests (adapted for new shape) ─────────────────────────────
+
 describe('fetchCandidates', () => {
-  it('calls searchRepos once per query with best-match sort', async () => {
+  it('calls searchRepos once per query with best-match sort for topic plans', async () => {
     mockSearch.mockResolvedValue([
       ghRepo({ id: 1, name: 'r1' }),
     ])
-    const queries = [
-      { topic: 'rust', coldStart: false },
-      { topic: 'cli', coldStart: false },
+    const queries: QueryPlan[] = [
+      { topic: 'rust', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
+      { topic: 'cli', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
     ]
     await fetchCandidates('token', queries)
     expect(mockSearch).toHaveBeenCalledTimes(2)
@@ -92,15 +104,15 @@ describe('fetchCandidates', () => {
       .mockResolvedValueOnce([ghRepo({ id: 1 }), ghRepo({ id: 2 })])
       .mockResolvedValueOnce([ghRepo({ id: 2 }), ghRepo({ id: 3 })])
     const result = await fetchCandidates('token', [
-      { topic: 'rust', coldStart: false },
-      { topic: 'cli', coldStart: false },
+      { topic: 'rust', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
+      { topic: 'cli', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
     ])
     expect(result.map((r) => r.id).sort()).toEqual([1, 2, 3])
   })
 
-  it('executes cold-start query when coldStart flag is set', async () => {
+  it('executes cold-start query when kind is coldStart', async () => {
     mockSearch.mockResolvedValue([ghRepo({ id: 1 })])
-    await fetchCandidates('token', [{ topic: '', coldStart: true }])
+    await fetchCandidates('token', [{ topic: '', kind: 'coldStart', coldStart: true, perPage: 100, sort: 'stars' }])
     const call = mockSearch.mock.calls[0]
     expect(call[1]).toBe('stars:>50000')
     expect(call[3]).toBe('stars')  // cold-start uses popularity sort
@@ -112,10 +124,100 @@ describe('fetchCandidates', () => {
       .mockRejectedValueOnce(new Error('rate limit'))
       .mockResolvedValueOnce([ghRepo({ id: 3 })])
     const result = await fetchCandidates('token', [
-      { topic: 'a', coldStart: false },
-      { topic: 'b', coldStart: false },
-      { topic: 'c', coldStart: false },
+      { topic: 'a', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
+      { topic: 'b', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
+      { topic: 'c', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
     ])
     expect(result.map((r) => r.id).sort()).toEqual([1, 3])
+  })
+})
+
+// ── New planQueries (extended) tests ─────────────────────────────────────────
+
+describe('planQueries (extended)', () => {
+  it('emits topic queries for top-4 affinity topics', () => {
+    const profile = makeProfile({
+      topicAffinity: new Map([['rust', 0.4], ['cli', 0.3], ['parser', 0.2], ['async', 0.1], ['extra', 0.05]]),
+    })
+    const plans = planQueries(profile)
+    const topicPlans = plans.filter(p => p.kind === 'topic')
+    expect(topicPlans.length).toBe(4)
+    expect(topicPlans.map(p => p.topic)).toEqual(['rust', 'cli', 'parser', 'async'])
+  })
+
+  it('emits subType queries for top-2 subTypes', () => {
+    const profile = makeProfile({
+      subTypeDistribution: new Map([['ai-coding', 0.5], ['cli-tool', 0.3], ['extra', 0.2]]),
+      topicAffinity: new Map([['x', 1]]),
+    })
+    const plans = planQueries(profile)
+    const subPlans = plans.filter(p => p.kind === 'subType')
+    expect(subPlans.length).toBe(2)
+  })
+
+  it('emits a language query for #1 language', () => {
+    const profile = makeProfile({
+      languageWeights: new Map([['Rust', 0.6], ['Python', 0.4]]),
+      topicAffinity: new Map([['x', 1]]),
+    })
+    const plans = planQueries(profile)
+    const langPlans = plans.filter(p => p.kind === 'language')
+    expect(langPlans.length).toBe(1)
+    expect(langPlans[0].topic).toBe('Rust')
+  })
+
+  it('skips engagement queries when clickCount < 3', () => {
+    const profile = makeProfile({
+      topicAffinity: new Map([['rust', 1]]),
+      engagement: {
+        clickedTopicAffinity: new Map([['ai', 1]]),
+        clickedOwnerAffinity: new Map(),
+        clickedRepoIds: new Set(),
+        clickCount: 2,
+      },
+    })
+    const plans = planQueries(profile)
+    expect(plans.filter(p => p.kind === 'engagement').length).toBe(0)
+  })
+
+  it('emits engagement queries for top clicked topics not in user-affinity top', () => {
+    const profile = makeProfile({
+      topicAffinity: new Map([['rust', 1]]),
+      engagement: {
+        clickedTopicAffinity: new Map([['ai', 0.6], ['ml', 0.4]]),
+        clickedOwnerAffinity: new Map(),
+        clickedRepoIds: new Set(),
+        clickCount: 5,
+      },
+    })
+    const plans = planQueries(profile)
+    const engagementPlans = plans.filter(p => p.kind === 'engagement')
+    expect(engagementPlans.length).toBe(2)
+    expect(engagementPlans.map(p => p.topic).sort()).toEqual(['ai', 'ml'])
+  })
+
+  it('cold-start when no topic affinity', () => {
+    const plans = planQueries(makeProfile())
+    expect(plans.length).toBe(1)
+    expect(plans[0].coldStart).toBe(true)
+    expect(plans[0].kind).toBe('coldStart')
+  })
+
+  it('emits a pair query when top-2 topics both have affinity >= 0.15', () => {
+    const profile = makeProfile({
+      topicAffinity: new Map([['rust', 0.4], ['cli', 0.3], ['extra', 0.05]]),
+    })
+    const plans = planQueries(profile)
+    const pairs = plans.filter(p => p.kind === 'pair')
+    expect(pairs.length).toBe(1)
+    expect(pairs[0].topic).toBe('rust cli')           // composite key, executor reads it as the search query terms
+  })
+
+  it('skips pair query when second topic too weak', () => {
+    const profile = makeProfile({
+      topicAffinity: new Map([['rust', 0.9], ['cli', 0.05]]),
+    })
+    const plans = planQueries(profile)
+    expect(plans.filter(p => p.kind === 'pair').length).toBe(0)
   })
 })
