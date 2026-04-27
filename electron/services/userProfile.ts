@@ -7,7 +7,12 @@ import { buildDescriptionAffinity } from './signals/descriptionSignal'
 import { buildFreshnessPreference } from './signals/freshnessSignal'
 import { buildEngagementProfile } from './signals/engagementSignal'
 
-const ANCHOR_POOL_SIZE = 20
+// All starred + saved repos participate in anchoring; the prior 20-cap
+// excluded most of larger libraries from ever appearing in "Because you
+// starred …" explanations. The sort order is still meaningful: candidates
+// iterate the pool and pick the best matches, so recency + signal-richness
+// govern tie-breaking when multiple repos match equally.
+const ANCHOR_POOL_SIZE = Number.POSITIVE_INFINITY
 
 function normalize(m: Map<string, number>): Map<string, number> {
   const total = [...m.values()].reduce((a, b) => a + b, 0)

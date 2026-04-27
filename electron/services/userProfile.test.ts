@@ -38,6 +38,26 @@ describe('buildUserProfile', () => {
     expect(profile.engagement.clickCount).toBe(0)
   })
 
+  it('anchorPool includes ALL user repos (Fix H: no 20-cap)', () => {
+    // Construct 30 user repos with distinct ids to verify none are dropped
+    const userRepos = Array.from({ length: 30 }, (_, i) =>
+      makeRepo({
+        id: `r${i}`, name: `repo-${i}`,
+        topics: JSON.stringify(['rust']),
+        starred_at: new Date(NOW - i * 86400000).toISOString(),
+      }),
+    )
+    const corpus = computeCorpusStats(userRepos)
+    const profile = buildUserProfile({
+      userRepos: userRepos as any,
+      corpus,
+      engagementEvents: [],
+      clickedReposById: new Map(),
+      now: NOW,
+    })
+    expect(profile.anchorPool.length).toBe(30)
+  })
+
   it('integrates engagement events into profile.engagement', () => {
     const userRepos = [makeRepo({ topics: JSON.stringify(['rust']) })]
     const corpus = computeCorpusStats(userRepos)
