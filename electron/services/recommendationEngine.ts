@@ -4,7 +4,7 @@ import type { GitHubRepo } from '../github'
 import { classifyRepoBucket } from '../../src/lib/classifyRepoType'
 import { scoreTopic } from './signals/topicSignal'
 import { scoreDescription, tokenizeDescription } from './signals/descriptionSignal'
-import { scoreCategory } from './signals/categorySignal'
+import { scoreCategory, categoryMismatchPenalty } from './signals/categorySignal'
 import { scoreScale } from './signals/scaleSignal'
 import { scoreFreshness } from './signals/freshnessSignal'
 import { scoreEngagement } from './signals/engagementSignal'
@@ -104,7 +104,7 @@ export function rankCandidates(
       scale, freshness, engagement,
     }
 
-    const score =
+    const positiveScore =
       WEIGHTS.topic       * topic +
       WEIGHTS.description * description +
       WEIGHTS.subType     * cat.subType +
@@ -113,6 +113,11 @@ export function rankCandidates(
       WEIGHTS.scale       * scale +
       WEIGHTS.freshness   * freshness +
       WEIGHTS.engagement  * engagement
+
+    // Negative signal: dock score for candidates classified into buckets/subTypes
+    // the user has zero stars in. Counteracts the additive-positive bias that lets
+    // off-cluster repos (e.g. job-listings, edu-platforms) rank via topic+scale alone.
+    const score = Math.max(0, positiveScore - categoryMismatchPenalty(sc, profile))
 
     const rerankRepo = {
       id: String(repo.id),
