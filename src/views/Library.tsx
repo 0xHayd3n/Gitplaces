@@ -25,23 +25,25 @@ export default function Library() {
   const [activePanel, setActivePanel] = useState<ActivePanel>('repos')
   const [rows, setRows] = useState<LibraryRow[]>([])
   const [starredRows, setStarredRows] = useState<StarredRepoRow[]>([])
-  const [activeSegment, setActiveSegment] = useState<'all' | 'active' | 'inactive'>('all')
+  const [unstarredRows, setUnstarredRows] = useState<StarredRepoRow[]>([])
+  const [activeSegment, setActiveSegment] = useState<'all' | 'active' | 'unstarred'>('all')
 
-  const refreshRows = useCallback(() => {
+  const refreshAll = useCallback(() => {
     window.api.library.getAll().then(setRows).catch(() => {
       toast('Failed to load library', 'error')
     })
+    window.api.starred.getAll().then(setStarredRows).catch(() => {})
+    window.api.starred.getRecentlyUnstarred().then(setUnstarredRows).catch(() => {})
   }, [toast])
 
   useEffect(() => {
-    refreshRows()
-    window.api.starred.getAll().then(setStarredRows).catch(() => {})
-  }, [refreshRows])
+    refreshAll()
+  }, [refreshAll])
 
   useEffect(() => {
-    window.addEventListener('library:changed', refreshRows)
-    return () => window.removeEventListener('library:changed', refreshRows)
-  }, [refreshRows])
+    window.addEventListener('library:changed', refreshAll)
+    return () => window.removeEventListener('library:changed', refreshAll)
+  }, [refreshAll])
 
   const repoSelectedId = useMemo(() => {
     if (!repoMatch) return null
@@ -78,6 +80,7 @@ export default function Library() {
         <LibrarySidebar
           installedRows={rows}
           starredRows={starredRows}
+          unstarredRows={unstarredRows}
           selectedId={repoSelectedId}
           activeSegment={activeSegment}
           onSegmentChange={setActiveSegment}
