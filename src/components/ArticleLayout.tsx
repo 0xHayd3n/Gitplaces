@@ -20,6 +20,8 @@ export type ArticleLayoutProps = {
   dither?: React.ReactNode
   /** When true, body renders without internal padding (for Files / Components tabs) */
   fullBleedBody?: boolean
+  /** When true, collapses the banner to a compact title strip (for Files tab) */
+  collapsedHeader?: boolean
   /** Forwarded ref to the scroll container (the .article-layout element itself) */
   scrollRef?: React.RefObject<HTMLDivElement>
   /** When provided, body renders as two columns: content | divider | toc. Pass only on readme tab. */
@@ -42,6 +44,7 @@ export function ArticleLayout({
   navBar,
   dither,
   fullBleedBody = false,
+  collapsedHeader = false,
   scrollRef,
   tocSlot,
   statsSlot,
@@ -52,21 +55,23 @@ export function ArticleLayout({
   return (
     <div
       ref={resolvedScrollRef}
-      className={`article-layout${fullBleedBody ? ' article-layout--fullbleed' : ''}${(tocSlot || statsSlot) ? ' article-layout--has-toc' : ''}`}
+      className={`article-layout${fullBleedBody ? ' article-layout--fullbleed' : ''}${(tocSlot || statsSlot) ? ' article-layout--has-toc' : ''}${collapsedHeader ? ' article-layout--collapsed-header' : ''}`}
     >
       <div className="article-layout-top">
-        {dither && <div className="article-layout-dither-bg">{dither}</div>}
+        {!collapsedHeader && dither && <div className="article-layout-dither-bg">{dither}</div>}
         {navBar && <div className="article-layout-navbar-slot">{navBar}</div>}
         <div className="article-layout-top-panel">
-          {dither && <div className="article-layout-dither-spacer" />}
-          <div className="article-layout-title-row">
-            <div className="article-layout-title">{title}</div>
-            {titleExtras && <div className="article-layout-title-extras">{titleExtras}</div>}
-          </div>
-          {description && <div className="article-layout-description">{description}</div>}
-          <div className="article-layout-byline">{byline}</div>
-          {actionRow != null && <div className="article-layout-actions">{actionRow}</div>}
-          {actionRowExtras && <div className="article-layout-action-row-extras">{actionRowExtras}</div>}
+          {!collapsedHeader && dither && <div className="article-layout-dither-spacer" />}
+          {!collapsedHeader && (
+            <div className="article-layout-title-row">
+              <div className="article-layout-title">{title}</div>
+              {titleExtras && <div className="article-layout-title-extras">{titleExtras}</div>}
+            </div>
+          )}
+          {!collapsedHeader && description && <div className="article-layout-description">{description}</div>}
+          {!collapsedHeader && <div className="article-layout-byline">{byline}</div>}
+          {!collapsedHeader && actionRow != null && <div className="article-layout-actions">{actionRow}</div>}
+          {!collapsedHeader && actionRowExtras && <div className="article-layout-action-row-extras">{actionRowExtras}</div>}
         </div>
       </div>
       <div className="article-layout-tabs-slot article-layout-sticky-top">{tabs}</div>
