@@ -21,7 +21,7 @@ function recencyWeight(starredAt: string | null, now: number): number {
 
 function normalize(m: Map<string, number>): Map<string, number> {
   const total = [...m.values()].reduce((a, b) => a + b, 0)
-  if (total === 0) return m
+  if (total === 0) return new Map(m)
   const out = new Map<string, number>()
   for (const [k, v] of m) out.set(k, v / total)
   return out
