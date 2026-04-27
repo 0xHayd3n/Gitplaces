@@ -39,21 +39,30 @@ vi.mock('../services/recommendationFetcher', () => ({
 
 // Engine mock — keep simple so we don't depend on engine internals
 vi.mock('../services/recommendationEngine', () => ({
-  computeTopicStats: vi.fn().mockReturnValue({
-    docFrequency: new Map(),
-    totalRepos: 0,
-    idf: new Map(),
-  }),
-  buildUserProfile: vi.fn().mockReturnValue({
-    topicAffinity: new Map(),
-    bucketDistribution: new Map(),
-    subTypeDistribution: new Map(),
-    languageWeights: new Map(),
-    starScale: { median: 100, p25: 50, p75: 200 },
-    anchorPool: [],
-    repoCount: 0,
-  }),
   rankCandidates: vi.fn().mockReturnValue([]),
+}))
+
+vi.mock('../services/userProfile', () => ({
+  buildUserProfile: vi.fn().mockReturnValue({
+    topicAffinity: new Map(), descriptionAffinity: new Map(),
+    bucketDistribution: new Map(), subTypeDistribution: new Map(), languageWeights: new Map(),
+    starScale: { median: 100, p25: 50, p75: 200 }, anchorPool: [], repoCount: 0,
+    freshnessPreference: 365,
+    engagement: { clickedTopicAffinity: new Map(), clickedOwnerAffinity: new Map(), clickedRepoIds: new Set(), clickCount: 0 },
+  }),
+}))
+
+vi.mock('../services/corpusStats', () => ({
+  computeCorpusStats: vi.fn().mockReturnValue({
+    topicDocFrequency: new Map(), topicIdf: new Map(),
+    descriptionDocFrequency: new Map(), descriptionIdf: new Map(),
+    totalRepos: 0,
+  }),
+}))
+
+vi.mock('../services/engagementTracker', () => ({
+  getRecentClicks: vi.fn().mockReturnValue([]),
+  pruneOldEvents: vi.fn(),
 }))
 
 // ---------------------------------------------------------------------------
@@ -184,7 +193,7 @@ describe('getRecommendedHandler', () => {
 
     const popularRepo = makeGitHubRepo(99999)
     vi.mocked(fetchCandidates).mockResolvedValue([popularRepo])
-    vi.mocked(planQueries).mockReturnValue([{ topic: '', coldStart: true }])
+    vi.mocked(planQueries).mockReturnValue([{ topic: '', kind: 'coldStart', coldStart: true, perPage: 100, sort: 'stars' }])
     vi.mocked(getToken).mockReturnValue('test-token')
 
     // Only 2 user repos => cold start
@@ -237,7 +246,7 @@ describe('getRecommendedHandler', () => {
 
     const repo = makeGitHubRepo(1001)
     vi.mocked(fetchCandidates).mockResolvedValue([repo])
-    vi.mocked(planQueries).mockReturnValue([{ topic: 'typescript', coldStart: false }])
+    vi.mocked(planQueries).mockReturnValue([{ topic: 'typescript', kind: 'topic', coldStart: false, perPage: 30, sort: '' }])
     vi.mocked(getToken).mockReturnValue('test-token')
 
     // 5 user repos — above cold start threshold
@@ -272,7 +281,7 @@ describe('getRecommendedHandler', () => {
 
     const repo = makeGitHubRepo(2001)
     vi.mocked(fetchCandidates).mockResolvedValue([repo])
-    vi.mocked(planQueries).mockReturnValue([{ topic: 'typescript', coldStart: false }])
+    vi.mocked(planQueries).mockReturnValue([{ topic: 'typescript', kind: 'topic', coldStart: false, perPage: 30, sort: '' }])
     vi.mocked(getToken).mockReturnValue('test-token')
 
     // First call: 5 repos
@@ -326,7 +335,7 @@ describe('getRecommendedHandler', () => {
     const { fetchCandidates, planQueries } = await import('../services/recommendationFetcher')
 
     vi.mocked(fetchCandidates).mockRejectedValue(new Error('GitHub API rate limited'))
-    vi.mocked(planQueries).mockReturnValue([{ topic: 'typescript', coldStart: false }])
+    vi.mocked(planQueries).mockReturnValue([{ topic: 'typescript', kind: 'topic', coldStart: false, perPage: 30, sort: '' }])
     vi.mocked(getToken).mockReturnValue('test-token')
 
     const userRows = Array.from({ length: 5 }, (_, i) => makeRepoRow(String(i + 300), true, false))
@@ -347,26 +356,40 @@ describe('getRecommendedHandler', () => {
 
 describe('computeProfileHash', () => {
   it('returns stable hash for same inputs regardless of order', () => {
-    const a = computeProfileHash(['1', '2', '3'], ['10', '20'])
-    const b = computeProfileHash(['3', '1', '2'], ['20', '10'])
+    const a = computeProfileHash(['1', '2', '3'], ['10', '20'], [], 0)
+    const b = computeProfileHash(['3', '1', '2'], ['20', '10'], [], 0)
     expect(a).toBe(b)
   })
 
   it('differs when starred set changes', () => {
-    const a = computeProfileHash(['1', '2'], [])
-    const b = computeProfileHash(['1', '2', '3'], [])
+    const a = computeProfileHash(['1', '2'], [], [], 0)
+    const b = computeProfileHash(['1', '2', '3'], [], [], 0)
     expect(a).not.toBe(b)
   })
 
   it('differs when saved set changes', () => {
-    const a = computeProfileHash(['1'], ['10'])
-    const b = computeProfileHash(['1'], ['10', '20'])
+    const a = computeProfileHash(['1'], ['10'], [], 0)
+    const b = computeProfileHash(['1'], ['10', '20'], [], 0)
     expect(a).not.toBe(b)
   })
 
   it('handles empty sets deterministically', () => {
-    const hash = computeProfileHash([], [])
+    const hash = computeProfileHash([], [], [], 0)
     expect(typeof hash).toBe('string')
     expect(hash.length).toBeGreaterThan(0)
+  })
+})
+
+describe('computeProfileHash (click-aware)', () => {
+  it('changes when clicked repo set changes', () => {
+    const a = computeProfileHash(['1'], ['2'], [], 0)
+    const b = computeProfileHash(['1'], ['2'], ['3'], 0)
+    expect(a).not.toBe(b)
+  })
+  it('survives within an hour bucket of click timestamps', () => {
+    const t = 1_700_000_000_000  // arbitrary fixed
+    const a = computeProfileHash(['1'], [], ['c'], t)
+    const b = computeProfileHash(['1'], [], ['c'], t + 1000)  // same hour
+    expect(a).toBe(b)
   })
 })

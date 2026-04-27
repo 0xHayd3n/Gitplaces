@@ -6,20 +6,30 @@ import { classifyRepoBucket } from '../../src/lib/classifyRepoType'
 import { extractDominantColor } from '../color-extractor'
 import { poolAll } from '../concurrency'
 import type Database from 'better-sqlite3'
-import {
-  buildUserProfile,
-  computeTopicStats,
-  rankCandidates,
-} from '../services/recommendationEngine'
+import { rankCandidates } from '../services/recommendationEngine'
+import { buildUserProfile } from '../services/userProfile'
+import { computeCorpusStats } from '../services/corpusStats'
 import { planQueries, fetchCandidates } from '../services/recommendationFetcher'
+import { getRecentClicks, pruneOldEvents } from '../services/engagementTracker'
 import { cascadeRepoId } from '../db-helpers'
 import type { RecommendationResponse, RecommendationItem } from '../../src/types/recommendation'
 import type { RepoRow } from '../../src/types/repo'
 
-export function computeProfileHash(starredIds: string[], savedIds: string[]): string {
+const ENGAGEMENT_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000
+const PRUNE_INTERVAL_MS      = 7  * 24 * 60 * 60 * 1000
+
+export function computeProfileHash(
+  starredIds: string[],
+  savedIds: string[],
+  clickedRepoIds: string[],
+  latestClickTs: number,
+): string {
   const s = [...starredIds].sort().join(',')
   const v = [...savedIds].sort().join(',')
-  return createHash('sha256').update(`${s}|${v}`).digest('hex')
+  const c = [...clickedRepoIds].sort().join(',')
+  // Hour-bucket the latest click ts so the cache survives many clicks per hour
+  const tsBucket = Math.floor(latestClickTs / (60 * 60 * 1000))
+  return createHash('sha256').update(`${s}|${v}|${c}|${tsBucket}`).digest('hex')
 }
 
 // ---------------------------------------------------------------------------
@@ -34,6 +44,17 @@ interface L1Entry {
 }
 
 const l1Cache = new Map<string, L1Entry>()
+
+// ---------------------------------------------------------------------------
+// Helper: maybe prune old engagement events
+// ---------------------------------------------------------------------------
+function maybePrune(db: Database.Database): void {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'engagement_last_prune'").get() as { value: string } | undefined
+  const last = row ? parseInt(row.value, 10) : 0
+  if (Date.now() - last < PRUNE_INTERVAL_MS) return
+  pruneOldEvents(db, Date.now() - ENGAGEMENT_LOOKBACK_MS)
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('engagement_last_prune', String(Date.now()))
+}
 
 // ---------------------------------------------------------------------------
 // Helper: upsert ranked candidates into the repos table
@@ -130,109 +151,94 @@ function readBackRows(
 export async function getRecommendedHandler(): Promise<RecommendationResponse> {
   const db = getDb(app.getPath('userData'))
   const token = getToken()
-
-  // GitHub disconnected — return empty without calling the API.
   if (!token) return { items: [], stale: false, coldStart: false }
 
-  // 1. Load user repos
+  maybePrune(db)
+
+  // Load user repos
   const userRepos = db.prepare(
     'SELECT * FROM repos WHERE starred_at IS NOT NULL OR saved_at IS NOT NULL'
   ).all() as RepoRow[]
 
-  // 2. Compute profile hash
+  // Load engagement events + clicked repos
+  const engagementEvents = getRecentClicks(db, Date.now() - ENGAGEMENT_LOOKBACK_MS)
+  const clickedIds = [...new Set(engagementEvents.map(e => e.repo_id))]
+  const clickedReposById = new Map<string, { topics: string | null; owner: string }>()
+  if (clickedIds.length > 0) {
+    const placeholders = clickedIds.map(() => '?').join(',')
+    const rows = db.prepare(`SELECT id, topics, owner FROM repos WHERE id IN (${placeholders})`).all(...clickedIds) as { id: string; topics: string | null; owner: string }[]
+    for (const r of rows) clickedReposById.set(r.id, { topics: r.topics, owner: r.owner })
+  }
+
+  // Profile hash (now includes click state)
   const starredIds = userRepos.filter((r) => r.starred_at).map((r) => String(r.id))
   const savedIds   = userRepos.filter((r) => r.saved_at).map((r) => String(r.id))
-  const profileHash = computeProfileHash(starredIds, savedIds)
+  const latestClickTs = engagementEvents.length > 0 ? engagementEvents[0].ts : 0
+  const profileHash = computeProfileHash(starredIds, savedIds, clickedIds, latestClickTs)
 
-  // 3. Check L1 cache
+  // L1 cache
   const cached = l1Cache.get(profileHash)
   if (cached && (Date.now() - cached.timestamp) < L1_TTL_MS) {
     return cached.response
   }
 
-  // 4. Cold-start path (fewer than 3 user repos)
+  // Cold-start path (fewer than 3 user repos)
   if (userRepos.length < COLD_START_MIN_REPOS) {
-    const coldCandidates = await fetchCandidates(token, [{ topic: '', coldStart: true }])
-
-    // Upsert cold-start results to DB so they persist, then read back RepoRow shapes
+    const coldCandidates = await fetchCandidates(token, [{
+      topic: '', kind: 'coldStart', coldStart: true, perPage: 100, sort: 'stars',
+    }])
     upsertCandidates(db, coldCandidates, profileHash)
     const coldByIdMap = readBackRows(db, coldCandidates)
-
     const items: RecommendationItem[] = coldCandidates
       .map((repo): RecommendationItem | null => {
         const row = coldByIdMap.get(String(repo.id))
-        if (!row) {
-          console.warn(`[recommend] cold-start: no DB row for repo ${repo.owner.login}/${repo.name} (id=${repo.id}) after upsert`)
-          return null
-        }
+        if (!row) return null
         return {
-          repo: row,
-          score: 0,
+          repo: row, score: 0,
           scoreBreakdown: { topic: 0, description: 0, bucket: 0, subType: 0, language: 0, scale: 0, freshness: 0, engagement: 0 },
-          anchors: [],
-          primaryAnchor: null,
+          anchors: [], primaryAnchor: null,
         }
       })
-      .filter((item): item is RecommendationItem => item !== null)
-
+      .filter((i): i is RecommendationItem => i !== null)
     const response: RecommendationResponse = { items, stale: false, coldStart: true }
-
-    // Cache L1
     l1Cache.set(profileHash, { timestamp: Date.now(), response })
-
-    // Write L2 timestamp
-    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")
-      .run(`recommended_cache_ts:${profileHash}`, String(Date.now()))
-
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(`recommended_cache_ts:${profileHash}`, String(Date.now()))
     return response
   }
 
-  // 5. Normal path
-  const topicRows = db.prepare(
-    'SELECT topics FROM repos WHERE topics IS NOT NULL'
-  ).all() as { topics: string }[]
-
-  const topicStats = computeTopicStats(topicRows)
-  const profile = buildUserProfile({ userRepos, topicStats })
+  // Normal path
+  const corpusRows = db.prepare('SELECT topics, description FROM repos').all() as { topics: string | null; description: string | null }[]
+  const corpus = computeCorpusStats(corpusRows)
+  const profile = buildUserProfile({ userRepos, corpus, engagementEvents, clickedReposById })
   const queries = planQueries(profile)
   let candidates = await fetchCandidates(token, queries)
 
-  // Filter repos the user already has or owns
+  // Filter: not user-owned, not already user's, not recently clicked
   const existingIds = new Set(userRepos.map((r) => String(r.id)))
   const githubUsernameRow = db.prepare("SELECT value FROM settings WHERE key = 'github_username'").get() as { value: string } | undefined
   const githubUsername = githubUsernameRow?.value?.toLowerCase() ?? null
   candidates = candidates.filter((c) =>
     !existingIds.has(String(c.id)) &&
+    !profile.engagement.clickedRepoIds.has(String(c.id)) &&
     (!githubUsername || c.owner.login.toLowerCase() !== githubUsername)
   )
 
-  const ranked = rankCandidates(candidates, profile, topicStats)
+  const ranked = rankCandidates(candidates, profile, corpus)
 
-  // Upsert all candidates to DB, then re-read rows to get RepoRow shapes
   upsertCandidates(db, candidates, profileHash)
   const byIdMap = readBackRows(db, candidates)
 
-  // Map ranked items: swap item.repo (GitHubRepo) → RepoRow from DB
   const items: RecommendationItem[] = ranked
     .map((item): RecommendationItem | null => {
       const row = byIdMap.get(String(item.repo.id))
-      if (!row) {
-        console.warn(`[recommend] no DB row for repo ${item.repo.owner.login}/${item.repo.name} (id=${item.repo.id}) after upsert`)
-        return null
-      }
+      if (!row) return null
       return { ...item, repo: row }
     })
-    .filter((item): item is RecommendationItem => item !== null)
+    .filter((i): i is RecommendationItem => i !== null)
 
   const response: RecommendationResponse = { items, stale: false, coldStart: false }
-
-  // 6. Cache L1
   l1Cache.set(profileHash, { timestamp: Date.now(), response })
-
-  // 7. Write L2 timestamp to settings
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)")
-    .run(`recommended_cache_ts:${profileHash}`, String(Date.now()))
-
+  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(`recommended_cache_ts:${profileHash}`, String(Date.now()))
   return response
 }
 
