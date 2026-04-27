@@ -196,6 +196,14 @@ function emptyProfile(overrides: Partial<UserProfile> = {}): UserProfile {
     starScale: { median: 1000, p25: 500, p75: 2000 },
     anchorPool: [],
     repoCount: 0,
+    descriptionAffinity: new Map(),
+    freshnessPreference: 365,
+    engagement: {
+      clickedTopicAffinity: new Map(),
+      clickedOwnerAffinity: new Map(),
+      clickedRepoIds: new Set(),
+      clickCount: 0,
+    },
     ...overrides,
   }
 }

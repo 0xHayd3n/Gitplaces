@@ -168,7 +168,7 @@ export async function getRecommendedHandler(): Promise<RecommendationResponse> {
         return {
           repo: row,
           score: 0,
-          scoreBreakdown: { topic: 0, bucket: 0, subType: 0, language: 0, scale: 0 },
+          scoreBreakdown: { topic: 0, description: 0, bucket: 0, subType: 0, language: 0, scale: 0, freshness: 0, engagement: 0 },
           anchors: [],
           primaryAnchor: null,
         }

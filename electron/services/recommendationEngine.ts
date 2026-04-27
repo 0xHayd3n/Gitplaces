@@ -140,6 +140,15 @@ export function buildUserProfile(params: {
     starScale,
     anchorPool,
     repoCount: userRepos.length,
+    // Stub fields populated in later tasks; engine.ts is rewritten in Task 16.
+    descriptionAffinity: new Map(),
+    freshnessPreference: 365,
+    engagement: {
+      clickedTopicAffinity: new Map(),
+      clickedOwnerAffinity: new Map(),
+      clickedRepoIds: new Set(),
+      clickCount: 0,
+    },
   }
 }
 
@@ -195,7 +204,7 @@ export function scoreCandidate(
 
   return {
     score,
-    breakdown: { topic, bucket, subType, language, scale },
+    breakdown: { topic, bucket, subType, language, scale, description: 0, freshness: 0, engagement: 0 },
   }
 }
 

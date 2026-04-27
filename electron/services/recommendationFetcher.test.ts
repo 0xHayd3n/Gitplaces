@@ -18,9 +18,17 @@ function emptyProfile(overrides: Partial<UserProfile> = {}): UserProfile {
     bucketDistribution: new Map(),
     subTypeDistribution: new Map(),
     languageWeights: new Map(),
-    starScale: { median: 0, p25: 0, p75: 0 },
+    starScale: { median: 100, p25: 50, p75: 200 },
     anchorPool: [],
     repoCount: 0,
+    descriptionAffinity: new Map(),
+    freshnessPreference: 365,
+    engagement: {
+      clickedTopicAffinity: new Map(),
+      clickedOwnerAffinity: new Map(),
+      clickedRepoIds: new Set(),
+      clickCount: 0,
+    },
     ...overrides,
   }
 }
