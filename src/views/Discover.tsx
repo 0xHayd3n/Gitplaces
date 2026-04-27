@@ -443,7 +443,10 @@ export default function Discover() {
   useEffect(() => {
     if (!hasMounted.current) {
       hasMounted.current = true
-      if (restoredFromSnapshot.current) return
+      // Only skip the initial fetch if the snapshot actually has repos to render.
+      // A snapshot with empty `repos` means the user navigated away mid-load —
+      // skipping here leaves the grid permanently empty.
+      if (restoredFromSnapshot.current && (restoredSnapshot.current?.repos?.length ?? 0) > 0) return
     }
     recommendedCache.current = null
     recommendedItemsCache.current = null
