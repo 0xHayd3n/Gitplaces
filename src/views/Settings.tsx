@@ -103,6 +103,57 @@ export default function Settings() {
   const [loginPhase, setLoginPhase] = useState<LoginPhase>('idle')
   const [loginLines, setLoginLines] = useState<string[]>([])
 
+  // Skills Backup sync state
+  const [syncStatus, setSyncStatus] = useState<{
+    enabled: boolean
+    repoOwner: string | undefined
+    failedCount: number
+    lastSynced: number | null
+  } | null>(null)
+  const [syncConnecting, setSyncConnecting] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [syncConfirmOpen, setSyncConfirmOpen] = useState(false)
+
+  useEffect(() => {
+    window.api.skillSync.getStatus().then(setSyncStatus)
+  }, [])
+
+  useEffect(() => {
+    const onFailed = (_payload: { owner?: string; filename?: string; summary?: boolean; failCount?: number }) => {
+      window.api.skillSync.getStatus().then(setSyncStatus)
+    }
+    window.api.skillSync.onSyncFailed(onFailed)
+    return () => window.api.skillSync.offSyncFailed(onFailed)
+  }, [])
+
+  const handleSyncConnectClick = useCallback(() => {
+    setSyncConfirmOpen(true)
+  }, [])
+
+  const handleSyncConfirm = useCallback(async () => {
+    setSyncConfirmOpen(false)
+    setSyncConnecting(true)
+    setSyncError(null)
+    const result = await window.api.skillSync.setup()
+    setSyncConnecting(false)
+    if (result.ok) {
+      const status = await window.api.skillSync.getStatus()
+      setSyncStatus(status)
+    } else {
+      setSyncError(result.error)
+    }
+  }, [])
+
+  const handleSyncDisconnect = useCallback(async () => {
+    await window.api.skillSync.disconnect()
+    const status = await window.api.skillSync.getStatus()
+    setSyncStatus(status)
+  }, [])
+
+  const handleSyncRetry = useCallback(async () => {
+    await window.api.skillSync.retryFailed()
+  }, [])
+
   // Connectors state
   const auth = useGitHubAuth()
   const githubLogin = useGitHubLogin()
@@ -394,6 +445,21 @@ export default function Settings() {
 
   const renderConnectors = () => (
     <>
+      {syncConfirmOpen && (
+        <div className="coll-modal-overlay" onClick={() => setSyncConfirmOpen(false)}>
+          <div className="coll-modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            <div className="coll-modal-title">Connect Skills Backup</div>
+            <p className="settings-hint" style={{ marginTop: 8, marginBottom: 16 }}>
+              This will create a private repo <strong>gitsuite-skills</strong> on your GitHub account (or connect to an existing one). Your skills will be pushed there automatically after each generation.
+            </p>
+            <div className="coll-modal-actions">
+              <button className="coll-modal-cancel" onClick={() => setSyncConfirmOpen(false)}>Cancel</button>
+              <button className="coll-modal-create" onClick={handleSyncConfirm}>Create &amp; Connect</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="connector-section-header">
         <p className="settings-hint" style={{ margin: 0, fontSize: 12.5, color: 'var(--t2)' }}>
           Allow Git Suite to reference other apps and services for more context.
@@ -459,6 +525,53 @@ export default function Settings() {
               <p className="settings-hint error" style={{ margin: 0 }}>{githubError}</p>
             </div>
           )}
+
+          {/* Skills Backup */}
+          <div className="connector-row">
+            <div className="connector-icon connector-icon--skills-backup">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="16 16 12 12 8 16" />
+                <line x1="12" y1="12" x2="12" y2="21" />
+                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+              </svg>
+            </div>
+            <div className="connector-info">
+              <div className="connector-name">Skills Backup</div>
+              <div className="connector-desc">
+                {syncStatus?.enabled
+                  ? syncStatus.failedCount > 0
+                    ? `${syncStatus.failedCount} skill${syncStatus.failedCount > 1 ? 's' : ''} failed to sync`
+                    : syncStatus.lastSynced
+                      ? `Last synced ${new Date(syncStatus.lastSynced).toLocaleString()}`
+                      : 'Connected — waiting for first skill'
+                  : 'Back up your skills to GitHub'}
+              </div>
+            </div>
+            <div className="connector-actions">
+              {syncStatus?.enabled ? (
+                syncStatus.failedCount > 0 ? (
+                  <>
+                    <button className="settings-btn" onClick={handleSyncRetry}>Retry</button>
+                    <button className="settings-btn settings-btn--link connector-disconnect-btn" onClick={handleSyncDisconnect}>Disconnect</button>
+                  </>
+                ) : (
+                  <button className="settings-btn settings-btn--link connector-disconnect-btn" onClick={handleSyncDisconnect}>Disconnect</button>
+                )
+              ) : syncConnecting ? (
+                <span className="connector-status-text">Connecting…</span>
+              ) : (
+                <button
+                  className="settings-btn"
+                  onClick={handleSyncConnectClick}
+                  disabled={!githubUsername}
+                  title={!githubUsername ? 'Log in to GitHub first' : undefined}
+                >
+                  Connect
+                </button>
+              )}
+              {syncError && <div className="connector-error">{syncError}</div>}
+            </div>
+          </div>
 
           {/* Claude */}
           <div className="connector-row">
