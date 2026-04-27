@@ -98,6 +98,21 @@ describe('rankCandidates (orchestrator)', () => {
     expect(ranked.map(r => r.repo.id)).toEqual([1])
   })
 
+  it('falls back to top reranked when every candidate is anchorless (Fix G defensive)', () => {
+    // User repo has no topics / no classification → anchorPool entries can't
+    // produce anchors for any candidate. Result must not be empty.
+    const userRepos = [userRepo({ id: 1, topics: [] })] as any
+    const corpus = computeCorpusStats(userRepos)
+    const profile = buildUserProfile({ userRepos, corpus, engagementEvents: [], clickedReposById: new Map(), now: NOW })
+    const candidates = [
+      ghRepo({ id: 1, topics: ['anything'] }),
+      ghRepo({ id: 2, topics: ['anything-else'] }),
+    ]
+    const ranked = rankCandidates(candidates, profile, corpus, NOW)
+    expect(ranked.length).toBeGreaterThan(0)
+    expect(ranked.every(r => r.anchors.length === 0)).toBe(true)
+  })
+
   it('applies MMR rerank — diverse pick beats near-duplicate', () => {
     const userRepos = [userRepo({ id: 1, topics: ['rust', 'cli'] })] as any
     const corpus = computeCorpusStats(userRepos)

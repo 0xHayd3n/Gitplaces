@@ -161,7 +161,13 @@ export function rankCandidates(
   // why we're surfacing it ("Because you starred …" would be empty). Better to
   // omit than to show a hollow rec. Cold-start path uses a separate code path
   // and is not affected.
-  return reranked.filter((item) => item.anchors.length > 0)
+  const anchored = reranked.filter((item) => item.anchors.length > 0)
+
+  // Empty-list fallback: if the user's anchorPool produces no anchors for any
+  // candidate (e.g. anchorPool entries lack topics/bucket/lang signal), fall
+  // back to the top reranked items so the UI is never blank. The card will
+  // render with primaryAnchor=null in that branch.
+  return anchored.length > 0 ? anchored : reranked.slice(0, 10)
 }
 
 export function findAnchors(
