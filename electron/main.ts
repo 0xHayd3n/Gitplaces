@@ -6,7 +6,7 @@ import os from 'os'
 import Store from 'electron-store'
 import type Database from 'better-sqlite3'
 import { getDb, closeDb } from './db'
-import { getToken, setToken, clearToken, setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner, setSyncRepoOwner } from './store'
+import { getToken, setToken, clearToken, setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner } from './store'
 import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree } from './github'
 import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
 import { scanFromSources } from './mcp-scanner'
@@ -1323,7 +1323,11 @@ ipcMain.handle('skillSync:getStatus', async () => {
     (db.prepare("SELECT COUNT(*) as n FROM skills WHERE sync_status = 'failed'").get() as { n: number }).n +
     (db.prepare("SELECT COUNT(*) as n FROM sub_skills WHERE sync_status = 'failed'").get() as { n: number }).n
   const lastSynced = (db.prepare(
-    "SELECT MAX(synced_at) as t FROM skills WHERE synced_at IS NOT NULL"
+    `SELECT MAX(t) as t FROM (
+       SELECT MAX(synced_at) as t FROM skills WHERE synced_at IS NOT NULL
+       UNION ALL
+       SELECT MAX(synced_at) as t FROM sub_skills WHERE synced_at IS NOT NULL
+     )`
   ).get() as { t: number | null }).t
   return {
     enabled: getSyncEnabled(),
