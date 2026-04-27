@@ -30,6 +30,9 @@ const MAX_ANCHORS = 3
 // `findAnchors` is called per candidate with a generous pool size so the
 // diversification pass has alternatives to pick from. The pool is sliced down
 // to MAX_ANCHORS after diversification.
+//
+// INVARIANT: ANCHOR_DIVERSIFY_POOL > MAX_ANCHORS — if these are equal the
+// diversification pass has no room to substitute and silently becomes a no-op.
 const ANCHOR_DIVERSIFY_POOL = 10
 // Each prior use of an anchor in the result set divides its effective
 // similarity by (1 + ANCHOR_USAGE_PENALTY × usage_count). 0.3 is gentle: a

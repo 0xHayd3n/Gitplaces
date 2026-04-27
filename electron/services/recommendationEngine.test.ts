@@ -147,9 +147,11 @@ describe('anchor diversification', () => {
       ghRepo({ id: i + 1, owner: `c${i}`, name: `cand-${i}`, topics: ['ai'] }),
     )
     const ranked = rankCandidates(candidates, profile, corpus, NOW)
-    const distinctPrimary = new Set(ranked.map(r => r.primaryAnchor && `${r.primaryAnchor.owner}/${r.primaryAnchor.name}`))
-    // Without Fix I this would be 1 (same anchor for every card).
-    expect(distinctPrimary.size).toBeGreaterThan(1)
+    const primaryNames = ranked
+      .map(r => r.primaryAnchor && `${r.primaryAnchor.owner}/${r.primaryAnchor.name}`)
+      .filter((x): x is string => x !== null)
+    expect(primaryNames.length).toBe(ranked.length)              // every card has a primary anchor
+    expect(new Set(primaryNames).size).toBeGreaterThan(1)        // primary anchors are not all identical
   })
 })
 
