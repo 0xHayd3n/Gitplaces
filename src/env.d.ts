@@ -86,7 +86,7 @@ declare global {
         starRepo:         (owner: string, name: string) => Promise<void>
         unstarRepo:       (owner: string, name: string) => Promise<void>
         isStarred:        (owner: string, name: string) => Promise<boolean>
-        getRecommended:   () => Promise<RecommendationResponse>
+        getRecommended:   (page?: number, excludeIds?: string[]) => Promise<RecommendationResponse>
         getBranch:        (owner: string, name: string, branch: string) => Promise<{ rootTreeSha: string }>
         getTree:          (owner: string, name: string, treeSha: string) => Promise<Array<{ path: string; mode: string; type: 'blob' | 'tree'; sha: string; size?: number }>>
         getBlob:          (owner: string, name: string, blobSha: string) => Promise<{ content: string; rawBase64: string; size: number }>
@@ -265,6 +265,24 @@ declare global {
       }
       engagement: {
         logClick: (repoId: string, source: string) => Promise<void>
+      }
+      skillSync: {
+        setup(): Promise<{ ok: true; repoUrl: string } | { ok: false; error: string }>
+        disconnect(): Promise<{ ok: true }>
+        retryFailed(): Promise<{ ok: true }>
+        getStatus(): Promise<{
+          enabled: boolean
+          repoOwner: string | undefined
+          failedCount: number
+          lastSynced: number | null
+        }>
+        onSyncFailed(cb: (payload: {
+          owner?: string
+          filename?: string
+          summary?: boolean
+          failCount?: number
+        }) => void): void
+        offSyncFailed(cb: (...args: unknown[]) => void): void
       }
     }
   }
