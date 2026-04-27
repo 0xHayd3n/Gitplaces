@@ -50,3 +50,23 @@ export function getApiKey(): string | undefined {
 export function setApiKey(key: string): void {
   apiStore.set('anthropic.apiKey', key)
 }
+
+interface SkillSyncStoreSchema {
+  'skillSync.enabled': boolean
+  'skillSync.repoOwner': string
+}
+
+const skillSyncStore = new Store<SkillSyncStoreSchema>()
+
+export function getSyncEnabled(): boolean {
+  return skillSyncStore.get('skillSync.enabled', false)
+}
+export function setSyncEnabled(v: boolean): void {
+  skillSyncStore.set('skillSync.enabled', v)
+}
+export function getSyncRepoOwner(): string | undefined {
+  return skillSyncStore.get('skillSync.repoOwner') as string | undefined
+}
+export function setSyncRepoOwner(v: string): void {
+  skillSyncStore.set('skillSync.repoOwner', v)
+}
