@@ -18,8 +18,8 @@ export default function ArchivePanel({ archivedSet, allEntries }: Props) {
           <div className="projects-panel-empty">No archived repos</div>
         ) : (
           archiveKeys.map(key => {
-            const [owner, ...rest] = key.split('/')
-            const name = rest.join('/')
+            const slashIdx = key.indexOf('/')
+            const name = slashIdx === -1 ? key : key.slice(slashIdx + 1)
             const entry = allEntries.find(e => `${e.row.owner}/${e.row.name}` === key)
 
             if (!entry) {
