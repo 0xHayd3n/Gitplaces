@@ -212,3 +212,23 @@
 .library-panel.collapsed {
   display: none;
 }
+
+/* ── Local project avatar ────────────────────────────── */
+
+.library-sidebar-local-avatar {
+  background: rgba(167, 139, 250, 0.12);
+  color: #a78bfa;
+}
+
+/* ── Type indicator icon (right end of row) ──────────── */
+
+.library-sidebar-type-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.45;
+}
+
+.library-sidebar-type-icon.local {
+  opacity: 0.55;
+}
