@@ -537,14 +537,8 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   const [starWorking, setStarWorking] = useState(false)
 
   // Archive state
-  const { archivedSet, loading: archiveLoading, toggle: archiveToggle } = useArchivedRepos()
-  const [archived, setArchived] = useState(false)
-
-  useEffect(() => {
-    if (!archiveLoading && owner && name) {
-      setArchived(archivedSet.has(`${owner}/${name}`))
-    }
-  }, [archiveLoading, archivedSet, owner, name])
+  const { archivedSet, toggle: archiveToggle } = useArchivedRepos()
+  const archived = owner && name ? archivedSet.has(`${owner}/${name}`) : false
 
   // ── Publish active tab + callbacks to NavBar via context ──
   useEffect(() => {
@@ -845,11 +839,10 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     window.api.openExternal(`https://github.com/${owner}/${name}/fork`)
   }
 
-  const handleArchive = useCallback(() => {
+  const handleArchive = () => {
     if (!owner || !name) return
     archiveToggle(owner, name)
-    setArchived(prev => !prev)
-  }, [owner, name, archiveToggle])
+  }
 
   const handleStar = async () => {
     if (starWorking || !owner || !name) return
