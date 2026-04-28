@@ -6,9 +6,6 @@ import type { LocalProject } from '../../types/library'
 import RepoCard from '../RepoCard'
 import { useArchivedRepos } from '../../hooks/useArchivedRepos'
 import { recordRecentVisit } from '../../lib/recentVisits'
-import ProjectsSideRail, { type SideRailTab } from './ProjectsSideRail'
-import RecentPanel from './RecentPanel'
-import ArchivePanel from './ArchivePanel'
 
 
 // ── GitHub API repo → RepoRow ─────────────────────────────────────
@@ -149,8 +146,7 @@ export default function TemplateGallery() {
   const [search, setSearch] = useState('')
   const [cols, setCols] = useState(DEFAULT_COLS)
   const [colsOpen, setColsOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<SideRailTab>('recent')
-  const { archivedSet, loading: archiveLoading } = useArchivedRepos()
+  const { archivedSet } = useArchivedRepos()
 
   useEffect(() => {
     window.api.create.getTemplates().then(setTemplates).catch(() => {})
@@ -219,11 +215,6 @@ export default function TemplateGallery() {
 
   return (
     <div className="projects-shell">
-      <ProjectsSideRail activeTab={activeTab} onTabChange={setActiveTab} />
-      {activeTab === 'recent'
-        ? <RecentPanel />
-        : <ArchivePanel archivedSet={archivedSet} allEntries={allEntries} />
-      }
       <div className="projects-gallery">
       <div className="discover-drag-strip" aria-hidden="true" />
       {/* Hero */}
@@ -284,7 +275,7 @@ export default function TemplateGallery() {
           </div>
         </div>
 
-        {loading || archiveLoading ? (
+        {loading ? (
           <div className="discover-grid" data-cols={cols} style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
             {Array.from({ length: cols * 2 }).map((_, i) => (
               <div key={i} className="repo-card-skeleton">
