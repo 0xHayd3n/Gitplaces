@@ -1080,6 +1080,36 @@ function TheatreEmbed({ videoId }: { videoId: string }) {
   )
 }
 
+// ── Memoised wrapper around ReactMarkdown ─────────────────────────────
+// react-markdown v10 has no internal memoisation — every render re-parses
+// the source and re-runs the entire rehype plugin pipeline. Hover-driven
+// state changes in the parent (hoverLink, hoverGhRepo, linkPreviewTick)
+// were therefore triggering a full re-parse on every mouse movement.
+// React.memo with shallow prop comparison short-circuits when none of the
+// stable, memoised inputs have changed.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface MemoizedMarkdownProps {
+  content: string
+  components: Record<string, any>
+  remarkPlugins: any[]
+  rehypePlugins: any[]
+  urlTransform: (url: string) => string
+}
+const MemoizedMarkdown = memo(function MemoizedMarkdown({
+  content, components, remarkPlugins, rehypePlugins, urlTransform,
+}: MemoizedMarkdownProps) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={rehypePlugins}
+      urlTransform={urlTransform}
+      components={components}
+    >
+      {content}
+    </ReactMarkdown>
+  )
+})
+
 interface Props {
   content: string
   repoOwner: string
@@ -1456,6 +1486,39 @@ function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePat
     }
     return ''
   }
+
+  // Stable plugin arrays + urlTransform so the memoised <ReactMarkdown> wrapper
+  // can short-circuit re-renders when only hover/preview state changes.
+  // remarkPlugins never depends on props; rehypePlugins changes only when the
+  // repo identity changes (rehypeBlobLinks closes over owner/name/basePath).
+  // ttsOutput.current is a stable ref → safe to omit from rehypePlugins deps.
+  const remarkPlugins = useMemo(
+    () => [remarkGfm, [remarkEmoji, { accessible: false }]],
+    [],
+  )
+  const rehypePlugins = useMemo(
+    () => [
+      rehypeRaw,
+      [rehypeSanitize, sanitizeSchema],
+      rehypeFixCenterDivs,
+      rehypeRemoveTocSection,
+      rehypeRemoveLocaleSwitcher,
+      rehypeExtractMentions,
+      rehypeImageClassifier,
+      rehypeAddHeadingIds,
+      rehypeYouTubeLinks,
+      rehypeGitHubRepoLinks,
+      rehypeBlobLinks(repoOwner, repoName, basePath),
+      rehypeFootnoteLinks,
+      rehypeImageOnlyLinks,
+      [rehypeTtsAnnotate, { output: ttsOutput.current }],
+    ],
+    [repoOwner, repoName, basePath],
+  )
+  const urlTransform = useCallback(
+    (url: string) => url.startsWith('badge://') ? url : defaultUrlTransform(url),
+    [],
+  )
 
   // Memoised components map — only recreated when fnHistory changes (footnote highlights).
   // Prevents ReactMarkdown from re-rendering on every scroll-driven activeId update
@@ -1886,20 +1949,21 @@ function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePat
   // navigate, setHoverGhRepo, setHoverGhRepoRect: stable references (React Router / useState setters) — intentionally excluded
   // tts.play/pause/etc are stable useCallback references; ttsReady changes once (voices loaded)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [fnHistory, activeVideo, hoverVideo, ttsReady, invertDarkImages]) // only re-create when footnote, YouTube, or TTS-ready state changes
+  // hoverVideo was a phantom dep — only setHoverVideo is called inside, never read.
+  // Removing it lets MemoizedMarkdown skip re-renders when YouTube hover state flips.
+  }), [fnHistory, activeVideo, ttsReady, invertDarkImages]) // only re-create when footnote, YouTube, or TTS-ready state changes
 
   return (
     <div className={`readme-body${tts.status !== 'idle' ? ' tts-playing' : ''}`} ref={setContainerRef}>
       <div className="rm-body-row">
       <div className="rm-content">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm, [remarkEmoji, { accessible: false }]]}
-          rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], rehypeFixCenterDivs, rehypeRemoveTocSection, rehypeRemoveLocaleSwitcher, rehypeExtractMentions, rehypeImageClassifier, rehypeAddHeadingIds, rehypeYouTubeLinks, rehypeGitHubRepoLinks, rehypeBlobLinks(repoOwner, repoName, basePath), rehypeFootnoteLinks, rehypeImageOnlyLinks, [rehypeTtsAnnotate, { output: ttsOutput.current }]]}
-          urlTransform={(url) => url.startsWith('badge://') ? url : defaultUrlTransform(url)}
+        <MemoizedMarkdown
+          content={rewrittenContent}
           components={mdComponents}
-        >
-          {rewrittenContent}
-        </ReactMarkdown>
+          remarkPlugins={remarkPlugins}
+          rehypePlugins={rehypePlugins}
+          urlTransform={urlTransform}
+        />
       </div>
       </div> {/* end .rm-body-row */}
 
