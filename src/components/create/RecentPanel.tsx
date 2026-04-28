@@ -7,7 +7,7 @@ export default function RecentPanel() {
 
   return (
     <div className="projects-panel">
-      <div className="projects-panel-header">Recent</div>
+      <div className="projects-panel-header">RECENT</div>
       <div className="projects-panel-list">
         {entries.length === 0 ? (
           <div className="projects-panel-empty">No recent repos</div>

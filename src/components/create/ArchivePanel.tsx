@@ -12,7 +12,7 @@ export default function ArchivePanel({ archivedSet, allEntries }: Props) {
 
   return (
     <div className="projects-panel">
-      <div className="projects-panel-header">Archive</div>
+      <div className="projects-panel-header">ARCHIVE</div>
       <div className="projects-panel-list">
         {archiveKeys.length === 0 ? (
           <div className="projects-panel-empty">No archived repos</div>
