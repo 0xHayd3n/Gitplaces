@@ -195,13 +195,21 @@ export function initSchema(db: Database.Database): void {
   try { db.exec(`ALTER TABLE sub_skills ADD COLUMN synced_at INTEGER`) } catch {}
   try { db.exec(`ALTER TABLE sub_skills ADD COLUMN sync_status TEXT`) } catch {}
 
+  // Phase 23 migration — update notifications
+  try { db.exec(`ALTER TABLE repos ADD COLUMN is_forked         INTEGER DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE repos ADD COLUMN update_available  INTEGER DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE repos ADD COLUMN update_checked_at INTEGER DEFAULT NULL`) } catch {}
+  try { db.exec(`ALTER TABLE repos ADD COLUMN upstream_version  TEXT    DEFAULT NULL`) } catch {}
+  try { db.exec(`ALTER TABLE repos ADD COLUMN stored_version    TEXT    DEFAULT NULL`) } catch {}
+
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`
-    CREATE INDEX IF NOT EXISTS repos_starred_at   ON repos(starred_at);
-    CREATE INDEX IF NOT EXISTS repos_unstarred_at ON repos(unstarred_at);
-    CREATE INDEX IF NOT EXISTS repos_type_bucket  ON repos(type_bucket);
-    CREATE INDEX IF NOT EXISTS idx_engagement_ts   ON engagement_events(ts DESC);
-    CREATE INDEX IF NOT EXISTS idx_engagement_repo ON engagement_events(repo_id);
+    CREATE INDEX IF NOT EXISTS repos_starred_at      ON repos(starred_at);
+    CREATE INDEX IF NOT EXISTS repos_unstarred_at    ON repos(unstarred_at);
+    CREATE INDEX IF NOT EXISTS repos_type_bucket     ON repos(type_bucket);
+    CREATE INDEX IF NOT EXISTS idx_engagement_ts     ON engagement_events(ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_engagement_repo   ON engagement_events(repo_id);
+    CREATE INDEX IF NOT EXISTS repos_update_available ON repos(update_available);
   `)
 }
 

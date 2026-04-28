@@ -40,6 +40,12 @@ export interface RepoRow {
   // Phase 16 — nested repo type system
   type_bucket: string | null  // e.g. "dev-tools"
   type_sub:    string | null  // e.g. "algorithm"
+  // Phase 23 — update notifications
+  is_forked:         number | null   // 1 if user has a GitHub fork of this repo
+  update_available:  number | null   // 1 if an update has been detected
+  update_checked_at: number | null   // Unix timestamp of last check
+  upstream_version:  string | null   // latest release tag or pushed_at
+  stored_version:    string | null   // version at last save or update
 }
 
 export interface ReleaseAsset {
