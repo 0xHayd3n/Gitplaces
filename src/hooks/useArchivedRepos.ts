@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 const SETTINGS_KEY = 'archived_repos'
 
 export function useArchivedRepos() {
   const [archivedSet, setArchivedSet] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
+  const archivedSetRef = useRef<Set<string>>(archivedSet)
+  archivedSetRef.current = archivedSet
 
   useEffect(() => {
     window.api.settings.get(SETTINGS_KEY)
@@ -22,16 +24,14 @@ export function useArchivedRepos() {
 
   const toggle = useCallback((owner: string, name: string) => {
     const key = `${owner}/${name}`
-    setArchivedSet(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) {
-        next.delete(key)
-      } else {
-        next.add(key)
-      }
-      window.api.settings.set(SETTINGS_KEY, JSON.stringify([...next])).catch(() => {})
-      return next
-    })
+    const next = new Set(archivedSetRef.current)
+    if (next.has(key)) {
+      next.delete(key)
+    } else {
+      next.add(key)
+    }
+    setArchivedSet(next)
+    window.api.settings.set(SETTINGS_KEY, JSON.stringify([...next])).catch(() => {})
   }, [])
 
   return { archivedSet, loading, toggle }
