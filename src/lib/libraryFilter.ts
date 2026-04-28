@@ -25,7 +25,7 @@ export function filterLibraryEntries(
 
   switch (segment) {
     case 'all':
-      return entries
+      return entries.slice()
 
     case 'active':
       return entries.filter(e => {
@@ -46,6 +46,8 @@ export function filterLibraryEntries(
       })
 
     case 'recent': {
+      // recentVisits is assumed newest-first (as returned by getRecentVisits())
+      // entries are ordered by their position in that array, not by visitedAt
       const recentMap = new Map<string, number>()
       recentVisits.forEach((r, i) => recentMap.set(`${r.owner}/${r.name}`, i))
       const matched = entries.filter(e => recentMap.has(entryKey(e)))

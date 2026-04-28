@@ -1,7 +1,7 @@
 // src/lib/libraryFilter.test.ts
 import { describe, it, expect } from 'vitest'
 import { filterLibraryEntries } from './libraryFilter'
-import type { LibraryEntry, LocalProject } from '../types/library'
+import type { LibraryEntry } from '../types/library'
 import type { RepoRow } from '../types/repo'
 import type { LibraryRow } from '../types/repo'
 
