@@ -30,8 +30,7 @@ export function filterLibraryEntries(
     case 'active':
       return entries.filter(e => {
         if (e.kind !== 'repo') return false
-        const row = e.row as LibraryRow
-        return e.isInstalled && row.active === 1
+        return e.isInstalled && 'active' in e.row && (e.row as LibraryRow).active === 1
       })
 
     case 'unstarred': {

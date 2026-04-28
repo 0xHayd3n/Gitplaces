@@ -1,5 +1,5 @@
 // src/components/LibrarySidebar.tsx
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Layers, Brain, User, History, Archive } from 'lucide-react'
 import './LibrarySidebar.css'
 import type { LibraryRow, StarredRepoRow, RepoRow } from '../types/repo'
@@ -19,6 +19,7 @@ interface Props {
   recentVisits: RecentEntry[]
   githubUsername: string | null
   selectedId: string | null
+  selectedLocalPath: string | null
   activeSegment: ActiveSegment
   onSegmentChange: (s: ActiveSegment) => void
   onSelect: (row: RepoRow, isInstalled: boolean) => void
@@ -89,12 +90,11 @@ const SEGMENTS: { id: ActiveSegment; icon: React.ReactNode; label: string }[] = 
 export default function LibrarySidebar({
   installedRows, starredRows, unstarredRows, localProjects,
   archivedSet, recentVisits, githubUsername,
-  selectedId, activeSegment, onSegmentChange, onSelect, onSelectLocal,
+  selectedId, selectedLocalPath, activeSegment, onSegmentChange, onSelect, onSelectLocal,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
 
-  // Build unified entry list
-  const allEntries: LibraryEntry[] = (() => {
+  const allEntries = useMemo<LibraryEntry[]>(() => {
     const map = new Map<string, LibraryEntry>()
     for (const row of installedRows) {
       map.set(row.id, { kind: 'repo', row, isInstalled: true, isStarred: row.starred_at != null })
@@ -105,18 +105,15 @@ export default function LibrarySidebar({
       }
     }
     for (const project of localProjects) {
-      const key = `local:${project.path}`
-      map.set(key, { kind: 'local', project })
+      map.set(`local:${project.path}`, { kind: 'local', project })
     }
     return Array.from(map.values())
-  })()
+  }, [installedRows, starredRows, localProjects])
 
-  const visible = filterLibraryEntries(allEntries, activeSegment, {
-    archivedSet,
-    recentVisits,
-    githubUsername,
-    unstarredRows,
-  })
+  const visible = useMemo(
+    () => filterLibraryEntries(allEntries, activeSegment, { archivedSet, recentVisits, githubUsername, unstarredRows }),
+    [allEntries, activeSegment, archivedSet, recentVisits, githubUsername, unstarredRows],
+  )
 
   const handleRepoContextMenu = (e: React.MouseEvent, entry: LibraryEntry & { kind: 'repo' }) => {
     e.preventDefault()
@@ -174,11 +171,10 @@ export default function LibrarySidebar({
 
           // kind === 'local'
           const { project } = entry
-          const localKey = `local:${project.path}`
           return (
             <button
-              key={localKey}
-              className={`library-sidebar-item installed${selectedId === localKey ? ' selected' : ''}`}
+              key={`local:${project.path}`}
+              className={`library-sidebar-item installed${selectedLocalPath === project.path ? ' selected' : ''}`}
               onClick={() => onSelectLocal(project)}
               title={project.path}
             >
