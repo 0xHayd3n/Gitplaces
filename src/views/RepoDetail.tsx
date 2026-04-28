@@ -1907,7 +1907,7 @@ function RepoArticleActionRow({
       </button>
 
       <button
-        className={`article-action-btn${archived ? ' article-action-btn--archived' : ''}`}
+        className="article-action-btn"
         onClick={onArchive}
         title={archived ? 'Remove from archive' : 'Archive repo'}
       >
