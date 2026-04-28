@@ -711,9 +711,14 @@ export default function Discover() {
       let newResults: RepoRow[]
       if (searchPath === 'trending') {
         if (viewMode === 'recommended' && selectedSubtypes.length === 0) {
-          // The new recommendation handler returns a single ranked set; no pagination.
-          setHasMore(false)
-          return
+          // Paginate the recommendation engine: fetch the next GitHub search page
+          // for each query plan, exclude already-shown ids server-side, re-rank.
+          const excludeIds = repos.map(r => String(r.id))
+          const response = await window.api.github.getRecommended(nextPage, excludeIds)
+          newResults = response.items.map(item => item.repo)
+          if (recommendedItemsCache.current) {
+            recommendedItemsCache.current = [...recommendedItemsCache.current, ...response.items]
+          }
         } else {
           const subKw = selectedSubtypes.length === 1
             ? getSubTypeKeyword(selectedSubtypes[0])
@@ -752,6 +757,10 @@ export default function Discover() {
         setHasMore(false)
       } else if (searchPath === 'tagged') {
         setHasMore(newResults.length > 0)
+      } else if (viewMode === 'recommended' && selectedSubtypes.length === 0) {
+        // Recommended pages can be small after anchor + niche filtering; stop only
+        // when the engine returns nothing new.
+        setHasMore(newResults.length > 0)
       } else {
         setHasMore(newResults.length >= PER_PAGE / 2)
       }
@@ -776,7 +785,7 @@ export default function Discover() {
       window.api.engagement.logClick(repo.id, snap?.viewMode === 'recommended' ? 'recommended' : 'discover')
         .catch(() => { /* non-critical */ })
     }
-    navigate(path, { state: { fromDiscoverView: snap?.viewMode, fromDiscoverPath: location.pathname + location.search, repoAvatarUrl: repo?.avatar_url ?? null } })
+    navigate(path, { state: { fromDiscoverView: snap?.viewMode, fromDiscoverPath: location.pathname + location.search, repoAvatarUrl: repo?.avatar_url ?? null, background: location } })
   }, [navigate, location.pathname, location.search])
 
   // Stable callback — reads activeTags via liveSnapshotRef to avoid capturing it in deps
