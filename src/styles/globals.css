@@ -7954,7 +7954,7 @@ a {
 .repo-overlay {
   position: fixed;
   inset: 0;
-  z-index: 150;
+  z-index: 300;
   background: var(--bg);
   overflow-y: auto;
   animation: repo-overlay-fadein 200ms ease-out forwards;
@@ -7969,7 +7969,7 @@ a {
   position: fixed;
   top: 14px;
   right: 18px;
-  z-index: 151;
+  z-index: 301;
 }
 
 .profile-identity-row {
