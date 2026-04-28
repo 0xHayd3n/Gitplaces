@@ -29,6 +29,8 @@ Five new columns on the `repos` table:
 | `upstream_version` | `TEXT` | `NULL` | Latest release tag (e.g. `v2.1.0`) or latest commit SHA |
 | `stored_version` | `TEXT` | `NULL` | Version/SHA at last save or update |
 
+`stored_version` is written at repo-save time: use the latest release `tag_name` if one exists, otherwise the repo's current `pushed_at` value. This becomes the baseline the poller compares against.
+
 `RepoRow` in `src/types/repo.ts` gains all five fields. `LibraryRow` extends `RepoRow` and picks them up automatically.
 
 ### Settings Keys
@@ -69,9 +71,10 @@ If newer: set `update_available = 1`, write `upstream_version`, update `update_c
 - Writes `is_forked` to the repo row
 
 **Auto-update behaviour** — after `checkRepo` detects an update and `autoUpdateEnabled` is `"true"`:
-- Forked repo → call `applyForkSync(repo)` immediately
-- Learned repo → call `applySkillRegen(repo)` immediately
-- Both emit a toast notification via IPC: `"Auto-updated: {owner}/{name}"`
+- If repo is forked → call `applyForkSync(repo)`
+- If repo is learned → call `applySkillRegen(repo)`
+- If repo is both forked and learned → call **both** `applyForkSync` and `applySkillRegen` independently (not mutually exclusive)
+- Each successful apply emits a toast: `"Auto-updated: {owner}/{name}"`
 
 ---
 
@@ -83,10 +86,11 @@ If newer: set `update_available = 1`, write `upstream_version`, update `update_c
 
 | Channel | Payload | Response | Purpose |
 |---|---|---|---|
-| `update:get-changes` | `{ id: number }` | `UpdateChanges` | Fetch diff/release notes before user confirms |
+| `update:get-changes` | `{ id: number }` | `UpdateChanges` | Fetch diff/release notes before user confirms. For forked repos, uses `GET /repos/{owner}/{name}/compare/{storedVersion}...{upstreamVersion}` to list commits between the last synced SHA and upstream HEAD. For learned repos, uses the releases API or recent commits on the default branch. |
 | `update:apply-fork-sync` | `{ id: number }` | `{ ok: boolean, error?: string }` | Execute merge-upstream, clear `update_available` |
 | `update:apply-skill-regen` | `{ id: number }` | `{ ok: boolean, error?: string }` | Trigger skill regeneration pipeline |
 | `update:check-now` | — | — | Trigger immediate `checkAll()` outside normal interval |
+| `update:last-checked` | — | `{ timestamp: number \| null }` | Returns `MAX(update_checked_at)` from repos table for the Settings "Last checked" display |
 
 **`UpdateChanges` type:**
 ```ts
@@ -158,7 +162,7 @@ New section added to `Settings.tsx` after the existing "Connectors" section.
 |---|---|---|---|
 | Auto-update | Toggle | Off | When enabled, shows inline warning: *"Auto-update for learned repos consumes Claude API credits automatically."* Stores `autoUpdateEnabled` |
 | Check interval | Number input | 24 | Hours between polls (min 1, max 168). Changing it stops and restarts the service with the new interval. Stores `updateCheckIntervalHours` |
-| Last checked | Read-only text | — | Derived from the most recent `update_checked_at` across all repos: *"Last checked: X minutes ago"* |
+| Last checked | Read-only text | — | Derived from the most recent `update_checked_at` across all repos. The Settings view fetches this via a dedicated IPC call (`update:last-checked`) which queries `SELECT MAX(update_checked_at) FROM repos`. |
 | Check now | Button | — | Triggers `update:check-now` IPC, shows brief spinner |
 
 Auto-update is global — there is no per-repo override. Users who want selective control leave it off (default) and act on individual blue indicators.
