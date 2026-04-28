@@ -7950,6 +7950,28 @@ a {
 }
 .btn-close-overlay:hover { background: var(--bg3); color: var(--t1); }
 
+/* ── Repo overlay ──────────────────────────────────────────── */
+.repo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: var(--bg);
+  overflow-y: auto;
+  animation: repo-overlay-fadein 200ms ease-out forwards;
+}
+
+@keyframes repo-overlay-fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.repo-overlay-close {
+  position: fixed;
+  top: 14px;
+  right: 18px;
+  z-index: 151;
+}
+
 .profile-identity-row {
   display: flex;
   align-items: center;
