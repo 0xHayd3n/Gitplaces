@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import type { CreateTemplate } from '../../types/create'
 import type { RepoRow } from '../../types/repo'
 import RepoCard from '../RepoCard'
+import { useArchivedRepos } from '../../hooks/useArchivedRepos'
+import { recordRecentVisit } from '../../lib/recentVisits'
+import ProjectsSideRail, { type SideRailTab } from './ProjectsSideRail'
+import RecentPanel from './RecentPanel'
+import ArchivePanel from './ArchivePanel'
+import './ProjectsSideRail.css'
 
 // ── GitHub API repo → RepoRow ─────────────────────────────────────
 
@@ -131,7 +137,15 @@ const TYPE_LABELS: Record<string, string> = {
 
 // ── Component ─────────────────────────────────────────────────────
 
-const DEFAULT_COLS = 5
+export interface ProjectEntry {
+  row: RepoRow
+  isLocal: boolean
+  isGitRepo: boolean
+  localPath: string | null
+  hasGithub: boolean
+}
+
+const DEFAULT_COLS = 6
 
 export default function TemplateGallery() {
   const navigate = useNavigate()
@@ -142,6 +156,8 @@ export default function TemplateGallery() {
   const [search, setSearch] = useState('')
   const [cols, setCols] = useState(DEFAULT_COLS)
   const [colsOpen, setColsOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<SideRailTab>('recent')
+  const { archivedSet, loading: archiveLoading } = useArchivedRepos()
 
   useEffect(() => {
     window.api.create.getTemplates().then(setTemplates).catch(() => {})
@@ -196,8 +212,10 @@ export default function TemplateGallery() {
 
   const allEntries = [...localEntries, ...githubOnlyEntries]
 
+  const visibleEntries = allEntries.filter(({ row }) => !archivedSet.has(`${row.owner}/${row.name}`))
+
   const q = search.toLowerCase()
-  const filtered = allEntries.filter(({ row }) =>
+  const filtered = visibleEntries.filter(({ row }) =>
     !q ||
     row.name.toLowerCase().includes(q) ||
     (row.description ?? '').toLowerCase().includes(q) ||
@@ -205,7 +223,13 @@ export default function TemplateGallery() {
   )
 
   return (
-    <div className="projects-gallery">
+    <div className="projects-shell">
+      <ProjectsSideRail activeTab={activeTab} onTabChange={setActiveTab} />
+      {activeTab === 'recent'
+        ? <RecentPanel />
+        : <ArchivePanel archivedSet={archivedSet} allEntries={allEntries} />
+      }
+      <div className="projects-gallery">
       <div className="discover-drag-strip" aria-hidden="true" />
       {/* Hero */}
       <div className="projects-hero">
@@ -253,7 +277,7 @@ export default function TemplateGallery() {
             </button>
             {colsOpen && (
               <div className="projects-cols-popover">
-                {[3, 4, 5, 6, 7].map(n => (
+                {[4, 5, 6, 7, 8].map(n => (
                   <button
                     key={n}
                     className={`projects-cols-opt${cols === n ? ' active' : ''}`}
@@ -265,7 +289,7 @@ export default function TemplateGallery() {
           </div>
         </div>
 
-        {loading ? (
+        {loading || archiveLoading ? (
           <div className="discover-grid" data-cols={cols} style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
             {Array.from({ length: cols * 2 }).map((_, i) => (
               <div key={i} className="repo-card-skeleton">
@@ -290,11 +314,11 @@ export default function TemplateGallery() {
                 <RepoCard
                   repo={row}
                   onNavigate={path => {
-                    if (!hasGithub && localPath) {
-                      navigate(`/local-project?path=${encodeURIComponent(localPath)}&name=${encodeURIComponent(row.name)}&git=${isGitRepo ? '1' : '0'}`)
-                    } else {
-                      navigate(path)
-                    }
+                    const actualPath = !hasGithub && localPath
+                      ? `/local-project?path=${encodeURIComponent(localPath)}&name=${encodeURIComponent(row.name)}&git=${isGitRepo ? '1' : '0'}`
+                      : path
+                    recordRecentVisit({ owner: row.owner, name: row.name, avatar_url: row.avatar_url, navigatePath: actualPath })
+                    navigate(actualPath)
                   }}
                   onTagClick={() => {}}
                 />
@@ -303,6 +327,7 @@ export default function TemplateGallery() {
           </div>
         )}
       </div>
+    </div>
     </div>
   )
 }
