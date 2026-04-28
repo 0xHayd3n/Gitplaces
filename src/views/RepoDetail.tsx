@@ -20,6 +20,7 @@ import NavBar from '../components/NavBar'
 import LanguageIcon from '../components/LanguageIcon'
 import logoTransparent from '../assets/logo-transparent.png'
 import { useSavedRepos } from '../contexts/SavedRepos'
+import { useArchivedRepos } from '../hooks/useArchivedRepos'
 import { parseTopics, formatStars, type RepoRow, type ReleaseRow, type SkillRow, type SubSkillRow } from '../types/repo'
 import { parseSkillDepths } from '../utils/skillParse'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
@@ -535,6 +536,16 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   const [starred, setStarred] = useState(false)
   const [starWorking, setStarWorking] = useState(false)
 
+  // Archive state
+  const { archivedSet, loading: archiveLoading, toggle: archiveToggle } = useArchivedRepos()
+  const [archived, setArchived] = useState(false)
+
+  useEffect(() => {
+    if (!archiveLoading && owner && name) {
+      setArchived(archivedSet.has(`${owner}/${name}`))
+    }
+  }, [archiveLoading, archivedSet, owner, name])
+
   // ── Publish active tab + callbacks to NavBar via context ──
   useEffect(() => {
     repoNav.setActiveTab(activeTab)
@@ -833,6 +844,12 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     if (!owner || !name) return
     window.api.openExternal(`https://github.com/${owner}/${name}/fork`)
   }
+
+  const handleArchive = useCallback(() => {
+    if (!owner || !name) return
+    archiveToggle(owner, name)
+    setArchived(prev => !prev)
+  }, [owner, name, archiveToggle])
 
   const handleStar = async () => {
     if (starWorking || !owner || !name) return
@@ -1281,7 +1298,76 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
           <div style={{ padding: 20, fontSize: 11, color: 'var(--t2)', flex: 1 }}>
             Could not load repo — check your connection.
           </div>
+        ) : repo === null ? (
+          <div className="repo-detail-skeleton">
+            {/* Top section — mirrors .article-layout-top */}
+            <div className="repo-detail-sk-top">
+              <div className="repo-detail-sk-dither" />
+              <div className="repo-detail-sk-top-panel">
+                {/* 204px spacer — mirrors .article-layout-dither-spacer */}
+                <div className="repo-detail-sk-spacer" />
+                {/* Title row — mirrors .article-layout-title-row */}
+                <div className="repo-detail-sk-title-row">
+                  <div className="repo-detail-sk-bar" style={{ width: '46%', height: 26 }} />
+                  <div className="repo-detail-sk-pills">
+                    <div className="repo-detail-sk-pill" style={{ width: 78 }} />
+                    <div className="repo-detail-sk-pill" style={{ width: 96 }} />
+                  </div>
+                </div>
+                {/* Description — mirrors .article-layout-description */}
+                <div className="repo-detail-sk-description">
+                  <div className="repo-detail-sk-bar" style={{ width: '72%' }} />
+                </div>
+                {/* Byline — mirrors .article-layout-byline */}
+                <div className="repo-detail-sk-byline">
+                  <div className="repo-detail-sk-circle" />
+                  <div className="repo-detail-sk-bar" style={{ width: 80 }} />
+                  <div className="repo-detail-sk-bar" style={{ width: 60, opacity: 0.5 }} />
+                </div>
+                {/* Action buttons — mirrors .article-layout-actions */}
+                <div className="repo-detail-sk-actions">
+                  {[56, 64, 50, 50].map((w, i) => (
+                    <div key={i} className="repo-detail-sk-btn" style={{ width: w }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+            {/* Tabs row — mirrors .article-layout-tabs-slot */}
+            <div className="repo-detail-sk-tabs-row">
+              {[68, 52, 62, 48, 66].map((w, i) => (
+                <div key={i} className="repo-detail-sk-tab" style={{ width: w }} />
+              ))}
+            </div>
+            {/* Body — mirrors .article-layout-body--with-toc (3 columns) */}
+            <div className="repo-detail-sk-split">
+              {/* Left: TOC nav — mirrors .article-layout-toc-slot (200px) */}
+              <div className="repo-detail-sk-toc">
+                <div className="repo-detail-sk-bar" style={{ width: '55%', height: 8 }} />
+                {[72, 58, 88, 64, 78, 52].map((pct, i) => (
+                  <div key={i} className="repo-detail-sk-line" style={{ width: `${pct}%` }} />
+                ))}
+              </div>
+              {/* Center: content — mirrors .article-layout-body-content (flex-1) */}
+              <div className="repo-detail-sk-body-main">
+                {[90, 76, 85, 62, 94, 70, 80, 55, 88, 73].map((pct, i) => (
+                  <div key={i} className="repo-detail-sk-line" style={{ width: `${pct}%` }} />
+                ))}
+              </div>
+              {/* Right: stats sidebar — mirrors .article-layout-stats-slot (220px) */}
+              <div className="repo-detail-sk-sidebar-col">
+                <div className="repo-detail-sk-tile">
+                  <div className="repo-detail-sk-bar" style={{ width: 36 }} />
+                  {[0, 1, 2, 3].map(i => <div key={i} className="repo-detail-sk-stat" />)}
+                </div>
+                <div className="repo-detail-sk-tile">
+                  <div className="repo-detail-sk-bar" style={{ width: 60 }} />
+                  {[0, 1, 2, 3].map(i => <div key={i} className="repo-detail-sk-stat" />)}
+                </div>
+              </div>
+            </div>
+          </div>
         ) : (
+          <div className="repo-detail-content-fadein">
           <ArticleLayout
             navBar={inLibrary ? null : <NavBar />}
             byline={bylineNode}
@@ -1699,6 +1785,8 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                 onUnlearn={handleUnlearn}
                 onStar={handleStar}
                 onFork={handleFork}
+                archived={archived}
+                onArchive={handleArchive}
                 translationStatus={activeTab === 'readme' ? {
                   translating,
                   translated: readmeTranslated,
@@ -1723,6 +1811,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
             fullBleedBody={isFullBleedTab}
             collapsedHeader={activeTab === 'files'}
           />
+          </div>
         )}
           </div>
         </div>
@@ -1743,6 +1832,8 @@ type RepoArticleActionRowProps = {
   onUnlearn: () => void
   onStar: () => void
   onFork: () => void
+  archived: boolean
+  onArchive: () => void
   /** Translation status — rendered on the right when on the readme tab and translation is active */
   translationStatus?: {
     translating: boolean
@@ -1757,6 +1848,7 @@ function RepoArticleActionRow({
   learnState, starred, starWorking, starCount,
   cloneOpen, onToggleClone,
   onLearn, onUnlearn, onStar, onFork,
+  archived, onArchive,
   translationStatus,
 }: RepoArticleActionRowProps) {
   const learnBusy = learnState === 'LEARNING'
@@ -1819,6 +1911,17 @@ function RepoArticleActionRow({
       >
         <GitFork size={14} />
         <span>Fork</span>
+      </button>
+
+      <button
+        className={`article-action-btn${archived ? ' article-action-btn--archived' : ''}`}
+        onClick={onArchive}
+        title={archived ? 'Remove from archive' : 'Archive repo'}
+      >
+        <svg viewBox="0 0 24 24" width={14} height={14} fill="currentColor">
+          <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5z"/>
+        </svg>
+        <span>{archived ? 'Unarchive' : 'Archive'}</span>
       </button>
 
       {translationStatus && (translationStatus.translating || translationStatus.translated) && (
