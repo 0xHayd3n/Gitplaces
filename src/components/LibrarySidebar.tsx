@@ -1,25 +1,28 @@
+// src/components/LibrarySidebar.tsx
 import { useState } from 'react'
+import { Layers, Brain, User, History, Archive } from 'lucide-react'
 import './LibrarySidebar.css'
-import { Layers, Brain } from 'lucide-react'
 import type { LibraryRow, StarredRepoRow, RepoRow } from '../types/repo'
+import type { LibraryEntry, LocalProject, ActiveSegment } from '../types/library'
+import type { RecentEntry } from '../lib/recentVisits'
+import { filterLibraryEntries } from '../lib/libraryFilter'
 import RepoContextMenu, { type RepoContextMenuTarget } from './RepoContextMenu'
 
-type ActiveSegment = 'all' | 'active' | 'unstarred'
-
-interface SidebarEntry {
-  row: RepoRow
-  isInstalled: boolean
-  isStarred: boolean
-}
+export type { ActiveSegment }
 
 interface Props {
   installedRows: LibraryRow[]
   starredRows: StarredRepoRow[]
   unstarredRows: StarredRepoRow[]
+  localProjects: LocalProject[]
+  archivedSet: Set<string>
+  recentVisits: RecentEntry[]
+  githubUsername: string | null
   selectedId: string | null
   activeSegment: ActiveSegment
   onSegmentChange: (s: ActiveSegment) => void
   onSelect: (row: RepoRow, isInstalled: boolean) => void
+  onSelectLocal: (project: LocalProject) => void
 }
 
 function DashedStar({ size = 11 }: { size?: number }) {
@@ -41,38 +44,81 @@ function DashedStar({ size = 11 }: { size?: number }) {
   )
 }
 
+function GitHubIcon({ size = 11 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+    </svg>
+  )
+}
+
+function LocalIcon({ size = 11 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ color: '#a78bfa' }}>
+      <path d="M20 6h-2.18c.07-.44.18-.86.18-1a3 3 0 0 0-6 0c0 .14.11.56.18 1H10c-.27 0-2 .12-2 2v10c0 1.5 1.73 2 2 2h10c.27 0 2-.12 2-2V8c0-1.88-1.73-2-2-2zm-6-1a1 1 0 0 1 2 0c0 .14-.06.39-.11.6-.04.13-.07.27-.11.4h-1.56c-.04-.13-.07-.27-.11-.4-.05-.21-.11-.46-.11-.6zm6 13H10V8h2v1h6V8h2v10z" />
+    </svg>
+  )
+}
+
+function FolderIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ color: '#a78bfa' }} aria-hidden="true">
+      <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+    </svg>
+  )
+}
+
+const EMPTY_STATES: Record<ActiveSegment, string> = {
+  all: 'No repos or projects',
+  active: 'No active skills',
+  unstarred: 'Nothing unstarred in the last 30 days',
+  own: 'No repos or projects owned by you',
+  recent: 'Nothing viewed recently',
+  archive: 'Nothing archived',
+}
+
+const SEGMENTS: { id: ActiveSegment; icon: React.ReactNode; label: string }[] = [
+  { id: 'all',       icon: <Layers size={12} />,   label: 'All' },
+  { id: 'active',    icon: <Brain size={12} />,    label: 'Learned' },
+  { id: 'unstarred', icon: <DashedStar size={11} />, label: 'Unstarred' },
+  { id: 'own',       icon: <User size={12} />,     label: 'Own' },
+  { id: 'recent',    icon: <History size={12} />,  label: 'Recent' },
+  { id: 'archive',   icon: <Archive size={12} />,  label: 'Archive' },
+]
+
 export default function LibrarySidebar({
-  installedRows, starredRows, unstarredRows, selectedId, activeSegment, onSegmentChange, onSelect,
+  installedRows, starredRows, unstarredRows, localProjects,
+  archivedSet, recentVisits, githubUsername,
+  selectedId, activeSegment, onSegmentChange, onSelect, onSelectLocal,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
 
-  // Build the entry list for the current segment.
-  // - 'all' / 'active': merge installedRows + starredRows (starred-but-uninstalled), preserving
-  //   starred_at DESC order from the API. Installed rows go first since they have richer data.
-  // - 'unstarred': use unstarredRows directly (already ordered by unstarred_at DESC).
-  const entries: SidebarEntry[] = (() => {
-    if (activeSegment === 'unstarred') {
-      return unstarredRows.map(row => ({ row, isInstalled: row.installed === 1, isStarred: false }))
-    }
-    const map = new Map<string, SidebarEntry>()
+  // Build unified entry list
+  const allEntries: LibraryEntry[] = (() => {
+    const map = new Map<string, LibraryEntry>()
     for (const row of installedRows) {
-      map.set(row.id, { row, isInstalled: true, isStarred: row.starred_at != null })
+      map.set(row.id, { kind: 'repo', row, isInstalled: true, isStarred: row.starred_at != null })
     }
     for (const row of starredRows) {
       if (!map.has(row.id)) {
-        map.set(row.id, { row, isInstalled: false, isStarred: true })
+        map.set(row.id, { kind: 'repo', row, isInstalled: false, isStarred: true })
       }
+    }
+    for (const project of localProjects) {
+      const key = `local:${project.path}`
+      map.set(key, { kind: 'local', project })
     }
     return Array.from(map.values())
   })()
 
-  const visible = entries.filter(({ row, isInstalled }) => {
-    if (activeSegment === 'all' || activeSegment === 'unstarred') return true
-    if (activeSegment === 'active') return isInstalled && (row as LibraryRow).active === 1
-    return false
+  const visible = filterLibraryEntries(allEntries, activeSegment, {
+    archivedSet,
+    recentVisits,
+    githubUsername,
+    unstarredRows,
   })
 
-  const handleContextMenu = (e: React.MouseEvent, entry: SidebarEntry) => {
+  const handleRepoContextMenu = (e: React.MouseEvent, entry: LibraryEntry & { kind: 'repo' }) => {
     e.preventDefault()
     setMenu({
       x: e.clientX,
@@ -85,53 +131,64 @@ export default function LibrarySidebar({
     <aside className="library-sidebar">
       <div className="library-sidebar-header">REPOSITORIES</div>
       <div className="library-sidebar-filter">
-        <button
-          className={`library-sidebar-seg${activeSegment === 'all' ? ' active' : ''}`}
-          onClick={() => onSegmentChange('all')}
-        >
-          <Layers size={11} />
-          All
-        </button>
-        <button
-          className={`library-sidebar-seg${activeSegment === 'active' ? ' active' : ''}`}
-          onClick={() => onSegmentChange('active')}
-        >
-          <Brain size={11} />
-          Learned
-        </button>
-        <button
-          className={`library-sidebar-seg${activeSegment === 'unstarred' ? ' active' : ''}`}
-          onClick={() => onSegmentChange('unstarred')}
-          title="Recently unstarred (last 30 days)"
-        >
-          <DashedStar size={11} />
-          Unstarred
-        </button>
+        {SEGMENTS.map(({ id, icon, label }) => (
+          <button
+            key={id}
+            className={`library-sidebar-seg${activeSegment === id ? ' active' : ''}`}
+            onClick={() => onSegmentChange(id)}
+            title={label}
+          >
+            {icon}
+          </button>
+        ))}
       </div>
 
       <div className="library-sidebar-list">
         {visible.length === 0 && (
-          <div className="library-sidebar-empty">
-            {activeSegment === 'unstarred' ? 'Nothing unstarred in the last 30 days' : 'No repos'}
-          </div>
+          <div className="library-sidebar-empty">{EMPTY_STATES[activeSegment]}</div>
         )}
         {visible.map(entry => {
-          const { row, isInstalled } = entry
+          if (entry.kind === 'repo') {
+            const { row, isInstalled } = entry
+            return (
+              <button
+                key={row.id}
+                className={`library-sidebar-item${selectedId === row.id ? ' selected' : ''}${isInstalled ? ' installed' : ' uninstalled'}`}
+                onClick={() => onSelect(row, isInstalled)}
+                onContextMenu={e => handleRepoContextMenu(e, entry)}
+                title={`${row.owner}/${row.name}`}
+              >
+                <span className="library-sidebar-avatar">
+                  {row.avatar_url
+                    ? <img src={row.avatar_url} alt="" />
+                    : <span className="library-sidebar-avatar-fallback">{(row.name?.[0] ?? '?').toUpperCase()}</span>
+                  }
+                </span>
+                <span className="library-sidebar-name">{row.name}</span>
+                <span className="library-sidebar-type-icon">
+                  <GitHubIcon />
+                </span>
+              </button>
+            )
+          }
+
+          // kind === 'local'
+          const { project } = entry
+          const localKey = `local:${project.path}`
           return (
             <button
-              key={row.id}
-              className={`library-sidebar-item${selectedId === row.id ? ' selected' : ''}${isInstalled ? ' installed' : ' uninstalled'}`}
-              onClick={() => onSelect(row, isInstalled)}
-              onContextMenu={e => handleContextMenu(e, entry)}
-              title={`${row.owner}/${row.name}`}
+              key={localKey}
+              className={`library-sidebar-item installed${selectedId === localKey ? ' selected' : ''}`}
+              onClick={() => onSelectLocal(project)}
+              title={project.path}
             >
-              <span className="library-sidebar-avatar">
-                {row.avatar_url
-                  ? <img src={row.avatar_url} alt="" />
-                  : <span className="library-sidebar-avatar-fallback">{(row.name?.[0] ?? '?').toUpperCase()}</span>
-                }
+              <span className="library-sidebar-avatar library-sidebar-local-avatar">
+                <FolderIcon />
               </span>
-              <span className="library-sidebar-name">{row.name}</span>
+              <span className="library-sidebar-name">{project.name}</span>
+              <span className="library-sidebar-type-icon local">
+                <LocalIcon />
+              </span>
             </button>
           )
         })}
