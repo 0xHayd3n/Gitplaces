@@ -1,9 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate, useMatch, Routes, Route } from 'react-router-dom'
+import { useNavigate, useMatch, useLocation, Routes, Route } from 'react-router-dom'
 import { type LibraryRow, type StarredRepoRow, type RepoRow } from '../types/repo'
 import type { CollectionRow } from '../types/repo'
+import type { LocalProject, ActiveSegment } from '../types/library'
 import { useToast } from '../contexts/Toast'
 import { useRepoNav } from '../contexts/RepoNav'
+import { useGitHubAuth } from '../contexts/GitHubAuth'
+import { useArchivedRepos } from '../hooks/useArchivedRepos'
+import { getRecentVisits, recordRecentVisit } from '../lib/recentVisits'
+import type { RecentEntry } from '../lib/recentVisits'
 import NavRail from '../components/NavRail'
 import LibrarySidebar from '../components/LibrarySidebar'
 import CollectionsSidebar from '../components/CollectionsSidebar'
@@ -16,6 +21,9 @@ export default function Library() {
   const { toast } = useToast()
   const navigate = useNavigate()
   const { state: repoNav } = useRepoNav()
+  const { user } = useGitHubAuth()
+  const { archivedSet } = useArchivedRepos()
+  const location = useLocation()
   const isMiniTab = repoNav.activeTab === 'files' || repoNav.activeTab === 'components'
 
   const repoMatch  = useMatch('/library/repo/:owner/:name')
@@ -26,7 +34,13 @@ export default function Library() {
   const [rows, setRows] = useState<LibraryRow[]>([])
   const [starredRows, setStarredRows] = useState<StarredRepoRow[]>([])
   const [unstarredRows, setUnstarredRows] = useState<StarredRepoRow[]>([])
-  const [activeSegment, setActiveSegment] = useState<'all' | 'active' | 'unstarred'>('all')
+  const [activeSegment, setActiveSegment] = useState<ActiveSegment>('all')
+  const [localProjects, setLocalProjects] = useState<LocalProject[]>([])
+  const [recentVisits, setRecentVisits] = useState<RecentEntry[]>(() => getRecentVisits())
+
+  const refreshRecentVisits = useCallback(() => {
+    setRecentVisits(getRecentVisits())
+  }, [])
 
   const refreshAll = useCallback(() => {
     window.api.library.getAll().then(setRows).catch(() => {
@@ -45,6 +59,14 @@ export default function Library() {
     return () => window.removeEventListener('library:changed', refreshAll)
   }, [refreshAll])
 
+  useEffect(() => {
+    window.api.settings.get('projectsFolder').then(folder => {
+      if (folder) {
+        window.api.projects?.scanFolder(folder).then(setLocalProjects).catch(() => {})
+      }
+    }).catch(() => {})
+  }, [])
+
   const repoSelectedId = useMemo(() => {
     if (!repoMatch) return null
     const { owner, name } = repoMatch.params
@@ -57,13 +79,28 @@ export default function Library() {
 
   const collSelectedId = collMatch?.params.id ?? null
 
+  const selectedLocalPath = location.pathname === '/local-project'
+    ? new URLSearchParams(location.search).get('path')
+    : null
+
   const handlePanelToggle = useCallback((panel: 'repos' | 'collections') => {
     setActivePanel(panel)
   }, [])
 
   const handleRepoSelect = useCallback((row: RepoRow, _isInstalled: boolean) => {
+    recordRecentVisit({ owner: row.owner, name: row.name, avatar_url: row.avatar_url, navigatePath: `/library/repo/${row.owner}/${row.name}` })
+    refreshRecentVisits()
     navigate(`/library/repo/${row.owner}/${row.name}`)
-  }, [navigate])
+  }, [navigate, refreshRecentVisits])
+
+  const handleLocalSelect = useCallback((project: LocalProject) => {
+    const navPath = project.owner && project.repoName
+      ? `/library/repo/${project.owner}/${project.repoName}`
+      : `/local-project?path=${encodeURIComponent(project.path)}&name=${encodeURIComponent(project.name)}&git=${project.isGit ? '1' : '0'}`
+    recordRecentVisit({ owner: project.owner ?? '', name: project.repoName ?? project.name, avatar_url: null, navigatePath: navPath })
+    refreshRecentVisits()
+    navigate(navPath)
+  }, [navigate, refreshRecentVisits])
 
   const handleCollSelect = useCallback((id: string, coll: CollectionRow) => {
     navigate(`/library/collection/${id}`, { state: { coll, collectionName: coll.name } })
@@ -82,10 +119,16 @@ export default function Library() {
           installedRows={rows}
           starredRows={starredRows}
           unstarredRows={unstarredRows}
+          localProjects={localProjects}
+          archivedSet={archivedSet}
+          recentVisits={recentVisits}
+          githubUsername={user?.login ?? null}
           selectedId={repoSelectedId}
+          selectedLocalPath={selectedLocalPath}
           activeSegment={activeSegment}
           onSegmentChange={setActiveSegment}
           onSelect={handleRepoSelect}
+          onSelectLocal={handleLocalSelect}
         />
       </div>
 
