@@ -60,6 +60,11 @@ export default function Library() {
   }, [refreshAll])
 
   useEffect(() => {
+    if (collMatch) setActivePanel('collections')
+    else if (repoMatch) setActivePanel('repos')
+  }, [collMatch, repoMatch])
+
+  useEffect(() => {
     window.api.settings.get('projectsFolder').then(folder => {
       if (folder) {
         window.api.projects?.scanFolder(folder).then(setLocalProjects).catch(() => {})
