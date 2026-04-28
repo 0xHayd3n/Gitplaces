@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CreateTemplate } from '../../types/create'
 import type { RepoRow } from '../../types/repo'
@@ -8,7 +8,7 @@ import { recordRecentVisit } from '../../lib/recentVisits'
 import ProjectsSideRail, { type SideRailTab } from './ProjectsSideRail'
 import RecentPanel from './RecentPanel'
 import ArchivePanel from './ArchivePanel'
-import './ProjectsSideRail.css'
+
 
 // ── GitHub API repo → RepoRow ─────────────────────────────────────
 
@@ -185,42 +185,44 @@ export default function TemplateGallery() {
 
   // ── Merge: local takes precedence over GitHub ─────────────────────
 
-  const localKeySet = new Set(
-    localProjects
-      .filter(p => p.owner && p.repoName)
-      .map(p => `${p.owner}/${p.repoName}`)
+  const allEntries = useMemo<ProjectEntry[]>(() => {
+    const localKeySet = new Set(
+      localProjects
+        .filter(p => p.owner && p.repoName)
+        .map(p => `${p.owner}/${p.repoName}`)
+    )
+    const localEntries = localProjects.map(p => {
+      const ghMatch = p.owner && p.repoName
+        ? githubRepos.find(r => r.owner === p.owner && r.name === p.repoName)
+        : undefined
+      return {
+        row: ghMatch ?? makeStubRow(p),
+        isLocal: true,
+        isGitRepo: p.isGit,
+        localPath: p.path,
+        hasGithub: !!ghMatch || !!(p.owner && p.repoName),
+      }
+    })
+    const githubOnlyEntries = githubRepos
+      .filter(r => !localKeySet.has(`${r.owner}/${r.name}`))
+      .map(r => ({ row: r, isLocal: false, isGitRepo: false, localPath: null, hasGithub: true }))
+    return [...localEntries, ...githubOnlyEntries]
+  }, [localProjects, githubRepos])
+
+  const visibleEntries = useMemo(
+    () => allEntries.filter(({ row }) => !archivedSet.has(`${row.owner}/${row.name}`)),
+    [allEntries, archivedSet]
   )
 
-  // Local projects → RepoRow + metadata
-  const localEntries = localProjects.map(p => {
-    const ghMatch = p.owner && p.repoName
-      ? githubRepos.find(r => r.owner === p.owner && r.name === p.repoName)
-      : undefined
-    return {
-      row: ghMatch ?? makeStubRow(p),
-      isLocal: true,
-      isGitRepo: p.isGit,
-      localPath: p.path,
-      hasGithub: !!ghMatch || !!(p.owner && p.repoName),
-    }
-  })
-
-  // GitHub repos not already covered by a local project
-  const githubOnlyEntries = githubRepos
-    .filter(r => !localKeySet.has(`${r.owner}/${r.name}`))
-    .map(r => ({ row: r, isLocal: false, isGitRepo: false, localPath: null, hasGithub: true }))
-
-  const allEntries = [...localEntries, ...githubOnlyEntries]
-
-  const visibleEntries = allEntries.filter(({ row }) => !archivedSet.has(`${row.owner}/${row.name}`))
-
-  const q = search.toLowerCase()
-  const filtered = visibleEntries.filter(({ row }) =>
-    !q ||
-    row.name.toLowerCase().includes(q) ||
-    (row.description ?? '').toLowerCase().includes(q) ||
-    row.owner.toLowerCase().includes(q)
-  )
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return visibleEntries.filter(({ row }) =>
+      !q ||
+      row.name.toLowerCase().includes(q) ||
+      (row.description ?? '').toLowerCase().includes(q) ||
+      row.owner.toLowerCase().includes(q)
+    )
+  }, [visibleEntries, search])
 
   return (
     <div className="projects-shell">
