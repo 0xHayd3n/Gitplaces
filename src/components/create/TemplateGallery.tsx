@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CreateTemplate } from '../../types/create'
 import type { RepoRow } from '../../types/repo'
+import type { LocalProject } from '../../types/library'
 import RepoCard from '../RepoCard'
 import { useArchivedRepos } from '../../hooks/useArchivedRepos'
 import { recordRecentVisit } from '../../lib/recentVisits'
@@ -54,14 +55,6 @@ function apiRepoToRow(r: GithubApiRepo): RepoRow {
 }
 
 // ── Local project ─────────────────────────────────────────────────
-
-interface LocalProject {
-  name: string
-  path: string
-  isGit: boolean
-  owner: string | null
-  repoName: string | null
-}
 
 function makeStubRow(p: LocalProject): RepoRow {
   return {
