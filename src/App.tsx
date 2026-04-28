@@ -26,6 +26,7 @@ const Onboarding = lazy(() => import('./views/Onboarding'))
 const Settings = lazy(() => import('./views/Settings'))
 const Create = lazy(() => import('./views/Create'))
 const LocalProjectDetail = lazy(() => import('./views/LocalProjectDetail'))
+const RepoOverlay = lazy(() => import('./components/RepoOverlay'))
 
 function ProfileOverlayPortal() {
   const { profileState } = useProfileOverlay()
@@ -36,6 +37,7 @@ function ProfileOverlayPortal() {
 function AppContent() {
   const navigate = useNavigate()
   const location = useLocation()
+  const backgroundLocation = (location.state as { background?: typeof location } | null)?.background
   const { background } = useAppearance()
   const [aiOpen, setAiOpen] = useState(false)
   const { text: tooltipText, nodeRef: tooltipRef } = useTooltip()
@@ -62,7 +64,7 @@ function AppContent() {
         <Titlebar />
         <main className={`main-content${aiOpen ? ' ai-dialogue-tilt' : ''}`}>
           <Suspense fallback={<AppLoadingFallback />}>
-            <Routes>
+            <Routes location={backgroundLocation ?? location}>
               <Route path="/" element={<Navigate to="/library" replace />} />
               <Route path="/discover" element={<RequireGitHub><Discover /></RequireGitHub>} />
               <Route path="/library/*" element={<RequireGitHub><Library /></RequireGitHub>} />
@@ -76,6 +78,11 @@ function AppContent() {
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
+            {backgroundLocation && (
+              <Routes>
+                <Route path="/repo/:owner/:name" element={<RequireGitHub><RepoOverlay /></RequireGitHub>} />
+              </Routes>
+            )}
           </Suspense>
           <ProfileOverlayPortal />
         </main>
