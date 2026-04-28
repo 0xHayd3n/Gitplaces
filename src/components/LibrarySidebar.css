@@ -5,11 +5,25 @@
   overflow: hidden;
 }
 
+.library-sidebar-header {
+  padding: 14px 14px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--t4);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+
 .library-sidebar-filter {
   display: flex;
   padding: 8px 8px 4px;
   gap: 2px;
   flex-shrink: 0;
+  position: relative;
+  z-index: 4;
+  -webkit-app-region: drag;
 }
 
 .library-sidebar-seg {
@@ -27,6 +41,7 @@
   color: var(--t3);
   cursor: pointer;
   transition: background 0.1s, color 0.1s;
+  -webkit-app-region: no-drag;
 }
 
 .library-sidebar-seg:hover {

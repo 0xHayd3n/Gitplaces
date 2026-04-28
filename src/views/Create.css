@@ -12,6 +12,7 @@
 .projects-gallery {
   height: 100%;
   overflow-y: overlay;
+  background: var(--glass-bg);
 }
 
 /* Hero */

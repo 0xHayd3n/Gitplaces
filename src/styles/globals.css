@@ -29,6 +29,11 @@
   --glass-bg:     rgba(20, 20, 20, 0.85);
   --glass-border: rgba(255, 255, 255, 0.08);
 
+  /* Solid equivalent of --glass-bg blended over app-shell's --bg2.
+     Use for surfaces that must opaquely match the glass-rendered color
+     (e.g. sticky tabs over scrolling content, gradient stops). */
+  --surface-1:    #151516;
+
   /* Borders */
   --border:  rgba(255,255,255,0.07);
   --border2: rgba(255,255,255,0.13);
@@ -195,6 +200,8 @@ a {
 
 .main-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: transparent;
   position: relative;
@@ -2297,7 +2304,7 @@ a {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg);
+  background: var(--glass-bg);
 }
 
 /* Browser-style navigation bar (global) */
@@ -2579,6 +2586,230 @@ a {
   font-family: 'Inter', sans-serif;
   font-size: 11px;
   color: var(--t2);
+}
+
+/* ── Page transition fade-in ─────────────────────────────────────── */
+@keyframes pageFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.page-transition {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  animation: pageFadeIn 0.18s ease-out forwards;
+}
+
+/* ── Repo Detail content fade-in (skeleton → real layout transition) */
+@keyframes repoDetailFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.repo-detail-content-fadein {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  animation: repoDetailFadeIn 0.3s ease-out forwards;
+}
+
+/* ── Repo Detail loading skeleton ───────────────────────────────── */
+/* Mirrors the ArticleLayout DOM structure exactly. */
+.repo-detail-skeleton {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: overlay;
+  overflow-x: hidden;
+  background: var(--bg);
+}
+
+/* Mirrors .article-layout-top */
+.repo-detail-sk-top {
+  position: relative;
+  flex-shrink: 0;
+  background: var(--bg);
+}
+
+/* Mirrors .article-layout-dither-bg — absolute, 240px, fades at bottom */
+.repo-detail-sk-dither {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 240px;
+  background: var(--bg3);
+  animation: shimmer 1.4s infinite linear;
+  z-index: 0;
+  pointer-events: none;
+}
+.repo-detail-sk-dither::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 180px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+}
+
+/* Mirrors .article-layout-top-panel */
+.repo-detail-sk-top-panel {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mirrors .article-layout-dither-spacer — height: 204px */
+.repo-detail-sk-spacer {
+  height: 204px;
+  flex-shrink: 0;
+}
+
+/* Mirrors .article-layout-title-row — padding: 0 20px 8px */
+.repo-detail-sk-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  column-gap: 16px;
+  row-gap: 8px;
+  padding: 0 20px 8px;
+}
+
+/* Mirrors .article-layout-description — padding: 0 20px 10px */
+.repo-detail-sk-description {
+  padding: 0 20px 10px;
+}
+
+/* Mirrors .article-layout-byline — padding: 6px 20px 10px */
+.repo-detail-sk-byline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 20px 10px;
+}
+
+/* Mirrors .article-layout-actions — padding: 10px 20px */
+.repo-detail-sk-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+}
+
+/* Shared shimmer primitives */
+.repo-detail-sk-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg3);
+  flex-shrink: 0;
+  animation: shimmer 1.4s infinite linear;
+}
+.repo-detail-sk-bar {
+  height: 10px;
+  border-radius: 4px;
+  background: var(--bg3);
+  animation: shimmer 1.4s infinite linear;
+}
+.repo-detail-sk-pills {
+  display: flex;
+  gap: 8px;
+}
+.repo-detail-sk-pill {
+  height: 22px;
+  border-radius: 100px;
+  background: var(--bg3);
+  animation: shimmer 1.4s infinite linear;
+}
+.repo-detail-sk-btn {
+  height: 32px;
+  border-radius: 6px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  animation: shimmer 1.4s infinite linear;
+}
+
+/* Mirrors .article-layout-tabs-slot — sticky row with border-bottom */
+.repo-detail-sk-tabs-row {
+  display: flex;
+  gap: 0;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--bg3);
+  flex-shrink: 0;
+  background: var(--bg);
+}
+/* Each tab shimmer bar sits inline, matching padding: 9px 14px on real tabs */
+.repo-detail-sk-tab {
+  height: 10px;
+  border-radius: 4px;
+  background: var(--bg3);
+  animation: shimmer 1.4s infinite linear;
+  margin: 14px 6px;
+}
+
+/* Mirrors .article-layout-body--with-toc — flex-row, three columns */
+.repo-detail-sk-split {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  flex: 1;
+  min-height: 200px;
+}
+
+/* Mirrors .article-layout-toc-slot — width: 200px, sticky */
+.repo-detail-sk-toc {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 18px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Mirrors .article-layout-body-content — flex: 1, padding: 0 22px 20px */
+.repo-detail-sk-body-main {
+  flex: 1;
+  min-width: 0;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Mirrors .article-layout-stats-slot — width: 220px */
+.repo-detail-sk-sidebar-col {
+  width: 220px;
+  flex-shrink: 0;
+  padding: 16px 12px;
+}
+
+.repo-detail-sk-line {
+  height: 10px;
+  border-radius: 4px;
+  background: var(--bg3);
+  animation: shimmer 1.4s infinite linear;
+}
+.repo-detail-sk-tile {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.repo-detail-sk-stat {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg3);
+  animation: shimmer 1.4s infinite linear;
 }
 
 /* ── Breadcrumb bar ─────────────────────────────────────────────────── */
@@ -10634,6 +10865,7 @@ a {
   display: flex;
   height: 100%;
   min-height: 0;
+  position: relative;
 }
 .library-root-v2 .sidebar-rail {
   position: static;
@@ -10654,6 +10886,7 @@ a {
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
+  background: var(--glass-bg);
 }
 .library-detail-area {
   flex: 1;
@@ -10669,6 +10902,7 @@ a {
   z-index: auto;
   flex: 1;
   min-height: 0;
+  background: transparent;
 }
 
 .library-detail-empty {

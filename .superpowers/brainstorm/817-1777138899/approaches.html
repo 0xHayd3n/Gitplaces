@@ -1,0 +1,42 @@
+<h2>How should the grouping data be structured?</h2>
+<p class="subtitle">All three approaches produce identical UI — the difference is in the code and data model.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Two fields on each language</h3>
+      <p>Add <code>domainCategory</code> and <code>ecosystemCategory</code> to every language entry in <code>languages.ts</code>. Toggle switches which field drives the sidebar grouping.</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>Fully explicit — audit any language at a glance</li><li>Easy to edit one language independently</li><li>No indirection</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>~140 language entries each need a second field assigned</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Mapping table</h3>
+      <p>Keep the existing <code>category</code> field (becomes "ecosystem"). Add a <code>DOMAIN_MAP</code> object that maps each ecosystem category → domain. No changes to individual language entries.</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>Minimal data change — don't touch ~140 entries</li><li>Ecosystem grouping already exists</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Indirect — must cross-reference two places to see a language's domain</li><li>All languages in an ecosystem category share one domain (may be too coarse)</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Central groupings config</h3>
+      <p>Define a <code>GROUPINGS</code> config object outside the language entries. Each grouping is a record mapping a group name → list of language keys. Languages themselves stay unchanged.</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>Adding a third grouping later is trivial</li><li>No changes to language entries at all</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Most indirection — groupings and languages are fully decoupled</li><li>Easy to forget a language when adding a new grouping</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:24px">My recommendation: <strong>A</strong> — two fields. Explicit and auditable, and the one-time cost of assigning both categories to ~140 languages is low.</p>

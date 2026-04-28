@@ -83,6 +83,7 @@ export default function LibrarySidebar({
 
   return (
     <aside className="library-sidebar">
+      <div className="library-sidebar-header">REPOSITORIES</div>
       <div className="library-sidebar-filter">
         <button
           className={`library-sidebar-seg${activeSegment === 'all' ? ' active' : ''}`}

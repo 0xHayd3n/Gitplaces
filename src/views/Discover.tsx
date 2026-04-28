@@ -56,6 +56,10 @@ function loadLayoutPrefs(): LayoutPrefs {
   }
 }
 
+// ── Module-level recommended cache (survives component unmount) ───
+const RECOMMENDED_TTL_MS = 60 * 60 * 1000
+let _recommendedModuleCache: { items: RecommendationItem[]; fetchedAt: number } | null = null
+
 // ── Discover view ─────────────────────────────────────────────────
 export default function Discover() {
   const navigationType = useNavigationType()
@@ -214,12 +218,17 @@ export default function Discover() {
   useEffect(() => {
     async function loadHeroData() {
       try {
-        let items: import('../types/recommendation').RecommendationItem[]
+        let items: RecommendationItem[]
         if (recommendedItemsCache.current) {
           items = recommendedItemsCache.current
+        } else if (_recommendedModuleCache && Date.now() - _recommendedModuleCache.fetchedAt < RECOMMENDED_TTL_MS) {
+          items = _recommendedModuleCache.items
+          recommendedItemsCache.current = items
+          recommendedCache.current = items.map(i => i.repo)
         } else {
           const response = await window.api.github.getRecommended()
           items = response.items
+          _recommendedModuleCache = { items, fetchedAt: Date.now() }
           recommendedItemsCache.current = items
           recommendedCache.current = items.map(i => i.repo)
         }
@@ -398,11 +407,16 @@ export default function Discover() {
       if (viewMode === 'recommended' && selectedSubtypes.length === 0) {
         if (recommendedCache.current) {
           data = recommendedCache.current
+        } else if (_recommendedModuleCache && Date.now() - _recommendedModuleCache.fetchedAt < RECOMMENDED_TTL_MS) {
+          data = _recommendedModuleCache.items.map(i => i.repo)
+          recommendedCache.current = data
+          recommendedItemsCache.current = _recommendedModuleCache.items
         } else {
           const response = await window.api.github.getRecommended()
           data = response.items.map(item => item.repo)
           recommendedCache.current = data
           recommendedItemsCache.current = response.items
+          _recommendedModuleCache = { items: response.items, fetchedAt: Date.now() }
         }
       } else {
         const subKw = selectedSubtypes.length === 1

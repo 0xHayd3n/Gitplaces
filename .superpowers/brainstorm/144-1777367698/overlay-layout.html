@@ -1,0 +1,88 @@
+<h2>How should the repo overlay fill the screen?</h2>
+<p class="subtitle">When you click a repo card on Discover, how much of the screen should the overlay take up?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:var(--bg2);padding:16px;display:flex;align-items:center;justify-content:center;min-height:160px;">
+      <div style="position:relative;width:100%;max-width:320px;height:120px;">
+        <!-- Discover page behind -->
+        <div style="position:absolute;inset:0;background:var(--bg3);border-radius:8px;opacity:0.5;"></div>
+        <!-- Full-screen overlay -->
+        <div style="position:absolute;inset:6px;background:var(--bg);border-radius:6px;border:1.5px solid var(--border2);display:flex;flex-direction:column;">
+          <div style="height:28px;background:var(--bg2);border-radius:5px 5px 0 0;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 10px;gap:6px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--t4);"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--t4);"></div>
+            <div style="flex:1;"></div>
+            <div style="width:14px;height:14px;border-radius:3px;border:1px solid var(--border2);"></div>
+          </div>
+          <div style="flex:1;padding:8px;display:flex;gap:6px;">
+            <div style="width:28px;background:var(--bg2);border-radius:4px;"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+              <div style="height:8px;background:var(--bg3);border-radius:3px;width:70%;"></div>
+              <div style="height:6px;background:var(--bg3);border-radius:3px;width:50%;"></div>
+              <div style="height:6px;background:var(--bg3);border-radius:3px;width:85%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Full-screen overlay</h3>
+      <p>Covers the entire window — identical to the current RepoDetail page, but no navigation. Feels immersive. Close button / Escape dismisses it.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:var(--bg2);padding:16px;display:flex;align-items:center;justify-content:center;min-height:160px;">
+      <div style="position:relative;width:100%;max-width:320px;height:120px;">
+        <!-- Discover page behind (slightly visible) -->
+        <div style="position:absolute;inset:0;background:var(--bg3);border-radius:8px;opacity:0.6;"></div>
+        <!-- Centered modal ~80% -->
+        <div style="position:absolute;top:8px;left:16px;right:16px;bottom:8px;background:var(--bg);border-radius:8px;border:1.5px solid var(--border2);box-shadow:0 8px 32px rgba(0,0,0,0.3);display:flex;flex-direction:column;">
+          <div style="height:24px;background:var(--bg2);border-radius:7px 7px 0 0;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 8px;">
+            <div style="flex:1;height:5px;background:var(--bg3);border-radius:3px;width:60%;"></div>
+            <div style="width:12px;height:12px;border-radius:50%;border:1px solid var(--border2);margin-left:6px;"></div>
+          </div>
+          <div style="flex:1;padding:6px;display:flex;gap:5px;">
+            <div style="width:24px;background:var(--bg2);border-radius:4px;"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+              <div style="height:6px;background:var(--bg3);border-radius:3px;width:65%;"></div>
+              <div style="height:5px;background:var(--bg3);border-radius:3px;width:45%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Centered modal (~80% width/height)</h3>
+      <p>Large dialog floating above Discover with a dimmed backdrop. The grid peeks around the edges. Click backdrop or Escape closes it.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:var(--bg2);padding:16px;display:flex;align-items:center;justify-content:center;min-height:160px;">
+      <div style="position:relative;width:100%;max-width:320px;height:120px;">
+        <!-- Discover page on left -->
+        <div style="position:absolute;left:0;top:0;bottom:0;width:45%;background:var(--bg3);border-radius:8px 0 0 8px;opacity:0.7;"></div>
+        <!-- Sliding panel on right -->
+        <div style="position:absolute;right:0;top:0;bottom:0;width:58%;background:var(--bg);border-left:1.5px solid var(--border2);border-radius:0 8px 8px 0;display:flex;flex-direction:column;">
+          <div style="height:24px;background:var(--bg2);border-bottom:1px solid var(--border);border-radius:0 7px 0 0;display:flex;align-items:center;padding:0 8px;">
+            <div style="width:12px;height:12px;border-radius:50%;border:1px solid var(--border2);"></div>
+            <div style="flex:1;height:5px;background:var(--bg3);border-radius:3px;margin-left:6px;"></div>
+          </div>
+          <div style="flex:1;padding:6px;display:flex;flex-direction:column;gap:4px;">
+            <div style="height:6px;background:var(--bg3);border-radius:3px;width:80%;"></div>
+            <div style="height:5px;background:var(--bg3);border-radius:3px;width:60%;"></div>
+            <div style="height:5px;background:var(--bg3);border-radius:3px;width:90%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Slide-in side panel (~55% width)</h3>
+      <p>Panel slides in from the right, covering about half the screen. Discover grid stays partially visible on the left. Feels like a detail drawer.</p>
+    </div>
+  </div>
+
+</div>

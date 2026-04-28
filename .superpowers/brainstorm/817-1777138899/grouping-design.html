@@ -1,0 +1,119 @@
+<h2>Grouping switcher — design proposal</h2>
+<p class="subtitle">Toggle sits at the top of the language sidebar. Click a mode to preview it below.</p>
+
+<div class="section">
+  <span class="label">Toggle placement (sidebar header)</span>
+  <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;max-width:280px;margin-top:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="color:#ccc;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Languages</span>
+      <div style="display:flex;background:#111;border:1px solid #333;border-radius:6px;overflow:hidden">
+        <button id="btn-domain" onclick="showMode('domain')" style="padding:4px 10px;font-size:11px;border:none;cursor:pointer;background:#6c47ff;color:#fff;font-weight:600">Domain</button>
+        <button id="btn-ecosystem" onclick="showMode('ecosystem')" style="padding:4px 10px;font-size:11px;border:none;cursor:pointer;background:transparent;color:#888">Ecosystem</button>
+      </div>
+    </div>
+
+    <div id="mode-domain">
+      <div style="margin-bottom:8px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">⚙ Systems</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">C, C++, Rust, Go, Zig, Assembly…</div>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">🌐 Web</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">JS, TS, PHP, Ruby, HTML, CSS, Vue…</div>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">📊 Data & Science</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">Python, R, Julia, MATLAB, SQL…</div>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">λ Functional</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">Haskell, Elixir, OCaml, F#, Clojure…</div>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">📱 Mobile & Desktop</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">Swift, Kotlin, Java, C#, Dart…</div>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">🐚 DevOps & Config</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">Shell, Docker, Make, Nix, HCL…</div>
+      </div>
+      <div style="margin-bottom:8px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">🔲 Hardware</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">CUDA, GLSL, HLSL, Verilog…</div>
+      </div>
+      <div>
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">✦ Specialty</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">Solidity, GDScript, COBOL, TeX, Prolog…</div>
+      </div>
+    </div>
+
+    <div id="mode-ecosystem" style="display:none">
+      <div style="margin-bottom:6px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">⚙ Systems</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">C, C++, Rust, Go, Zig…</div>
+      </div>
+      <div style="margin-bottom:6px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">☕ JVM</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">Java, Kotlin, Scala, Groovy…</div>
+      </div>
+      <div style="margin-bottom:6px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px"> Apple</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">Swift, Objective-C…</div>
+      </div>
+      <div style="margin-bottom:6px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">◑ .NET</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">C#, F#, VB.NET</div>
+      </div>
+      <div style="margin-bottom:6px">
+        <div style="color:#6c47ff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">JS JavaScript</div>
+        <div style="color:#aaa;font-size:12px;padding-left:8px">JS, TS, CoffeeScript…</div>
+      </div>
+      <div style="color:#555;font-size:11px;padding-left:4px;font-style:italic">+ 19 more groups (BEAM, Lisp, Functional, Scripting, Shell, Data, Logic, Markup, Styling, Typesetting, Database, Config, Blockchain, Hardware, Game, Enterprise, Editor, UI, Web Frameworks)</div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px">
+  <span class="label">Key design decisions</span>
+  <ul style="color:#ccc;font-size:13px;line-height:1.8;margin-top:8px">
+    <li><strong>8 domain groups vs 24 ecosystem groups</strong> — Domain collapses the long tail into Specialty</li>
+    <li><strong>Preference persisted</strong> — saved to localStorage so it survives app restarts</li>
+    <li><strong>Data model</strong> — each language gets both <code>domainCategory</code> and <code>ecosystemCategory</code> fields; current <code>category</code> field becomes <code>ecosystemCategory</code></li>
+    <li><strong>Default mode</strong> — Domain (simpler for new users), Ecosystem for power users</li>
+  </ul>
+</div>
+
+<script>
+function showMode(mode) {
+  document.getElementById('mode-domain').style.display = mode === 'domain' ? 'block' : 'none';
+  document.getElementById('mode-ecosystem').style.display = mode === 'ecosystem' ? 'block' : 'none';
+  document.getElementById('btn-domain').style.background = mode === 'domain' ? '#6c47ff' : 'transparent';
+  document.getElementById('btn-domain').style.color = mode === 'domain' ? '#fff' : '#888';
+  document.getElementById('btn-ecosystem').style.background = mode === 'ecosystem' ? '#6c47ff' : 'transparent';
+  document.getElementById('btn-ecosystem').style.color = mode === 'ecosystem' ? '#fff' : '#888';
+}
+</script>
+
+<div class="options" style="margin-top:24px" data-multiselect>
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>This looks right</h3>
+      <p>8 domain groups, 24 ecosystem groups, toggle in sidebar header</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tweak-domains" onclick="toggleSelect(this)">
+    <div class="letter">~</div>
+    <div class="content">
+      <h3>Tweak the domain groups</h3>
+      <p>I want different names or different category splits</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tweak-toggle" onclick="toggleSelect(this)">
+    <div class="letter">~</div>
+    <div class="content">
+      <h3>Tweak the toggle placement</h3>
+      <p>Put the toggle somewhere else in the UI</p>
+    </div>
+  </div>
+</div>

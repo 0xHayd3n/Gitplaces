@@ -1,3 +1,4 @@
+import logoSrc from '../../assets/logo.png'
 import './ProjectsSideRail.css'
 
 export type SideRailTab = 'recent' | 'archive'
@@ -31,6 +32,7 @@ const TABS: { id: SideRailTab; icon: React.ReactNode; label: string }[] = [
 export default function ProjectsSideRail({ activeTab, onTabChange }: Props) {
   return (
     <div className="projects-side-rail">
+      <img src={logoSrc} alt="Git Suite" className="projects-rail-logo" />
       {TABS.map(({ id, icon, label }) => (
         <div key={id} className="projects-side-rail-btn-wrap">
           <button

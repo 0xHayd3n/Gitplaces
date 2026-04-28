@@ -7,7 +7,7 @@
   min-height: 0;
   overflow-y: overlay;
   overflow-x: hidden;
-  background: var(--bg);
+  background: transparent;
 }
 
 /* Full-bleed mode (Files / Components tabs): outer layout does not scroll,
@@ -18,7 +18,7 @@
 
 .article-layout-top {
   flex-shrink: 0;
-  background: var(--bg);
+  background: transparent;
   position: relative;
 }
 
@@ -105,7 +105,7 @@
   left: 0;
   right: 0;
   height: 180px;
-  background: linear-gradient(to bottom, transparent, var(--bg));
+  background: linear-gradient(to bottom, transparent, var(--surface-1));
   pointer-events: none;
   z-index: 2;
 }
@@ -170,7 +170,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--bg);
+  background: var(--surface-1);
   border-bottom: 1px solid var(--bg3);
 }
 
@@ -208,7 +208,7 @@
 .article-layout-body--with-toc > .article-layout-body-content {
   flex: 1;
   min-width: 0;
-  padding: 0 22px 20px;
+  padding: 20px 22px;
 }
 
 .article-layout-body--with-toc > .article-layout-toc-slot {

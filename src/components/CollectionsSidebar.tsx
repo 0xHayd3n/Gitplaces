@@ -31,6 +31,7 @@ export default function CollectionsSidebar({ selectedId, onSelect }: Collections
 
   return (
     <aside className="library-sidebar">
+      <div className="library-sidebar-header">COLLECTIONS</div>
       <div className="library-sidebar-list">
         {collections.length === 0 && (
           <div className="library-sidebar-empty">No collections</div>

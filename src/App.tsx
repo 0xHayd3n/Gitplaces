@@ -38,6 +38,7 @@ function AppContent() {
   const navigate = useNavigate()
   const location = useLocation()
   const backgroundLocation = (location.state as { background?: typeof location } | null)?.background
+  const pageKey = (backgroundLocation ?? location).pathname.split('/')[1] || 'root'
   const { background } = useAppearance()
   const [aiOpen, setAiOpen] = useState(false)
   const { text: tooltipText, nodeRef: tooltipRef } = useTooltip()
@@ -64,20 +65,22 @@ function AppContent() {
         <Titlebar />
         <main className={`main-content${aiOpen ? ' ai-dialogue-tilt' : ''}`}>
           <Suspense fallback={<AppLoadingFallback />}>
-            <Routes location={backgroundLocation ?? location}>
-              <Route path="/" element={<Navigate to="/library" replace />} />
-              <Route path="/discover" element={<RequireGitHub><Discover /></RequireGitHub>} />
-              <Route path="/library/*" element={<RequireGitHub><Library /></RequireGitHub>} />
-              <Route path="/collections" element={<Navigate to="/library" replace />} />
-              <Route path="/local-project" element={<LocalProjectDetail />} />
-              <Route path="/create" element={<Create />} />
-              <Route path="/create/:sessionId" element={<Create />} />
-              <Route path="/starred" element={<RequireGitHub><Starred /></RequireGitHub>} />
-              <Route path="/profile" element={<RequireGitHub><Profile /></RequireGitHub>} />
-              <Route path="/repo/:owner/:name" element={<RequireGitHub><RepoDetail /></RequireGitHub>} />
-              <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
+            <div key={pageKey} className="page-transition">
+              <Routes location={backgroundLocation ?? location}>
+                <Route path="/" element={<Navigate to="/library" replace />} />
+                <Route path="/discover" element={<RequireGitHub><Discover /></RequireGitHub>} />
+                <Route path="/library/*" element={<RequireGitHub><Library /></RequireGitHub>} />
+                <Route path="/collections" element={<Navigate to="/library" replace />} />
+                <Route path="/local-project" element={<LocalProjectDetail />} />
+                <Route path="/create" element={<Create />} />
+                <Route path="/create/:sessionId" element={<Create />} />
+                <Route path="/starred" element={<RequireGitHub><Starred /></RequireGitHub>} />
+                <Route path="/profile" element={<RequireGitHub><Profile /></RequireGitHub>} />
+                <Route path="/repo/:owner/:name" element={<RequireGitHub><RepoDetail /></RequireGitHub>} />
+                <Route path="/onboarding" element={<Onboarding />} />
+                <Route path="/settings" element={<Settings />} />
+              </Routes>
+            </div>
             {backgroundLocation && (
               <Routes>
                 <Route path="/repo/:owner/:name" element={<RequireGitHub><RepoOverlay /></RequireGitHub>} />

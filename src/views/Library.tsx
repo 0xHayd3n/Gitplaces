@@ -71,6 +71,7 @@ export default function Library() {
 
   return (
     <div className="library-root-v2">
+      <div className="discover-drag-strip" aria-hidden="true" />
       <NavRail activePanel={activePanel} onPanelToggle={handlePanelToggle} />
 
       <div
