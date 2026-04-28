@@ -89,7 +89,7 @@ RepoDetail's existing back button (rendered when `fromDiscoverPath` is in locati
   top: 14px;
   right: 18px;
   z-index: 151;
-  /* styled to match existing icon-button pattern */
+  /* use existing .btn-close-overlay class from globals.css */
 }
 ```
 
@@ -101,7 +101,7 @@ RepoDetail's existing back button (rendered when `fromDiscoverPath` is in locati
 | Press Escape or click X | `navigate(-1)` — overlay unmounts, Discover visible exactly as left |
 | Click RepoDetail back button | Same as Escape — `navigate(-1)` closes overlay |
 | Navigate directly to `/repo/owner/name` | Full-page RepoDetail renders (no background state, existing behaviour) |
-| Refresh while overlay is open | MemoryRouter resets; no persistent URL in Electron, so RepoDetail renders full-page |
+| Refresh while overlay is open | App uses `MemoryRouter` — any refresh resets router to `/`, so RepoDetail renders full-page (acceptable for Electron) |
 
 ## Files Changed
 
