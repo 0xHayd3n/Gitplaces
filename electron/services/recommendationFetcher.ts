@@ -144,12 +144,13 @@ function buildSearchQuery(plan: QueryPlan): string {
 export async function fetchCandidates(
   token: string | null,
   queries: QueryPlan[],
+  page: number = 1,
 ): Promise<GitHubRepo[]> {
   const seen = new Set<number>()
   const merged: GitHubRepo[] = []
 
   const results = await Promise.allSettled(
-    queries.map(async (q) => searchRepos(token, buildSearchQuery(q), q.perPage, q.sort, 'desc', 1))
+    queries.map(async (q) => searchRepos(token, buildSearchQuery(q), q.perPage, q.sort, 'desc', page))
   )
 
   for (const r of results) {

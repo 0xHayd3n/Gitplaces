@@ -148,7 +148,10 @@ function readBackRows(
 // ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
-export async function getRecommendedHandler(): Promise<RecommendationResponse> {
+export async function getRecommendedHandler(
+  page: number = 1,
+  excludeIds: string[] = [],
+): Promise<RecommendationResponse> {
   const db = getDb(app.getPath('userData'))
   const token = getToken()
   if (!token) return { items: [], stale: false, coldStart: false }
@@ -176,17 +179,22 @@ export async function getRecommendedHandler(): Promise<RecommendationResponse> {
   const latestClickTs = engagementEvents.length > 0 ? engagementEvents[0].ts : 0
   const profileHash = computeProfileHash(starredIds, savedIds, clickedIds, latestClickTs)
 
-  // L1 cache
-  const cached = l1Cache.get(profileHash)
-  if (cached && (Date.now() - cached.timestamp) < L1_TTL_MS) {
-    return cached.response
+  // L1 cache — page 1 only. Subsequent pages bypass cache so scrolling fetches
+  // fresh GitHub search pages on each call.
+  if (page === 1) {
+    const cached = l1Cache.get(profileHash)
+    if (cached && (Date.now() - cached.timestamp) < L1_TTL_MS) {
+      return cached.response
+    }
   }
+
+  const excludeSet = new Set(excludeIds)
 
   // Cold-start path (fewer than 3 user repos)
   if (userRepos.length < COLD_START_MIN_REPOS) {
     const coldCandidates = await fetchCandidates(token, [{
       topic: '', kind: 'coldStart', coldStart: true, perPage: 100, sort: 'stars',
-    }])
+    }], page)
     upsertCandidates(db, coldCandidates, profileHash)
     const coldByIdMap = readBackRows(db, coldCandidates)
     const items: RecommendationItem[] = coldCandidates
@@ -200,9 +208,14 @@ export async function getRecommendedHandler(): Promise<RecommendationResponse> {
         }
       })
       .filter((i): i is RecommendationItem => i !== null)
-    const response: RecommendationResponse = { items, stale: false, coldStart: true }
-    l1Cache.set(profileHash, { timestamp: Date.now(), response })
-    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(`recommended_cache_ts:${profileHash}`, String(Date.now()))
+    const filteredItems = excludeSet.size > 0
+      ? items.filter(i => !excludeSet.has(String(i.repo.id)))
+      : items
+    const response: RecommendationResponse = { items: filteredItems, stale: false, coldStart: true }
+    if (page === 1) {
+      l1Cache.set(profileHash, { timestamp: Date.now(), response })
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(`recommended_cache_ts:${profileHash}`, String(Date.now()))
+    }
     return response
   }
 
@@ -211,14 +224,15 @@ export async function getRecommendedHandler(): Promise<RecommendationResponse> {
   const corpus = computeCorpusStats(corpusRows)
   const profile = buildUserProfile({ userRepos, corpus, engagementEvents, clickedReposById })
   const queries = planQueries(profile, corpus)
-  let candidates = await fetchCandidates(token, queries)
+  let candidates = await fetchCandidates(token, queries, page)
 
-  // Filter: not user-owned, not already user's, not recently clicked
+  // Filter: not user-owned, not already user's, not recently clicked, not already shown
   const existingIds = new Set(userRepos.map((r) => String(r.id)))
   const githubUsernameRow = db.prepare("SELECT value FROM settings WHERE key = 'github_username'").get() as { value: string } | undefined
   const githubUsername = githubUsernameRow?.value?.toLowerCase() ?? null
   candidates = candidates.filter((c) =>
     !existingIds.has(String(c.id)) &&
+    !excludeSet.has(String(c.id)) &&
     !profile.engagement.clickedRepoIds.has(String(c.id)) &&
     (!githubUsername || c.owner.login.toLowerCase() !== githubUsername)
   )
@@ -238,11 +252,12 @@ export async function getRecommendedHandler(): Promise<RecommendationResponse> {
 
   // Fallback: if the niche-only candidate pool yielded nothing (e.g. user's
   // topics are dominated by repos above MAX_STAR_CEILING), fall back to the
-  // cold-start popular pool so the UI is never empty.
+  // cold-start popular pool so the UI is never empty. Honour `page` and
+  // `excludeIds` so subsequent scroll fetches surface new mainstream picks.
   if (items.length === 0) {
     const coldCandidates = await fetchCandidates(token, [{
       topic: '', kind: 'coldStart', coldStart: true, perPage: 100, sort: 'stars',
-    }])
+    }], page)
     if (coldCandidates.length > 0) {
       upsertCandidates(db, coldCandidates, profileHash)
       const coldByIdMap = readBackRows(db, coldCandidates)
@@ -256,21 +271,23 @@ export async function getRecommendedHandler(): Promise<RecommendationResponse> {
             anchors: [], primaryAnchor: null,
           }
         })
-        .filter((i): i is RecommendationItem => i !== null)
+        .filter((i): i is RecommendationItem => i !== null && !excludeSet.has(String(i.repo.id)))
       const response: RecommendationResponse = { items: fallbackItems, stale: false, coldStart: true }
-      l1Cache.set(profileHash, { timestamp: Date.now(), response })
+      if (page === 1) l1Cache.set(profileHash, { timestamp: Date.now(), response })
       return response
     }
   }
 
   const response: RecommendationResponse = { items, stale: false, coldStart: false }
-  l1Cache.set(profileHash, { timestamp: Date.now(), response })
-  db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(`recommended_cache_ts:${profileHash}`, String(Date.now()))
+  if (page === 1) {
+    l1Cache.set(profileHash, { timestamp: Date.now(), response })
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(`recommended_cache_ts:${profileHash}`, String(Date.now()))
+  }
   return response
 }
 
 export function registerRecommendHandlers(): void {
-  ipcMain.handle('github:getRecommended', async () => {
-    return getRecommendedHandler()
+  ipcMain.handle('github:getRecommended', async (_event, page?: number, excludeIds?: string[]) => {
+    return getRecommendedHandler(page ?? 1, excludeIds ?? [])
   })
 }
