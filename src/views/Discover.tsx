@@ -291,10 +291,6 @@ export default function Discover() {
     }, { replace: true })
   }
 
-  function handleAiNavigate(owner: string, name: string) {
-    navigate(`/repo/${owner}/${name}`)
-  }
-
   useEffect(() => {
     window.api.search.getTopics().then(setAllTopics).catch(() => {})
   }, [])
@@ -787,6 +783,10 @@ export default function Discover() {
     }
     navigate(path, { state: { fromDiscoverView: snap?.viewMode, fromDiscoverPath: location.pathname + location.search, repoAvatarUrl: repo?.avatar_url ?? null, background: location } })
   }, [navigate, location.pathname, location.search])
+
+  const handleAiNavigate = useCallback((owner: string, name: string) => {
+    navigateToRepo(`/repo/${owner}/${name}`)
+  }, [navigateToRepo])
 
   // Stable callback — reads activeTags via liveSnapshotRef to avoid capturing it in deps
   const addTag = useCallback((tag: string) => {
