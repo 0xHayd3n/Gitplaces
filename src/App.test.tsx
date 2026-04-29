@@ -11,11 +11,13 @@ function makeApi(overrides: Partial<typeof window.api> = {}) {
       getUser: vi.fn(), getStarred: vi.fn().mockResolvedValue(undefined),
       disconnect: vi.fn(),
       getSavedRepos: vi.fn().mockResolvedValue([]),
+      getFeedRepos: vi.fn().mockResolvedValue([]),
       saveRepo: vi.fn().mockResolvedValue(undefined),
       searchRepos: vi.fn().mockResolvedValue([]),
       getRepo: vi.fn().mockResolvedValue(null),
       getReadme: vi.fn().mockResolvedValue(null),
       getReleases: vi.fn().mockResolvedValue([]),
+      getCompare: vi.fn().mockResolvedValue(null),
       getRelatedRepos: vi.fn().mockResolvedValue([]),
     },
     settings: {

@@ -1,0 +1,96 @@
+.release-event {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px 14px;
+  border-bottom: 1px solid #21262d;
+}
+
+.release-event__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.release-event__avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.release-event__time {
+  margin-left: auto;
+  font-size: 11px;
+  color: #484f58;
+}
+
+.release-event__header strong {
+  color: var(--t1);
+  font-weight: 600;
+}
+
+.release-event__tag,
+.release-event__repo {
+  color: var(--t1);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.1s;
+}
+
+.release-event__tag:hover,
+.release-event__repo:hover {
+  border-bottom-color: var(--t1);
+}
+
+/* Notes flow inline within the event row — no inset card. */
+.release-event__notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 28px; /* aligns body under the actor text, past the avatar */
+}
+
+.release-event__title {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--t1);
+  text-decoration: none;
+  line-height: 1.3;
+}
+
+.release-event__title:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--t1);
+}
+
+/* Markdown rendering inherits from ReadmeRenderer's .readme-body styles
+ * (tables, code blocks, callouts, etc. — same as RepoDetail). We just
+ * provide the wrapper for word-wrapping and a small fallback for Suspense. */
+.release-event__body {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.release-event__body-fallback {
+  min-height: 24px;
+}
+
+.release-event__toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--accent, #58a6ff);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.release-event__toggle:hover {
+  text-decoration: underline;
+}

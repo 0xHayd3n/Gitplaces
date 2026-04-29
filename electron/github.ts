@@ -86,7 +86,7 @@ export interface GitHubEventRepo {
 export type GitHubEventPayload =
   | { type: 'WatchEvent'; action: 'started' }
   | { type: 'ForkEvent'; forkee: { full_name: string } }
-  | { type: 'ReleaseEvent'; action: 'published'; release: { tag_name: string } }
+  | { type: 'ReleaseEvent'; action: 'published'; release: { tag_name: string; name?: string | null; body?: string | null } }
   | { type: 'PullRequestEvent'; action: 'closed'; pull_request: { merged: boolean; title: string } }
 
 export interface GitHubEvent {
@@ -100,22 +100,19 @@ export interface GitHubEvent {
 
 const HIGH_SIGNAL = new Set(['WatchEvent', 'ForkEvent', 'ReleaseEvent', 'PullRequestEvent'])
 
-export async function getReceivedEvents(token: string, username: string): Promise<GitHubEvent[]> {
-  const res = await fetch(
-    `${BASE}/users/${encodeURIComponent(username)}/received_events?per_page=30`,
-    { headers: githubHeaders(token) },
-  )
-  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
+const RECEIVED_EVENTS_MAX_PAGES = 5
+const RECEIVED_EVENTS_DEFAULT_CUTOFF_MS = 90 * 24 * 60 * 60 * 1000
 
-  const raw = await res.json() as Array<{
-    id: string
-    type: string
-    actor: { login: string; avatar_url: string }
-    repo: { name: string }
-    payload: Record<string, unknown>
-    created_at: string
-  }>
+type RawReceivedEvent = {
+  id: string
+  type: string
+  actor: { login: string; avatar_url: string }
+  repo: { name: string }
+  payload: Record<string, unknown>
+  created_at: string
+}
 
+function mapReceivedEvents(raw: RawReceivedEvent[]): GitHubEvent[] {
   return raw
     .filter(e => HIGH_SIGNAL.has(e.type))
     .filter(e => {
@@ -133,6 +130,50 @@ export async function getReceivedEvents(token: string, username: string): Promis
       payload: { type: e.type, ...e.payload } as GitHubEventPayload,
       created_at: e.created_at,
     }))
+}
+
+export async function getReceivedEvents(
+  token: string,
+  username: string,
+  cutoffMs: number = RECEIVED_EVENTS_DEFAULT_CUTOFF_MS,
+): Promise<GitHubEvent[]> {
+  const cutoff = Date.now() - cutoffMs
+  const collected: GitHubEvent[] = []
+  let url: string | null = `${BASE}/users/${encodeURIComponent(username)}/received_events?per_page=30`
+  let pagesFetched = 0
+
+  while (url && pagesFetched < RECEIVED_EVENTS_MAX_PAGES) {
+    let res: Response
+    try {
+      res = await fetch(url, { headers: githubHeaders(token) })
+    } catch (err) {
+      if (pagesFetched === 0) throw err
+      break // network failure on later page → return what we have
+    }
+    if (!res.ok) {
+      if (pagesFetched === 0) throw new Error(`GitHub API error: ${res.status}`)
+      break // rate limit or transient on later page → return what we have
+    }
+
+    const raw = await res.json() as RawReceivedEvent[]
+    pagesFetched++
+    collected.push(...mapReceivedEvents(raw))
+
+    // Empty page → nothing more to find, even if a next-link is present.
+    if (raw.length === 0) break
+
+    // Early termination when the oldest event in this page is past the cutoff.
+    // GitHub returns events newest-first, so once we cross the line subsequent
+    // pages can only contain older events.
+    const oldestTime = new Date(raw[raw.length - 1].created_at).getTime()
+    if (oldestTime < cutoff) break
+
+    const link = res.headers.get('Link') ?? ''
+    const match = link.match(/<([^>]+)>;\s*rel="next"/)
+    url = match ? match[1] : null
+  }
+
+  return collected.filter(e => new Date(e.created_at).getTime() >= cutoff)
 }
 
 export async function getUser(token: string): Promise<GitHubUser> {
@@ -229,6 +270,77 @@ export async function getReleases(token: string | null, owner: string, name: str
   const res = await fetch(`${BASE}/repos/${owner}/${name}/releases?per_page=10`, { headers: githubHeaders(token) })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   return res.json() as Promise<GitHubRelease[]>
+}
+
+// ── Compare (release before/after summary) ─────────────────────────
+// Compact projection of GitHub's compare API. We intentionally drop the full
+// commit and file lists from the response — release widgets only need totals
+// and a top-N preview. Cache results in the main process keyed on the ref
+// pair, since compare results between two immutable refs never change.
+
+export interface CompareSummary {
+  base: string
+  head: string
+  htmlUrl: string
+  totalCommits: number
+  filesChanged: number
+  additions: number
+  deletions: number
+  topFiles: { filename: string; status: string; additions: number; deletions: number }[]
+  topAuthors: { login: string; avatarUrl: string; commits: number }[]
+}
+
+export async function getCompare(
+  token: string | null,
+  owner: string,
+  name: string,
+  base: string,
+  head: string,
+): Promise<CompareSummary> {
+  const url = `${BASE}/repos/${owner}/${name}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`
+  const res = await fetch(url, { headers: githubHeaders(token) })
+  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
+  const data = await res.json() as {
+    html_url: string
+    total_commits: number
+    files?: Array<{ filename: string; status: string; additions: number; deletions: number }>
+    commits?: Array<{ author?: { login: string; avatar_url: string } | null; committer?: { login: string; avatar_url: string } | null }>
+  }
+
+  const files = data.files ?? []
+  const additions = files.reduce((sum, f) => sum + (f.additions ?? 0), 0)
+  const deletions = files.reduce((sum, f) => sum + (f.deletions ?? 0), 0)
+
+  // Top 5 files by total churn for an at-a-glance "what changed" preview.
+  const topFiles = [...files]
+    .sort((a, b) => (b.additions + b.deletions) - (a.additions + a.deletions))
+    .slice(0, 5)
+    .map(f => ({ filename: f.filename, status: f.status, additions: f.additions, deletions: f.deletions }))
+
+  // Aggregate author commit counts; prefer `author` (GitHub user) over `committer`.
+  const authorCounts = new Map<string, { login: string; avatarUrl: string; commits: number }>()
+  for (const c of data.commits ?? []) {
+    const a = c.author ?? c.committer
+    if (!a?.login) continue
+    const existing = authorCounts.get(a.login)
+    if (existing) existing.commits++
+    else authorCounts.set(a.login, { login: a.login, avatarUrl: a.avatar_url, commits: 1 })
+  }
+  const topAuthors = [...authorCounts.values()]
+    .sort((a, b) => b.commits - a.commits)
+    .slice(0, 5)
+
+  return {
+    base,
+    head,
+    htmlUrl: data.html_url,
+    totalCommits: data.total_commits,
+    filesChanged: files.length,
+    additions,
+    deletions,
+    topFiles,
+    topAuthors,
+  }
 }
 
 export async function starRepo(token: string, owner: string, name: string): Promise<void> {

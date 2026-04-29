@@ -92,6 +92,12 @@ export function initSchema(db: Database.Database): void {
       fetched_at TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS compare_cache (
+      cache_key  TEXT PRIMARY KEY,
+      data       TEXT NOT NULL,
+      fetched_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS create_sessions (
       id             TEXT PRIMARY KEY,
       name           TEXT NOT NULL,

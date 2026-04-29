@@ -4,7 +4,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-import { getUser, getStarred, startDeviceFlow, pollDeviceToken, getRepo, searchRepos, getReadme, getReleases } from './github'
+import { getUser, getStarred, startDeviceFlow, pollDeviceToken, getRepo, searchRepos, getReadme, getReleases, getReceivedEvents } from './github'
 
 function makeResponse(body: unknown, headers: Record<string, string> = {}, ok = true) {
   return {
@@ -224,6 +224,119 @@ describe('getReleases', () => {
     await getReleases(null, 'alice', 'repo')
     const [, opts] = mockFetch.mock.calls[0]
     expect(opts.headers.Authorization).toBeUndefined()
+  })
+})
+
+describe('getReceivedEvents', () => {
+  beforeEach(() => mockFetch.mockReset())
+
+  function makeRawEvent(overrides: Partial<{ id: string; type: string; created_at: string; payload: Record<string, unknown> }> = {}) {
+    return {
+      id: overrides.id ?? '1',
+      type: overrides.type ?? 'WatchEvent',
+      actor: { login: 'alice', avatar_url: 'a.png' },
+      repo: { name: 'alice/repo' },
+      payload: overrides.payload ?? { action: 'started' },
+      created_at: overrides.created_at ?? new Date().toISOString(),
+    }
+  }
+
+  it('returns mapped events from a single page', async () => {
+    mockFetch.mockResolvedValue(makeResponse([makeRawEvent({ id: '1', type: 'WatchEvent' })]))
+    const result = await getReceivedEvents('tok', 'alice')
+    expect(result).toHaveLength(1)
+    expect(result[0].repo.full_name).toBe('alice/repo')
+    expect(result[0].type).toBe('WatchEvent')
+  })
+
+  it('filters out non-high-signal event types', async () => {
+    mockFetch.mockResolvedValue(makeResponse([
+      makeRawEvent({ id: '1', type: 'PushEvent' }),
+      makeRawEvent({ id: '2', type: 'IssueCommentEvent' }),
+      makeRawEvent({ id: '3', type: 'WatchEvent' }),
+      makeRawEvent({ id: '4', type: 'ForkEvent', payload: { forkee: { full_name: 'bob/repo' } } }),
+      makeRawEvent({ id: '5', type: 'ReleaseEvent', payload: { action: 'published', release: { tag_name: 'v1' } } }),
+    ]))
+    const result = await getReceivedEvents('tok', 'alice')
+    expect(result.map(e => e.id).sort()).toEqual(['3', '4', '5'])
+  })
+
+  it('keeps merged PRs but drops unmerged closed PRs', async () => {
+    mockFetch.mockResolvedValue(makeResponse([
+      makeRawEvent({ id: '1', type: 'PullRequestEvent', payload: { action: 'closed', pull_request: { merged: true, title: 't' } } }),
+      makeRawEvent({ id: '2', type: 'PullRequestEvent', payload: { action: 'closed', pull_request: { merged: false, title: 't' } } }),
+      makeRawEvent({ id: '3', type: 'PullRequestEvent', payload: { action: 'opened', pull_request: { merged: false, title: 't' } } }),
+    ]))
+    const result = await getReceivedEvents('tok', 'alice')
+    expect(result.map(e => e.id)).toEqual(['1'])
+  })
+
+  it('follows Link header to fetch multiple pages', async () => {
+    const recent = new Date().toISOString()
+    const page1 = [makeRawEvent({ id: '1', type: 'WatchEvent', created_at: recent })]
+    const page2 = [makeRawEvent({ id: '2', type: 'WatchEvent', created_at: recent })]
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(page1, { Link: '<https://api.github.com/users/alice/received_events?page=2>; rel="next"' }))
+      .mockResolvedValueOnce(makeResponse(page2))
+    const result = await getReceivedEvents('tok', 'alice')
+    expect(result).toHaveLength(2)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops after 5 pages', async () => {
+    const recent = new Date().toISOString()
+    mockFetch.mockResolvedValue(
+      makeResponse(
+        [makeRawEvent({ id: 'r', type: 'WatchEvent', created_at: recent })],
+        { Link: '<https://api.github.com/users/alice/received_events?page=99>; rel="next"' },
+      )
+    )
+    await getReceivedEvents('tok', 'alice')
+    expect(mockFetch).toHaveBeenCalledTimes(5)
+  })
+
+  it('stops paginating once a page contains only events older than the cutoff', async () => {
+    const fresh = new Date().toISOString()
+    const old = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString()
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(
+        [makeRawEvent({ id: '1', type: 'WatchEvent', created_at: fresh })],
+        { Link: '<https://api.github.com/users/alice/received_events?page=2>; rel="next"' },
+      ))
+      .mockResolvedValueOnce(makeResponse(
+        [makeRawEvent({ id: '2', type: 'WatchEvent', created_at: old })],
+        { Link: '<https://api.github.com/users/alice/received_events?page=3>; rel="next"' },
+      ))
+    const result = await getReceivedEvents('tok', 'alice')
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+    expect(result.map(e => e.id)).toEqual(['1'])
+  })
+
+  it('stops paginating on an empty page even when a next-link is present', async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse(
+      [],
+      { Link: '<https://api.github.com/users/alice/received_events?page=2>; rel="next"' },
+    ))
+    const result = await getReceivedEvents('tok', 'alice')
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(result).toEqual([])
+  })
+
+  it('throws when the first page errors', async () => {
+    mockFetch.mockResolvedValueOnce(makeResponse({}, {}, false))
+    await expect(getReceivedEvents('tok', 'alice')).rejects.toThrow('GitHub API error: 401')
+  })
+
+  it('returns first-page data if a later page errors (graceful degradation)', async () => {
+    const recent = new Date().toISOString()
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(
+        [makeRawEvent({ id: '1', type: 'WatchEvent', created_at: recent })],
+        { Link: '<https://api.github.com/users/alice/received_events?page=2>; rel="next"' },
+      ))
+      .mockResolvedValueOnce(makeResponse({}, {}, false))
+    const result = await getReceivedEvents('tok', 'alice')
+    expect(result.map(e => e.id)).toEqual(['1'])
   })
 })
 

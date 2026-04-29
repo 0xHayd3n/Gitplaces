@@ -1,0 +1,40 @@
+.star-event {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 16px 14px;
+  border-bottom: 1px solid #21262d;
+}
+
+.star-event__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.star-event__avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.star-event__time {
+  margin-left: auto;
+  font-size: 11px;
+  color: #484f58;
+}
+
+/* Width matches one card from the fork pair (50% body − 44px arrow, halved)
+ * so a single starred-repo card visually mirrors a single fork card. */
+.star-event__body {
+  display: flex;
+  width: calc(25% - 22px);
+  margin: 0 auto;
+}
+
+.star-event__body > .repo-card {
+  flex: 1;
+}

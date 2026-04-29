@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('api', {
     getReleases:   (owner: string, name: string) => ipcRenderer.invoke('github:getReleases', owner, name),
     saveRepo:        (owner: string, name: string) => ipcRenderer.invoke('github:saveRepo', owner, name),
     getSavedRepos:   () => ipcRenderer.invoke('github:getSavedRepos'),
+    getFeedRepos:    () => ipcRenderer.invoke('github:getFeedRepos'),
     getMyRepos:      () => ipcRenderer.invoke('github:getMyRepos'),
     getRelatedRepos: (owner: string, name: string, topicsJson: string) =>
       ipcRenderer.invoke('github:getRelatedRepos', owner, name, topicsJson),
@@ -50,6 +51,8 @@ contextBridge.exposeInMainWorld('api', {
     getRawFile: (owner: string, name: string, branch: string, path: string) => ipcRenderer.invoke('github:getRawFile', owner, name, branch, path),
     getReceivedEvents: (username: string) =>
       ipcRenderer.invoke('github:getReceivedEvents', username) as Promise<import('./github').GitHubEvent[]>,
+    getCompare: (owner: string, name: string, base: string, head: string) =>
+      ipcRenderer.invoke('github:getCompare', owner, name, base, head) as Promise<import('./github').CompareSummary>,
   },
 
   settings: {

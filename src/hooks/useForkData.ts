@@ -25,6 +25,38 @@ function rowToForkData(row: RepoRow): ForkRepoData {
   }
 }
 
+// Single-repo variant. Shares the same module-level cache as useForkData so a
+// repo fetched for a fork pair is reused when the same repo appears in a star
+// event (and vice versa).
+export function useRepoData(
+  fullName: string
+): { repo: ForkRepoData | null; loading: boolean } {
+  const [repo, setRepo] = useState<ForkRepoData | null>(cache.get(fullName) ?? null)
+  const [loading, setLoading] = useState(!cache.has(fullName))
+
+  useEffect(() => {
+    if (cache.has(fullName)) {
+      setRepo(cache.get(fullName) ?? null)
+      setLoading(false)
+      return
+    }
+    const [owner, name] = fullName.split('/')
+    window.api.github.getRepo(owner, name)
+      .then(row => {
+        const data = row ? rowToForkData(row) : null
+        cache.set(fullName, data)
+        setRepo(data)
+      })
+      .catch(() => {
+        cache.set(fullName, null)
+        setRepo(null)
+      })
+      .finally(() => setLoading(false))
+  }, [fullName])
+
+  return { repo, loading }
+}
+
 // Note: does not support changing originalFullName/forkFullName after mount.
 // State is initialized from cache at first render only; re-mounting handles new inputs.
 export function useForkData(

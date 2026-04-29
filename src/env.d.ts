@@ -81,6 +81,7 @@ declare global {
         getReleases:   (owner: string, name: string) => Promise<ReleaseRow[]>
         saveRepo:         (owner: string, name: string) => Promise<void>
         getSavedRepos:    () => Promise<{ owner: string; name: string }[]>
+        getFeedRepos:     () => Promise<{ owner: string; name: string }[]>
         getMyRepos:       () => Promise<any[]>
         getRelatedRepos:  (owner: string, name: string, topicsJson: string) => Promise<RepoRow[]>
         starRepo:         (owner: string, name: string) => Promise<void>
@@ -99,6 +100,17 @@ declare global {
           payload: Record<string, unknown>
           created_at: string
         }>>
+        getCompare: (owner: string, name: string, base: string, head: string) => Promise<{
+          base: string
+          head: string
+          htmlUrl: string
+          totalCommits: number
+          filesChanged: number
+          additions: number
+          deletions: number
+          topFiles: { filename: string; status: string; additions: number; deletions: number }[]
+          topAuthors: { login: string; avatarUrl: string; commits: number }[]
+        }>
       }
       settings: {
         get: (key: string) => Promise<string | null>

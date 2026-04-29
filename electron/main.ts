@@ -7,7 +7,7 @@ import Store from 'electron-store'
 import type Database from 'better-sqlite3'
 import { getDb, closeDb } from './db'
 import { getToken, setToken, clearToken, setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner } from './store'
-import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents } from './github'
+import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, type CompareSummary } from './github'
 import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
 import { scanFromSources } from './mcp-scanner'
 import type { McpScanResult } from '../src/types/mcp'
@@ -770,6 +770,17 @@ ipcMain.handle('github:getSavedRepos', async () => {
   return db.prepare('SELECT owner, name FROM repos WHERE saved_at IS NOT NULL').all()
 })
 
+// Repos that should contribute to the activity feed: anything saved OR currently
+// starred. Distinct from getSavedRepos (which only powers the Library "is saved"
+// predicate) — the feed wants release coverage for every repo the user has shown
+// interest in, including stars-only.
+ipcMain.handle('github:getFeedRepos', async () => {
+  const db = getDb(app.getPath('userData'))
+  return db.prepare(
+    'SELECT owner, name FROM repos WHERE saved_at IS NOT NULL OR starred_at IS NOT NULL'
+  ).all()
+})
+
 ipcMain.handle('github:getRelatedRepos', async (_event, owner: string, name: string, topicsJson: string) => {
   const db = getDb(app.getPath('userData'))
   const topics: string[] = (() => { try { return JSON.parse(topicsJson) } catch { return [] } })()
@@ -843,6 +854,42 @@ ipcMain.handle('github:getReceivedEvents', async (_event, username: string) => {
   const token = getToken()
   if (!token) return []
   return getReceivedEvents(token, username)
+})
+
+// Persistent disk cache for compare summaries with a 30-day TTL.
+// Refs are immutable so the response between two specific tags never changes;
+// the TTL is just a safety/cleanup horizon (and an upgrade path if we ever
+// extend the projected fields).
+const COMPARE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
+
+ipcMain.handle('github:getCompare', async (_event, owner: string, name: string, base: string, head: string) => {
+  // `...` separator is safe: git refs cannot contain `...` per git-check-ref-rules,
+  // so this can never collide between distinct (base, head) pairs.
+  const key = `${owner}/${name}/${base}...${head}`
+  const db = getDb(app.getPath('userData'))
+
+  const row = db.prepare('SELECT data, fetched_at FROM compare_cache WHERE cache_key = ?').get(key) as
+    | { data: string; fetched_at: string }
+    | undefined
+
+  if (row) {
+    const age = Date.now() - new Date(row.fetched_at).getTime()
+    if (age < COMPARE_CACHE_TTL_MS) {
+      try {
+        return JSON.parse(row.data) as CompareSummary
+      } catch {
+        // Corrupted row — drop it so the refetch path can write a clean record
+        // instead of leaving us permanently parse-failing on every cold start.
+        db.prepare('DELETE FROM compare_cache WHERE cache_key = ?').run(key)
+      }
+    }
+  }
+
+  const token = getToken() ?? null
+  const summary = await getCompare(token, owner, name, base, head)
+  db.prepare('INSERT OR REPLACE INTO compare_cache (cache_key, data, fetched_at) VALUES (?, ?, ?)')
+    .run(key, JSON.stringify(summary), new Date().toISOString())
+  return summary
 })
 
 // ── SVG cache IPC ────────────────────────────────────────────────

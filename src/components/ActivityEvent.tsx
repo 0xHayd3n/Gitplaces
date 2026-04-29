@@ -3,6 +3,8 @@ import { useSavedRepos } from '../contexts/SavedRepos'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
 import './ActivityEvent.css'
 import { ForkEventCard } from './ForkEventCard'
+import { StarEventCard } from './StarEventCard'
+import { ReleaseEventCard } from './ReleaseEventCard'
 
 interface Props {
   event: GitHubFeedEvent
@@ -23,30 +25,13 @@ function buildDescription(event: GitHubFeedEvent): { parts: Array<{ text: string
   const actor = event.actor.login
   const repoFull = event.repo.full_name
 
-  switch (event.type) {
-    case 'WatchEvent':
-      return { parts: [
-        { text: actor, bold: true },
-        { text: ' starred ', bold: false },
-        { text: repoFull, bold: true },
-      ]}
-    case 'ReleaseEvent': {
-      const tag = (event.payload as { release: { tag_name: string } }).release.tag_name
-      return { parts: [
-        { text: actor, bold: true },
-        { text: ' released ', bold: false },
-        { text: tag, bold: true },
-        { text: ' on ', bold: false },
-        { text: repoFull, bold: true },
-      ]}
-    }
-    case 'PullRequestEvent':
-      return { parts: [
-        { text: actor, bold: true },
-        { text: ' merged a PR into ', bold: false },
-        { text: repoFull, bold: true },
-      ]}
-  }
+  // PullRequestEvent is the only path that still flows through here — Watch,
+  // Release, and Fork events have their own dedicated card components.
+  return { parts: [
+    { text: actor, bold: true },
+    { text: ' merged a PR into ', bold: false },
+    { text: repoFull, bold: true },
+  ]}
 }
 
 export default function ActivityEvent({ event }: Props) {
@@ -55,6 +40,12 @@ export default function ActivityEvent({ event }: Props) {
 
   if (event.type === 'ForkEvent') {
     return <ForkEventCard event={event} />
+  }
+  if (event.type === 'WatchEvent') {
+    return <StarEventCard event={event} />
+  }
+  if (event.type === 'ReleaseEvent') {
+    return <ReleaseEventCard event={event} />
   }
 
   const [owner, name] = event.repo.full_name.split('/')
