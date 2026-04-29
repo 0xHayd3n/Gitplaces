@@ -1,8 +1,4 @@
 // electron/services/updateService.ts
-import type Database from 'better-sqlite3'
-import type { BrowserWindow } from 'electron'
-import { getToken, getGitHubUser } from '../store'
-import { githubHeaders } from '../github'
 
 // ── Pure helpers (tested) ──────────────────────────────────────────────────────
 
