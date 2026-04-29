@@ -195,6 +195,7 @@ export default function Settings() {
   const handleIntervalChange = useCallback(async (hours: number) => {
     const clamped = Math.min(168, Math.max(1, hours))
     setCheckIntervalHours(clamped)
+    setIntervalDraft(String(clamped))
     await window.api.settings.set('updateCheckIntervalHours', String(clamped))
     await window.api.updates.restartService()
   }, [])
