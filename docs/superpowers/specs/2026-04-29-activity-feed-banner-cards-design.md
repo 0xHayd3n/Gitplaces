@@ -131,7 +131,7 @@ interface ActivityModalProps {
 - Renders the hero banner using the same `DitherBackground` + overlay pattern as `BannerCard`, but in a 200px-tall hero variant.
 - Renders the close button, header strip, body (with the chosen content component), and footer.
 - Footer buttons:
-  - `Open in Library` — calls `useNavigate()(\`/library/repo/${owner}/${name}\`)` *and* `onClose()`. Disabled with tooltip "Save this repo to your library first" if `useSavedRepos().isSaved(owner, name) === false`.
+  - `Open in Library` — calls `onClose()` first, then `useNavigate()(\`/library/repo/${owner}/${name}\`)` (close-before-navigate avoids a flash of the modal during the route change). Disabled with tooltip "Save this repo to your library first" if `useSavedRepos().isSaved(owner, name) === false`.
   - `View on GitHub` — opens the appropriate URL externally (`https://github.com/{owner}/{name}/releases/tag/{tag}` for releases, `https://github.com/{owner}/{name}/pull/{number}` for PRs).
   - `Close` — calls `onClose()`.
 - Esc keypress handler attached on mount, removed on unmount.
@@ -156,7 +156,7 @@ interface ActivityModalProps {
 **Props:** `{ event: GitHubFeedEvent }`
 
 Renders the body content for a `ReleaseEvent` modal:
-- Lazy-loaded `<ReadmeRenderer>` (existing component) with the release body markdown, after `stripCompareLine()`-ing the auto-generated changelog line.
+- Lazy-loaded `<ReadmeRenderer>` (existing component) with the release body markdown, after `stripCompareLine()`-ing the auto-generated changelog line. `stripCompareLine` is exported from `src/utils/parseCompareUrl.ts`.
 - `<CompareSummary>` (existing component) below the markdown, when `parseCompareUrl(body)` returns a valid `{ owner, repo, base, head }`. Skipped silently if no compare URL is in the body.
 
 ### `PullRequestModalContent.tsx` (new)
@@ -279,7 +279,7 @@ The release flag from the GitHub API isn't currently surfaced through `useFeed`'
 export function stripMarkdownPreview(body: string, maxLength: number): string
 ```
 
-- Removes the auto-generated `**Full Changelog**: ...` line via existing `stripCompareLine` helper.
+- Removes the auto-generated `**Full Changelog**: ...` line via the existing `stripCompareLine` helper exported from `src/utils/parseCompareUrl.ts`.
 - Strips fenced code blocks (` ``` ... ``` `) and inline code (`` ` `` to `` ` ``).
 - Strips images (`![alt](url)` → empty).
 - Strips link wrappers (`[text](url)` → `text`).
@@ -316,11 +316,11 @@ For PRs: `versionLabel = '#' + pull_request.number`, `tag = 'PR MERGED'`, `title
 
 `PullRequestEvent` from GitHub's received_events arrives with multiple `action` values. `useFeed.ts` will filter to merged events only, before pushing into `events`:
 ```ts
-.filter(e =>
-  e.type !== 'PullRequestEvent' ||
-  (e.payload as { action?: string; pull_request?: { merged?: boolean } }).action === 'closed' &&
-    (e.payload as { pull_request?: { merged?: boolean } }).pull_request?.merged === true
-)
+.filter(e => {
+  if (e.type !== 'PullRequestEvent') return true
+  const payload = e.payload as { action?: string; pull_request?: { merged?: boolean } }
+  return payload.action === 'closed' && payload.pull_request?.merged === true
+})
 ```
 This keeps `PullRequestEvent` consumers in `ActivityEvent.tsx` simple (no need to recheck the action).
 
