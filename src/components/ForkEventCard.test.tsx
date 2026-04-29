@@ -93,6 +93,15 @@ describe('ForkEventCard', () => {
     expect(links.some(l => l.getAttribute('href') === 'https://github.com/zzzzshawn/Databuddy')).toBe(true)
   })
 
+  it('applies TypeScript language color to lang-dot', () => {
+    mockUseForkData.mockReturnValue({ original: originalData, fork: forkData, loading: false })
+
+    const { container } = render(<ForkEventCard event={forkEvent} />)
+
+    const dot = container.querySelector('.fork-mini-card__lang-dot')
+    expect(dot).toHaveStyle({ background: '#3178c6' })
+  })
+
   it('falls back to repo name from event when API returns null', () => {
     mockUseForkData.mockReturnValue({ original: null, fork: null, loading: false })
 

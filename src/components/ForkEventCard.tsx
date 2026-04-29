@@ -14,6 +14,31 @@ function relativeTime(iso: string): string {
   return `${days}d ago`
 }
 
+const LANGUAGE_COLORS: Record<string, string> = {
+  TypeScript:  '#3178c6',
+  JavaScript:  '#f1e05a',
+  Python:      '#3572A5',
+  Rust:        '#dea584',
+  Go:          '#00ADD8',
+  Java:        '#b07219',
+  'C++':       '#f34b7d',
+  C:           '#555555',
+  'C#':        '#178600',
+  Ruby:        '#701516',
+  PHP:         '#4F5D95',
+  Swift:       '#F05138',
+  Kotlin:      '#A97BFF',
+  Shell:       '#89e051',
+  HTML:        '#e34c26',
+  CSS:         '#563d7c',
+}
+
+const LANG_COLOR_FALLBACK = '#3fb950'
+
+function langColor(language: string | null): string {
+  return (language && LANGUAGE_COLORS[language]) || LANG_COLOR_FALLBACK
+}
+
 interface ForkMiniCardProps {
   owner: string
   name: string
@@ -42,7 +67,7 @@ function ForkMiniCard({ owner, name, description, language, stars, forks, isFork
         <div className="fork-mini-card__meta">
           {language && (
             <span className="fork-mini-card__lang">
-              <span className="fork-mini-card__lang-dot" />
+              <span className="fork-mini-card__lang-dot" style={{ background: langColor(language) }} />
               {language}
             </span>
           )}
