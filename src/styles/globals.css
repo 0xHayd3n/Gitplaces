@@ -64,6 +64,9 @@
   --red-border:   rgba(220,38,38,0.18);
   --red-text:     #f87171;
 
+  /* Update notification */
+  --color-update-available: #3b82f6;
+
   /* Status aliases */
   --status-ok:  #059669;
   --status-err: #dc2626;
@@ -1477,6 +1480,15 @@ a {
   display: none;
 }
 
+/* Same problem under the repo overlay: the underlying view (Library, Discover,
+   TemplateGallery, etc.) still has its .discover-drag-strip mounted at top: 0,
+   and its OS-level drag region keeps intercepting clicks for the overlay's
+   docked tabs even though the overlay paints on top. Hide the strip whenever
+   a repo overlay is open so the overlay's content owns the title-bar zone. */
+.main-content:has(.repo-overlay) .discover-drag-strip {
+  display: none;
+}
+
 /* ── Grid Header ───────────────────────────────────────────────── */
 
 .grid-header-wrapper {
@@ -2558,6 +2570,9 @@ a {
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   transition: color 0.1s;
+  /* Carve out clickable zone inside the draggable .article-layout-tabs-slot
+     so tabs remain clickable when the sticky row docks at the top. */
+  -webkit-app-region: no-drag;
 }
 .repo-detail-tab:hover { color: var(--t1); }
 .repo-detail-tab.active {

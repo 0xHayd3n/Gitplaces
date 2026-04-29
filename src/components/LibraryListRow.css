@@ -1,0 +1,32 @@
+.library-row-indicators {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.library-row-name.update-available {
+  color: var(--color-update-available);
+}
+
+.library-indicator-fork {
+  color: var(--t3);
+  flex-shrink: 0;
+}
+
+.library-update-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-update-available);
+  display: flex;
+  align-items: center;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+
+.library-update-btn:hover {
+  opacity: 1;
+}
