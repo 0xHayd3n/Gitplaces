@@ -37,6 +37,8 @@ import { registerAiChatHandlers } from './ipc/aiChatHandlers'
 import { registerTtsHandlers } from './ipc/ttsHandlers'
 import { registerRecommendHandlers } from './ipc/recommendHandlers'
 import { registerEngagementHandlers } from './ipc/engagementHandlers'
+import { registerUpdateHandlers } from './ipc/updateHandlers'
+import { startUpdateService, checkIsFork } from './services/updateService'
 import { registerCreateHandlers, closeAllOnQuit } from './ipc/createHandlers'
 import { startVerificationService, enqueueRepo } from './services/verificationService'
 import { startSkillSyncService, push as skillSyncPush, pushAll as skillSyncPushAll, setupRepo as skillSyncSetupRepo } from './services/skillSyncService'
@@ -739,6 +741,28 @@ ipcMain.handle('github:saveRepo', async (_event, owner: string, name: string) =>
   // Fetch language so verificationService can route to the correct registry
   const saved = db.prepare('SELECT language FROM repos WHERE id = ?').get(`${owner}/${name}`) as { language: string | null } | undefined
   enqueueRepo({ repoId: `${owner}/${name}`, owner, name, language: saved?.language ?? null, priority: 'high' })
+  // Set initial stored_version baseline and check if user has forked this repo
+  setImmediate(async () => {
+    const token = getToken() ?? null
+    const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
+    if (token) headers.Authorization = `Bearer ${token}`
+    // Determine initial stored_version
+    let storedVersion: string | null = null
+    try {
+      const relRes = await fetch(`https://api.github.com/repos/${owner}/${name}/releases/latest`, { headers })
+      if (relRes.ok) {
+        const rel = await relRes.json() as { tag_name: string }
+        storedVersion = rel.tag_name
+      } else {
+        const dbRow = db.prepare('SELECT pushed_at FROM repos WHERE owner = ? AND name = ?').get(owner, name) as { pushed_at: string | null } | undefined
+        storedVersion = dbRow?.pushed_at ?? null
+      }
+    } catch { /* network failure — leave stored_version null */ }
+    // Check fork status
+    const isFork = await checkIsFork(owner, name)
+    db.prepare('UPDATE repos SET stored_version = ?, is_forked = ? WHERE owner = ? AND name = ?')
+      .run(storedVersion, isFork ? 1 : 0, owner, name)
+  })
 })
 
 ipcMain.handle('github:getSavedRepos', async () => {
@@ -1796,6 +1820,7 @@ registerAiChatHandlers()
 registerTtsHandlers()
 registerRecommendHandlers()
 registerEngagementHandlers()
+registerUpdateHandlers()
 registerCreateHandlers()
 
 // ── Profile IPC ──────────────────────────────────────────────────
@@ -2250,6 +2275,7 @@ app.whenReady().then(() => {
   if (mainWindow) {
     startVerificationService(db, mainWindow)
     startSkillSyncService(db, mainWindow)
+    startUpdateService(db, mainWindow)
   }
   const existingToken = getToken()
   if (existingToken) initTopicCache(existingToken).catch(() => {}) // Non-blocking
