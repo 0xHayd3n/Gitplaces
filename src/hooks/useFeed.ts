@@ -73,7 +73,7 @@ export function useFeed(): FeedState & { refresh: () => void } {
                 type: 'ReleaseEvent',
                 actor: { login: owner, avatar_url: `https://github.com/${owner}.png` },
                 repo: { full_name: `${owner}/${name}` },
-                payload: { release: { tag_name: r.tag_name, name: r.name, body: r.body } },
+                payload: { release: { tag_name: r.tag_name, name: r.name, body: r.body, prerelease: r.prerelease } },
                 created_at: r.published_at,
               }))
           ),

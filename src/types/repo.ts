@@ -61,6 +61,7 @@ export interface ReleaseRow {
   published_at: string
   body: string | null
   assets: ReleaseAsset[]
+  prerelease: boolean
 }
 
 /** Parse the JSON topics string from a RepoRow into a string array. */
