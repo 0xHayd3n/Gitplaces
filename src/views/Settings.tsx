@@ -5,7 +5,7 @@ import { useGitHubLogin } from '../hooks/useGitHubLogin'
 
 type SetupPhase = 'idle' | 'checking' | 'installing' | 'auth' | 'done' | 'error'
 type LoginPhase = 'idle' | 'logging-in' | 'done' | 'error'
-type CategoryId = 'claude-desktop' | 'appearance' | 'language' | 'downloads' | 'projects' | 'connectors'
+type CategoryId = 'claude-desktop' | 'appearance' | 'language' | 'downloads' | 'projects' | 'connectors' | 'updates'
 
 type CustomConnector = { id: string; name: string; url: string; oauthClientId: string; oauthClientSecret: string }
 
@@ -71,6 +71,13 @@ const ConnectorsIcon = () => (
   </svg>
 )
 
+const UpdatesIcon = () => (
+  <svg {...iconProps}>
+    <path d="M8 3v6 M5 6l3-3 3 3" />
+    <path d="M3.5 10a5.5 5.5 0 1 0 9.5-3.8" />
+  </svg>
+)
+
 const CATEGORIES: { id: CategoryId; label: string; icon: ReactNode }[] = [
   { id: 'claude-desktop', label: 'Claude Desktop', icon: <DesktopIcon /> },
   { id: 'appearance', label: 'Appearance', icon: <PaletteIcon /> },
@@ -78,6 +85,7 @@ const CATEGORIES: { id: CategoryId; label: string; icon: ReactNode }[] = [
   { id: 'downloads', label: 'Downloads', icon: <DownloadIcon /> },
   { id: 'projects', label: 'Projects', icon: <ProjectsIcon /> },
   { id: 'connectors', label: 'Connectors', icon: <ConnectorsIcon /> },
+  { id: 'updates', label: 'Updates', icon: <UpdatesIcon /> },
 ]
 
 export default function Settings() {
@@ -114,8 +122,26 @@ export default function Settings() {
   const [syncError, setSyncError] = useState<string | null>(null)
   const [syncConfirmOpen, setSyncConfirmOpen] = useState(false)
 
+  // Updates state
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(false)
+  const [checkIntervalHours, setCheckIntervalHours] = useState(24)
+  const [lastCheckedTs, setLastCheckedTs] = useState<number | null>(null)
+  const [updateChecking, setUpdateChecking] = useState(false)
+
   useEffect(() => {
     window.api.skillSync.getStatus().then(setSyncStatus)
+  }, [])
+
+  useEffect(() => {
+    window.api.settings.get('autoUpdateEnabled').then(val => {
+      setAutoUpdateEnabled(val === 'true')
+    }).catch(() => {})
+    window.api.settings.get('updateCheckIntervalHours').then(val => {
+      if (val) setCheckIntervalHours(parseInt(val, 10) || 24)
+    }).catch(() => {})
+    window.api.updates.lastChecked().then(({ timestamp }) => {
+      setLastCheckedTs(timestamp)
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -154,6 +180,26 @@ export default function Settings() {
     await window.api.skillSync.retryFailed()
     const status = await window.api.skillSync.getStatus()
     setSyncStatus(status)
+  }, [])
+
+  const handleAutoUpdateToggle = useCallback(async (enabled: boolean) => {
+    setAutoUpdateEnabled(enabled)
+    await window.api.settings.set('autoUpdateEnabled', enabled ? 'true' : 'false')
+  }, [])
+
+  const handleIntervalChange = useCallback(async (hours: number) => {
+    const clamped = Math.min(168, Math.max(1, hours))
+    setCheckIntervalHours(clamped)
+    await window.api.settings.set('updateCheckIntervalHours', String(clamped))
+    await window.api.updates.restartService()
+  }, [])
+
+  const handleCheckNow = useCallback(async () => {
+    setUpdateChecking(true)
+    await window.api.updates.checkNow()
+    const { timestamp } = await window.api.updates.lastChecked()
+    setLastCheckedTs(timestamp)
+    setUpdateChecking(false)
   }, [])
 
   // Connectors state
@@ -1049,6 +1095,74 @@ export default function Settings() {
     </div>
   )
 
+  const renderUpdates = () => (
+    <>
+      <div className="settings-group">
+        <div className="settings-group-title">Update Checks</div>
+        <div className="settings-group-body">
+
+          <div className="settings-group-row">
+            <div className="settings-group-row-main">
+              <div className="settings-group-row-label">Auto-update</div>
+              {autoUpdateEnabled && (
+                <div className="settings-group-row-sub settings-hint-warn">
+                  Auto-update for learned repos consumes Claude API credits automatically.
+                </div>
+              )}
+            </div>
+            <label className="settings-toggle">
+              <input
+                type="checkbox"
+                checked={autoUpdateEnabled}
+                onChange={e => handleAutoUpdateToggle(e.target.checked)}
+              />
+              <span className="settings-toggle-track" />
+            </label>
+          </div>
+
+          <div className="settings-group-row">
+            <div className="settings-group-row-main">
+              <div className="settings-group-row-label">Check every (hours)</div>
+            </div>
+            <input
+              type="number"
+              className="settings-input-number"
+              min={1}
+              max={168}
+              value={checkIntervalHours}
+              onChange={e => handleIntervalChange(parseInt(e.target.value, 10) || 24)}
+            />
+          </div>
+
+          <div className="settings-group-row">
+            <div className="settings-group-row-main">
+              <div className="settings-group-row-label">Last checked</div>
+              <div className="settings-group-row-sub">
+                {lastCheckedTs
+                  ? (() => {
+                      const diff = Math.floor((Date.now() / 1000 - lastCheckedTs) / 60)
+                      if (diff < 1) return 'Just now'
+                      if (diff < 60) return `${diff} minute${diff !== 1 ? 's' : ''} ago`
+                      const h = Math.floor(diff / 60)
+                      return `${h} hour${h !== 1 ? 's' : ''} ago`
+                    })()
+                  : 'Never'}
+              </div>
+            </div>
+            <button
+              className="settings-btn"
+              onClick={handleCheckNow}
+              disabled={updateChecking}
+            >
+              {updateChecking ? 'Checking…' : 'Check now'}
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </>
+  )
+
   const activeLabel = CATEGORIES.find(c => c.id === activeCategory)?.label ?? ''
 
   return (
@@ -1079,6 +1193,7 @@ export default function Settings() {
           {activeCategory === 'downloads' && renderDownloads()}
           {activeCategory === 'projects' && renderProjects()}
           {activeCategory === 'connectors' && renderConnectors()}
+          {activeCategory === 'updates' && renderUpdates()}
         </div>
       </main>
     </div>
