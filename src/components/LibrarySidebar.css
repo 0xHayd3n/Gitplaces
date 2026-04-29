@@ -174,6 +174,10 @@
   width: 78px;
 }
 
+.library-panel.mini .library-sidebar-header {
+  display: none;
+}
+
 .library-panel.mini .library-sidebar-filter {
   display: none;
 }
@@ -231,4 +235,38 @@
 
 .library-sidebar-type-icon.local {
   opacity: 0.55;
+}
+
+/* ── Summary button ──────────────────────────────────── */
+
+.library-summary-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 7px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t3);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.library-summary-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--t2);
+}
+
+.library-summary-btn.active {
+  color: var(--t1);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.library-panel.mini .library-summary-btn {
+  display: none;
 }

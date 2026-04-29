@@ -1,5 +1,6 @@
 // src/components/LibrarySidebar.tsx
 import { useState, useMemo } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Layers, Brain, User, History, Archive } from 'lucide-react'
 import './LibrarySidebar.css'
 import type { LibraryRow, StarredRepoRow, RepoRow } from '../types/repo'
@@ -93,6 +94,9 @@ export default function LibrarySidebar({
   selectedId, selectedLocalPath, activeSegment, onSegmentChange, onSelect, onSelectLocal,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const isSummaryActive = location.pathname === '/library'
 
   const allEntries = useMemo<LibraryEntry[]>(() => {
     const map = new Map<string, LibraryEntry>()
@@ -127,6 +131,12 @@ export default function LibrarySidebar({
   return (
     <aside className="library-sidebar">
       <div className="library-sidebar-header">REPOSITORIES</div>
+      <button
+        className={`library-summary-btn${isSummaryActive ? ' active' : ''}`}
+        onClick={() => navigate('/library')}
+      >
+        Summary
+      </button>
       <div className="library-sidebar-filter">
         {SEGMENTS.map(({ id, icon, label }) => (
           <button
