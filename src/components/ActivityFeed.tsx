@@ -1,12 +1,17 @@
+import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useGitHubAuth } from '../contexts/GitHubAuth'
-import { useFeed } from '../hooks/useFeed'
+import { useFeed, type GitHubFeedEvent } from '../hooks/useFeed'
 import ActivityEvent from './ActivityEvent'
+import { DateDivider } from './DateDivider'
+import { ActivityModal } from './ActivityModal'
+import { groupEventsByDay } from '../utils/groupEventsByDay'
 import './ActivityFeed.css'
 
 export default function ActivityFeed() {
   const { user } = useGitHubAuth()
   const { events, loading, error, refresh } = useFeed()
+  const [selectedEvent, setSelectedEvent] = useState<GitHubFeedEvent | null>(null)
 
   if (!user) {
     return (
@@ -15,6 +20,8 @@ export default function ActivityFeed() {
       </div>
     )
   }
+
+  const groups = groupEventsByDay(events)
 
   return (
     <div className="activity-feed">
@@ -42,10 +49,26 @@ export default function ActivityFeed() {
           <p className="activity-feed-msg">Nothing in your network yet</p>
         )}
 
-        {events.map(event => (
-          <ActivityEvent key={event.id} event={event} />
+        {groups.map(group => (
+          <div key={group.label}>
+            <DateDivider label={group.label} />
+            {group.events.map(event => (
+              <ActivityEvent
+                key={event.id}
+                event={event}
+                onOpenModal={setSelectedEvent}
+              />
+            ))}
+          </div>
         ))}
       </div>
+
+      {selectedEvent && (
+        <ActivityModal
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+        />
+      )}
     </div>
   )
 }
