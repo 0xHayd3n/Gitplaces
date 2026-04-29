@@ -19,7 +19,7 @@
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.1.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "^12.9.0",
     "electron-store": "^8.2.0",
     "epub-gen-memory": "^1.1.2",
     "html-docx-js": "^0.3.1",
