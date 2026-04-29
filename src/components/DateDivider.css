@@ -1,0 +1,20 @@
+.date-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 16px 12px;
+}
+
+.date-divider__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--t3);
+  flex-shrink: 0;
+}
+
+.date-divider__line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
