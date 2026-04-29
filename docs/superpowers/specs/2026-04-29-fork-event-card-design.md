@@ -12,7 +12,7 @@ Replace the plain-text fork event row in the ActivityFeed with a visual two-card
 - ForkEvents in the activity feed render a `ForkEventCard` instead of a text description.
 - The card shows the actor header (`{actor} forked a repository · {timestamp}`) above two mini repo cards joined by an arrow (`→`).
 - **Original repo card** (left): grey border, shows owner, repo name, description (2-line clamp), language dot, star count, fork count.
-- **Fork card** (right): blue border, "fork" badge (top-right), shows owner, repo name, description, language. No star/fork count (new forks always show 0).
+- **Fork card** (right): blue border, "fork" badge (top-right), shows owner, repo name, description, language. Star and fork counts are omitted — the fork card intentionally shows less metadata to visually distinguish it from the original.
 - Hovering either card brightens its border to `#58a6ff`.
 - Clicking either card opens `https://github.com/{owner}/{repo}` in a new tab.
 - While API data is loading, both cards render animated skeleton placeholders.
@@ -29,7 +29,7 @@ Top-level component for a fork feed event.
 **Responsibilities:**
 - Extracts `originalFullName` from `event.repo.full_name` and `forkFullName` from `(event.payload as { forkee: { full_name: string } }).forkee.full_name`.
 - Calls `useForkData(originalFullName, forkFullName)`.
-- Renders the actor header row.
+- Renders the actor header row: `event.actor.avatar_url` (20px circle), `event.actor.login` (bold), "forked a repository" text, and relative timestamp from `event.created_at` — right-aligned.
 - Renders two `ForkMiniCard` sub-components separated by the arrow glyph.
 - Renders skeleton cards when `loading === true`.
 
@@ -87,15 +87,24 @@ interface ForkRepoData {
 ```
 
 **Implementation:**
-- Module-level `Map<string, ForkRepoData>` cache — keyed by `full_name`. Populated on successful fetch; never invalidated within a session (fork metadata doesn't change meaningfully mid-session).
-- On mount, checks cache first. If both repos are cached, sets `loading: false` immediately.
-- For uncached repos, fetches `GET https://api.github.com/repos/{owner}/{repo}` using the same GitHub auth headers already used by `useFeed`.
-- Fetches both repos in parallel (`Promise.all`). Sets `loading: false` after both settle.
-- On fetch failure for either repo, stores `null` in the cache for that key so subsequent renders don't retry endlessly.
+- This is an Electron app; the GitHub OAuth token lives in the main process and is never exposed to the renderer. All GitHub API calls from the renderer go through the `window.api.github` IPC bridge.
+- Use `window.api.github.getRepo(owner, name)` to fetch each repo. This IPC handler already exists (`electron/main.ts`), handles auth internally, and returns a `RepoRow | null`. Map the relevant `RepoRow` fields to `ForkRepoData`: `description`, `language`, `stars`, `forks`.
+- Module-level `Map<string, ForkRepoData | null>` cache — keyed by `full_name`. Populated on resolution (including `null` for failures); never invalidated within a session.
+- On mount, each key is checked independently. Keys already in the cache (whether populated or `null`) are resolved immediately without a network call. Only uncached keys trigger `window.api.github.getRepo`. If both are cached, `loading` starts as `false` with no effect.
+- Uncached repos are fetched in parallel via `Promise.allSettled`. Sets `loading: false` after all outstanding fetches settle.
+- On IPC error or `null` return for a repo, stores `null` in the cache for that key so subsequent renders resolve immediately from cache without retrying.
 
 ### `ActivityEvent.tsx` (modify)
 
-Add a `'ForkEvent'` case to the existing event-type switch (currently the text-based `buildDescription` function handles it). The new case short-circuits the text path and returns `<ForkEventCard event={event} />` directly, bypassing `buildDescription` entirely for fork events.
+The `buildDescription()` function returns a `{ parts }` object — not JSX — so the integration point is **not** inside that switch. Instead, add an early return guard at the top of the `ActivityEvent` component render function (before `buildDescription` is called):
+
+```tsx
+if (event.type === 'ForkEvent') {
+  return <ForkEventCard event={event} />
+}
+```
+
+This short-circuits the text rendering path for fork events entirely. The existing `'ForkEvent'` case inside `buildDescription` can be left in place (it becomes dead code for fork events) or removed — either is acceptable.
 
 ## Data flow
 
@@ -107,8 +116,8 @@ FeedEvent (ForkEvent)
 ForkEventCard
   └── useForkData(originalFullName, forkFullName)
         ├── cache hit → return immediately
-        └── cache miss → GET /repos/{owner}/{repo} × 2 (parallel)
-              └── ForkRepoData { owner, name, description, language, stars, forks }
+        └── cache miss → window.api.github.getRepo × 2 (parallel, IPC to main process)
+              └── RepoRow → mapped to ForkRepoData { owner, name, description, language, stars, forks }
 
   └── render ForkMiniCard × 2 + arrow
         loading=true  → skeleton placeholders
