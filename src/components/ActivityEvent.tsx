@@ -2,7 +2,7 @@ import type { GitHubFeedEvent } from '../hooks/useFeed'
 import './ActivityEvent.css'
 import { ForkEventCard } from './ForkEventCard'
 import { StarEventCard } from './StarEventCard'
-import { BannerCard, type BannerCardTier } from './BannerCard'
+import { BannerCard, type BannerCardProps } from './BannerCard'
 import { classifyRelease, type ReleaseTier } from '../utils/classifyRelease'
 import { stripMarkdownPreview } from '../utils/stripMarkdownPreview'
 
@@ -39,7 +39,7 @@ function tierToTagText(tier: ReleaseTier): string {
 function releaseToBannerProps(
   event: GitHubFeedEvent,
   onOpenModal: (event: GitHubFeedEvent) => void,
-) {
+): BannerCardProps {
   const release = (event.payload as unknown as ReleasePayload).release
   const tier: ReleaseTier = classifyRelease({
     tagName: release.tag_name,
@@ -53,7 +53,7 @@ function releaseToBannerProps(
 
   return {
     tag: tierToTagText(tier),
-    tier: tier as BannerCardTier,
+    tier,
     title: `${release.tag_name}${titleSuffix}`,
     descriptionPreview: stripMarkdownPreview(release.body ?? '', PREVIEW_MAX_LENGTH),
     versionLabel: release.tag_name,
@@ -67,12 +67,12 @@ function releaseToBannerProps(
 function pullRequestToBannerProps(
   event: GitHubFeedEvent,
   onOpenModal: (event: GitHubFeedEvent) => void,
-) {
+): BannerCardProps {
   const pr = (event.payload as unknown as PullRequestPayload).pull_request
   const [ownerLogin] = event.repo.full_name.split('/')
   return {
     tag: 'PR MERGED',
-    tier: 'normal' as BannerCardTier,
+    tier: 'normal',
     title: pr.title,
     descriptionPreview: stripMarkdownPreview(pr.body ?? '', PREVIEW_MAX_LENGTH),
     versionLabel: `#${pr.number}`,
