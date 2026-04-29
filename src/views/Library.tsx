@@ -60,6 +60,22 @@ export default function Library() {
   }, [refreshAll])
 
   useEffect(() => {
+    const onStatusChanged = ({ ids }: { ids: string[] }) => {
+      if (!ids.length) return
+      refreshAll()
+    }
+    const onToast = ({ message }: { message: string }) => {
+      toast(message, 'success')
+    }
+    window.api.updates.onStatusChanged(onStatusChanged)
+    window.api.updates.onToast(onToast)
+    return () => {
+      window.api.updates.offStatusChanged(onStatusChanged)
+      window.api.updates.offToast(onToast)
+    }
+  }, [refreshAll, toast])
+
+  useEffect(() => {
     if (collMatch) setActivePanel('collections')
     else if (repoMatch) setActivePanel('repos')
   }, [collMatch, repoMatch])
