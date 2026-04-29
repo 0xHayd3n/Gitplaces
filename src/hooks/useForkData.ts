@@ -21,7 +21,7 @@ function rowToForkData(row: RepoRow): ForkRepoData {
     language: row.language,
     stars: row.stars,
     forks: row.forks,
-    avatarUrl: `https://github.com/${row.owner}.png?size=40`,
+    avatarUrl: row.avatar_url ?? `https://github.com/${row.owner}.png?size=200`,
   }
 }
 

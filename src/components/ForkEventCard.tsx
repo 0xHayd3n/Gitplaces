@@ -58,7 +58,7 @@ export function ForkEventCard({ event }: Props) {
             <ForkRepoCard
               owner={original?.owner ?? originalOwner}
               name={original?.name ?? originalName}
-              avatarUrl={`https://github.com/${original?.owner ?? originalOwner}.png?size=40`}
+              avatarUrl={original?.avatarUrl ?? `https://github.com/${originalOwner}.png?size=200`}
               description={original?.description ?? null}
               language={original?.language ?? null}
               stars={original?.stars ?? null}
@@ -69,7 +69,7 @@ export function ForkEventCard({ event }: Props) {
             <ForkRepoCard
               owner={fork?.owner ?? forkOwner}
               name={fork?.name ?? forkName}
-              avatarUrl={`https://github.com/${fork?.owner ?? forkOwner}.png?size=40`}
+              avatarUrl={fork?.avatarUrl ?? `https://github.com/${forkOwner}.png?size=200`}
               description={fork?.description ?? null}
               language={fork?.language ?? null}
               stars={fork?.stars ?? null}
