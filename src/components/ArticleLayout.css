@@ -165,10 +165,49 @@
   flex-shrink: 0;
 }
 
+/* Drag strip docked at the very top of the article layout. Provides the
+   window drag region for repo views and reserves the OS title-bar zone so
+   the tabs row below never enters it (and therefore stays clickable when
+   sticky-docked). Sticky so it remains pinned at top: 0 of the scroll
+   container as the user scrolls. Real DOM element (not ::before) because
+   Chromium's WM_NCHITTEST skips pseudo-elements for app-region.
+   Transparent by default so the banner shows through to the top edge; the
+   strip turns opaque only once the user has scrolled (.article-layout--
+   scrolled) so it visually appears alongside the docked tabs. The drag
+   region itself is active in both states — users can always drag the
+   window from the top. */
+.article-layout-drag-strip {
+  position: sticky;
+  top: 0;
+  height: 32px;
+  z-index: 11;
+  flex-shrink: 0;
+  background: transparent;
+  -webkit-app-region: drag;
+  transition: background 0.12s ease;
+}
+
+.article-layout--scrolled .article-layout-drag-strip {
+  background: var(--surface-1);
+}
+
+/* Extend the dither banner up behind the (default-transparent) drag strip
+   so the banner visually still reaches the top edge when not scrolled.
+   We shift only the dither (absolute-positioned) — not the whole top
+   section — because the navbar inside .article-layout-top has
+   -webkit-app-region: no-drag on its full-width wrapper, which would
+   otherwise cancel the drag strip's drag region if pulled up to overlap. */
+.article-layout-dither-bg {
+  top: -32px;
+  height: 272px;
+}
+
 .article-layout-tabs-slot {
   flex-shrink: 0;
   position: sticky;
-  top: 0;
+  /* Docks 32px below viewport top so the row sits below the drag strip,
+     keeping it out of the title-bar zone and reliably clickable. */
+  top: 32px;
   z-index: 10;
   background: var(--surface-1);
   border-bottom: 1px solid var(--bg3);

@@ -1,5 +1,5 @@
 // src/components/ArticleLayout.tsx
-import React, { useRef } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import './ArticleLayout.css'
 
 export type ArticleLayoutProps = {
@@ -52,11 +52,28 @@ export function ArticleLayout({
   const internalScrollRef = useRef<HTMLDivElement>(null)
   const resolvedScrollRef = scrollRef ?? internalScrollRef
 
+  // Track whether the user has scrolled at all so the top drag strip can
+  // appear only when content is scrolling under the title-bar zone (and stay
+  // hidden while the banner is still anchored to the top).
+  const [isScrolled, setIsScrolled] = useState(false)
+  useEffect(() => {
+    const el = resolvedScrollRef.current
+    if (!el) return
+    const update = () => setIsScrolled(el.scrollTop > 0)
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    return () => el.removeEventListener('scroll', update)
+  }, [resolvedScrollRef])
+
   return (
     <div
       ref={resolvedScrollRef}
-      className={`article-layout${fullBleedBody ? ' article-layout--fullbleed' : ''}${(tocSlot || statsSlot) ? ' article-layout--has-toc' : ''}${collapsedHeader ? ' article-layout--collapsed-header' : ''}`}
+      className={`article-layout${fullBleedBody ? ' article-layout--fullbleed' : ''}${(tocSlot || statsSlot) ? ' article-layout--has-toc' : ''}${collapsedHeader ? ' article-layout--collapsed-header' : ''}${isScrolled ? ' article-layout--scrolled' : ''}`}
     >
+      {/* Drag strip docks at top: 0 to reserve the title-bar zone (window
+          drag region) and push the sticky tabs row below it, keeping the
+          tabs reliably clickable when scrolled. */}
+      <div className="article-layout-drag-strip" aria-hidden="true" />
       <div className="article-layout-top">
         {!collapsedHeader && dither && <div className="article-layout-dither-bg">{dither}</div>}
         {navBar && <div className="article-layout-navbar-slot">{navBar}</div>}
