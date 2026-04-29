@@ -28,7 +28,6 @@ export function BannerCard({
         <DitherBackground
           avatarUrl={`https://github.com/${ownerLogin}.png?size=200`}
           fallbackGradient={tier === 'major' ? MAJOR_FALLBACK_GRADIENT : undefined}
-          staticFrame
         />
         <div className="banner-card__version-overlay">{versionLabel}</div>
       </div>
