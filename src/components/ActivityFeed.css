@@ -1,0 +1,86 @@
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.activity-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+
+.activity-feed-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+
+.activity-feed-refresh {
+  background: none;
+  border: none;
+  padding: 4px;
+  border-radius: 4px;
+  color: var(--t3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: color 0.1s, background 0.1s;
+}
+
+.activity-feed-refresh:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--t2);
+}
+
+.activity-feed-refresh:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.activity-feed-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.activity-feed-msg {
+  padding: 32px 16px;
+  font-size: 13px;
+  color: var(--t3);
+  text-align: center;
+  margin: 0;
+}
+
+.activity-feed-msg--error {
+  color: rgba(255, 100, 100, 0.8);
+}
+
+.activity-feed-skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.activity-event-skeleton {
+  height: 52px;
+  border-bottom: 1px solid var(--glass-border);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.03) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: feed-shimmer 1.4s infinite;
+}
+
+@keyframes feed-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
