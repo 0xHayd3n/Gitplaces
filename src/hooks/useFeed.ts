@@ -17,6 +17,7 @@ interface FeedState {
 }
 
 const POLL_MS = 5 * 60 * 1000
+const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000
 
 export function useFeed(): FeedState & { refresh: () => void } {
   const { user } = useGitHubAuth()
@@ -29,8 +30,46 @@ export function useFeed(): FeedState & { refresh: () => void } {
     setLoading(true)
     setError(null)
     try {
-      const result = await window.api.github.getReceivedEvents(login) as GitHubFeedEvent[]
-      setEvents(result)
+      const [received, savedRepos] = await Promise.all([
+        window.api.github.getReceivedEvents(login) as Promise<GitHubFeedEvent[]>,
+        window.api.github.getSavedRepos(),
+      ])
+
+      const cutoff = Date.now() - NINETY_DAYS_MS
+      const releaseResults = await Promise.allSettled(
+        savedRepos.map(({ owner, name }) =>
+          window.api.github.getReleases(owner, name).then(releases =>
+            releases
+              .filter(r => new Date(r.published_at).getTime() > cutoff)
+              .map((r): GitHubFeedEvent => ({
+                id: `release-${owner}-${name}-${r.tag_name}`,
+                type: 'ReleaseEvent',
+                actor: { login: owner, avatar_url: `https://github.com/${owner}.png` },
+                repo: { full_name: `${owner}/${name}` },
+                payload: { release: { tag_name: r.tag_name } },
+                created_at: r.published_at,
+              }))
+          )
+        )
+      )
+
+      const receivedReleaseKeys = new Set(
+        received
+          .filter(e => e.type === 'ReleaseEvent')
+          .map(e => `${e.repo.full_name}::${(e.payload as { release?: { tag_name: string } }).release?.tag_name}`)
+      )
+
+      const repoReleases = releaseResults
+        .flatMap(r => r.status === 'fulfilled' ? r.value : [])
+        .filter(e => {
+          const key = `${e.repo.full_name}::${(e.payload as { release: { tag_name: string } }).release.tag_name}`
+          return !receivedReleaseKeys.has(key)
+        })
+
+      const merged = [...received, ...repoReleases]
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+      setEvents(merged)
     } catch {
       setError('Couldn\'t load activity')
     } finally {
