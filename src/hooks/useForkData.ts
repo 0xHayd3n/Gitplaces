@@ -8,6 +8,7 @@ export interface ForkRepoData {
   language: string | null
   stars: number | null
   forks: number | null
+  avatarUrl: string
 }
 
 const cache = new Map<string, ForkRepoData | null>()
@@ -20,6 +21,7 @@ function rowToForkData(row: RepoRow): ForkRepoData {
     language: row.language,
     stars: row.stars,
     forks: row.forks,
+    avatarUrl: `https://github.com/${row.owner}.png?size=40`,
   }
 }
 
