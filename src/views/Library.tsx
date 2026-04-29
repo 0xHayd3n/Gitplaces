@@ -14,6 +14,7 @@ import LibrarySidebar from '../components/LibrarySidebar'
 import CollectionsSidebar from '../components/CollectionsSidebar'
 import RepoDetail from './RepoDetail'
 import CollectionDetail from './CollectionDetail'
+import ActivityFeed from '../components/ActivityFeed'
 
 type ActivePanel = 'repos' | 'collections'
 
@@ -171,21 +172,7 @@ export default function Library() {
               <Route path="collection/:id" element={<CollectionDetail />} />
             </Routes>
           ) : (
-            <div className="library-detail-empty">
-              <div className="library-detail-empty-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                </svg>
-              </div>
-              <h2 className="library-detail-empty-title">Your Library</h2>
-              <p className="library-detail-empty-sub">
-                {rows.length > 0
-                  ? <>{rows.length} skill{rows.length !== 1 ? 's' : ''} installed{starredRows.length > 0 ? ` · ${starredRows.length} starred` : ''}</>
-                  : 'No skills installed yet'}
-              </p>
-              <p className="library-detail-empty-hint">Select a repo or collection from the sidebar to view details.</p>
-            </div>
+            <ActivityFeed />
           )}
         </div>
       </main>
