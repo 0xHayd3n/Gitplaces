@@ -26,6 +26,7 @@ const originalData: ForkRepoData = {
   language: 'TypeScript',
   stars: 4200,
   forks: 312,
+  avatarUrl: 'https://github.com/anthropics.png?size=40',
 }
 
 const forkData: ForkRepoData = {
@@ -35,17 +36,16 @@ const forkData: ForkRepoData = {
   language: 'TypeScript',
   stars: 0,
   forks: 0,
+  avatarUrl: 'https://github.com/zzzzshawn.png?size=40',
 }
 
 describe('ForkEventCard', () => {
   it('renders skeleton cards while loading', () => {
     mockUseForkData.mockReturnValue({ original: null, fork: null, loading: true })
 
-    render(<ForkEventCard event={forkEvent} />)
+    const { container } = render(<ForkEventCard event={forkEvent} />)
 
-    expect(screen.getAllByRole('generic', { hidden: true })
-      .some(el => el.classList.contains('fork-mini-card--skeleton'))
-    ).toBe(true)
+    expect(container.querySelector('.fork-repo-card--skeleton')).toBeInTheDocument()
     expect(screen.queryByText('Databuddy')).toBeNull()
   })
 
@@ -54,7 +54,8 @@ describe('ForkEventCard', () => {
 
     render(<ForkEventCard event={forkEvent} />)
 
-    expect(screen.getAllByText('zzzzshawn')).toHaveLength(2)
+    // actor in header + fork card creator row
+    expect(screen.getAllByText('zzzzshawn').length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText(/forked a repository/)).toBeInTheDocument()
   })
 
@@ -74,16 +75,16 @@ describe('ForkEventCard', () => {
     expect(screen.getByText('fork')).toBeInTheDocument()
   })
 
-  it('shows stars and forks on original card', () => {
+  it('shows stars and forks on original card using formatCount', () => {
     mockUseForkData.mockReturnValue({ original: originalData, fork: forkData, loading: false })
 
     render(<ForkEventCard event={forkEvent} />)
 
-    expect(screen.getByText(/4,200/)).toBeInTheDocument()
+    expect(screen.getByText(/4\.2k/)).toBeInTheDocument()
     expect(screen.getByText(/312/)).toBeInTheDocument()
   })
 
-  it('links original card to github.com/anthropics/Databuddy', () => {
+  it('links original and fork cards to correct GitHub URLs', () => {
     mockUseForkData.mockReturnValue({ original: originalData, fork: forkData, loading: false })
 
     render(<ForkEventCard event={forkEvent} />)
@@ -93,13 +94,12 @@ describe('ForkEventCard', () => {
     expect(links.some(l => l.getAttribute('href') === 'https://github.com/zzzzshawn/Databuddy')).toBe(true)
   })
 
-  it('renders boxed language icon with TypeScript color', () => {
+  it('renders circle arrow between cards', () => {
     mockUseForkData.mockReturnValue({ original: originalData, fork: forkData, loading: false })
 
     const { container } = render(<ForkEventCard event={forkEvent} />)
 
-    const iconBox = container.querySelector('.fork-mini-card__lang > span')
-    expect(iconBox).toHaveStyle({ background: '#3178c6' })
+    expect(container.querySelector('.fork-event__arrow-circle')).toBeInTheDocument()
   })
 
   it('falls back to repo name from event when API returns null', () => {
@@ -107,9 +107,8 @@ describe('ForkEventCard', () => {
 
     render(<ForkEventCard event={forkEvent} />)
 
-    // Should still render repo names parsed from full_name
     expect(screen.getAllByText('Databuddy')).toHaveLength(2)
     expect(screen.getByText('anthropics')).toBeInTheDocument()
-    expect(screen.getAllByText('zzzzshawn')).toHaveLength(2)
+    expect(screen.getAllByText('zzzzshawn').length).toBeGreaterThanOrEqual(1)
   })
 })

@@ -1,7 +1,6 @@
 import type { GitHubFeedEvent } from '../hooks/useFeed'
 import { useForkData } from '../hooks/useForkData'
-import type { ForkRepoData } from '../hooks/useForkData'
-import LanguageIcon from './LanguageIcon'
+import { ForkRepoCard, ForkRepoCardSkeleton } from './ForkRepoCard'
 import './ForkEventCard.css'
 
 function relativeTime(iso: string): string {
@@ -13,62 +12,6 @@ function relativeTime(iso: string): string {
   if (hrs < 24) return `${hrs}h ago`
   const days = Math.floor(hrs / 24)
   return `${days}d ago`
-}
-
-interface ForkMiniCardProps {
-  owner: string
-  name: string
-  description: string | null
-  language: string | null
-  stars: number | null
-  forks: number | null
-  isFork: boolean
-}
-
-function ForkMiniCard({ owner, name, description, language, stars, forks, isFork }: ForkMiniCardProps) {
-  return (
-    <a
-      className={`fork-mini-card${isFork ? ' fork-mini-card--fork' : ''}`}
-      href={`https://github.com/${owner}/${name}`}
-      target="_blank"
-      rel="noreferrer"
-    >
-      <div className="fork-mini-card__top">
-        <span className="fork-mini-card__owner">{owner}</span>
-        {isFork && <span className="fork-mini-card__badge">fork</span>}
-      </div>
-      <div className="fork-mini-card__name">{name}</div>
-      {description && <div className="fork-mini-card__desc">{description}</div>}
-      {(language || (!isFork && stars !== null)) && (
-        <div className="fork-mini-card__meta">
-          {language && (
-            <span className="fork-mini-card__lang">
-              <LanguageIcon lang={language} size={12} boxed />
-              {language}
-            </span>
-          )}
-          {!isFork && stars !== null && (
-            <span>★ {stars.toLocaleString()}</span>
-          )}
-          {!isFork && forks !== null && (
-            <span>⑂ {forks.toLocaleString()}</span>
-          )}
-        </div>
-      )}
-    </a>
-  )
-}
-
-function ForkMiniCardSkeleton() {
-  return (
-    <div className="fork-mini-card fork-mini-card--skeleton">
-      <div className="fork-skeleton fork-skeleton--owner" />
-      <div className="fork-skeleton fork-skeleton--name" />
-      <div className="fork-skeleton fork-skeleton--desc-full" />
-      <div className="fork-skeleton fork-skeleton--desc-short" />
-      <div className="fork-skeleton fork-skeleton--meta" />
-    </div>
-  )
 }
 
 interface Props {
@@ -83,6 +26,12 @@ export function ForkEventCard({ event }: Props) {
 
   const [originalOwner, originalName] = originalFullName.split('/')
   const [forkOwner, forkName] = forkFullName.split('/')
+
+  const arrow = (
+    <div className="fork-event__arrow-col">
+      <div className="fork-event__arrow-circle">→</div>
+    </div>
+  )
 
   return (
     <div className="fork-event">
@@ -100,25 +49,27 @@ export function ForkEventCard({ event }: Props) {
       <div className="fork-event__body">
         {loading ? (
           <>
-            <ForkMiniCardSkeleton />
-            <span className="fork-event__arrow">→</span>
-            <ForkMiniCardSkeleton />
+            <ForkRepoCardSkeleton />
+            {arrow}
+            <ForkRepoCardSkeleton />
           </>
         ) : (
           <>
-            <ForkMiniCard
+            <ForkRepoCard
               owner={original?.owner ?? originalOwner}
               name={original?.name ?? originalName}
+              avatarUrl={`https://github.com/${original?.owner ?? originalOwner}.png?size=40`}
               description={original?.description ?? null}
               language={original?.language ?? null}
               stars={original?.stars ?? null}
               forks={original?.forks ?? null}
               isFork={false}
             />
-            <span className="fork-event__arrow">→</span>
-            <ForkMiniCard
+            {arrow}
+            <ForkRepoCard
               owner={fork?.owner ?? forkOwner}
               name={fork?.name ?? forkName}
+              avatarUrl={`https://github.com/${fork?.owner ?? forkOwner}.png?size=40`}
               description={fork?.description ?? null}
               language={fork?.language ?? null}
               stars={fork?.stars ?? null}
