@@ -4,7 +4,7 @@ import './BannerCard.css'
 
 export type BannerCardTier = 'normal' | 'major' | 'prerelease'
 
-interface BannerCardProps {
+export interface BannerCardProps {
   tag: string
   tier: BannerCardTier
   title: string

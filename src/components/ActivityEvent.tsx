@@ -1,43 +1,89 @@
-import { useNavigate } from 'react-router-dom'
-import { useSavedRepos } from '../contexts/SavedRepos'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
 import './ActivityEvent.css'
 import { ForkEventCard } from './ForkEventCard'
 import { StarEventCard } from './StarEventCard'
-import { ReleaseEventCard } from './ReleaseEventCard'
+import { BannerCard, type BannerCardTier } from './BannerCard'
+import { classifyRelease, type ReleaseTier } from '../utils/classifyRelease'
+import { stripMarkdownPreview } from '../utils/stripMarkdownPreview'
 
 interface Props {
   event: GitHubFeedEvent
+  onOpenModal: (event: GitHubFeedEvent) => void
 }
 
-function relativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diffMs / 60_000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  return `${days}d ago`
+const PREVIEW_MAX_LENGTH = 240
+
+interface ReleasePayload {
+  release: {
+    tag_name: string
+    name?: string | null
+    body?: string | null
+    prerelease?: boolean | null
+  }
 }
 
-function buildDescription(event: GitHubFeedEvent): { parts: Array<{ text: string; bold: boolean }> } {
-  const actor = event.actor.login
-  const repoFull = event.repo.full_name
-
-  // PullRequestEvent is the only path that still flows through here — Watch,
-  // Release, and Fork events have their own dedicated card components.
-  return { parts: [
-    { text: actor, bold: true },
-    { text: ' merged a PR into ', bold: false },
-    { text: repoFull, bold: true },
-  ]}
+interface PullRequestPayload {
+  pull_request: {
+    title: string
+    number: number
+    body?: string | null
+  }
 }
 
-export default function ActivityEvent({ event }: Props) {
-  const navigate = useNavigate()
-  const { isSaved } = useSavedRepos()
+function tierToTagText(tier: ReleaseTier): string {
+  if (tier === 'major') return 'MAJOR UPDATE'
+  if (tier === 'prerelease') return 'PRE-RELEASE'
+  return 'UPDATE'
+}
 
+function releaseToBannerProps(
+  event: GitHubFeedEvent,
+  onOpenModal: (event: GitHubFeedEvent) => void,
+) {
+  const release = (event.payload as unknown as ReleasePayload).release
+  const tier: ReleaseTier = classifyRelease({
+    tagName: release.tag_name,
+    prereleaseFlag: release.prerelease === true,
+  })
+  const trimmedName = release.name?.trim()
+  const titleSuffix = trimmedName && trimmedName !== release.tag_name
+    ? ` — ${trimmedName}`
+    : ''
+  const [ownerLogin] = event.repo.full_name.split('/')
+
+  return {
+    tag: tierToTagText(tier),
+    tier: tier as BannerCardTier,
+    title: `${release.tag_name}${titleSuffix}`,
+    descriptionPreview: stripMarkdownPreview(release.body ?? '', PREVIEW_MAX_LENGTH),
+    versionLabel: release.tag_name,
+    ownerLogin: ownerLogin ?? '',
+    repoFullName: event.repo.full_name,
+    occurredAt: event.created_at,
+    onClick: () => onOpenModal(event),
+  }
+}
+
+function pullRequestToBannerProps(
+  event: GitHubFeedEvent,
+  onOpenModal: (event: GitHubFeedEvent) => void,
+) {
+  const pr = (event.payload as unknown as PullRequestPayload).pull_request
+  const [ownerLogin] = event.repo.full_name.split('/')
+  return {
+    tag: 'PR MERGED',
+    tier: 'normal' as BannerCardTier,
+    title: pr.title,
+    descriptionPreview: stripMarkdownPreview(pr.body ?? '', PREVIEW_MAX_LENGTH),
+    versionLabel: `#${pr.number}`,
+    ownerLogin: ownerLogin ?? '',
+    repoFullName: event.repo.full_name,
+    occurredAt: event.created_at,
+    onClick: () => onOpenModal(event),
+  }
+}
+
+export default function ActivityEvent({ event, onOpenModal }: Props) {
   if (event.type === 'ForkEvent') {
     return <ForkEventCard event={event} />
   }
@@ -45,41 +91,10 @@ export default function ActivityEvent({ event }: Props) {
     return <StarEventCard event={event} />
   }
   if (event.type === 'ReleaseEvent') {
-    return <ReleaseEventCard event={event} />
+    return <BannerCard {...releaseToBannerProps(event, onOpenModal)} />
   }
-
-  const [owner, name] = event.repo.full_name.split('/')
-  const saved = isSaved(owner, name)
-
-  const { parts } = buildDescription(event)
-
-  const handleRepoClick = () => {
-    if (saved) navigate(`/library/repo/${owner}/${name}`)
+  if (event.type === 'PullRequestEvent') {
+    return <BannerCard {...pullRequestToBannerProps(event, onOpenModal)} />
   }
-
-  return (
-    <div className="activity-event">
-      <img
-        className="activity-event-avatar"
-        src={event.actor.avatar_url}
-        alt={event.actor.login}
-      />
-      <p className="activity-event-desc">
-        {parts.map((part, i) => {
-          const isRepo = part.text === event.repo.full_name
-          if (isRepo && saved) {
-            return (
-              <button key={i} className="activity-event-repo-link" onClick={handleRepoClick}>
-                {part.text}
-              </button>
-            )
-          }
-          return part.bold
-            ? <strong key={i}>{part.text}</strong>
-            : <span key={i}>{part.text}</span>
-        })}
-      </p>
-      <span className="activity-event-time">{relativeTime(event.created_at)}</span>
-    </div>
-  )
+  return null
 }
