@@ -14,13 +14,16 @@ function dayKey(d: Date): string {
   return d.toDateString() // local-time, stable per-day key
 }
 
-function labelFor(eventDate: Date, now: Date): string {
-  const todayKey = dayKey(now)
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+function labelFor(
+  eventDate: Date,
+  now: Date,
+  todayKey: string,
+  yesterdayKey: string,
+): string {
   const eventKey = dayKey(eventDate)
 
   if (eventKey === todayKey) return 'Today'
-  if (eventKey === dayKey(yesterday)) return 'Yesterday'
+  if (eventKey === yesterdayKey) return 'Yesterday'
   if (eventDate.getFullYear() === now.getFullYear()) {
     return MONTH_DAY.format(eventDate)
   }
@@ -33,6 +36,10 @@ export function groupEventsByDay(
 ): EventGroup[] {
   const groups: EventGroup[] = []
   const indexByKey = new Map<string, number>()
+  const todayKey = dayKey(now)
+  const yesterdayKey = dayKey(
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1),
+  )
 
   for (const event of events) {
     const date = new Date(event.created_at)
@@ -41,7 +48,7 @@ export function groupEventsByDay(
     if (idx === undefined) {
       idx = groups.length
       indexByKey.set(key, idx)
-      groups.push({ label: labelFor(date, now), events: [] })
+      groups.push({ label: labelFor(date, now, todayKey, yesterdayKey), events: [] })
     }
     groups[idx].events.push(event)
   }
