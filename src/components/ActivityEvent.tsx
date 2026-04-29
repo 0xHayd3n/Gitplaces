@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useSavedRepos } from '../contexts/SavedRepos'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
 import './ActivityEvent.css'
+import { ForkEventCard } from './ForkEventCard'
 
 interface Props {
   event: GitHubFeedEvent
@@ -61,6 +62,10 @@ function buildDescription(event: GitHubFeedEvent): { parts: Array<{ text: string
 export default function ActivityEvent({ event }: Props) {
   const navigate = useNavigate()
   const { isSaved } = useSavedRepos()
+
+  if (event.type === 'ForkEvent') {
+    return <ForkEventCard event={event} />
+  }
 
   const [owner, name] = event.repo.full_name.split('/')
   const saved = isSaved(owner, name)
