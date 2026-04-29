@@ -1,5 +1,4 @@
 import type { GitHubFeedEvent } from '../hooks/useFeed'
-import './ActivityEvent.css'
 import { ForkEventCard } from './ForkEventCard'
 import { StarEventCard } from './StarEventCard'
 import { BannerCard, type BannerCardProps } from './BannerCard'
