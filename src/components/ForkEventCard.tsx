@@ -33,7 +33,7 @@ function ForkMiniCard({ owner, name, description, language, stars, forks, isFork
       rel="noreferrer"
     >
       <div className="fork-mini-card__top">
-        {!isFork && <span className="fork-mini-card__owner">{owner}</span>}
+        <span className="fork-mini-card__owner">{owner}</span>
         {isFork && <span className="fork-mini-card__badge">fork</span>}
       </div>
       <div className="fork-mini-card__name">{name}</div>

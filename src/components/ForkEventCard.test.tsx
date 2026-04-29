@@ -54,7 +54,7 @@ describe('ForkEventCard', () => {
 
     render(<ForkEventCard event={forkEvent} />)
 
-    expect(screen.getByText('zzzzshawn')).toBeInTheDocument()
+    expect(screen.getAllByText('zzzzshawn').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/forked a repository/)).toBeInTheDocument()
   })
 
@@ -101,6 +101,6 @@ describe('ForkEventCard', () => {
     // Should still render repo names parsed from full_name
     expect(screen.getAllByText('Databuddy')).toHaveLength(2)
     expect(screen.getByText('anthropics')).toBeInTheDocument()
-    expect(screen.getByText('zzzzshawn')).toBeInTheDocument()
+    expect(screen.getAllByText('zzzzshawn').length).toBeGreaterThanOrEqual(1)
   })
 })
