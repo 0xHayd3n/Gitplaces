@@ -30,16 +30,6 @@ function buildDescription(event: GitHubFeedEvent): { parts: Array<{ text: string
         { text: ' starred ', bold: false },
         { text: repoFull, bold: true },
       ]}
-    case 'ForkEvent': {
-      const forkee = (event.payload as { forkee: { full_name: string } }).forkee.full_name
-      return { parts: [
-        { text: actor, bold: true },
-        { text: ' forked ', bold: false },
-        { text: repoFull, bold: true },
-        { text: ' → ', bold: false },
-        { text: forkee, bold: true },
-      ]}
-    }
     case 'ReleaseEvent': {
       const tag = (event.payload as { release: { tag_name: string } }).release.tag_name
       return { parts: [
