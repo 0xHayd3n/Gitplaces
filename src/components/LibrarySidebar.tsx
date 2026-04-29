@@ -1,7 +1,7 @@
 // src/components/LibrarySidebar.tsx
 import { useState, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Layers, Brain, User, History, Archive } from 'lucide-react'
+import { Layers, Brain, User, History, Archive, Activity } from 'lucide-react'
 import './LibrarySidebar.css'
 import type { LibraryRow, StarredRepoRow, RepoRow } from '../types/repo'
 import type { LibraryEntry, LocalProject, ActiveSegment } from '../types/library'
@@ -131,12 +131,15 @@ export default function LibrarySidebar({
   return (
     <aside className="library-sidebar">
       <div className="library-sidebar-header">REPOSITORIES</div>
-      <button
-        className={`library-summary-btn${isSummaryActive ? ' active' : ''}`}
-        onClick={() => navigate('/library')}
-      >
-        Summary
-      </button>
+      <div className="library-activity-row">
+        <button
+          className={`library-activity-btn${isSummaryActive ? ' active' : ''}`}
+          onClick={() => navigate('/library')}
+        >
+          <Activity size={11} />
+          Activity
+        </button>
+      </div>
       <div className="library-sidebar-filter">
         {SEGMENTS.map(({ id, icon, label }) => (
           <button
