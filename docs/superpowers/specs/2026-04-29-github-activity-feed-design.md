@@ -59,6 +59,40 @@ fetch()
 
 ---
 
+## Types
+
+Define in `electron/github.ts` alongside existing interfaces (`GitHubRepo`, `GitHubRelease`, etc.):
+
+```ts
+export interface GitHubEventActor {
+  login: string
+  avatar_url: string
+}
+
+export interface GitHubEventRepo {
+  name: string  // "owner/repo" format
+}
+
+export type GitHubEventPayload =
+  | { action: 'started' }                                                            // WatchEvent
+  | { forkee: { full_name: string } }                                               // ForkEvent
+  | { action: 'published'; release: { tag_name: string } }                         // ReleaseEvent
+  | { action: 'closed'; pull_request: { merged: boolean; title: string } }         // PullRequestEvent
+
+export interface GitHubEvent {
+  id: string
+  type: 'WatchEvent' | 'ForkEvent' | 'ReleaseEvent' | 'PullRequestEvent'
+  actor: GitHubEventActor
+  repo: GitHubEventRepo
+  payload: GitHubEventPayload
+  created_at: string
+}
+```
+
+These types are used in `electron/github.ts`, `electron/preload.ts`, and `src/hooks/useFeed.ts`.
+
+---
+
 ## IPC Layer
 
 **`electron/github.ts`** — new function:
@@ -75,10 +109,12 @@ export async function getReceivedEvents(token: string, username: string): Promis
 window.api.github.getReceivedEvents(username: string): Promise<GitHubEvent[]>
 ```
 
-**`electron/main.ts`** — handler:
+**`electron/main.ts`** — handler with null token guard:
 ```ts
 ipcMain.handle('github:getReceivedEvents', async (_, username: string) => {
-  return getReceivedEvents(getToken(), username)
+  const token = getToken()
+  if (!token) return []
+  return getReceivedEvents(token, username)
 })
 ```
 
@@ -134,7 +170,7 @@ Single event card rendered as a compact row.
   - `ReleaseEvent` → "**actor** released **v1.2.0** on **owner/repo**"
   - `PullRequestEvent` (merged) → "**actor** merged a PR into **owner/repo**"
 - **Timestamp** — relative time ("3 hours ago") computed inline, no external library
-- **Clickable repo name** — if the repo is in `SavedReposContext`, clicking navigates to `/library/repo/:owner/:name`; otherwise the text is non-interactive
+- **Clickable repo name** — if the repo has an installed skill (`isSaved(owner, name)` returns true from `useSavedRepos()`), clicking navigates to `/library/repo/:owner/:name`; otherwise the text is non-interactive. Starred-only repos do not qualify.
 
 ---
 
@@ -149,19 +185,35 @@ A new clickable row added above the existing segment filter pills (All, Learned,
 - On click: `navigate('/library')` — clears repo selection, renders `ActivityFeed` in main area
 - Active state is derived purely from the route; no new context or state needed
 
-### Route change
+### Library.tsx change
 
-`Library.tsx` currently renders an empty placeholder at its index route. This is replaced:
+`Library.tsx` renders the main content area via a conditional — not a `<Route index>`. The current pattern is:
 
 ```tsx
-// Before
-<Route index element={<EmptyState />} />
-
-// After
-<Route index element={<ActivityFeed />} />
+{hasDetail ? (
+  <Routes>
+    <Route path="repo/:owner/:name" element={<RepoDetail />} />
+    <Route path="collection/:id" element={<CollectionDetail />} />
+  </Routes>
+) : (
+  <div className="library-detail-empty">...</div>
+)}
 ```
 
-When a repo is selected from the sidebar, the existing `navigate('/library/repo/:owner/:name')` call is unchanged — it replaces the feed with `RepoDetail` as before.
+Replace the `<div className="library-detail-empty">` block with `<ActivityFeed />`:
+
+```tsx
+{hasDetail ? (
+  <Routes>
+    <Route path="repo/:owner/:name" element={<RepoDetail />} />
+    <Route path="collection/:id" element={<CollectionDetail />} />
+  </Routes>
+) : (
+  <ActivityFeed />
+)}
+```
+
+No router restructure needed. When a repo is selected from the sidebar, the existing `navigate('/library/repo/:owner/:name')` call is unchanged — it sets `hasDetail` to true, replacing the feed with `RepoDetail`.
 
 ---
 
@@ -175,6 +227,14 @@ When a repo is selected from the sidebar, the existing `navigate('/library/repo/
 | `PullRequestEvent` | `action === 'closed'` && `merged === true` | merged a PR |
 
 All other event types are discarded before returning to the renderer.
+
+---
+
+## Implementation Notes
+
+- **`GitHubEventRepo.full_name`** — the GitHub Events API returns `event.repo.name` as the full `owner/repo` slug. Name it `full_name` in the interface (not `name`) to match `GitHubRepo` conventions and avoid confusion. `ActivityEvent` must split on `/` to extract `owner` and `repo` separately for navigation.
+- **`useFeed` refresh interval** — `refresh()` must `clearInterval` the existing timer before calling `setInterval` again to avoid accumulating concurrent timers. Use a `useRef` to hold the interval ID, following the same pattern as `useArchivedRepos.ts`.
+- **"Summary" button in mini mode** — `LibrarySidebar` collapses to 78px in mini mode via `.library-panel.mini`. The Summary button should be hidden in mini mode (matching the segment filter pills behavior), added via `.library-panel.mini .library-summary-btn { display: none }`.
 
 ---
 
