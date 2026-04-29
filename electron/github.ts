@@ -72,6 +72,69 @@ export interface BlobResult {
   size: number
 }
 
+// ── Activity Feed ─────────────────────────────────────────────────
+
+export interface GitHubEventActor {
+  login: string
+  avatar_url: string
+}
+
+export interface GitHubEventRepo {
+  full_name: string  // GitHub API field is called "name" but holds "owner/repo" slug
+}
+
+export type GitHubEventPayload =
+  | { action: 'started' }
+  | { forkee: { full_name: string } }
+  | { action: 'published'; release: { tag_name: string } }
+  | { action: 'closed'; pull_request: { merged: boolean; title: string } }
+
+export interface GitHubEvent {
+  id: string
+  type: 'WatchEvent' | 'ForkEvent' | 'ReleaseEvent' | 'PullRequestEvent'
+  actor: GitHubEventActor
+  repo: GitHubEventRepo
+  payload: GitHubEventPayload
+  created_at: string
+}
+
+const HIGH_SIGNAL = new Set(['WatchEvent', 'ForkEvent', 'ReleaseEvent', 'PullRequestEvent'])
+
+export async function getReceivedEvents(token: string, username: string): Promise<GitHubEvent[]> {
+  const res = await fetch(
+    `https://api.github.com/users/${encodeURIComponent(username)}/received_events?per_page=30`,
+    { headers: githubHeaders(token) },
+  )
+  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
+
+  const raw = await res.json() as Array<{
+    id: string
+    type: string
+    actor: { login: string; avatar_url: string }
+    repo: { name: string }
+    payload: Record<string, unknown>
+    created_at: string
+  }>
+
+  return raw
+    .filter(e => HIGH_SIGNAL.has(e.type))
+    .filter(e => {
+      if (e.type === 'PullRequestEvent') {
+        const pr = e.payload as { action?: string; pull_request?: { merged?: boolean } }
+        return pr.action === 'closed' && pr.pull_request?.merged === true
+      }
+      return true
+    })
+    .map(e => ({
+      id: e.id,
+      type: e.type as GitHubEvent['type'],
+      actor: e.actor,
+      repo: { full_name: e.repo.name },
+      payload: e.payload as GitHubEventPayload,
+      created_at: e.created_at,
+    }))
+}
+
 export async function getUser(token: string): Promise<GitHubUser> {
   const res = await fetch(`${BASE}/user`, { headers: githubHeaders(token) })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
