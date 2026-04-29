@@ -84,10 +84,10 @@ export interface GitHubEventRepo {
 }
 
 export type GitHubEventPayload =
-  | { action: 'started' }
-  | { forkee: { full_name: string } }
-  | { action: 'published'; release: { tag_name: string } }
-  | { action: 'closed'; pull_request: { merged: boolean; title: string } }
+  | { type: 'WatchEvent'; action: 'started' }
+  | { type: 'ForkEvent'; forkee: { full_name: string } }
+  | { type: 'ReleaseEvent'; action: 'published'; release: { tag_name: string } }
+  | { type: 'PullRequestEvent'; action: 'closed'; pull_request: { merged: boolean; title: string } }
 
 export interface GitHubEvent {
   id: string
@@ -102,7 +102,7 @@ const HIGH_SIGNAL = new Set(['WatchEvent', 'ForkEvent', 'ReleaseEvent', 'PullReq
 
 export async function getReceivedEvents(token: string, username: string): Promise<GitHubEvent[]> {
   const res = await fetch(
-    `https://api.github.com/users/${encodeURIComponent(username)}/received_events?per_page=30`,
+    `${BASE}/users/${encodeURIComponent(username)}/received_events?per_page=30`,
     { headers: githubHeaders(token) },
   )
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
@@ -130,7 +130,7 @@ export async function getReceivedEvents(token: string, username: string): Promis
       type: e.type as GitHubEvent['type'],
       actor: e.actor,
       repo: { full_name: e.repo.name },
-      payload: e.payload as GitHubEventPayload,
+      payload: { type: e.type, ...e.payload } as GitHubEventPayload,
       created_at: e.created_at,
     }))
 }
