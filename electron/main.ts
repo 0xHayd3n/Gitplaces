@@ -7,7 +7,7 @@ import Store from 'electron-store'
 import type Database from 'better-sqlite3'
 import { getDb, closeDb } from './db'
 import { getToken, setToken, clearToken, setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner } from './store'
-import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree } from './github'
+import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents } from './github'
 import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
 import { scanFromSources } from './mcp-scanner'
 import type { McpScanResult } from '../src/types/mcp'
@@ -837,6 +837,12 @@ ipcMain.handle('github:getBlob', async (_event, owner: string, name: string, blo
   const result = await getBlobBySha(token, owner, name, blobSha)
   blobCache.set(blobSha, result)
   return result
+})
+
+ipcMain.handle('github:getReceivedEvents', async (_event, username: string) => {
+  const token = getToken()
+  if (!token) return []
+  return getReceivedEvents(token, username)
 })
 
 // ── SVG cache IPC ────────────────────────────────────────────────

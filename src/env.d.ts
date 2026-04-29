@@ -91,6 +91,14 @@ declare global {
         getTree:          (owner: string, name: string, treeSha: string) => Promise<Array<{ path: string; mode: string; type: 'blob' | 'tree'; sha: string; size?: number }>>
         getBlob:          (owner: string, name: string, blobSha: string) => Promise<{ content: string; rawBase64: string; size: number }>
         getRawFile:       (owner: string, name: string, branch: string, path: string) => Promise<ArrayBuffer>
+        getReceivedEvents: (username: string) => Promise<Array<{
+          id: string
+          type: 'WatchEvent' | 'ForkEvent' | 'ReleaseEvent' | 'PullRequestEvent'
+          actor: { login: string; avatar_url: string }
+          repo: { full_name: string }
+          payload: Record<string, unknown>
+          created_at: string
+        }>>
       }
       settings: {
         get: (key: string) => Promise<string | null>

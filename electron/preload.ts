@@ -48,6 +48,8 @@ contextBridge.exposeInMainWorld('api', {
     getTree:    (owner: string, name: string, treeSha: string) => ipcRenderer.invoke('github:getTree', owner, name, treeSha),
     getBlob:    (owner: string, name: string, blobSha: string) => ipcRenderer.invoke('github:getBlob', owner, name, blobSha),
     getRawFile: (owner: string, name: string, branch: string, path: string) => ipcRenderer.invoke('github:getRawFile', owner, name, branch, path),
+    getReceivedEvents: (username: string) =>
+      ipcRenderer.invoke('github:getReceivedEvents', username) as Promise<import('./github').GitHubEvent[]>,
   },
 
   settings: {
