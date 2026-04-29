@@ -15,7 +15,7 @@ const baseProps = {
   title: 'v1.2.3 — Bug fixes',
   descriptionPreview: 'Fixes some bugs',
   versionLabel: 'v1.2.3',
-  ownerLogin: 'vitejs',
+  ownerAvatarUrl: 'https://avatars.githubusercontent.com/u/6128107?v=4',
   repoFullName: 'vitejs/vite',
   occurredAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5h ago
   onClick: vi.fn(),
@@ -43,7 +43,7 @@ describe('BannerCard', () => {
   it('passes the owner avatar URL into DitherBackground', () => {
     render(<BannerCard {...baseProps} />)
     const dither = screen.getByTestId('dither')
-    expect(dither.getAttribute('data-avatar')).toContain('github.com/vitejs.png')
+    expect(dither.getAttribute('data-avatar')).toBe(baseProps.ownerAvatarUrl)
   })
 
   it('applies the major modifier class for tier=major', () => {

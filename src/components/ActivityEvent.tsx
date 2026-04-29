@@ -48,7 +48,6 @@ function releaseToBannerProps(
   const titleSuffix = trimmedName && trimmedName !== release.tag_name
     ? ` — ${trimmedName}`
     : ''
-  const [ownerLogin] = event.repo.full_name.split('/')
 
   return {
     tag: tierToTagText(tier),
@@ -56,7 +55,7 @@ function releaseToBannerProps(
     title: `${release.tag_name}${titleSuffix}`,
     descriptionPreview: stripMarkdownPreview(release.body ?? '', PREVIEW_MAX_LENGTH),
     versionLabel: release.tag_name,
-    ownerLogin: ownerLogin ?? '',
+    ownerAvatarUrl: event.actor.avatar_url,
     repoFullName: event.repo.full_name,
     occurredAt: event.created_at,
     onClick: () => onOpenModal(event),
@@ -68,14 +67,13 @@ function pullRequestToBannerProps(
   onOpenModal: (event: GitHubFeedEvent) => void,
 ): BannerCardProps {
   const pr = (event.payload as unknown as PullRequestPayload).pull_request
-  const [ownerLogin] = event.repo.full_name.split('/')
   return {
     tag: 'PR MERGED',
     tier: 'normal',
     title: pr.title,
     descriptionPreview: stripMarkdownPreview(pr.body ?? '', PREVIEW_MAX_LENGTH),
     versionLabel: `#${pr.number}`,
-    ownerLogin: ownerLogin ?? '',
+    ownerAvatarUrl: event.actor.avatar_url,
     repoFullName: event.repo.full_name,
     occurredAt: event.created_at,
     onClick: () => onOpenModal(event),

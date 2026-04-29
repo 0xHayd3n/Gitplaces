@@ -71,7 +71,7 @@ export function useFeed(): FeedState & { refresh: () => void } {
               .map((r): GitHubFeedEvent => ({
                 id: `release-${owner}-${name}-${r.tag_name}`,
                 type: 'ReleaseEvent',
-                actor: { login: owner, avatar_url: `https://github.com/${owner}.png` },
+                actor: { login: owner, avatar_url: `https://github.com/${owner}.png?size=200` },
                 repo: { full_name: `${owner}/${name}` },
                 payload: { release: { tag_name: r.tag_name, name: r.name, body: r.body, prerelease: r.prerelease } },
                 created_at: r.published_at,

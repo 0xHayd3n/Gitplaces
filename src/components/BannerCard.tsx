@@ -10,7 +10,7 @@ export interface BannerCardProps {
   title: string
   descriptionPreview: string
   versionLabel: string
-  ownerLogin: string
+  ownerAvatarUrl: string
   repoFullName: string
   occurredAt: string
   onClick: () => void
@@ -20,14 +20,15 @@ const MAJOR_FALLBACK_GRADIENT: [string, string] = ['#2a1750', '#110a26']
 
 export function BannerCard({
   tag, tier, title, descriptionPreview, versionLabel,
-  ownerLogin, repoFullName, occurredAt, onClick,
+  ownerAvatarUrl, repoFullName, occurredAt, onClick,
 }: BannerCardProps) {
   return (
     <div className={`banner-card banner-card--${tier}`} onClick={onClick}>
       <div className="banner-card__image">
         <DitherBackground
-          avatarUrl={`https://github.com/${ownerLogin}.png?size=200`}
+          avatarUrl={ownerAvatarUrl}
           fallbackGradient={tier === 'major' ? MAJOR_FALLBACK_GRADIENT : undefined}
+          staticFrame
         />
         <div className="banner-card__version-overlay">{versionLabel}</div>
       </div>
@@ -36,7 +37,7 @@ export function BannerCard({
         <span className="banner-card__title">{title}</span>
         <p className="banner-card__desc">{descriptionPreview}</p>
         <div className="banner-card__meta">
-          <img src={`https://github.com/${ownerLogin}.png?size=40`} alt="" />
+          <img src={ownerAvatarUrl} alt="" />
           <strong>{repoFullName}</strong>
           <span>·</span>
           <span>{relativeTime(occurredAt)}</span>
