@@ -29,8 +29,8 @@
 
 .fork-event__body {
   display: flex;
-  align-items: center;
-  max-width: 50%;
+  align-items: stretch;
+  width: 50%;
   margin: 0 auto;
 }
 

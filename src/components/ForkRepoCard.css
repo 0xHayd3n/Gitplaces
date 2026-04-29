@@ -3,9 +3,9 @@
 
 a.repo-card.fork-repo-card,
 .fork-repo-card.fork-repo-card--skeleton {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
-  min-height: 200px;
+  min-height: 230px;
   text-decoration: none;
   color: inherit;
 }
