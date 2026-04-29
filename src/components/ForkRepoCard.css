@@ -1,9 +1,11 @@
 /* ForkRepoCard reuses .repo-card / .repo-card-* classes from globals.css.
    This file only carries the fork-event-specific additions and overrides. */
 
-a.repo-card.fork-repo-card {
+a.repo-card.fork-repo-card,
+.fork-repo-card.fork-repo-card--skeleton {
   flex: 1;
   min-width: 0;
+  min-height: 200px;
   text-decoration: none;
   color: inherit;
 }
