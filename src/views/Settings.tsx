@@ -127,6 +127,7 @@ export default function Settings() {
   const [checkIntervalHours, setCheckIntervalHours] = useState(24)
   const [lastCheckedTs, setLastCheckedTs] = useState<number | null>(null)
   const [updateChecking, setUpdateChecking] = useState(false)
+  const [intervalDraft, setIntervalDraft] = useState(String(checkIntervalHours))
 
   useEffect(() => {
     window.api.skillSync.getStatus().then(setSyncStatus)
@@ -137,7 +138,11 @@ export default function Settings() {
       setAutoUpdateEnabled(val === 'true')
     }).catch(() => {})
     window.api.settings.get('updateCheckIntervalHours').then(val => {
-      if (val) setCheckIntervalHours(parseInt(val, 10) || 24)
+      if (val) {
+        const parsed = parseInt(val, 10) || 24
+        setCheckIntervalHours(parsed)
+        setIntervalDraft(String(parsed))
+      }
     }).catch(() => {})
     window.api.updates.lastChecked().then(({ timestamp }) => {
       setLastCheckedTs(timestamp)
@@ -196,10 +201,13 @@ export default function Settings() {
 
   const handleCheckNow = useCallback(async () => {
     setUpdateChecking(true)
-    await window.api.updates.checkNow()
-    const { timestamp } = await window.api.updates.lastChecked()
-    setLastCheckedTs(timestamp)
-    setUpdateChecking(false)
+    try {
+      await window.api.updates.checkNow()
+      const { timestamp } = await window.api.updates.lastChecked()
+      setLastCheckedTs(timestamp)
+    } finally {
+      setUpdateChecking(false)
+    }
   }, [])
 
   // Connectors state
@@ -1129,8 +1137,9 @@ export default function Settings() {
               className="settings-input-number"
               min={1}
               max={168}
-              value={checkIntervalHours}
-              onChange={e => handleIntervalChange(parseInt(e.target.value, 10) || 24)}
+              value={intervalDraft}
+              onChange={e => setIntervalDraft(e.target.value)}
+              onBlur={() => handleIntervalChange(parseInt(intervalDraft, 10) || 24)}
             />
           </div>
 
