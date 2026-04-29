@@ -266,6 +266,18 @@ declare global {
       engagement: {
         logClick: (repoId: string, source: string) => Promise<void>
       }
+      updates: {
+        checkNow: () => Promise<void>
+        lastChecked: () => Promise<{ timestamp: number | null }>
+        getChanges: (id: string) => Promise<unknown>
+        applyForkSync: (id: string) => Promise<{ ok: boolean; error?: string }>
+        applySkillRegen: (id: string) => Promise<{ ok: boolean; error?: string }>
+        restartService: () => Promise<void>
+        onStatusChanged: (cb: (data: unknown) => void) => void
+        offStatusChanged: (cb: (data: unknown) => void) => void
+        onToast: (cb: (data: unknown) => void) => void
+        offToast: (cb: (data: unknown) => void) => void
+      }
       skillSync: {
         setup(): Promise<{ ok: true; repoUrl: string } | { ok: false; error: string }>
         disconnect(): Promise<{ ok: true }>
