@@ -91,7 +91,7 @@ export function registerUpdateHandlers(): void {
   })
 
   // Restart polling interval (called when updateCheckIntervalHours setting changes)
-  ipcMain.handle('update:restart-service', async () => {
+  ipcMain.handle('update:restart-service', () => {
     restartUpdateService()
   })
 }
