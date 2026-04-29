@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect } from 'vitest'
 import { ForkEventCard } from './ForkEventCard'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
 import type { ForkRepoData } from '../hooks/useForkData'
@@ -54,7 +54,7 @@ describe('ForkEventCard', () => {
 
     render(<ForkEventCard event={forkEvent} />)
 
-    expect(screen.getAllByText('zzzzshawn').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('zzzzshawn')).toHaveLength(2)
     expect(screen.getByText(/forked a repository/)).toBeInTheDocument()
   })
 
@@ -101,6 +101,6 @@ describe('ForkEventCard', () => {
     // Should still render repo names parsed from full_name
     expect(screen.getAllByText('Databuddy')).toHaveLength(2)
     expect(screen.getByText('anthropics')).toBeInTheDocument()
-    expect(screen.getAllByText('zzzzshawn').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('zzzzshawn')).toHaveLength(2)
   })
 })
