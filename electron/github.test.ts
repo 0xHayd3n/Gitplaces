@@ -369,3 +369,49 @@ describe('getReadme with ref parameter', () => {
     expect(result).toBeNull()
   })
 })
+
+describe('payload type surface', () => {
+  it('GitHubRelease carries prerelease flag', () => {
+    const r: import('./github').GitHubRelease = {
+      tag_name: 'v1.0.0',
+      name: null,
+      published_at: new Date().toISOString(),
+      body: null,
+      assets: [],
+      prerelease: true,
+    }
+    expect(r.prerelease).toBe(true)
+  })
+
+  it('ReleaseEvent payload exposes prerelease flag', () => {
+    const p: import('./github').GitHubEventPayload = {
+      type: 'ReleaseEvent',
+      action: 'published',
+      release: { tag_name: 'v2.0.0', name: 'Two', body: null, prerelease: false },
+    }
+    if (p.type === 'ReleaseEvent') {
+      expect(p.release.prerelease).toBe(false)
+    }
+  })
+
+  it('PullRequestEvent payload exposes number, body, user, base, and head', () => {
+    const p: import('./github').GitHubEventPayload = {
+      type: 'PullRequestEvent',
+      action: 'closed',
+      pull_request: {
+        merged: true,
+        title: 'Fix it',
+        number: 1234,
+        body: 'Body markdown',
+        user: { login: 'alice', avatar_url: 'https://example.com/a.png' },
+        base: { sha: 'aaa', ref: 'main' },
+        head: { sha: 'bbb', ref: 'feature' },
+      },
+    }
+    if (p.type === 'PullRequestEvent') {
+      expect(p.pull_request.number).toBe(1234)
+      expect(p.pull_request.base.sha).toBe('aaa')
+      expect(p.pull_request.head.ref).toBe('feature')
+    }
+  })
+})

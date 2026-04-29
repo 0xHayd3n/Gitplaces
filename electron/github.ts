@@ -51,6 +51,7 @@ export interface GitHubRelease {
   published_at: string
   body: string | null
   assets: GitHubReleaseAsset[]
+  prerelease: boolean
 }
 
 export interface GitHubStarredRepo {
@@ -86,8 +87,29 @@ export interface GitHubEventRepo {
 export type GitHubEventPayload =
   | { type: 'WatchEvent'; action: 'started' }
   | { type: 'ForkEvent'; forkee: { full_name: string } }
-  | { type: 'ReleaseEvent'; action: 'published'; release: { tag_name: string; name?: string | null; body?: string | null } }
-  | { type: 'PullRequestEvent'; action: 'closed'; pull_request: { merged: boolean; title: string } }
+  | {
+      type: 'ReleaseEvent'
+      action: 'published'
+      release: {
+        tag_name: string
+        name?: string | null
+        body?: string | null
+        prerelease?: boolean | null
+      }
+    }
+  | {
+      type: 'PullRequestEvent'
+      action: 'closed'
+      pull_request: {
+        merged: boolean
+        title: string
+        number: number
+        body?: string | null
+        user: { login: string; avatar_url: string }
+        base: { sha: string; ref: string }
+        head: { sha: string; ref: string }
+      }
+    }
 
 export interface GitHubEvent {
   id: string
