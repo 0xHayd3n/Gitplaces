@@ -24,13 +24,14 @@ export default function UpdateModal({
   const [regenApplying, setRegenApplying] = useState(false)
   const [forkError, setForkError] = useState<string | null>(null)
   const [regenError, setRegenError] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   const isLearned = true // all LibraryRows have installed skills
 
   useEffect(() => {
     window.api.updates.getChanges(repoId)
       .then((c) => { setChanges(c as Changes); setLoading(false) })
-      .catch(() => setLoading(false))
+      .catch(() => { setFetchError('Failed to load changes.'); setLoading(false) })
   }, [repoId])
 
   const handleForkSync = async () => {
@@ -61,6 +62,7 @@ export default function UpdateModal({
 
         <div className="update-modal-body">
           {loading && <p className="update-modal-loading">Fetching changes…</p>}
+          {fetchError && <p className="update-error">{fetchError}</p>}
 
           {!loading && changes && (
             <>
