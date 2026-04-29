@@ -123,7 +123,7 @@ export function ActivityModal({ event, onClose }: Props) {
 
         <div className="activity-modal__header">
           <div className="activity-modal__tag-row">
-            <span className={tagModifier(header.tier)}>{header.tag}</span>
+            <span className={`activity-modal__tag ${tagModifier(header.tier)}`.trim()}>{header.tag}</span>
             <span className="dot">·</span>
             <span className="posted">Posted {POSTED_FMT.format(new Date(event.created_at))}</span>
           </div>

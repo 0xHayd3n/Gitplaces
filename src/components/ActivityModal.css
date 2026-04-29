@@ -85,6 +85,10 @@
   color: var(--t3);
 }
 
+.activity-modal__tag {
+  /* base hook — typography inherited from .activity-modal__tag-row */
+}
+
 .activity-modal__tag--major { color: var(--accent-text); }
 .activity-modal__tag--prerelease { color: #ffa657; }
 
