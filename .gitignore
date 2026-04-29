@@ -12,3 +12,6 @@ dist-electron/
 
 # Git worktrees
 .claude/worktrees/
+
+# Superpowers brainstorm scratch (visual companion mockups, .events, .server-info)
+.superpowers/
