@@ -28,7 +28,7 @@ describe('ForkRepoCard', () => {
 
   it('renders the dither zone', () => {
     const { container } = render(<ForkRepoCard {...baseProps} />)
-    expect(container.querySelector('.fork-repo-card__dither')).toBeInTheDocument()
+    expect(container.querySelector('.repo-card-dither')).toBeInTheDocument()
   })
 
   it('renders avatar with owner src in title row', () => {
@@ -57,7 +57,7 @@ describe('ForkRepoCard', () => {
     expect(container.querySelector('.repo-card-icon-badge')).toBeNull()
   })
 
-  it('renders creator row with owner name', () => {
+  it('renders owner in footer stats', () => {
     render(<ForkRepoCard {...baseProps} />)
     expect(screen.getByText('anthropics')).toBeInTheDocument()
   })
@@ -92,8 +92,8 @@ describe('ForkRepoCardSkeleton', () => {
     expect(container.querySelector('.fork-repo-card--skeleton')).toBeInTheDocument()
   })
 
-  it('renders dither loading zone', () => {
+  it('renders dither zone in skeleton', () => {
     const { container } = render(<ForkRepoCardSkeleton />)
-    expect(container.querySelector('.fork-repo-card__dither--loading')).toBeInTheDocument()
+    expect(container.querySelector('.repo-card-dither')).toBeInTheDocument()
   })
 })

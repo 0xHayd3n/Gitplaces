@@ -24,51 +24,71 @@ export function ForkRepoCard({
 
   return (
     <a
-      className={`fork-repo-card${isFork ? ' fork-repo-card--fork' : ''}`}
+      className={`repo-card fork-repo-card${isFork ? ' fork-repo-card--fork' : ''}`}
       href={`https://github.com/${owner}/${name}`}
       target="_blank"
       rel="noreferrer"
     >
-      <div className="fork-repo-card__dither">
+      <div className="repo-card-dither">
         <DitherBackground avatarUrl={avatarUrl} fallbackGradient={fallbackGradient} />
-        {isFork && <span className="fork-repo-card__fork-badge">fork</span>}
+        {isFork && <span className="fork-repo-card__fork-pill">fork</span>}
       </div>
-      <div className="fork-repo-card__info">
-        <div className="fork-repo-card__title-row">
-          <img
-            className="fork-repo-card__avatar"
-            src={avatarUrl}
-            alt={owner}
-            width={28}
-            height={28}
-          />
-          <span className="fork-repo-card__name">{name}</span>
-          {language && (
-            <span
-              className="repo-card-icon-badge"
-              style={{ '--badge-color': getLangColor(language) } as React.CSSProperties}
-            >
-              <span className="repo-card-icon-badge-icon">
-                <LanguageIcon lang={language} size={18} boxed />
+
+      <div className="repo-card-info">
+        <div className="repo-card-top">
+          <img className="repo-card-avatar" src={avatarUrl} alt="" />
+          <div className="repo-card-top-text">
+            <div className="repo-card-name">{name}</div>
+            {description && <p className="repo-card-desc">{description}</p>}
+          </div>
+        </div>
+
+        <div className="repo-card-grow" />
+
+        <div className="repo-card-footer">
+          <div className="repo-card-footer-left">
+            <div className="repo-card-stats">
+              <span className="repo-card-stat repo-card-stat-owner">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+                </svg>
+                {owner}
               </span>
-              <span className="repo-card-icon-badge-text">{language}</span>
-            </span>
-          )}
-        </div>
-        {description && <p className="fork-repo-card__desc">{description}</p>}
-        <div className="fork-repo-card__creator">
-          <img
-            className="fork-repo-card__creator-avatar"
-            src={avatarUrl}
-            alt={owner}
-            width={16}
-            height={16}
-          />
-          <span className="fork-repo-card__creator-name">{owner}</span>
-        </div>
-        <div className="fork-repo-card__stats">
-          <span>★ {formatCount(stars)}</span>
-          {!isFork && <span>⑂ {formatCount(forks)}</span>}
+              {stars != null && (
+                <span className="repo-card-stat">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                  {formatCount(stars)}
+                </span>
+              )}
+              {!isFork && forks != null && (
+                <span className="repo-card-stat">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="6" cy="6" r="2" />
+                    <circle cx="18" cy="6" r="2" />
+                    <circle cx="12" cy="18" r="2" />
+                    <path d="M6 8v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8" />
+                    <path d="M12 12v4" />
+                  </svg>
+                  {formatCount(forks)}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="repo-card-footer-badges">
+            {language && (
+              <span
+                className="repo-card-icon-badge"
+                style={{ '--badge-color': getLangColor(language) } as React.CSSProperties}
+              >
+                <span className="repo-card-icon-badge-icon">
+                  <LanguageIcon lang={language} size={18} boxed />
+                </span>
+                <span className="repo-card-icon-badge-text">{language}</span>
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </a>
@@ -77,21 +97,26 @@ export function ForkRepoCard({
 
 export function ForkRepoCardSkeleton() {
   return (
-    <div className="fork-repo-card fork-repo-card--skeleton">
-      <div className="fork-repo-card__dither fork-repo-card__dither--loading" />
-      <div className="fork-repo-card__info">
-        <div className="fork-repo-card__title-row">
+    <div className="repo-card fork-repo-card fork-repo-card--skeleton">
+      <div className="repo-card-dither" />
+      <div className="repo-card-info">
+        <div className="repo-card-top">
           <div className="frcs frcs--avatar" />
-          <div className="frcs frcs--name" />
-          <div className="frcs frcs--badge" />
+          <div className="repo-card-top-text">
+            <div className="frcs frcs--name" />
+            <div className="frcs frcs--desc" />
+            <div className="frcs frcs--desc frcs--desc-short" />
+          </div>
         </div>
-        <div className="frcs frcs--desc-full" />
-        <div className="frcs frcs--desc-short" />
-        <div className="fork-repo-card__creator">
-          <div className="frcs frcs--creator-avatar" />
-          <div className="frcs frcs--creator-name" />
+        <div className="repo-card-grow" />
+        <div className="repo-card-footer">
+          <div className="repo-card-footer-left">
+            <div className="frcs frcs--stat" />
+          </div>
+          <div className="repo-card-footer-badges">
+            <div className="frcs frcs--badge" />
+          </div>
         </div>
-        <div className="frcs frcs--stats" />
       </div>
     </div>
   )
