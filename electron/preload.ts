@@ -354,4 +354,37 @@ contextBridge.exposeInMainWorld('api', {
     },
   },
 
+  updates: {
+    checkNow:        ()                => ipcRenderer.invoke('update:check-now'),
+    lastChecked:     ()                => ipcRenderer.invoke('update:last-checked') as Promise<{ timestamp: number | null }>,
+    getChanges:      (id: string)      => ipcRenderer.invoke('update:get-changes', id),
+    applyForkSync:   (id: string)      => ipcRenderer.invoke('update:apply-fork-sync', id) as Promise<{ ok: boolean; error?: string }>,
+    applySkillRegen: (id: string)      => ipcRenderer.invoke('update:apply-skill-regen', id) as Promise<{ ok: boolean; error?: string }>,
+    restartService:  ()                => ipcRenderer.invoke('update:restart-service'),
+    onStatusChanged: (cb: (payload: { ids: string[] }) => void) => {
+      const wrapped = ((_: unknown, payload: { ids: string[] }) => cb(payload)) as (...args: unknown[]) => void
+      callbackWrappers.set(cb, wrapped)
+      ipcRenderer.on('update:status-changed', wrapped)
+    },
+    offStatusChanged: (cb: (payload: { ids: string[] }) => void) => {
+      const wrapped = callbackWrappers.get(cb)
+      if (wrapped) {
+        ipcRenderer.removeListener('update:status-changed', wrapped)
+        callbackWrappers.delete(cb)
+      }
+    },
+    onToast: (cb: (payload: { message: string }) => void) => {
+      const wrapped = ((_: unknown, payload: { message: string }) => cb(payload)) as (...args: unknown[]) => void
+      callbackWrappers.set(cb, wrapped)
+      ipcRenderer.on('update:toast', wrapped)
+    },
+    offToast: (cb: (payload: { message: string }) => void) => {
+      const wrapped = callbackWrappers.get(cb)
+      if (wrapped) {
+        ipcRenderer.removeListener('update:toast', wrapped)
+        callbackWrappers.delete(cb)
+      }
+    },
+  },
+
 })
