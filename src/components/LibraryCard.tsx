@@ -1,3 +1,4 @@
+import './LibraryCard.css'
 import { useState } from 'react'
 import { Boxes, GitFork, ArrowUpCircle } from 'lucide-react'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
