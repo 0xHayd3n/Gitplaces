@@ -23,6 +23,8 @@ function rowToForkData(row: RepoRow): ForkRepoData {
   }
 }
 
+// Note: does not support changing originalFullName/forkFullName after mount.
+// State is initialized from cache at first render only; re-mounting handles new inputs.
 export function useForkData(
   originalFullName: string,
   forkFullName: string
@@ -51,6 +53,7 @@ export function useForkData(
           })
           .catch(() => {
             cache.set(originalFullName, null)
+            setOriginal(null)
           })
       )
     }
@@ -66,6 +69,7 @@ export function useForkData(
           })
           .catch(() => {
             cache.set(forkFullName, null)
+            setFork(null)
           })
       )
     }
