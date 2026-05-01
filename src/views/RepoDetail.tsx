@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue, lazy, Suspense } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Brain, FileDown, GitBranch, GitFork } from 'lucide-react'
+import { FileDown } from 'lucide-react'
+import { PiBrainFill, PiGitBranchFill, PiStarFill, PiStar, PiGitForkFill } from 'react-icons/pi'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -1869,7 +1870,7 @@ function RepoArticleActionRow({
             <polyline points="4 12 9 17 20 6" />
           </svg>
         ) : (
-          <Brain size={14} />
+          <PiBrainFill size={14} />
         )}
         <span>{learnLabel}</span>
       </button>
@@ -1881,7 +1882,7 @@ function RepoArticleActionRow({
         aria-controls="repo-detail-clone-panel"
         title="Clone options"
       >
-        <GitBranch size={14} />
+        <PiGitBranchFill size={14} />
         <span>Clone</span>
       </button>
 
@@ -1891,9 +1892,7 @@ function RepoArticleActionRow({
         disabled={starWorking}
         title={starred ? 'Unstar on GitHub' : 'Star on GitHub'}
       >
-        <svg viewBox="0 0 16 16" width={14} height={14} fill={starred ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5">
-          <path d="M8 1.5l1.85 3.75 4.15.6-3 2.93.7 4.1L8 10.77l-3.7 1.96.7-4.1-3-2.93 4.15-.6z" />
-        </svg>
+        {starred ? <PiStarFill size={14} /> : <PiStar size={14} />}
         <span>Star</span>
       </button>
 
@@ -1902,7 +1901,7 @@ function RepoArticleActionRow({
         onClick={onFork}
         title="Fork on GitHub"
       >
-        <GitFork size={14} />
+        <PiGitForkFill size={14} />
         <span>Fork</span>
       </button>
 
