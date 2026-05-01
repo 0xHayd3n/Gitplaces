@@ -62,11 +62,11 @@ After every task: run the affected test file(s) and confirm no new failures vs. 
 **Files:**
 - Modify: `electron/db.ts` — add two `ALTER TABLE` calls
 
-The new columns are `archived_at` (ISO timestamp string, nullable) and `forked_at` (same). Both are added in the existing migration block alongside the current `try { db.exec('ALTER TABLE repos ADD COLUMN ...') } catch {}` lines (around `electron/db.ts:197-209`).
+The new columns are `archived_at` (ISO timestamp string, nullable) and `forked_at` (same). Both are added in the existing migration block alongside the current `try { db.exec('ALTER TABLE repos ADD COLUMN ...') } catch {}` lines for the `repos` table (around `electron/db.ts:205-209`).
 
 - [ ] **Step 1.1: Open `electron/db.ts` and locate the migration block.**
 
-  Find the section with these existing lines (approximately lines 197-209):
+  Find the section with these existing lines (approximately lines 205-209):
   ```ts
   try { db.exec(`ALTER TABLE repos ADD COLUMN is_forked         INTEGER DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE repos ADD COLUMN update_available  INTEGER DEFAULT 0`) } catch {}
