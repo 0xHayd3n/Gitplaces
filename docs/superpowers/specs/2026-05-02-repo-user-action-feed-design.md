@@ -68,9 +68,9 @@ All four event types are read from existing tables (`repos.starred_at` / `archiv
 
 ### 1.3 No backfill
 
-Migration only adds columns and indexes. Existing rows get `archived_at = NULL` and `forked_at = NULL` — those events don't appear in any feed. The `archived_repos` settings JSON is left in place; `useArchivedRepos.toggle` becomes a dual-write (settings list + `archived_at`) so existing archived state continues to work without surfacing a fake event.
+Migration only adds columns. Existing rows get `archived_at = NULL` and `forked_at = NULL` — those events don't appear in any feed. The `archived_repos` settings JSON is left in place; `useArchivedRepos.toggle` becomes a dual-write (settings list + `archived_at`) so existing archived state continues to work without surfacing a fake event.
 
-Net diff in `db.ts`: ~10 LOC.
+Net diff in `db.ts`: ~3 LOC (two `ALTER TABLE` statements).
 
 ## 2. Read Path
 
@@ -524,7 +524,7 @@ Unchanged. `setSelectedReleaseId(...)` still opens `ActivityModal` with `activit
 
 ## 5. Instrumentation Points
 
-The four IPC handlers from Section 2 need to be called at the right moments.
+The instrumentation needed for each event type. Star and learn already work via existing handlers; fork and archive need new wiring.
 
 ### 5.1 Star / Unstar — already instrumented
 
