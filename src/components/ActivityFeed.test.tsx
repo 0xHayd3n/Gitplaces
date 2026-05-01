@@ -27,8 +27,8 @@ vi.mock('./ActivityEvent', () => ({
 }))
 
 vi.mock('./ActivityModal', () => ({
-  ActivityModal: ({ event, onClose }: any) => (
-    <div data-testid="activity-modal" data-event-id={event.id} onClick={onClose} />
+  ActivityModal: ({ initialEventId, onClose }: any) => (
+    <div data-testid="activity-modal" data-event-id={initialEventId} onClick={onClose} />
   ),
 }))
 

@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { ActivityModal } from './ActivityModal'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
@@ -56,19 +56,20 @@ beforeEach(() => {
 function renderModal(event: GitHubFeedEvent, onClose = vi.fn()) {
   return render(
     <MemoryRouter>
-      <ActivityModal event={event} onClose={onClose} />
+      <ActivityModal events={[event]} initialEventId={event.id} onClose={onClose} />
     </MemoryRouter>
   )
 }
 
 describe('ActivityModal', () => {
-  it('renders the version label and major tag for a major release', () => {
+  it('renders the title and major tag for a major release', () => {
     renderModal(releaseEvent)
-    expect(screen.getByText('v19.0.0')).toBeInTheDocument()
+    // Version appears in the title (`v19.0.0 — Reactivity Refresh`), no separate label.
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('v19.0.0')
     expect(screen.getByText('MAJOR UPDATE')).toBeInTheDocument()
   })
 
-  it('renders the PR number and PR MERGED tag for a merged PR', () => {
+  it('renders the PR number in the tag row and PR MERGED tag for a merged PR', () => {
     renderModal(prEvent)
     expect(screen.getByText('#1248')).toBeInTheDocument()
     expect(screen.getByText('PR MERGED')).toBeInTheDocument()
@@ -133,5 +134,70 @@ describe('ActivityModal', () => {
     const button = screen.getByText('Open in Library') as HTMLButtonElement
     expect(button.disabled).toBe(true)
     expect(button.title).toMatch(/save/i)
+  })
+
+  it('renders subsequent events below the initial one', () => {
+    render(
+      <MemoryRouter>
+        <ActivityModal
+          events={[releaseEvent, prEvent]}
+          initialEventId={releaseEvent.id}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>
+    )
+    // Both events are visible in the scroll container.
+    expect(screen.getByText('MAJOR UPDATE')).toBeInTheDocument()
+    expect(screen.getByText('PR MERGED')).toBeInTheDocument()
+  })
+
+  it('does not render events that come before the initial one', () => {
+    render(
+      <MemoryRouter>
+        <ActivityModal
+          events={[releaseEvent, prEvent]}
+          initialEventId={prEvent.id}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>
+    )
+    // releaseEvent precedes prEvent in the list, so it should not appear.
+    expect(screen.queryByText('MAJOR UPDATE')).toBeNull()
+    expect(screen.getByText('PR MERGED')).toBeInTheDocument()
+  })
+
+  it('skips ForkEvent and WatchEvent entries without crashing', () => {
+    const forkEvent: GitHubFeedEvent = {
+      id: 'fork-1',
+      type: 'ForkEvent',
+      actor: { login: 'a', avatar_url: '' },
+      repo: { full_name: 'a/b' },
+      payload: { forkee: { full_name: 'a/c' } },
+      created_at: new Date().toISOString(),
+    }
+    const watchEvent: GitHubFeedEvent = {
+      id: 'watch-1',
+      type: 'WatchEvent',
+      actor: { login: 'a', avatar_url: '' },
+      repo: { full_name: 'a/b' },
+      payload: {},
+      created_at: new Date().toISOString(),
+    }
+
+    expect(() =>
+      render(
+        <MemoryRouter>
+          <ActivityModal
+            events={[releaseEvent, forkEvent, watchEvent, prEvent]}
+            initialEventId={releaseEvent.id}
+            onClose={vi.fn()}
+          />
+        </MemoryRouter>
+      )
+    ).not.toThrow()
+
+    // Release and PR render; Fork/Watch are filtered out (no crash, no entries).
+    expect(screen.getByText('MAJOR UPDATE')).toBeInTheDocument()
+    expect(screen.getByText('PR MERGED')).toBeInTheDocument()
   })
 })

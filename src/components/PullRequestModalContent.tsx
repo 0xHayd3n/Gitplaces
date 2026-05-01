@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
+import { stripMentionsAndRefs } from '../utils/stripMentionsAndRefs'
 import { CompareSummary } from './CompareSummary'
 
 const ReadmeRenderer = lazy(() => import('./ReadmeRenderer'))
@@ -23,7 +24,7 @@ interface Props {
 
 export function PullRequestModalContent({ event }: Props) {
   const pr = (event.payload as unknown as PullRequestPayload).pull_request
-  const body = pr.body ?? ''
+  const body = stripMentionsAndRefs(pr.body ?? '')
   const [owner, repo] = event.repo.full_name.split('/')
 
   return (

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
 import { parseCompareUrl, stripCompareLine } from '../utils/parseCompareUrl'
+import { stripMentionsAndRefs } from '../utils/stripMentionsAndRefs'
 import { CompareSummary } from './CompareSummary'
 
 const ReadmeRenderer = lazy(() => import('./ReadmeRenderer'))
@@ -21,7 +22,8 @@ export function ReleaseModalContent({ event }: Props) {
   const release = (event.payload as unknown as ReleasePayload).release
   const rawBody = release.body ?? ''
   const compare = parseCompareUrl(rawBody)
-  const body = compare ? stripCompareLine(rawBody) : rawBody
+  const withoutCompare = compare ? stripCompareLine(rawBody) : rawBody
+  const body = stripMentionsAndRefs(withoutCompare)
 
   const [owner, name] = event.repo.full_name.split('/')
 
