@@ -193,6 +193,16 @@ export function initSchema(db: Database.Database): void {
     ts          INTEGER NOT NULL
   )`)
 
+  // Repo notes (user's private per-repo notes, synced to gitsuite-skills)
+  db.exec(`CREATE TABLE IF NOT EXISTS repo_notes (
+    repo_id      TEXT PRIMARY KEY REFERENCES repos(id),
+    notes        TEXT NOT NULL DEFAULT '',
+    updated_at   INTEGER NOT NULL DEFAULT 0,
+    sync_status  TEXT NOT NULL DEFAULT 'pending',
+    synced_at    INTEGER,
+    github_sha   TEXT
+  )`)
+
   // Skill GitHub sync columns
   try { db.exec(`ALTER TABLE skills ADD COLUMN github_sha TEXT`) } catch {}
   try { db.exec(`ALTER TABLE skills ADD COLUMN synced_at INTEGER`) } catch {}
