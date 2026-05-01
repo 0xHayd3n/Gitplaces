@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld('api', {
     getReadme:        (owner: string, name: string) => ipcRenderer.invoke('github:getReadme', owner, name),
     getFileContent:   (owner: string, name: string, path: string) => ipcRenderer.invoke('github:getFileContent', owner, name, path),
     getReleases:   (owner: string, name: string) => ipcRenderer.invoke('github:getReleases', owner, name),
+    getRepoUserEvents: (owner: string, name: string) =>
+      ipcRenderer.invoke('github:getRepoUserEvents', owner, name),
     saveRepo:        (owner: string, name: string) => ipcRenderer.invoke('github:saveRepo', owner, name),
     getSavedRepos:   () => ipcRenderer.invoke('github:getSavedRepos'),
     getFeedRepos:    () => ipcRenderer.invoke('github:getFeedRepos'),

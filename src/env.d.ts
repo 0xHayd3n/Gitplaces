@@ -2,6 +2,7 @@ import type { RepoRow, ReleaseRow, SkillRow, SubSkillRow, LibraryRow, Collection
 import type { ComponentScanResult } from './types/components'
 import type { AiChatMessage } from './components/AiChatOverlay.types'
 import type { RecommendationResponse } from './types/recommendation'
+import type { RepoUserEvent } from './types/repoUserEvents'
 
 declare module '*.png' {
   const src: string
@@ -79,6 +80,7 @@ declare global {
         getReadme:        (owner: string, name: string) => Promise<string | null>
         getFileContent:   (owner: string, name: string, path: string) => Promise<string | null>
         getReleases:   (owner: string, name: string) => Promise<ReleaseRow[]>
+        getRepoUserEvents: (owner: string, name: string) => Promise<RepoUserEvent[]>
         saveRepo:         (owner: string, name: string) => Promise<void>
         getSavedRepos:    () => Promise<{ owner: string; name: string }[]>
         getFeedRepos:     () => Promise<{ owner: string; name: string }[]>

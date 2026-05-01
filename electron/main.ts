@@ -43,6 +43,7 @@ import { registerCreateHandlers, closeAllOnQuit } from './ipc/createHandlers'
 import { startVerificationService, enqueueRepo } from './services/verificationService'
 import { startSkillSyncService, push as skillSyncPush, pushAll as skillSyncPushAll, setupRepo as skillSyncSetupRepo } from './services/skillSyncService'
 import { parseOgImage, isGenericGitHubOg } from './services/ogImageService'
+import { getRepoUserEvents } from './services/repoUserEvents'
 import { sanitiseRef } from './sanitiseRef'
 import type { CollectionRow, CollectionRepoRow } from '../src/types/repo'
 import { classifyRepoBucket } from '../src/lib/classifyRepoType'
@@ -698,6 +699,11 @@ ipcMain.handle('github:getReleases', async (_event, owner: string, name: string)
   const token = getToken()
   if (!token) return [] // GitHub disconnected — skip API call
   return getReleases(token, owner, name)  // errors propagate to renderer → "Failed to load releases." UI state
+})
+
+ipcMain.handle('github:getRepoUserEvents', async (_event, owner: string, name: string) => {
+  const db = getDb(app.getPath('userData'))
+  return getRepoUserEvents(db, owner, name)
 })
 
 ipcMain.handle('github:starRepo', async (_event, owner: string, name: string) => {
