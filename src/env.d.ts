@@ -81,6 +81,8 @@ declare global {
         getFileContent:   (owner: string, name: string, path: string) => Promise<string | null>
         getReleases:   (owner: string, name: string) => Promise<ReleaseRow[]>
         getRepoUserEvents: (owner: string, name: string) => Promise<RepoUserEvent[]>
+        recordFork:       (owner: string, name: string) => Promise<void>
+        setArchivedAt:    (owner: string, name: string, archived: boolean) => Promise<void>
         saveRepo:         (owner: string, name: string) => Promise<void>
         getSavedRepos:    () => Promise<{ owner: string; name: string }[]>
         getFeedRepos:     () => Promise<{ owner: string; name: string }[]>

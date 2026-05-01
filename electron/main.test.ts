@@ -32,3 +32,48 @@ describe('versioned installs query', () => {
     expect(refs).toEqual(['v7.3.9'])
   })
 })
+
+describe('recordFork SQL', () => {
+  it('sets repos.forked_at to a non-null timestamp', () => {
+    if (!db) throw new Error('db not initialized')
+    db.prepare("INSERT INTO repos (id, owner, name) VALUES ('r1', 'alice', 'repo')").run()
+
+    db.prepare('UPDATE repos SET forked_at=? WHERE owner=? AND name=?')
+      .run(new Date().toISOString(), 'alice', 'repo')
+
+    const row = db.prepare('SELECT forked_at FROM repos WHERE id=?').get('r1') as { forked_at: string | null }
+    expect(row.forked_at).not.toBeNull()
+    expect(typeof row.forked_at).toBe('string')
+  })
+
+  it('UPDATE silently no-ops for an unknown repo', () => {
+    if (!db) throw new Error('db not initialized')
+    const result = db.prepare('UPDATE repos SET forked_at=? WHERE owner=? AND name=?')
+      .run(new Date().toISOString(), 'unknown', 'repo')
+    expect(result.changes).toBe(0)
+  })
+})
+
+describe('setArchivedAt SQL', () => {
+  it('archived=true sets archived_at to a non-null timestamp', () => {
+    if (!db) throw new Error('db not initialized')
+    db.prepare("INSERT INTO repos (id, owner, name) VALUES ('r1', 'alice', 'repo')").run()
+
+    db.prepare('UPDATE repos SET archived_at=? WHERE owner=? AND name=?')
+      .run(new Date().toISOString(), 'alice', 'repo')
+
+    const row = db.prepare('SELECT archived_at FROM repos WHERE id=?').get('r1') as { archived_at: string | null }
+    expect(row.archived_at).not.toBeNull()
+  })
+
+  it('archived=false clears archived_at to NULL', () => {
+    if (!db) throw new Error('db not initialized')
+    db.prepare("INSERT INTO repos (id, owner, name, archived_at) VALUES ('r1', 'alice', 'repo', '2026-04-01T00:00:00Z')").run()
+
+    db.prepare('UPDATE repos SET archived_at=? WHERE owner=? AND name=?')
+      .run(null, 'alice', 'repo')
+
+    const row = db.prepare('SELECT archived_at FROM repos WHERE id=?').get('r1') as { archived_at: string | null }
+    expect(row.archived_at).toBeNull()
+  })
+})

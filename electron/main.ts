@@ -706,6 +706,18 @@ ipcMain.handle('github:getRepoUserEvents', async (_event, owner: string, name: s
   return getRepoUserEvents(db, owner, name)
 })
 
+ipcMain.handle('github:recordFork', async (_event, owner: string, name: string) => {
+  const db = getDb(app.getPath('userData'))
+  db.prepare('UPDATE repos SET forked_at=? WHERE owner=? AND name=?')
+    .run(new Date().toISOString(), owner, name)
+})
+
+ipcMain.handle('github:setArchivedAt', async (_event, owner: string, name: string, archived: boolean) => {
+  const db = getDb(app.getPath('userData'))
+  const ts = archived ? new Date().toISOString() : null
+  db.prepare('UPDATE repos SET archived_at=? WHERE owner=? AND name=?').run(ts, owner, name)
+})
+
 ipcMain.handle('github:starRepo', async (_event, owner: string, name: string) => {
   const token = getToken()
   if (!token) throw new Error('Not connected')

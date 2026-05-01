@@ -36,6 +36,10 @@ contextBridge.exposeInMainWorld('api', {
     getReleases:   (owner: string, name: string) => ipcRenderer.invoke('github:getReleases', owner, name),
     getRepoUserEvents: (owner: string, name: string) =>
       ipcRenderer.invoke('github:getRepoUserEvents', owner, name),
+    recordFork: (owner: string, name: string) =>
+      ipcRenderer.invoke('github:recordFork', owner, name),
+    setArchivedAt: (owner: string, name: string, archived: boolean) =>
+      ipcRenderer.invoke('github:setArchivedAt', owner, name, archived),
     saveRepo:        (owner: string, name: string) => ipcRenderer.invoke('github:saveRepo', owner, name),
     getSavedRepos:   () => ipcRenderer.invoke('github:getSavedRepos'),
     getFeedRepos:    () => ipcRenderer.invoke('github:getFeedRepos'),
