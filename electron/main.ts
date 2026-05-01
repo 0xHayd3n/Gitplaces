@@ -7,7 +7,7 @@ import Store from 'electron-store'
 import type Database from 'better-sqlite3'
 import { getDb, closeDb } from './db'
 import { getToken, setToken, clearToken, setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner } from './store'
-import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getFileContentWithSha, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, type CompareSummary } from './github'
+import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, type CompareSummary } from './github'
 import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
 import { scanFromSources } from './mcp-scanner'
 import type { McpScanResult } from '../src/types/mcp'
@@ -1467,7 +1467,7 @@ ipcMain.handle('notes:pullFromGitHub', async (_event, repoId: string, owner: str
   const local = db.prepare('SELECT updated_at FROM repo_notes WHERE repo_id = ?')
     .get(repoId) as { updated_at: number } | undefined
 
-  const remote = await pullNote(repoId, owner, repoName)
+  const remote = await pullNote(owner, repoName)
   if (!remote) return { ok: true, action: 'no-remote' }
 
   if (remote.updatedAt > (local?.updated_at ?? 0)) {
@@ -2399,7 +2399,7 @@ app.whenReady().then(() => {
   if (mainWindow) {
     startVerificationService(db, mainWindow)
     startSkillSyncService(db, mainWindow)
-    startNotesSyncService(db, mainWindow)
+    startNotesSyncService(db)
     if (getSyncEnabled()) void pushAllPendingNotes()
     startUpdateService(db, mainWindow)
   }

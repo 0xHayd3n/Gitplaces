@@ -1,15 +1,12 @@
-import type { BrowserWindow } from 'electron'
 import type Database from 'better-sqlite3'
 import { getToken, getSyncEnabled, getSyncRepoOwner } from '../store'
 import { putFileContents, getFileContentWithSha } from '../github'
 import { SKILLS_BACKUP_REPO } from './skillSyncService'
 
-let _win: BrowserWindow | null = null
 let _db: Database.Database | null = null
 
-export function startNotesSyncService(db: Database.Database, win: BrowserWindow): void {
+export function startNotesSyncService(db: Database.Database): void {
   _db = db
-  _win = win
 }
 
 function formatNoteFile(notes: string, updatedAt: number): string {
@@ -76,7 +73,6 @@ export async function pushAllPendingNotes(): Promise<void> {
 }
 
 export async function pullNote(
-  repoId: string,
   owner: string,
   repoName: string,
 ): Promise<{ notes: string; updatedAt: number; sha: string } | null> {
