@@ -16,7 +16,13 @@ vi.mock('../contexts/SavedRepos', () => ({
 }))
 
 vi.mock('./DitherBackground', () => ({ default: () => <div data-testid="dither" /> }))
-vi.mock('./ReleaseModalContent', () => ({ ReleaseModalContent: () => <div data-testid="release-content" /> }))
+const releaseContentSpy = vi.fn()
+vi.mock('./ReleaseModalContent', () => ({
+  ReleaseModalContent: (props: Record<string, unknown>) => {
+    releaseContentSpy(props)
+    return <div data-testid="release-content" />
+  },
+}))
 vi.mock('./PullRequestModalContent', () => ({ PullRequestModalContent: () => <div data-testid="pr-content" /> }))
 
 const releaseEvent: GitHubFeedEvent = {
@@ -50,6 +56,7 @@ const prEvent: GitHubFeedEvent = {
 
 beforeEach(() => {
   navigateMock.mockClear()
+  releaseContentSpy.mockClear()
   isSavedMock = vi.fn().mockReturnValue(true)
 })
 
@@ -199,5 +206,46 @@ describe('ActivityModal', () => {
     // Release and PR render; Fork/Watch are filtered out (no crash, no entries).
     expect(screen.getByText('MAJOR UPDATE')).toBeInTheDocument()
     expect(screen.getByText('PR MERGED')).toBeInTheDocument()
+  })
+
+  it('forwards onLearnVersion, learnState, and alreadyLearned to ReleaseModalContent', () => {
+    const onLearnVersion = vi.fn()
+    const versionLearnStates = new Map<string, 'UNLEARNED' | 'LEARNING' | 'LEARNED' | 'ERROR'>([
+      ['v19.0.0', 'LEARNING'],
+    ])
+    const versionedLearns = new Set<string>(['v19.0.0'])
+    render(
+      <MemoryRouter>
+        <ActivityModal
+          events={[releaseEvent]}
+          initialEventId={releaseEvent.id}
+          onClose={vi.fn()}
+          onLearnVersion={onLearnVersion}
+          versionLearnStates={versionLearnStates}
+          versionedLearns={versionedLearns}
+        />
+      </MemoryRouter>
+    )
+    expect(releaseContentSpy).toHaveBeenCalled()
+    const props = releaseContentSpy.mock.calls[0][0]
+    expect(props.onLearnVersion).toBe(onLearnVersion)
+    expect(props.learnState).toBe('LEARNING')
+    expect(props.alreadyLearned).toBe(true)
+  })
+
+  it('passes learnState=undefined and alreadyLearned=false when no version maps are provided', () => {
+    render(
+      <MemoryRouter>
+        <ActivityModal
+          events={[releaseEvent]}
+          initialEventId={releaseEvent.id}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>
+    )
+    const props = releaseContentSpy.mock.calls[0][0]
+    expect(props.onLearnVersion).toBeUndefined()
+    expect(props.learnState).toBeUndefined()
+    expect(props.alreadyLearned).toBe(false)
   })
 })

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import DitherBackground from './DitherBackground'
 import { useSavedRepos } from '../contexts/SavedRepos'
 import { classifyRelease } from '../utils/classifyRelease'
-import { ReleaseModalContent } from './ReleaseModalContent'
+import { ReleaseModalContent, type VersionLearnState } from './ReleaseModalContent'
 import { PullRequestModalContent } from './PullRequestModalContent'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
 import './ActivityModal.css'
@@ -12,6 +12,9 @@ interface Props {
   events: GitHubFeedEvent[]
   initialEventId: string
   onClose: () => void
+  onLearnVersion?: (tag: string) => void
+  versionLearnStates?: Map<string, VersionLearnState>
+  versionedLearns?: Set<string>
 }
 
 interface DerivedHeader {
@@ -91,6 +94,9 @@ interface EntryProps {
   event: GitHubFeedEvent
   onClose: () => void
   eager?: boolean
+  onLearnVersion?: (tag: string) => void
+  learnState?: VersionLearnState
+  alreadyLearned?: boolean
 }
 
 function EntrySkeleton() {
@@ -115,7 +121,10 @@ function EntrySkeleton() {
   )
 }
 
-function ActivityModalEntry({ event, onClose, eager = false }: EntryProps) {
+function ActivityModalEntry({
+  event, onClose, eager = false,
+  onLearnVersion, learnState, alreadyLearned,
+}: EntryProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const { isSaved } = useSavedRepos()
@@ -211,7 +220,12 @@ function ActivityModalEntry({ event, onClose, eager = false }: EntryProps) {
 
       <div className="activity-modal__body">
         {event.type === 'ReleaseEvent'
-          ? <ReleaseModalContent event={event} />
+          ? <ReleaseModalContent
+              event={event}
+              onLearnVersion={onLearnVersion}
+              learnState={learnState}
+              alreadyLearned={alreadyLearned}
+            />
           : <PullRequestModalContent event={event} />}
       </div>
 
@@ -235,7 +249,10 @@ function ActivityModalEntry({ event, onClose, eager = false }: EntryProps) {
   )
 }
 
-export function ActivityModal({ events, initialEventId, onClose }: Props) {
+export function ActivityModal({
+  events, initialEventId, onClose,
+  onLearnVersion, versionLearnStates, versionedLearns,
+}: Props) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -265,14 +282,22 @@ export function ActivityModal({ events, initialEventId, onClose }: Props) {
           ×
         </button>
         <div className="activity-modal__scroll">
-          {visibleEvents.map((event, index) => (
-            <ActivityModalEntry
-              key={event.id}
-              event={event}
-              onClose={onClose}
-              eager={index === 0}
-            />
-          ))}
+          {visibleEvents.map((event, index) => {
+            const tag = event.type === 'ReleaseEvent'
+              ? (event.payload as unknown as { release: { tag_name: string } }).release.tag_name
+              : null
+            return (
+              <ActivityModalEntry
+                key={event.id}
+                event={event}
+                onClose={onClose}
+                eager={index === 0}
+                onLearnVersion={onLearnVersion}
+                learnState={tag && versionLearnStates ? versionLearnStates.get(tag) : undefined}
+                alreadyLearned={tag && versionedLearns ? versionedLearns.has(tag) : false}
+              />
+            )
+          })}
         </div>
       </div>
     </div>
