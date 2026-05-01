@@ -47,8 +47,12 @@ import { BannerCard } from '../components/BannerCard'
 import { releaseToBannerProps } from '../components/ActivityEvent'
 import { ActivityModal } from '../components/ActivityModal'
 import { DateDivider } from '../components/DateDivider'
-import { groupEventsByDay } from '../utils/groupEventsByDay'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
+import { useRepoUserEvents } from '../hooks/useRepoUserEvents'
+import { useGitHubAuth } from '../contexts/GitHubAuth'
+import { groupRepoActivityByDay } from '../utils/groupRepoActivityByDay'
+import { RepoUserEventRow } from '../components/RepoUserEventRow'
+import type { RepoActivityItem } from '../types/repoActivity'
 import FilesTab from '../components/FilesTab'
 import { useRepoNav } from '../contexts/RepoNav'
 const StorybookExplorer = lazy(() => import('../components/StorybookExplorer'))
@@ -516,26 +520,52 @@ export default function RepoDetail() {
   const [versionLearnStates, setVersionLearnStates] = useState<Map<string, 'UNLEARNED' | 'LEARNING' | 'LEARNED' | 'ERROR'>>(new Map())
   const [related, setRelated] = useState<RepoRow[]>([])
   // Memoised synthetic events for the Activities tab; rebuilt only when the
-  // releases data or the repo identity changes.
+  // releases data or the repo identity changes. Still used as the `events`
+  // prop on <ActivityModal> for stacked navigation through release modals.
   const activityEvents = useMemo(
     () => Array.isArray(releases)
       ? (releases as ReleaseRow[]).map(r => releaseRowToFeedEvent(r, `${owner}/${name}`))
       : [],
     [releases, owner, name],
   )
-  // Day-grouped form for rendering Today / Yesterday / Apr 27 dividers between
-  // BannerCards — same shape the Library's ActivityFeed produces.
-  const activityGroups = useMemo(() => groupEventsByDay(activityEvents), [activityEvents])
-  // First-resolve fallback: if releases comes back empty/error, drop from the
-  // optimistic 'activities' default to README. The ref ensures we only apply
-  // the fallback once — subsequent navigations to Activities by the user stick.
+  // User-action events (star / archive / fork / learn) recorded locally by
+  // write IPCs; merged with releases below to form the unified Activities feed.
+  const userEvents = useRepoUserEvents(owner, name)
+  const { user: authedUser } = useGitHubAuth()
+  const userLogin = authedUser?.login ?? ''
+  const userAvatarUrl = userLogin ? `https://avatars.githubusercontent.com/${userLogin}?s=64` : ''
+
+  // Merge releases + user events into a single sorted list, then day-group.
+  const repoActivityItems = useMemo<RepoActivityItem[]>(() => {
+    const items: RepoActivityItem[] = []
+    if (Array.isArray(releases)) {
+      for (const r of releases as ReleaseRow[]) {
+        const ev = releaseRowToFeedEvent(r, `${owner}/${name}`)
+        items.push({ kind: 'release', ts: ev.created_at, event: ev })
+      }
+    }
+    if (Array.isArray(userEvents)) {
+      for (const u of userEvents) items.push({ kind: 'user', ts: u.ts, event: u })
+    }
+    return items.sort((a, b) => b.ts.localeCompare(a.ts))
+  }, [releases, userEvents, owner, name])
+
+  const repoActivityGroups = useMemo(
+    () => groupRepoActivityByDay(repoActivityItems),
+    [repoActivityItems],
+  )
+  // First-resolve fallback: if BOTH releases and user events come back empty/error,
+  // drop from the optimistic 'activities' default to README. The ref ensures we
+  // only apply the fallback once — subsequent navigations to Activities by the
+  // user stick.
   useEffect(() => {
     if (fellBackRef.current) return
-    if (releases === 'loading') return
+    if (releases === 'loading' || userEvents === 'loading') return
     fellBackRef.current = true
-    const hasActivity = Array.isArray(releases) && (releases as ReleaseRow[]).length > 0
+    const hasActivity = (Array.isArray(releases) && (releases as ReleaseRow[]).length > 0)
+                     || (Array.isArray(userEvents) && userEvents.length > 0)
     if (!hasActivity && activeTab === 'activities') setActiveTab('readme')
-  }, [releases, activeTab])
+  }, [releases, userEvents, activeTab])
   const [sidebarRelated, setSidebarRelated] = useState<RelatedRepo[]>([])
   const [repoCols, setRepoCols] = useState<{ id: string; name: string }[]>([])
 
@@ -1538,28 +1568,34 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                 )}
 
                 {activeTab === 'activities' && (
-                  releases === 'loading' ? (
+                  (releases === 'loading' || userEvents === 'loading') ? (
                     <p className="repo-detail-placeholder">Loading activity…</p>
-                  ) : releases === 'error' ? (
+                  ) : (releases === 'error' && userEvents === 'error') ? (
                     <p className="repo-detail-placeholder">Failed to load activity.</p>
-                  ) : (releases as ReleaseRow[]).length === 0 ? (
-                    // Defensive: the visibility rule normally hides the
-                    // Activities tab when releases is empty, so this branch
-                    // is reached only if a user explicitly clicks Activities
-                    // on a no-release repo (which the tab strip wouldn't
-                    // expose). Kept as a safe fallback.
+                  ) : repoActivityItems.length === 0 ? (
                     <p className="repo-detail-placeholder">No activity yet.</p>
                   ) : (
                     <div className="repo-activity-split">
                       <div className="repo-activity-split-left">
-                        {activityGroups.map(group => (
+                        {repoActivityGroups.map(group => (
                           <div key={group.label} className="repo-activity-group">
                             <DateDivider label={group.label} />
-                            {group.events.map(event => (
-                              <BannerCard
-                                key={event.id}
-                                {...releaseToBannerProps(event, () => setSelectedReleaseId(event.id))}
-                              />
+                            {group.items.map(item => (
+                              item.kind === 'release' ? (
+                                <BannerCard
+                                  key={item.event.id}
+                                  {...releaseToBannerProps(item.event, () => setSelectedReleaseId(item.event.id))}
+                                />
+                              ) : (
+                                <RepoUserEventRow
+                                  key={`${item.event.type}-${item.ts}`}
+                                  event={item.event}
+                                  repoOwner={owner!}
+                                  repoName={name!}
+                                  userLogin={userLogin}
+                                  userAvatarUrl={userAvatarUrl}
+                                />
+                              )
                             ))}
                           </div>
                         ))}

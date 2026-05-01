@@ -5,6 +5,7 @@ import RepoDetail from './RepoDetail'
 import { SavedReposProvider } from '../contexts/SavedRepos'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
 import { AppearanceProvider } from '../contexts/Appearance'
+import { GitHubAuthProvider } from '../contexts/GitHubAuth'
 import { parseSkillDepths } from '../utils/skillParse'
 import type { SkillRow } from '../types/repo'
 
@@ -54,10 +55,14 @@ function setupDetail(
   generateFn: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue({ content: '## [CORE]\nfoo', version: 'v1' }),
   relatedRepos: object[] = [],
   releases: object[] | 'reject' = [],
+  userEvents: object[] | 'reject' = [],
 ) {
   const releasesFn = releases === 'reject'
     ? vi.fn().mockRejectedValue(new Error('boom'))
     : vi.fn().mockResolvedValue(releases)
+  const userEventsFn = userEvents === 'reject'
+    ? vi.fn().mockRejectedValue(new Error('boom'))
+    : vi.fn().mockResolvedValue(userEvents)
   Object.defineProperty(window, 'api', {
     value: {
       github: {
@@ -71,6 +76,10 @@ function setupDetail(
         starRepo: vi.fn().mockResolvedValue(undefined),
         unstarRepo: vi.fn().mockResolvedValue(undefined),
         isStarred: vi.fn().mockResolvedValue(false),
+        getUser: vi.fn().mockResolvedValue({ login: 'tester' }),
+        getRepoUserEvents: userEventsFn,
+        recordFork: vi.fn().mockResolvedValue(undefined),
+        setArchivedAt: vi.fn().mockResolvedValue(undefined),
       },
       org: {
         getVerified: vi.fn().mockResolvedValue(false),
@@ -111,13 +120,15 @@ function setupDetail(
   return render(
     <MemoryRouter initialEntries={['/repo/vercel/next.js']}>
       <AppearanceProvider>
-        <ProfileOverlayProvider>
-          <SavedReposProvider>
-            <Routes>
-              <Route path="/repo/:owner/:name" element={<RepoDetail />} />
-            </Routes>
-          </SavedReposProvider>
-        </ProfileOverlayProvider>
+        <GitHubAuthProvider>
+          <ProfileOverlayProvider>
+            <SavedReposProvider>
+              <Routes>
+                <Route path="/repo/:owner/:name" element={<RepoDetail />} />
+              </Routes>
+            </SavedReposProvider>
+          </ProfileOverlayProvider>
+        </GitHubAuthProvider>
       </AppearanceProvider>
     </MemoryRouter>
   )
@@ -259,6 +270,80 @@ describe('RepoDetail activities tab', () => {
     fireEvent.click(card)
     // Modal renders — the close × button is a stable assertion target.
     await waitFor(() => screen.getByLabelText('Close'))
+  })
+})
+
+describe('RepoDetail activities tab — merged feed', () => {
+  const sampleStarEvent = { type: 'star', ts: '2026-04-15T10:00:00Z' }
+
+  it('renders both BannerCards and RepoUserEventRows when both sources have data', async () => {
+    const { container } = setupDetail(null, null, vi.fn(), [], [sampleRelease], [sampleStarEvent])
+    await waitFor(() => screen.getAllByText('next.js'))
+    await waitFor(
+      () => {
+        if (!container.querySelector('.banner-card')) throw new Error('banner-card not yet')
+        return container.querySelector('.banner-card')
+      },
+      { timeout: 3000 },
+    )
+    expect(container.querySelector('.repo-user-event')).not.toBeNull()
+  })
+
+  it('renders only user events when releases is empty', async () => {
+    const { container } = setupDetail(null, null, vi.fn(), [], [], [sampleStarEvent])
+    await waitFor(() => screen.getAllByText('next.js'))
+    await waitFor(
+      () => {
+        if (!container.querySelector('.repo-user-event')) throw new Error('user-event not yet')
+        return container.querySelector('.repo-user-event')
+      },
+      { timeout: 3000 },
+    )
+    expect(container.querySelector('.banner-card')).toBeNull()
+  })
+
+  it('renders only releases when user events is empty', async () => {
+    const { container } = setupDetail(null, null, vi.fn(), [], [sampleRelease], [])
+    await waitFor(() => screen.getAllByText('next.js'))
+    await waitFor(
+      () => {
+        if (!container.querySelector('.banner-card')) throw new Error('banner-card not yet')
+        return container.querySelector('.banner-card')
+      },
+      { timeout: 3000 },
+    )
+    expect(container.querySelector('.repo-user-event')).toBeNull()
+  })
+
+  it('default tab is Activities when user events is non-empty even with no releases', async () => {
+    const { container } = setupDetail(null, null, vi.fn(), [], [], [sampleStarEvent])
+    await waitFor(() => screen.getAllByText('next.js'))
+    await waitFor(
+      () => {
+        if (!container.querySelector('.repo-user-event')) throw new Error('not yet')
+        return container.querySelector('.repo-user-event')
+      },
+      { timeout: 3000 },
+    )
+  })
+
+  it('default tab falls back to Readme when both releases and user events are empty', async () => {
+    const { container } = setupDetail(null, null, vi.fn(), [], [], [])
+    await waitFor(() => screen.getAllByText('next.js'))
+    expect(container.querySelector('.banner-card')).toBeNull()
+    expect(container.querySelector('.repo-user-event')).toBeNull()
+  })
+
+  it('renders the resolved source when one errors and the other resolves', async () => {
+    const { container } = setupDetail(null, null, vi.fn(), [], [sampleRelease], 'reject')
+    await waitFor(() => screen.getAllByText('next.js'))
+    await waitFor(
+      () => {
+        if (!container.querySelector('.banner-card')) throw new Error('banner-card not yet')
+        return container.querySelector('.banner-card')
+      },
+      { timeout: 3000 },
+    )
   })
 })
 
