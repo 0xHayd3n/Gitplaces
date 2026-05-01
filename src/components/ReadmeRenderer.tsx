@@ -131,181 +131,6 @@ function rehypeImageClassifier() {
   }
 }
 
-// ── Rehype plugin: extract acknowledgment sections into Mentions ───
-// Identifies headings like "Contributors", "Sponsors", "Backers",
-// "Acknowledgments", "Thanks to", "Built with", "Powered by", etc.
-// and relocates those sections (heading + content until next heading
-// at same/higher level) into a single <section class="rm-mentions">
-// appended to the document. Runs after rehype-sanitize and before
-// rehypeFootnoteLinks so extracted content still receives footnote,
-// image classification, and heading ID treatment.
-//
-// Uses filter + reassignment (not splice) — same approach as
-// rehypeRemoveTocSection for the same unified compatibility reason.
-const MENTIONS_HEADINGS = /^(?:(?:code\s+)?contributors?|financial\s+contributors?|sponsors?|backers?|thanks?\s+to|built\s+with|powered\s+by|made\s+by|acknowledg(?:e?ments?|ing)|supporters?|partners?|credits?)$/i
-
-function isMentionsHeading(node: unknown): boolean {
-  if ((node as any)?.type !== 'element') return false
-  const el = node as Element
-  if (!/^h[1-6]$/.test(el.tagName)) return false
-  const text = extractNodeText(el).trim().replace(/^[^\w]+/, '').replace(/[^\w]+$/, '').trim()
-  return MENTIONS_HEADINGS.test(text)
-}
-
-function rehypeExtractMentions() {
-  return (tree: Root) => {
-    const collected: typeof tree.children = []
-    let inMention = false
-    let mentionLevel = 0
-
-    ;(tree as any).children = tree.children.filter((node: any) => {
-      if (node.type === 'element' && /^h[1-6]$/.test(node.tagName)) {
-        const level = parseInt(node.tagName[1])
-        if (isMentionsHeading(node)) {
-          inMention = true
-          mentionLevel = level
-          collected.push(node)
-          return false
-        }
-        if (inMention && level <= mentionLevel) {
-          inMention = false
-          return true
-        }
-      }
-      if (inMention) {
-        collected.push(node)
-        return false
-      }
-      return true
-    })
-
-    // Extract mentions: links (with href) and plain-text names from the collected nodes.
-    // Walks all collected content and pulls out <a> elements and leaf text from <li>/<p>.
-    const mentions: Array<{ text: string; href?: string }> = []
-    const seen = new Set<string>()
-
-    function extractMentions(node: any): void {
-      if (node.type === 'text') return
-      if (node.type !== 'element') return
-      const el = node as Element
-      // Skip the original section headings — we don't need them in the flat list
-      if (/^h[1-6]$/.test(el.tagName)) return
-
-      // Extract <a> links
-      if (el.tagName === 'a') {
-        const href = String(el.properties?.href ?? '')
-        const text = extractNodeText(el).trim()
-        if (text && !seen.has(text.toLowerCase())) {
-          seen.add(text.toLowerCase())
-          mentions.push({ text, ...(href && { href }) })
-        }
-        return
-      }
-
-      // For list items without links, extract plain text
-      if (el.tagName === 'li') {
-        const hasLink = el.children.some((c: any) => c.type === 'element' && c.tagName === 'a')
-        if (!hasLink) {
-          const text = extractNodeText(el).trim()
-          if (text && !seen.has(text.toLowerCase())) {
-            seen.add(text.toLowerCase())
-            mentions.push({ text })
-          }
-          return
-        }
-      }
-
-      for (const child of el.children) extractMentions(child)
-    }
-
-    for (const node of collected) extractMentions(node)
-
-    // Also extract body-level logo rows (paragraphs of only externally-linked
-    // images, e.g. CNCF sandbox badge, foundation logos) — move them to mentions
-    // so they don't clutter the article body.  GitHub avatar URLs are excluded
-    // because those are contributor grids handled separately.
-    ;(tree as any).children = (tree as any).children.filter((node: any) => {
-      if (node.type !== 'element' || (node as Element).tagName !== 'p') return true
-      const sig = (node as Element).children.filter(
-        (c: any) => !(c.type === 'text' && (c as Text).value.trim() === '')
-      )
-      if (sig.length === 0) return true
-
-      const allExtLinkedImgs = sig.every((c: any) => {
-        if (c.type !== 'element') return false
-        const el = c as Element
-        if (el.tagName !== 'a') return false
-        const href = String(el.properties?.href ?? '')
-        if (!href.startsWith('http')) return false
-        if (href.includes('avatars.githubusercontent.com')) return false
-        return el.children.some(
-          (ch: any) => ch.type === 'element' && (ch as Element).tagName === 'img'
-        )
-      })
-      if (!allExtLinkedImgs) return true
-
-      // Extract as mentions
-      for (const c of sig) {
-        const el = c as Element
-        const href = String(el.properties?.href ?? '')
-        const imgEl = el.children.find(
-          (ch: any) => ch.type === 'element' && (ch as Element).tagName === 'img'
-        ) as Element | undefined
-        const alt = String(imgEl?.properties?.alt ?? '').trim()
-        let text = alt
-        if (!text) {
-          try { text = new URL(href).hostname.replace(/^www\./, '') } catch { /* skip */ }
-        }
-        if (text && !seen.has(text.toLowerCase())) {
-          seen.add(text.toLowerCase())
-          mentions.push({ text, href })
-        }
-      }
-      return false  // remove logo row from body
-    })
-
-    if (mentions.length === 0) return
-
-    // Build flat inline list: "name, name, name" with links preserved
-    const listChildren: ElementContent[] = []
-    for (let i = 0; i < mentions.length; i++) {
-      const m = mentions[i]
-      if (i > 0) listChildren.push({ type: 'text', value: ', ' } as any)
-      if (m.href) {
-        listChildren.push({
-          type: 'element',
-          tagName: 'a',
-          properties: { href: m.href, className: ['rm-mention-link'], dataMention: true },
-          children: [{ type: 'text', value: m.text }],
-        } as ElementContent)
-      } else {
-        listChildren.push({ type: 'text', value: m.text } as any)
-      }
-    }
-
-    const section: Element = {
-      type: 'element',
-      tagName: 'section',
-      properties: { className: ['rm-mentions'] },
-      children: [
-        {
-          type: 'element',
-          tagName: 'h2',
-          properties: { className: ['rm-mentions-heading'], id: 'mentions' },
-          children: [{ type: 'text', value: 'Mentions' }],
-        },
-        {
-          type: 'element',
-          tagName: 'div',
-          properties: { className: ['rm-mentions-list'] },
-          children: listChildren,
-        },
-      ],
-    }
-    tree.children.push(section)
-  }
-}
-
 // ── Rehype plugin: remove locale-switcher paragraphs ─────────────
 // Detects paragraphs whose only content is locale-language links
 // (e.g. "English | 中文 | 日本語") and removes them entirely.
@@ -567,9 +392,6 @@ function rehypeFootnoteLinks() {
 
       // Skip GitHub repo links — they navigate in-app and must not become footnotes
       if (node.properties?.dataGhOwner) return SKIP
-
-      // Skip Mentions links — they're already in the streamlined Mentions section
-      if (node.properties?.dataMention) return SKIP
 
       // Assign footnote number — deduplicate same URL
       let n: number
@@ -1503,7 +1325,6 @@ function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePat
       rehypeFixCenterDivs,
       rehypeRemoveTocSection,
       rehypeRemoveLocaleSwitcher,
-      rehypeExtractMentions,
       rehypeImageClassifier,
       rehypeAddHeadingIds,
       rehypeYouTubeLinks,

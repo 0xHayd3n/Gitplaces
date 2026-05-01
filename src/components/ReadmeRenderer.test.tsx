@@ -677,53 +677,6 @@ describe('link preview popover', () => {
   })
 })
 
-describe('mentions section extraction', () => {
-  it('extracts Contributors links into a flat Mentions list', () => {
-    const md = '## Intro\n\nHello world.\n\n## Contributors\n\n- [Alice](https://example.com/alice)\n- [Bob](https://example.com/bob)\n\n## License\n\nMIT'
-    const { container } = render(
-      <MemoryRouter><ReadmeRenderer content={md} repoOwner="test" repoName="test" basePath="" /></MemoryRouter>
-    )
-    const mentions = container.querySelector('.rm-mentions')
-    expect(mentions).not.toBeNull()
-    expect(mentions!.querySelector('.rm-mentions-heading')?.textContent).toBe('Mentions')
-    // Flat comma-separated list with links
-    const list = mentions!.querySelector('.rm-mentions-list')
-    expect(list).not.toBeNull()
-    const links = list!.querySelectorAll('a.rm-mention-link')
-    expect(links.length).toBe(2)
-    expect(links[0].textContent).toBe('Alice')
-    expect(links[1].textContent).toBe('Bob')
-
-    // Contributors heading removed from main content
-    const rmContent = container.querySelector('.rm-content')!
-    const mainH2s = Array.from(rmContent.querySelectorAll('h2:not(.rm-mentions h2)')).map(h => h.textContent)
-    expect(mainH2s).not.toContain('Contributors')
-    expect(mainH2s).toContain('Intro')
-    expect(mainH2s).toContain('License')
-  })
-
-  it('does not create rm-mentions section when no acknowledgment headings exist', () => {
-    const md = '## Intro\n\nHello world.\n\n## License\n\nMIT'
-    const { container } = render(
-      <MemoryRouter><ReadmeRenderer content={md} repoOwner="test" repoName="test" basePath="" /></MemoryRouter>
-    )
-    expect(container.querySelector('.rm-mentions')).toBeNull()
-  })
-
-  it('extracts multiple acknowledgment sections into a single Mentions list', () => {
-    const md = '## Intro\n\nHello.\n\n## Sponsors\n\n- [Acme](https://acme.com)\n\n## Backers\n\n- [Dana](https://dana.dev)\n\n## License\n\nMIT'
-    const { container } = render(
-      <MemoryRouter><ReadmeRenderer content={md} repoOwner="test" repoName="test" basePath="" /></MemoryRouter>
-    )
-    const mentions = container.querySelector('.rm-mentions')
-    expect(mentions).not.toBeNull()
-    const links = mentions!.querySelectorAll('a.rm-mention-link')
-    expect(links.length).toBe(2)
-    expect(links[0].textContent).toBe('Acme')
-    expect(links[1].textContent).toBe('Dana')
-  })
-})
-
 describe('GitHub repo link behaviour', () => {
   it('renders with data-gh-owner, data-gh-name, and rm-gh-repo-link class', () => {
     const { container } = renderMd('[react](https://github.com/facebook/react)')

@@ -3815,41 +3815,6 @@ a {
 }
 .rm-footnote-ref:hover { text-decoration: underline; }
 
-/* ── Mentions section (relocated contributor/sponsor content) ── */
-.rm-mentions {
-  margin-top: 36px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-}
-.rm-mentions-heading {
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--t2);
-  margin: 0 0 12px 0;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-.rm-mentions-list {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  color: var(--t2);
-  line-height: 1.8;
-  margin: 0;
-}
-.rm-mention-link {
-  color: var(--accent-text);
-  text-decoration: none;
-}
-.rm-mention-link:hover {
-  text-decoration: underline;
-}
-.rm-mentions + .rm-references {
-  margin-top: 24px;
-  border-top: none;
-  padding-top: 0;
-}
-
 /* ── References section (appended after README content) ── */
 .rm-references {
   margin-top: 36px;
