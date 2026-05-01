@@ -35,6 +35,15 @@ function tierToTagText(tier: ReleaseTier): string {
   return 'UPDATE'
 }
 
+// Direct avatars.githubusercontent.com URL (NOT github.com/<owner>.png, which
+// is a 302 redirect; the redirect response lacks Access-Control-Allow-Origin
+// and breaks the dither's crossOrigin="anonymous" image load — leaves the
+// canvas tainted and produces a blank fallback gradient).
+function repoOwnerAvatarUrl(fullName: string): string {
+  const owner = fullName.split('/')[0]
+  return `https://avatars.githubusercontent.com/${owner}?s=200`
+}
+
 function releaseToBannerProps(
   event: GitHubFeedEvent,
   onOpenModal: (event: GitHubFeedEvent) => void,
@@ -44,18 +53,13 @@ function releaseToBannerProps(
     tagName: release.tag_name,
     prereleaseFlag: release.prerelease === true,
   })
-  const trimmedName = release.name?.trim()
-  const titleSuffix = trimmedName && trimmedName !== release.tag_name
-    ? ` — ${trimmedName}`
-    : ''
-
   return {
     tag: tierToTagText(tier),
     tier,
-    title: `${release.tag_name}${titleSuffix}`,
+    title: release.tag_name,
     descriptionPreview: stripMarkdownPreview(release.body ?? '', PREVIEW_MAX_LENGTH),
     versionLabel: release.tag_name,
-    ownerAvatarUrl: event.actor.avatar_url,
+    ownerAvatarUrl: repoOwnerAvatarUrl(event.repo.full_name),
     repoFullName: event.repo.full_name,
     occurredAt: event.created_at,
     onClick: () => onOpenModal(event),
@@ -73,7 +77,7 @@ function pullRequestToBannerProps(
     title: pr.title,
     descriptionPreview: stripMarkdownPreview(pr.body ?? '', PREVIEW_MAX_LENGTH),
     versionLabel: `#${pr.number}`,
-    ownerAvatarUrl: event.actor.avatar_url,
+    ownerAvatarUrl: repoOwnerAvatarUrl(event.repo.full_name),
     repoFullName: event.repo.full_name,
     occurredAt: event.created_at,
     onClick: () => onOpenModal(event),
