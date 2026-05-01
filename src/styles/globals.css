@@ -11260,3 +11260,106 @@ a {
 
 .profile-view-retry-btn:hover { background: var(--bg4); }
 
+/* ── Repo Notes tile ──────────────────────────────────────── */
+.repo-notes-tile {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.repo-notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.repo-notes-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--t3);
+}
+.repo-notes-save-status {
+  font-size: 9px;
+  color: #4ade80;
+  opacity: 0.7;
+}
+.repo-notes-save-status.saving {
+  color: var(--t3);
+  opacity: 1;
+}
+.repo-notes-preview {
+  min-height: 40px;
+  font-size: 11px;
+  color: var(--t2);
+  line-height: 1.6;
+  padding: 7px 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  cursor: text;
+  transition: border-color 0.15s, background 0.15s;
+}
+.repo-notes-preview:hover {
+  border-color: var(--border2);
+  background: rgba(255,255,255,0.04);
+}
+.repo-notes-preview p  { margin: 0 0 4px; }
+.repo-notes-preview ul,
+.repo-notes-preview ol { margin: 4px 0; padding-left: 14px; }
+.repo-notes-preview li { margin: 2px 0; }
+.repo-notes-preview strong { color: var(--t1); }
+.repo-notes-preview code {
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+.repo-notes-empty {
+  min-height: 40px;
+  font-size: 11px;
+  color: var(--t4);
+  font-style: italic;
+  padding: 7px 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  cursor: text;
+  transition: border-color 0.15s, background 0.15s;
+}
+.repo-notes-empty:hover {
+  border-color: var(--border2);
+  background: rgba(255,255,255,0.04);
+}
+.repo-notes-textarea {
+  width: 100%;
+  max-height: 160px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--t2);
+  font-size: 11px;
+  font-family: inherit;
+  padding: 7px 8px;
+  resize: none;
+  outline: none;
+  box-sizing: border-box;
+  line-height: 1.5;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.repo-notes-textarea::-webkit-scrollbar       { width: 3px; }
+.repo-notes-textarea::-webkit-scrollbar-track { background: transparent; }
+.repo-notes-textarea::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+}
+.repo-notes-textarea:focus { border-color: rgba(255,255,255,0.28); }
+.repo-notes-edit-hint {
+  font-size: 9px;
+  color: var(--t4);
+  margin-top: 4px;
+  text-align: right;
+}
+
