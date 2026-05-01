@@ -708,7 +708,10 @@ ipcMain.handle('github:getRepoUserEvents', async (_event, owner: string, name: s
 
 ipcMain.handle('github:recordFork', async (_event, owner: string, name: string) => {
   const db = getDb(app.getPath('userData'))
-  db.prepare('UPDATE repos SET forked_at=? WHERE owner=? AND name=?')
+  // Preserve the first-click timestamp — fork is one-time per repo (you can't
+  // unfork in-app), so a second click on the Fork button shouldn't overwrite
+  // the original event date with a later one.
+  db.prepare('UPDATE repos SET forked_at=? WHERE owner=? AND name=? AND forked_at IS NULL')
     .run(new Date().toISOString(), owner, name)
 })
 

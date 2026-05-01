@@ -34,11 +34,11 @@ describe('versioned installs query', () => {
 })
 
 describe('recordFork SQL', () => {
-  it('sets repos.forked_at to a non-null timestamp', () => {
+  it('sets repos.forked_at to a non-null timestamp on first click', () => {
     if (!db) throw new Error('db not initialized')
     db.prepare("INSERT INTO repos (id, owner, name) VALUES ('r1', 'alice', 'repo')").run()
 
-    db.prepare('UPDATE repos SET forked_at=? WHERE owner=? AND name=?')
+    db.prepare('UPDATE repos SET forked_at=? WHERE owner=? AND name=? AND forked_at IS NULL')
       .run(new Date().toISOString(), 'alice', 'repo')
 
     const row = db.prepare('SELECT forked_at FROM repos WHERE id=?').get('r1') as { forked_at: string | null }
@@ -46,9 +46,21 @@ describe('recordFork SQL', () => {
     expect(typeof row.forked_at).toBe('string')
   })
 
+  it('preserves the original timestamp on a second click', () => {
+    if (!db) throw new Error('db not initialized')
+    db.prepare("INSERT INTO repos (id, owner, name, forked_at) VALUES ('r1', 'alice', 'repo', '2026-04-01T00:00:00Z')").run()
+
+    const result = db.prepare('UPDATE repos SET forked_at=? WHERE owner=? AND name=? AND forked_at IS NULL')
+      .run(new Date().toISOString(), 'alice', 'repo')
+
+    expect(result.changes).toBe(0)
+    const row = db.prepare('SELECT forked_at FROM repos WHERE id=?').get('r1') as { forked_at: string | null }
+    expect(row.forked_at).toBe('2026-04-01T00:00:00Z')
+  })
+
   it('UPDATE silently no-ops for an unknown repo', () => {
     if (!db) throw new Error('db not initialized')
-    const result = db.prepare('UPDATE repos SET forked_at=? WHERE owner=? AND name=?')
+    const result = db.prepare('UPDATE repos SET forked_at=? WHERE owner=? AND name=? AND forked_at IS NULL')
       .run(new Date().toISOString(), 'unknown', 'repo')
     expect(result.changes).toBe(0)
   })
