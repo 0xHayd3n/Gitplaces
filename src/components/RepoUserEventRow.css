@@ -1,0 +1,23 @@
+.repo-user-event {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--t2);
+  min-height: 32px;
+}
+.repo-user-event__avatar { width: 20px; height: 20px; border-radius: 50%; }
+.repo-user-event__user { color: var(--accent-text); font-weight: 600; }
+.repo-user-event__verb { color: var(--t2); }
+.repo-user-event__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--bg3);
+  color: var(--t1);
+}
+.repo-user-event__chip-avatar { width: 14px; height: 14px; border-radius: 3px; }
+.repo-user-event__time { margin-left: auto; color: var(--t3); font-size: 11px; }
