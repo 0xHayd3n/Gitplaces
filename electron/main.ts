@@ -7,7 +7,7 @@ import Store from 'electron-store'
 import type Database from 'better-sqlite3'
 import { getDb, closeDb } from './db'
 import { getToken, setToken, clearToken, setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner } from './store'
-import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, type CompareSummary } from './github'
+import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getFileContentWithSha, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, type CompareSummary } from './github'
 import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
 import { scanFromSources } from './mcp-scanner'
 import type { McpScanResult } from '../src/types/mcp'
@@ -42,6 +42,7 @@ import { startUpdateService, checkIsFork } from './services/updateService'
 import { registerCreateHandlers, closeAllOnQuit } from './ipc/createHandlers'
 import { startVerificationService, enqueueRepo } from './services/verificationService'
 import { startSkillSyncService, push as skillSyncPush, pushAll as skillSyncPushAll, setupRepo as skillSyncSetupRepo } from './services/skillSyncService'
+import { startNotesSyncService, pushNote as notesSyncPush, pushAllPendingNotes, pullNote } from './services/notesSyncService'
 import { parseOgImage, isGenericGitHubOg } from './services/ogImageService'
 import { getRepoUserEvents } from './services/repoUserEvents'
 import { sanitiseRef } from './sanitiseRef'
@@ -1435,6 +1436,55 @@ ipcMain.handle('skillSync:getStatus', async () => {
   }
 })
 
+// ── Notes IPC ────────────────────────────────────────────────
+ipcMain.handle('notes:get', (_event, repoId: string) => {
+  const db = getDb(app.getPath('userData'))
+  const row = db.prepare(
+    'SELECT notes, updated_at FROM repo_notes WHERE repo_id = ?'
+  ).get(repoId) as { notes: string; updated_at: number } | undefined
+  return row ?? null
+})
+
+ipcMain.handle('notes:set', async (_event, repoId: string, notes: string) => {
+  const db = getDb(app.getPath('userData'))
+  const updatedAt = Date.now()
+  db.prepare(`
+    INSERT INTO repo_notes (repo_id, notes, updated_at, sync_status)
+    VALUES (?, ?, ?, 'pending')
+    ON CONFLICT(repo_id) DO UPDATE
+      SET notes = excluded.notes,
+          updated_at = excluded.updated_at,
+          sync_status = 'pending'
+  `).run(repoId, notes, updatedAt)
+  const repo = db.prepare('SELECT owner, name FROM repos WHERE id = ?')
+    .get(repoId) as { owner: string; name: string } | undefined
+  if (repo) void notesSyncPush(repoId, repo.owner, repo.name, notes, updatedAt)
+  return { ok: true }
+})
+
+ipcMain.handle('notes:pullFromGitHub', async (_event, repoId: string, owner: string, repoName: string) => {
+  const db = getDb(app.getPath('userData'))
+  const local = db.prepare('SELECT updated_at FROM repo_notes WHERE repo_id = ?')
+    .get(repoId) as { updated_at: number } | undefined
+
+  const remote = await pullNote(repoId, owner, repoName)
+  if (!remote) return { ok: true, action: 'no-remote' }
+
+  if (remote.updatedAt > (local?.updated_at ?? 0)) {
+    db.prepare(`
+      INSERT INTO repo_notes (repo_id, notes, updated_at, sync_status, github_sha)
+      VALUES (?, ?, ?, 'synced', ?)
+      ON CONFLICT(repo_id) DO UPDATE
+        SET notes = excluded.notes,
+            updated_at = excluded.updated_at,
+            sync_status = 'synced',
+            github_sha = excluded.github_sha
+    `).run(repoId, remote.notes, remote.updatedAt, remote.sha)
+    return { ok: true, action: 'updated', notes: remote.notes }
+  }
+  return { ok: true, action: 'local-wins' }
+})
+
 // ── Library IPC ─────────────────────────────────────────────────
 ipcMain.handle('library:getAll', async () => {
   const db = getDb(app.getPath('userData'))
@@ -2349,6 +2399,8 @@ app.whenReady().then(() => {
   if (mainWindow) {
     startVerificationService(db, mainWindow)
     startSkillSyncService(db, mainWindow)
+    startNotesSyncService(db, mainWindow)
+    if (getSyncEnabled()) void pushAllPendingNotes()
     startUpdateService(db, mainWindow)
   }
   const existingToken = getToken()
