@@ -1,10 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue, lazy, Suspense } from 'react'
 import { useLocation } from 'react-router-dom'
-import { FileDown } from 'lucide-react'
 import { PiBrainFill, PiGitBranchFill, PiStarFill, PiStar, PiGitForkFill } from 'react-icons/pi'
-import { formatBytes } from '../utils/formatBytes'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   SiGithub, SiDiscord, SiSlack, SiTelegram, SiReddit,
@@ -58,7 +54,6 @@ const ComponentExplorer = lazy(() => import('../components/ComponentExplorer'))
 import { isComponentLibraryRepo } from '../utils/componentLibraryDetector'
 import VerificationBadge from '../components/VerificationBadge'
 import { useVerification } from '../hooks/useVerification'
-import { sanitiseRef } from '../../electron/sanitiseRef'
 import CloneOptionsPanel from '../components/CloneOptionsPanel'
 import { ArticleLayout } from '../components/ArticleLayout'
 
