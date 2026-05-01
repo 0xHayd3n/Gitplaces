@@ -107,10 +107,10 @@ Self-contained component. All notes logic stays here — nothing leaks into `Rep
 
 **On mount:**
 - Calls `window.api.notes.get(repoId)`
-- If sync enabled and `github_sha` exists, fires `notes:pullFromGitHub` to check for newer remote copy
+- If sync enabled and a note row exists (regardless of `github_sha`), fires `notes:pullFromGitHub` to check for newer remote copy
 
 **Interaction model:**
-- Default state: rendered markdown (via `react-markdown` or `marked` — whichever is already in the bundle)
+- Default state: rendered markdown via `react-markdown` (both `react-markdown` and `marked` are in the bundle; prefer `react-markdown` as it integrates naturally with React's render tree)
 - Click anywhere on the rendered content → textarea opens with raw markdown source
 - Click outside / blur → returns to preview mode
 - Empty state: dim italic "Click to add notes... (markdown supported)" — clicking opens textarea directly
