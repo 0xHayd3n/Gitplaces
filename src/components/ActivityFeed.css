@@ -61,6 +61,34 @@
   color: rgba(255, 100, 100, 0.8);
 }
 
+.activity-event-wrapper {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.activity-event-wrapper > * {
+  min-height: 0;
+}
+
+/* Animatable grid-template-rows expands the row from 0 to natural height,
+   so items below get pushed down smoothly instead of jumping when fresh
+   entries are prepended after a fetch. */
+.activity-event-wrapper--fresh {
+  animation: activity-event-enter 0.38s ease-out;
+  overflow: hidden;
+}
+
+@keyframes activity-event-enter {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+
 .activity-feed-skeletons {
   display: flex;
   flex-direction: column;

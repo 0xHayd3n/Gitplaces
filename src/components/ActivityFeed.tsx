@@ -25,6 +25,22 @@ export default function ActivityFeed() {
   const location = useLocation()
   const navigate = useNavigate()
 
+  // Track event IDs from the prior render so we can animate items that appear
+  // when a fetch merges fresher entries in on top of the cached list. `null`
+  // on the very first render means cached items render statically — they were
+  // already there last session, so they shouldn't appear to "arrive".
+  const prevIdsRef = useRef<Set<string> | null>(null)
+  const prevIds = prevIdsRef.current
+  const freshIds = new Set<string>()
+  if (prevIds !== null) {
+    for (const e of events) {
+      if (!prevIds.has(e.id)) freshIds.add(e.id)
+    }
+  }
+  useEffect(() => {
+    prevIdsRef.current = new Set(events.map(e => e.id))
+  }, [events])
+
   // Re-arm pull gesture once a pull-triggered refresh completes.
   useEffect(() => {
     if (!loading && triggeredRef.current) triggeredRef.current = false
@@ -141,11 +157,19 @@ export default function ActivityFeed() {
           <div key={group.label}>
             <DateDivider label={group.label} />
             {group.events.map(event => (
-              <ActivityEvent
+              <div
                 key={event.id}
-                event={event}
-                onOpenModal={setSelectedEvent}
-              />
+                className={
+                  freshIds.has(event.id)
+                    ? 'activity-event-wrapper activity-event-wrapper--fresh'
+                    : 'activity-event-wrapper'
+                }
+              >
+                <ActivityEvent
+                  event={event}
+                  onOpenModal={setSelectedEvent}
+                />
+              </div>
             ))}
           </div>
         ))}
