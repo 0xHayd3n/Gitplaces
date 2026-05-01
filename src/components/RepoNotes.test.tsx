@@ -39,15 +39,15 @@ describe('RepoNotes', () => {
   it('switches to textarea when preview is clicked', async () => {
     mockGet.mockResolvedValue({ notes: 'hello world', updated_at: 1000 })
     render(<RepoNotes repoId="12345" owner="facebook" repoName="react" />)
-    await waitFor(() => screen.getByText('hello world'))
-    await userEvent.click(screen.getByText('hello world'))
+    const preview = await screen.findByText('hello world')
+    await userEvent.click(preview)
     expect(screen.getByRole('textbox')).toBeInTheDocument()
   })
 
   it('switches to textarea when empty-state placeholder is clicked', async () => {
     render(<RepoNotes repoId="12345" owner="facebook" repoName="react" />)
-    await waitFor(() => screen.getByText(/Click to add notes/i))
-    await userEvent.click(screen.getByText(/Click to add notes/i))
+    const placeholder = await screen.findByText(/Click to add notes/i)
+    await userEvent.click(placeholder)
     expect(screen.getByRole('textbox')).toBeInTheDocument()
   })
 

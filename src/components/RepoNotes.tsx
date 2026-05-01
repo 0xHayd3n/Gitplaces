@@ -34,7 +34,10 @@ export default function RepoNotes({ repoId, owner, repoName }: Props) {
         }
       }
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
   }, [repoId, owner, repoName])
 
   useEffect(() => {
