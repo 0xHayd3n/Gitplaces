@@ -207,6 +207,8 @@ export function initSchema(db: Database.Database): void {
   try { db.exec(`ALTER TABLE repos ADD COLUMN update_checked_at INTEGER DEFAULT NULL`) } catch {}
   try { db.exec(`ALTER TABLE repos ADD COLUMN upstream_version  TEXT    DEFAULT NULL`) } catch {}
   try { db.exec(`ALTER TABLE repos ADD COLUMN stored_version    TEXT    DEFAULT NULL`) } catch {}
+  try { db.exec(`ALTER TABLE repos ADD COLUMN archived_at       TEXT    DEFAULT NULL`) } catch {}
+  try { db.exec(`ALTER TABLE repos ADD COLUMN forked_at         TEXT    DEFAULT NULL`) } catch {}
 
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`
