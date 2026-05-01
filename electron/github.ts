@@ -289,7 +289,11 @@ export async function getDefaultBranch(
 }
 
 export async function getReleases(token: string | null, owner: string, name: string): Promise<GitHubRelease[]> {
-  const res = await fetch(`${BASE}/repos/${owner}/${name}/releases?per_page=10`, { headers: githubHeaders(token) })
+  // per_page=100 is GitHub's hard max for a single page. Covers ~all repos in
+  // one call. Repos with >100 releases (rare — e.g. react ~360, next.js ~580)
+  // are still truncated; full pagination deferred until we have a real
+  // "load older" affordance.
+  const res = await fetch(`${BASE}/repos/${owner}/${name}/releases?per_page=100`, { headers: githubHeaders(token) })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   return res.json() as Promise<GitHubRelease[]>
 }
