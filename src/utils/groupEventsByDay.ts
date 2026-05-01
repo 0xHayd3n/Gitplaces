@@ -10,11 +10,11 @@ const MONTH_DAY_YEAR = new Intl.DateTimeFormat('en-US', {
   month: 'long', day: 'numeric', year: 'numeric',
 })
 
-function dayKey(d: Date): string {
+export function dayKey(d: Date): string {
   return d.toDateString() // local-time, stable per-day key
 }
 
-function labelFor(
+export function labelFor(
   eventDate: Date,
   now: Date,
   todayKey: string,
