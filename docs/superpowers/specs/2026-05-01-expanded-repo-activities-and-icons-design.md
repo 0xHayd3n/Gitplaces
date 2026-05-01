@@ -88,7 +88,7 @@ function releaseRowToFeedEvent(r: ReleaseRow, repoFullName: string): GitHubFeedE
   return {
     id: `release-${r.tag_name}`,
     type: 'ReleaseEvent',
-    actor: { login: '', avatar_url: '' },     // BannerCard derives the avatar from repo owner
+    actor: { login: '', avatar_url: '' },     // see note below
     repo: { full_name: repoFullName },
     payload: {
       release: {
@@ -105,12 +105,33 @@ function releaseRowToFeedEvent(r: ReleaseRow, repoFullName: string): GitHubFeedE
 }
 ```
 
-`actor.login`/`actor.avatar_url` are empty strings because `BannerCard` doesn't read them — `releaseToBannerProps` derives the avatar from `event.repo.full_name` via `repoOwnerAvatarUrl()`. We still satisfy the type.
+**Empty `actor` is safe:**
+- `BannerCard` doesn't read `actor` — `releaseToBannerProps` derives the card avatar from `event.repo.full_name` via `repoOwnerAvatarUrl()`.
+- `ActivityModalEntry.deriveHeader` (`ActivityModal.tsx:39-78`) computes a `bylineActor: event.actor.login` field, but the entry render block (`ActivityModal.tsx:179-234`) doesn't display `bylineActor` anywhere — it's dead data on the header. Empty string flows through harmlessly.
+- `ReleaseRow` has no `author` field (verified in `src/types/repo.ts:58-65`), so we can't populate `actor` from the release row even if we wanted to.
 
 ### 1.5 Activities tab body
 
-Replaces the entire `activeTab === 'releases'` block at `RepoDetail.tsx:1488-1576`.
+Replaces the entire `activeTab === 'releases'` block at `RepoDetail.tsx:1488-1579`.
 
+The current `ActivityModal` is a stack reader (per commit `894ac1d`): it takes an array of events plus an `initialEventId` and renders the clicked event with all earlier supported events stacked below for vertical scrolling. We mirror that behaviour for the per-repo Activities tab — clicking release v3 opens a panel showing v3, v2, v1 stacked.
+
+State:
+```ts
+const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(null)
+```
+
+Memoised event list (rebuilt only when releases or owner/name changes):
+```ts
+const activityEvents = useMemo(
+  () => Array.isArray(releases)
+    ? releases.map(r => releaseRowToFeedEvent(r, `${owner}/${name}`))
+    : [],
+  [releases, owner, name],
+)
+```
+
+Body render:
 ```tsx
 {activeTab === 'activities' && (
   releases === 'loading' ? (
@@ -119,23 +140,21 @@ Replaces the entire `activeTab === 'releases'` block at `RepoDetail.tsx:1488-157
     <p className="repo-detail-placeholder">Failed to load activity.</p>
   ) : (
     <div className="repo-activity-feed">
-      {(releases as ReleaseRow[]).map(r => {
-        const event = releaseRowToFeedEvent(r, `${owner}/${name}`)
-        return (
-          <BannerCard
-            key={r.tag_name}
-            {...releaseToBannerProps(event, () => setSelectedActivityEvent(event))}
-          />
-        )
-      })}
+      {activityEvents.map(event => (
+        <BannerCard
+          key={event.id}
+          {...releaseToBannerProps(event, () => setSelectedReleaseId(event.id))}
+        />
+      ))}
     </div>
   )
 )}
 
-{selectedActivityEvent && (
+{selectedReleaseId && (
   <ActivityModal
-    event={selectedActivityEvent}
-    onClose={() => setSelectedActivityEvent(null)}
+    events={activityEvents}
+    initialEventId={selectedReleaseId}
+    onClose={() => setSelectedReleaseId(null)}
     onLearnVersion={handleVersionLearn}
     versionLearnStates={versionLearnStates}
     versionedLearns={versionedLearns}
@@ -143,7 +162,7 @@ Replaces the entire `activeTab === 'releases'` block at `RepoDetail.tsx:1488-157
 )}
 ```
 
-`releaseToBannerProps` is currently defined as a non-exported function in `ActivityEvent.tsx:47-67` — export it (or move it to a shared util file `src/utils/releaseToBannerProps.ts`). Decision: **export from `ActivityEvent.tsx`** to minimise touch surface; future extraction is cheap.
+`releaseToBannerProps` is currently a non-exported function at `ActivityEvent.tsx:47-67` — **export it** (minimal touch surface; future extraction to a shared util is cheap if needed).
 
 ### 1.6 Inline expand removed
 
@@ -206,31 +225,73 @@ Library-feed release modals don't get the assets list because `onLearnVersion` i
 
 ## 3. ActivityModal: Prop Forwarding
 
-`src/components/ActivityModal.tsx:214`. Three new optional props on `ActivityModal`, piped to `ReleaseModalContent` only for `ReleaseEvent` types.
+`src/components/ActivityModal.tsx`. The current API (per commit `894ac1d`) is a panel-based vertical reader rendering a stack of events via internal `ActivityModalEntry` children. The new install props need to thread through both layers: `ActivityModal` → `ActivityModalEntry` → `ReleaseModalContent`.
+
+### 3.1 `ActivityModal` props (current line 11-15)
 
 ```ts
-interface ActivityModalProps {
-  event: GitHubFeedEvent | null
+interface Props {
+  events: GitHubFeedEvent[]
+  initialEventId: string
   onClose: () => void
-  // New:
+  // New (all optional — Library feed call sites omit them):
   onLearnVersion?: (tag: string) => void
   versionLearnStates?: Map<string, VersionLearnState>
   versionedLearns?: Set<string>
 }
 ```
 
-When rendering `ReleaseModalContent` (existing line 214):
+### 3.2 `ActivityModalEntry` props (current `EntryProps`, lines 90-94)
 
-```tsx
-<ReleaseModalContent
-  event={event}
-  onLearnVersion={onLearnVersion}
-  learnState={versionLearnStates?.get(tagFromEvent(event))}
-  alreadyLearned={versionedLearns?.has(tagFromEvent(event))}
-/>
+```ts
+interface EntryProps {
+  event: GitHubFeedEvent
+  onClose: () => void
+  eager?: boolean
+  // New:
+  onLearnVersion?: (tag: string) => void
+  learnState?: VersionLearnState
+  alreadyLearned?: boolean
+}
 ```
 
-`tagFromEvent` extracts `event.payload.release.tag_name` — small inline helper.
+### 3.3 Per-entry derivation in the map (current lines 268-275)
+
+```tsx
+{visibleEvents.map((event, index) => {
+  const tag = event.type === 'ReleaseEvent'
+    ? (event.payload as { release: { tag_name: string } }).release.tag_name
+    : null
+  return (
+    <ActivityModalEntry
+      key={event.id}
+      event={event}
+      onClose={onClose}
+      eager={index === 0}
+      onLearnVersion={onLearnVersion}
+      learnState={tag && versionLearnStates ? versionLearnStates.get(tag) : undefined}
+      alreadyLearned={tag && versionedLearns ? versionedLearns.has(tag) : false}
+    />
+  )
+})}
+```
+
+### 3.4 `ActivityModalEntry` → `ReleaseModalContent` (current line 213-215)
+
+```tsx
+<div className="activity-modal__body">
+  {event.type === 'ReleaseEvent'
+    ? <ReleaseModalContent
+        event={event}
+        onLearnVersion={onLearnVersion}
+        learnState={learnState}
+        alreadyLearned={alreadyLearned}
+      />
+    : <PullRequestModalContent event={event} />}
+</div>
+```
+
+`PullRequestModalContent` is unchanged. Library-feed call sites of `ActivityModal` (today: `ActivityFeed.tsx`) don't pass the new props → `learnState`/`alreadyLearned` arrive as `undefined`/`false`, no install button rendered, behaviour identical to today.
 
 ## 4. Icon Swaps (RepoArticleActionRow)
 
@@ -275,12 +336,12 @@ Net removal: ~175 LOC.
 
 ### 5.2 `src/components/ReadmeRenderer.test.tsx`
 
-Delete the three tests at:
-- Line 686 — `'extracts acknowledgment links into rm-mentions section'`
+Delete the entire `describe('mentions section extraction', …)` block at lines 680-725 (three `it()` blocks):
+- Line 681 — `'extracts Contributors links into a flat Mentions list'`
 - Line 705 — `'does not create rm-mentions section when no acknowledgment headings exist'`
-- Line 718 — `'extracts text-only mentions when items have no links'`
+- Line 713 — `'extracts multiple acknowledgment sections into a single Mentions list'`
 
-Net removal: ~50 LOC. No replacement tests — other ReadmeRenderer tests already verify normal heading rendering, which is the post-removal behaviour.
+Net removal: ~46 LOC. No replacement tests — other ReadmeRenderer tests already verify normal heading rendering, which is the post-removal behaviour.
 
 ### 5.3 `src/styles/globals.css`
 
