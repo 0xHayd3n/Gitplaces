@@ -1012,7 +1012,9 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   const version = Array.isArray(releases) && releases.length > 0 ? releases[0].tag_name : '—'
   const hasReleases = Array.isArray(releases) && releases.length > 0
   const visibleTabs = ALL_TABS.filter(t =>
-    (t.id !== 'activities' || releases === 'loading' || hasReleases) &&
+    // 'activities' is always visible — the empty-state placeholder handles
+    // repos with no releases. README is still the default landing tab when
+    // releases resolves empty/error (fellBackRef effect demotes activeTab).
     (t.id !== 'related'    || related.length > 0) &&
     (t.id !== 'videos'     || videoLinks.length > 0) &&
     (t.id !== 'posts'      || socialPosts.length > 0) &&

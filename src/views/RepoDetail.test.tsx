@@ -229,16 +229,20 @@ describe('RepoDetail activities tab', () => {
     expect(activitiesTab).toBeInTheDocument()
   })
 
-  it('hides the Activities tab and falls back to README default when releases is empty', async () => {
-    setupDetail(null, null, vi.fn(), [], [])
+  it('shows the Activities tab even when releases is empty, but falls back to README as the default', async () => {
+    const { container } = setupDetail(null, null, vi.fn(), [], [])
     await waitFor(() => screen.getAllByText('next.js'))
-    expect(screen.queryByRole('button', { name: 'Activities' })).not.toBeInTheDocument()
+    // Tab is always visible
+    expect(screen.getByRole('button', { name: 'Activities' })).toBeInTheDocument()
+    // README is the active default — Activities body is not mounted, no BannerCards
+    expect(container.querySelector('.banner-card')).toBeNull()
   })
 
-  it('hides Activities and falls back to README when getReleases rejects', async () => {
-    setupDetail(null, null, vi.fn(), [], 'reject')
+  it('shows the Activities tab even when getReleases rejects, but falls back to README as the default', async () => {
+    const { container } = setupDetail(null, null, vi.fn(), [], 'reject')
     await waitFor(() => screen.getAllByText('next.js'))
-    expect(screen.queryByRole('button', { name: 'Activities' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Activities' })).toBeInTheDocument()
+    expect(container.querySelector('.banner-card')).toBeNull()
   })
 
   it('opens the ActivityModal when a release card is clicked', async () => {
