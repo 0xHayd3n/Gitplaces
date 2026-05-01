@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue, la
 import { useLocation } from 'react-router-dom'
 import { FileDown } from 'lucide-react'
 import { PiBrainFill, PiGitBranchFill, PiStarFill, PiStar, PiGitForkFill } from 'react-icons/pi'
+import { formatBytes } from '../utils/formatBytes'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -326,13 +327,6 @@ function daysAgoLabel(iso: string | null): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
   if (days === 0) return 'today'
   return `${days} days ago`
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
 }
 
 // ── Skill utilities ────────────────────────────────────────────────
