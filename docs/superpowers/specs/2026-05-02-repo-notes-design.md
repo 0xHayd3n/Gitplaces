@@ -49,8 +49,9 @@ Added to `electron/db.ts` alongside existing table definitions. `CREATE TABLE IF
 
 ```ts
 notes: {
-  get:  (repoId: string) => ipcRenderer.invoke('notes:get', repoId),
-  set:  (repoId: string, notes: string) => ipcRenderer.invoke('notes:set', repoId, notes),
+  get:             (repoId: string) => ipcRenderer.invoke('notes:get', repoId),
+  set:             (repoId: string, notes: string) => ipcRenderer.invoke('notes:set', repoId, notes),
+  pullFromGitHub:  (repoId: string, owner: string, repoName: string) => ipcRenderer.invoke('notes:pullFromGitHub', repoId, owner, repoName),
 }
 ```
 
@@ -77,13 +78,13 @@ Good for **auth flows** — check the `src/auth` dir first.
 - Rate limits: 5000 req/hr
 ```
 
-The `<!-- updated: ... -->` comment is invisible when rendered on GitHub and carries the epoch-ms timestamp used for conflict resolution.
+The `<!-- updated: ... -->` comment is invisible when rendered on GitHub and carries the epoch-ms timestamp used for conflict resolution. The timestamp is always on the first line; parsing extracts it with a simple regex on line 1: `/^<!-- updated: (\d+) -->$/`.
 
 ### Key functions
 
 - `startNotesSyncService(db, win)` — captures db/win refs at startup
 - `pushNote(repoId, owner, repoName, content)` — calls `putFileContents` with the stored `github_sha`; updates `sync_status` + `github_sha` on success, marks `failed` on error
-- `pushAllPendingNotes()` — bulk push of all `pending | failed` rows with 250ms delay between calls
+- `pushAllPendingNotes()` — bulk push of all `pending | failed` rows with 250ms delay between calls; called as fire-and-forget from `main.ts` immediately after `startNotesSyncService()` at app startup (same pattern as `skillSyncService` calling `pushAll()` from `setupRepo`)
 
 ### Conflict resolution (pull on app start)
 
@@ -137,7 +138,7 @@ New `.repo-notes-*` classes added to `src/styles/globals.css`, following the exi
 |---|---|
 | `electron/db.ts` | Add `repo_notes` table definition |
 | `electron/main.ts` | Add `notes:get`, `notes:set`, `notes:pullFromGitHub` IPC handlers; call `startNotesSyncService` at startup |
-| `electron/preload.ts` | Expose `window.api.notes.get` and `window.api.notes.set` |
+| `electron/preload.ts` | Expose `window.api.notes.get`, `window.api.notes.set`, and `window.api.notes.pullFromGitHub` |
 | `electron/services/notesSyncService.ts` | New file — push/pull note sync logic |
 | `src/components/RepoNotes.tsx` | New file — notes tile component |
 | `src/styles/globals.css` | Add `.repo-notes-*` styles |
