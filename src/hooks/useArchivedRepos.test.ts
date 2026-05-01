@@ -8,6 +8,9 @@ function makeSettingsApi(stored: string | null = null) {
       get: vi.fn().mockResolvedValue(stored),
       set: vi.fn().mockResolvedValue(undefined),
     },
+    github: {
+      setArchivedAt: vi.fn().mockResolvedValue(undefined),
+    },
   }
 }
 

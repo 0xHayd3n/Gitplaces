@@ -913,7 +913,8 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   // ── Handlers ──────────────────────────────────────────────────────
   const handleFork = () => {
     if (!owner || !name) return
-    window.api.openExternal(`https://github.com/${owner}/${name}/fork`)
+    void window.api.openExternal(`https://github.com/${owner}/${name}/fork`)
+    void window.api.github.recordFork(owner, name)
   }
 
   const handleArchive = () => {

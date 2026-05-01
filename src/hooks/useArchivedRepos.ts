@@ -25,13 +25,11 @@ export function useArchivedRepos() {
   const toggle = useCallback((owner: string, name: string) => {
     const key = `${owner}/${name}`
     const next = new Set(archivedSetRef.current)
-    if (next.has(key)) {
-      next.delete(key)
-    } else {
-      next.add(key)
-    }
+    const archived = !next.has(key)
+    if (archived) next.add(key); else next.delete(key)
     setArchivedSet(next)
     window.api.settings.set(SETTINGS_KEY, JSON.stringify([...next])).catch(() => {})
+    window.api.github.setArchivedAt(owner, name, archived).catch(() => {})
   }, [])
 
   return { archivedSet, loading, toggle }
