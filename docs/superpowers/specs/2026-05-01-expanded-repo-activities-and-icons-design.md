@@ -19,8 +19,9 @@ No new files. Six existing files modified.
 | File | Change |
 |---|---|
 | `src/views/RepoDetail.tsx` | Tab type + ALL_TABS, default-tab effect, Activities tab body, modal wiring, 4 icon swaps |
+| `src/components/ActivityEvent.tsx` | Export `releaseToBannerProps` (currently non-exported) |
 | `src/components/ReleaseModalContent.tsx` | New optional props: install button + assets list |
-| `src/components/ActivityModal.tsx` | Pipe install props through to `ReleaseModalContent` |
+| `src/components/ActivityModal.tsx` | Thread install props through to `ActivityModalEntry` → `ReleaseModalContent` |
 | `src/components/ReadmeRenderer.tsx` | Delete `rehypeExtractMentions` plugin and its registration |
 | `src/components/ReadmeRenderer.test.tsx` | Delete 3 mention-related tests |
 | `src/styles/globals.css` | Delete `.rm-mentions*` selectors |
@@ -395,7 +396,7 @@ Extend the existing `getReleases` mock setup:
 
 ### 6.4 Tests deleted
 
-3 `rm-mentions*` tests in `ReadmeRenderer.test.tsx` (lines 686, 705, 718). No replacements.
+The three `it()` blocks inside `describe('mentions section extraction', …)` at `ReadmeRenderer.test.tsx:680-725` (lines 681, 705, 713). No replacements.
 
 ### 6.5 Verification at the end
 
