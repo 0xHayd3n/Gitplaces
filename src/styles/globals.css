@@ -5995,6 +5995,9 @@ a {
 }
 .btn-view-github:hover { color: var(--t1); border-color: var(--border2); }
 
+.repo-title-github-link { transition: color 0.12s; }
+.repo-title-github-link:hover { color: var(--t1) !important; }
+
 /* Article action row - equal-weight icon+label buttons above the tabs */
 .article-action-row {
   display: flex;
