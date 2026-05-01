@@ -654,6 +654,26 @@ export async function getFileContent(
   return Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf-8')
 }
 
+export async function getFileContentWithSha(
+  token: string | null,
+  owner: string,
+  name: string,
+  path: string,
+): Promise<{ content: string; sha: string } | null> {
+  const res = await fetch(
+    `${BASE}/repos/${owner}/${name}/contents/${path}`,
+    { headers: githubHeaders(token) },
+  )
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
+  const data = (await res.json()) as { content?: string; encoding?: string; sha?: string }
+  if (!data.content || data.encoding !== 'base64' || !data.sha) return null
+  return {
+    content: Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf-8'),
+    sha: data.sha,
+  }
+}
+
 export async function getBranch(
   token: string | null,
   owner: string,
