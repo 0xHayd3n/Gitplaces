@@ -52,6 +52,7 @@ import { useRepoUserEvents } from '../hooks/useRepoUserEvents'
 import { useGitHubAuth } from '../contexts/GitHubAuth'
 import { groupRepoActivityByDay } from '../utils/groupRepoActivityByDay'
 import { RepoUserEventRow } from '../components/RepoUserEventRow'
+import RepoNotes from '../components/RepoNotes'
 import type { RepoActivityItem } from '../types/repoActivity'
 import FilesTab from '../components/FilesTab'
 import { useRepoNav } from '../contexts/RepoNav'
@@ -1164,6 +1165,10 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
 
   const statsSlotNode = !repoError ? (
     <div className="stats-sidebar">
+
+      {repo && (
+        <RepoNotes repoId={repo.id} owner={owner!} repoName={name!} />
+      )}
 
       {/* ── Stats tile ── */}
       {repo && (
