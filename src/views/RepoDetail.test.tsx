@@ -118,7 +118,6 @@ function setupDetail(
         get: vi.fn().mockResolvedValue(null),
         set: vi.fn().mockResolvedValue(undefined),
         pullFromGitHub: vi.fn().mockResolvedValue({ action: 'noop' }),
-        pushToGitHub: vi.fn().mockResolvedValue({ action: 'noop' }),
       },
       skillSync: {
         getStatus: vi.fn().mockResolvedValue({ enabled: false }),
