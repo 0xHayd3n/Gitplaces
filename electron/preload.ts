@@ -365,6 +365,15 @@ contextBridge.exposeInMainWorld('api', {
     },
   },
 
+  notes: {
+    get:            (repoId: string) =>
+      ipcRenderer.invoke('notes:get', repoId),
+    set:            (repoId: string, notes: string) =>
+      ipcRenderer.invoke('notes:set', repoId, notes),
+    pullFromGitHub: (repoId: string, owner: string, repoName: string) =>
+      ipcRenderer.invoke('notes:pullFromGitHub', repoId, owner, repoName),
+  },
+
   updates: {
     checkNow:        ()                => ipcRenderer.invoke('update:check-now'),
     lastChecked:     ()                => ipcRenderer.invoke('update:last-checked') as Promise<{ timestamp: number | null }>,
