@@ -11,30 +11,30 @@ The Activities tab in `RepoDetail.tsx` currently shows release events from the m
 - **starred** — when they starred the repo
 - **learned** — when they generated a Skills folder for the repo (master and/or components)
 - **forked** — when they forked the repo
-- **cloned** — when they cloned the repo (each clone is its own event)
 - **archived** — when they archived the repo in their library
+
+Originally a fifth event type, **cloned**, was scoped in. It was dropped during spec review: `CloneOptionsPanel` does not actually perform a `git clone` to a known local destination — it only copies the clone URL, opens GitHub Desktop, or downloads archive formats. With no destination path and no success signal there is no truthful clone event to record. Clone is deferred to a future iteration if/when an actual clone-with-destination flow exists. See Section 8.
 
 These events render as Steam-style single-line rows merged into the existing left-panel timeline, day-grouped chronologically with the release events. The right panel of the Activities tab stays empty.
 
 User-level decisions captured during brainstorming:
 
-- **Q1**: Ship all five action types in V1 (no defer).
+- **Q1**: Ship all five action types in V1. *(Adjusted to four during spec review — clone dropped.)*
 - **Q2**: Single event per toggle. Star and archive are toggles — only the most recent transition into the "on" state is surfaced (no unstars / unarchives in the feed).
 - **Q3**: User actions merge into the **left** panel alongside releases. Right panel stays empty for future planning.
 - **Q4**: Steam-style action rows — user avatar, colored username, plain verb, target chip with its own icon. Always show a target chip (even for self-referential events like star/archive). Display-only (no click navigation in V1).
-- **Q5**: No backfill. Star and learn already have real timestamps from existing data and light up immediately. Fork, clone, archive only appear for actions performed *after* this ships.
+- **Q5**: No backfill. Star and learn already have real timestamps from existing data and light up immediately. Fork and archive only appear for actions performed *after* this ships.
 
 ## File Touch List
 
 | File | Change |
 |---|---|
-| `electron/db.ts` | Add `archived_at` and `forked_at` columns to `repos` (idempotent `ALTER TABLE`); new index `idx_engagement_repo_type` |
-| `electron/services/engagementTracker.ts` | New helper `logClone(db, repoId, path)` |
+| `electron/db.ts` | Add `archived_at` and `forked_at` columns to `repos` (idempotent `ALTER TABLE`) |
 | `electron/services/repoUserEvents.ts` | NEW. `getRepoUserEvents(db, owner, name)` — normalized read across multiple tables |
-| `electron/services/repoUserEvents.test.ts` | NEW. ~10 cases covering all event types |
-| `electron/main.ts` | New IPC handlers: `github:getRepoUserEvents`, `github:recordFork`, `github:recordClone`, `github:setArchivedAt` |
-| `electron/preload.ts` | Surface the four new methods on `window.api.github.*` |
-| `electron/main.test.ts` | Tests for the three new write handlers |
+| `electron/services/repoUserEvents.test.ts` | NEW. ~8 cases covering each event type |
+| `electron/main.ts` | New IPC handlers: `github:getRepoUserEvents`, `github:recordFork`, `github:setArchivedAt` |
+| `electron/preload.ts` | Surface the three new methods on `window.api.github.*` |
+| `electron/main.test.ts` | Tests for the two new write handlers |
 | `src/types/repoUserEvents.ts` | NEW. Discriminated `RepoUserEvent` type |
 | `src/types/repoActivity.ts` | NEW. `RepoActivityItem` union (release \| user) |
 | `src/hooks/useRepoUserEvents.ts` | NEW. Renderer-side hook wrapping the read IPC |
@@ -42,12 +42,12 @@ User-level decisions captured during brainstorming:
 | `src/utils/groupRepoActivityByDay.ts` | NEW. Day-grouper for `RepoActivityItem[]` |
 | `src/utils/groupRepoActivityByDay.test.ts` | NEW. ~5 cases |
 | `src/components/RepoUserEventRow.tsx` (+ `.css`) | NEW. Steam-style action row component |
-| `src/components/RepoUserEventRow.test.tsx` | NEW. ~6 render cases |
+| `src/components/RepoUserEventRow.test.tsx` | NEW. ~5 render cases |
 | `src/hooks/useArchivedRepos.ts` | Dual-write: on toggle, also call `setArchivedAt` IPC |
-| `src/views/RepoDetail.tsx` | Wire fork/clone success paths to call `recordFork`/`recordClone`. Replace single-source feed with merged feed. |
-| `src/views/RepoDetail.test.tsx` | Extend `setupDetail` to mock `getRepoUserEvents`; new cases for merged feed |
+| `src/views/RepoDetail.tsx` | Wire fork action to call `recordFork` (optimistic on click). Replace single-source feed with merged feed. |
+| `src/views/RepoDetail.test.tsx` | Wrap `setupDetail` in `GitHubAuthProvider`; mock `getRepoUserEvents`; new cases for merged feed |
 
-No new files for clone-action ingestion (uses existing `CloneOptionsPanel` — just calls the new IPC after success). No changes to `BannerCard`, `ActivityModal`, `ReleaseModalContent`. The Library activity feed (`ActivityFeed.tsx`) stays unchanged.
+No changes to `BannerCard`, `ActivityModal`, `ReleaseModalContent`, `CloneOptionsPanel`, or `engagement_events` table. The Library activity feed (`ActivityFeed.tsx`) stays unchanged.
 
 ## 1. Schema and Migration
 
@@ -62,21 +62,11 @@ try { db.exec(`ALTER TABLE repos ADD COLUMN forked_at   TEXT DEFAULT NULL`) } ca
 
 Both store ISO timestamp strings, matching the existing `starred_at` / `unstarred_at` convention. Wrapped in `try/catch` for idempotency per the existing migration pattern.
 
-### 1.2 New index for clone-event lookup
+### 1.2 No new tables, no new indexes
 
-In the post-migration index block (around `electron/db.ts:212-219`):
+All four event types are read from existing tables (`repos.starred_at` / `archived_at` / `forked_at`, `skills.generated_at`, `sub_skills.generated_at`). No `engagement_events` involvement, no new indexes needed.
 
-```sql
-CREATE INDEX IF NOT EXISTS idx_engagement_repo_type ON engagement_events(repo_id, event_type, ts DESC);
-```
-
-Speeds up the `WHERE repo_id=? AND event_type='clone'` query in the read path. Goes alongside the existing `idx_engagement_repo` and `idx_engagement_ts` indexes.
-
-### 1.3 No new tables
-
-The existing `engagement_events` table (already used for `event_type='click'` records) is reused for `event_type='clone'`. The `source` column stores the destination path. No schema change to that table.
-
-### 1.4 No backfill
+### 1.3 No backfill
 
 Migration only adds columns and indexes. Existing rows get `archived_at = NULL` and `forked_at = NULL` — those events don't appear in any feed. The `archived_repos` settings JSON is left in place; `useArchivedRepos.toggle` becomes a dual-write (settings list + `archived_at`) so existing archived state continues to work without surfacing a fake event.
 
@@ -93,7 +83,6 @@ export type RepoUserEvent =
   | { type: 'star';    ts: string }
   | { type: 'archive'; ts: string }
   | { type: 'fork';    ts: string }
-  | { type: 'clone';   ts: string; path: string }
   | { type: 'learn';   ts: string; skillFilename: string; skillType: 'master' | 'components' }
 ```
 
@@ -116,7 +105,6 @@ interface RepoRow {
 
 interface SkillRow { filename: string; generated_at: string | null }
 interface SubSkillRow { filename: string; generated_at: string | null }
-interface CloneRow { ts: number; source: string }
 
 export function getRepoUserEvents(
   db: Database.Database,
@@ -147,13 +135,6 @@ export function getRepoUserEvents(
     events.push({ type: 'learn', ts: components.generated_at, skillFilename: components.filename, skillType: 'components' })
   }
 
-  const clones = db.prepare(
-    `SELECT ts, source FROM engagement_events WHERE repo_id=? AND event_type='clone' ORDER BY ts DESC`
-  ).all(repo.id) as CloneRow[]
-  for (const c of clones) {
-    events.push({ type: 'clone', ts: new Date(c.ts).toISOString(), path: c.source })
-  }
-
   return events.sort((a, b) => b.ts.localeCompare(a.ts))
 }
 ```
@@ -172,28 +153,11 @@ ipcMain.handle('github:recordFork', (_e, owner: string, name: string) => {
     .run(new Date().toISOString(), owner, name)
 })
 
-ipcMain.handle('github:recordClone', (_e, owner: string, name: string, path: string) => {
-  const db = getDb(app.getPath('userData'))
-  const repo = db.prepare('SELECT id FROM repos WHERE owner=? AND name=?').get(owner, name) as { id: string } | undefined
-  if (!repo) return
-  logClone(db, repo.id, path)
-})
-
 ipcMain.handle('github:setArchivedAt', (_e, owner: string, name: string, archived: boolean) => {
   const db = getDb(app.getPath('userData'))
   const ts = archived ? new Date().toISOString() : null
   db.prepare('UPDATE repos SET archived_at=? WHERE owner=? AND name=?').run(ts, owner, name)
 })
-```
-
-`logClone` in `engagementTracker.ts`:
-
-```ts
-export function logClone(db: Database.Database, repoId: string, path: string): void {
-  db.prepare(
-    'INSERT INTO engagement_events (repo_id, event_type, source, ts) VALUES (?, ?, ?, ?)'
-  ).run(repoId, 'clone', path, Date.now())
-}
 ```
 
 ### 2.4 Preload surface
@@ -205,13 +169,11 @@ getRepoUserEvents: (owner: string, name: string) =>
   ipcRenderer.invoke('github:getRepoUserEvents', owner, name),
 recordFork: (owner: string, name: string) =>
   ipcRenderer.invoke('github:recordFork', owner, name),
-recordClone: (owner: string, name: string, path: string) =>
-  ipcRenderer.invoke('github:recordClone', owner, name, path),
 setArchivedAt: (owner: string, name: string, archived: boolean) =>
   ipcRenderer.invoke('github:setArchivedAt', owner, name, archived),
 ```
 
-The `env.d.ts` `Window['api']['github']` interface gains the four new methods (matching the same shape).
+The `env.d.ts` `Window['api']['github']` interface gains the three new methods (matching the same shape).
 
 ### 2.5 Renderer hook
 
@@ -241,7 +203,7 @@ export function useRepoUserEvents(
 
 ### 2.6 Repo-not-in-DB caveat
 
-If a user views a repo via `/discover/...` (no local DB row yet), `getRepoUserEvents` returns `[]` — no error, just empty. Same for the three write handlers — they no-op silently if the repo isn't in the DB. The user must save the repo (e.g., star or learn it) before action events can be tracked.
+If a user views a repo via `/discover/...` (no local DB row yet), `getRepoUserEvents` returns `[]` — no error, just empty. Same for the two write handlers — they no-op silently if the repo isn't in the DB (the `UPDATE` statements affect zero rows). The user must save the repo (e.g., star or learn it) before action events can be tracked.
 
 ## 3. `RepoUserEventRow` Component
 
@@ -280,16 +242,14 @@ Same domain convention used by `repoOwnerAvatarUrl` in `ActivityEvent.tsx:42-45`
 | `star` | "starred" | repo chip: `[ownerAvatar 14px] {owner}/{name}` |
 | `archive` | "archived" | repo chip: `[ownerAvatar 14px] {owner}/{name}` |
 | `fork` | "forked this to" | repo chip: `[userAvatar 14px] {userLogin}/{name}` *(GitHub's default fork destination)* |
-| `clone` | "cloned this to" | path chip: `[Folder icon] {path}` (monospace) |
 | `learn` (master) | "learned" | skill chip: `[PiBrainFill] {skillFilename}` |
 | `learn` (components) | "learned components for" | skill chip: `[PiBrainFill] {skillFilename}` |
 
-The chip kind is derived inside the component via a switch on `event.type`. Three chip variants share a base `.repo-user-event__chip` class plus a modifier (`--repo`, `--path`, `--skill`).
+The chip kind is derived inside the component via a switch on `event.type`. Two chip variants share a base `.repo-user-event__chip` class plus a modifier (`--repo`, `--skill`).
 
 ### 3.4 JSX
 
 ```tsx
-import { Folder } from 'lucide-react'
 import { PiBrainFill } from 'react-icons/pi'
 import { relativeTime } from '../utils/relativeTime'
 import type { RepoUserEvent } from '../types/repoUserEvents'
@@ -332,8 +292,6 @@ function buildContent(
       return { verb: 'archived', chip: <RepoChip avatar={repoAvatar} text={`${repoOwner}/${repoName}`} /> }
     case 'fork':
       return { verb: 'forked this to', chip: <RepoChip avatar={userAvatar} text={`${userLogin}/${repoName}`} /> }
-    case 'clone':
-      return { verb: 'cloned this to', chip: <PathChip path={event.path} /> }
     case 'learn':
       return {
         verb: event.skillType === 'components' ? 'learned components for' : 'learned',
@@ -347,15 +305,6 @@ function RepoChip({ avatar, text }: { avatar: string; text: string }) {
     <span className="repo-user-event__chip repo-user-event__chip--repo">
       <img src={avatar} alt="" className="repo-user-event__chip-avatar" />
       <span>{text}</span>
-    </span>
-  )
-}
-
-function PathChip({ path }: { path: string }) {
-  return (
-    <span className="repo-user-event__chip repo-user-event__chip--path">
-      <Folder size={12} />
-      <span>{path}</span>
     </span>
   )
 }
@@ -394,7 +343,6 @@ function SkillChip({ filename }: { filename: string }) {
   background: var(--surface-2);
   color: var(--t1);
 }
-.repo-user-event__chip--path { font-family: 'JetBrains Mono', monospace; }
 .repo-user-event__chip-avatar { width: 14px; height: 14px; border-radius: 3px; }
 .repo-user-event__time { margin-left: auto; color: var(--t3); font-size: 11px; }
 ```
@@ -586,27 +534,24 @@ The existing `github:starRepo` and `github:unstarRepo` handlers already update `
 
 The existing `skill:generate` IPC writes to `skills.generated_at` on success. Sub-skills similarly populate `sub_skills.generated_at`. No code change needed.
 
-### 5.3 Fork — new instrumentation
+### 5.3 Fork — new instrumentation, optimistic on click
 
-In `RepoDetail.tsx`, the existing `handleFork` (Fork button click handler) needs to call `recordFork` after the fork action succeeds. Find the fork success path and add:
+`handleFork` in `RepoDetail.tsx` (verified at `src/views/RepoDetail.tsx:884-887`) is a fire-and-forget `window.api.openExternal('https://github.com/.../fork')` — it opens the GitHub fork page in the browser and returns. There is no success/failure callback; the actual fork happens on github.com outside the app's awareness.
 
-```ts
-await window.api.github.recordFork(owner, name)
-```
-
-(One line. Fire-and-forget; failures don't break the fork action.)
-
-### 5.4 Clone — new instrumentation
-
-Cloning happens via `CloneOptionsPanel` (component). After a successful clone, `CloneOptionsPanel` already knows the destination path (it asked the user). It needs to call:
+**Decision: log optimistically on click.** The `handleFork` handler calls `recordFork` immediately after `openExternal` returns:
 
 ```ts
-await window.api.github.recordClone(owner, name, destinationPath)
+function handleFork() {
+  void window.api.openExternal(`https://github.com/${owner}/${name}/fork`)
+  void window.api.github.recordFork(owner!, name!)   // optimistic — we trust the click intent
+}
 ```
 
-The exact wiring depends on `CloneOptionsPanel`'s API — likely accepts an `onCloneSuccess?: (path: string) => void` callback that `RepoDetail.tsx` provides, which then calls `recordClone`. Alternatively, if `CloneOptionsPanel` performs the clone itself via an IPC, that IPC handler can call `logClone` directly. Implementation detail; either path is acceptable.
+Trade-off: if the user opens the page and doesn't actually complete the fork on github.com (cancels, closes the tab), we still record a fork event. The cost of a stray fork event in the personal feed is low — it's a "you intended to fork this on {date}" record. The alternative (polling GitHub for is_forked = true to confirm) is much more complex and not worth it for a personal log.
 
-### 5.5 Archive — extended instrumentation
+`recordFork` is fire-and-forget (`void`-prefixed); errors don't disrupt the fork flow.
+
+### 5.4 Archive — extended instrumentation
 
 `useArchivedRepos.toggle` becomes a dual-write:
 
@@ -627,7 +572,7 @@ The settings list stays the source of truth for "is this archived?" (existing UI
 
 ## 6. Testing
 
-TDD where tests already exist. ~600 LOC of new tests across five files.
+TDD where tests already exist. ~500 LOC of new tests across five files.
 
 ### 6.1 `electron/services/repoUserEvents.test.ts` (NEW)
 
@@ -640,11 +585,10 @@ Cases:
 - Returns one `fork` event when `repos.forked_at` is populated.
 - Returns a `learn` event with `skillType='master'` when `skills.generated_at` is populated.
 - Returns a second `learn` event with `skillType='components'` when `sub_skills.generated_at` is populated.
-- Returns multiple `clone` events from `engagement_events WHERE event_type='clone'`, each with the path from `source`.
 - Returns a fully-populated repo's events sorted desc by `ts`.
 - Skips null timestamps (no event for missing data).
 
-~10 cases, ~150 LOC.
+~8 cases, ~120 LOC.
 
 ### 6.2 `src/utils/groupRepoActivityByDay.test.ts` (NEW)
 
@@ -664,25 +608,31 @@ Renders one row per event type and asserts visible text + chip:
 - `star` → renders user login, "starred", repo chip with `owner/name`, relative time string.
 - `archive` → renders "archived", repo chip.
 - `fork` → renders "forked this to", chip with `{userLogin}/{repoName}`.
-- `clone` with `path` → renders "cloned this to", path text in chip, folder icon (assert via class `repo-user-event__chip--path`).
 - `learn` with `skillType='master'` → renders "learned", skill chip with `skillFilename`.
 - `learn` with `skillType='components'` → renders "learned components for".
 
-~6 cases, ~120 LOC.
+~5 cases, ~100 LOC.
 
 ### 6.4 `electron/main.test.ts` extensions
 
-Add three IPC handler tests:
+Add two IPC handler tests:
 
-- `github:recordFork` updates `repos.forked_at` to a valid ISO timestamp.
-- `github:recordClone` inserts a row into `engagement_events` with `event_type='clone'` and the path in `source`. No-ops silently if the repo isn't in the DB.
+- `github:recordFork` updates `repos.forked_at` to a valid ISO timestamp. No-ops silently if the repo isn't in the DB (UPDATE affects zero rows).
 - `github:setArchivedAt(true)` sets `archived_at`; `setArchivedAt(false)` clears it to `NULL`.
 
-~80 LOC added.
+~60 LOC added.
 
 ### 6.5 `src/views/RepoDetail.test.tsx` extensions
 
-Extend `setupDetail` to also mock `getRepoUserEvents` (defaults to `[]`). Add cases:
+**Two changes to `setupDetail`** before any new test cases:
+
+1. **Wrap render tree in `<GitHubAuthProvider>`.** `RepoDetail` now reads `useGitHubAuth()` for the user login and avatar (Section 4.3). The current `setupDetail` doesn't wrap that provider, so all existing tests would throw `"useGitHubAuth must be used inside GitHubAuthProvider"` once the merge logic is in place. Add the provider to the existing wrapper stack alongside `AppearanceProvider` / `ProfileOverlayProvider` / `SavedReposProvider`. Mock `window.api.github.getUser` to return `{ login: 'tester' }` so the provider resolves to a connected user.
+
+2. **Mock `getRepoUserEvents`** on the `window.api.github` mock object, defaulting to `[]`. Tests can override per-case. Same pattern as the existing `getReleases` mock.
+
+Existing tests pass unchanged after these two harness extensions.
+
+New cases:
 
 - Activities tab renders both `BannerCard`s AND `RepoUserEventRow`s when both sources have data.
 - Activities tab renders only user events when `releases` is `[]`.
@@ -690,8 +640,9 @@ Extend `setupDetail` to also mock `getRepoUserEvents` (defaults to `[]`). Add ca
 - Default tab is `'activities'` when `userEvents` is non-empty even if `releases` is empty.
 - Default tab is `'readme'` when both are empty.
 - Loading state shows "Loading activity…" while either source is loading.
+- One source errored, the other resolved → renders the resolved one (no error placeholder).
 
-~6 cases, ~150 LOC additions.
+~7 cases, ~170 LOC additions.
 
 ### 6.6 No tests deleted
 
@@ -707,22 +658,23 @@ Existing tests pass unchanged. The Library `ActivityFeed.test.tsx` is unaffected
 
 Recommended commit order — each commit leaves the test suite green relative to its baseline:
 
-1. **Schema** — `db.ts` migration + `engagementTracker.ts` `logClone` helper. Tested via the existing `engagementTracker.test.ts` patterns.
-2. **Read service + IPC** — `repoUserEvents.ts` + `getRepoUserEvents` IPC + preload + types. Includes Section 2's tests.
-3. **Write IPCs** — `recordFork` / `recordClone` / `setArchivedAt` handlers + preload. Includes Section 6.4's tests.
+1. **Schema** — `db.ts` migration only (two `ALTER TABLE` calls). No new helpers needed.
+2. **Read service + IPC** — `repoUserEvents.ts` + `getRepoUserEvents` IPC + preload + types. Includes Section 6.1's tests.
+3. **Write IPCs** — `recordFork` / `setArchivedAt` handlers + preload. Includes Section 6.4's tests.
 4. **Day-grouper utility** — small refactor of `groupEventsByDay.ts` exports + new `groupRepoActivityByDay.ts` + its tests.
 5. **`RepoUserEventRow` component** — TDD: write tests first (Section 6.3), then component + CSS.
-6. **Activities tab integration** — wire merge + render switch + state reconciliation in `RepoDetail.tsx`. Includes Section 6.5's tests.
-7. **Instrumentation** — fork/clone/archive call sites updated to invoke the new write IPCs. The most behavior-affecting commit; verify by manually triggering each action in the running app.
+6. **Activities tab integration** — wire merge + render switch + state reconciliation in `RepoDetail.tsx`. Includes Section 6.5's tests (test harness updates first, then new cases). Star and learn already have data, so this commit is end-to-end testable in the running app via existing repos that the user has starred or learned.
+7. **Instrumentation** — fork on click in `RepoDetail.tsx`, archive dual-write in `useArchivedRepos.ts`. The most behavior-affecting commit; verify manually by forking a repo and toggling archive.
 
 Branch policy: work directly on `main` per project rules.
 
 ## 8. Out of Scope
 
-- **Click behavior on action rows.** Display-only in V1. Navigation hooks (open Skills folder for a learn row, reveal clone path in Finder, etc.) deferred.
-- **Backfill of historical action timestamps** for fork/clone/archive. Per Q5, no synthetic timestamps; only future actions appear.
+- **Clone events.** Originally scoped in, dropped during spec review. `CloneOptionsPanel` does not perform a `git clone` to a known local path — it only copies the clone URL, opens GitHub Desktop, or downloads archive formats. With no destination path and no clone-completion signal there is no truthful event to record. Defer to a future iteration when an actual clone-with-destination flow exists in the app (e.g., "Clone to folder…" button → folder picker → spawn `git clone`). The data path is straightforward to add then: a new event_type in `engagement_events` and one more case in `getRepoUserEvents` / `RepoUserEventRow`.
+- **Click behavior on action rows.** Display-only in V1. Navigation hooks (open Skills folder for a learn row, etc.) deferred.
+- **Backfill of historical action timestamps** for fork/archive. Per Q5, no synthetic timestamps; only future actions appear.
 - **Surfacing unstars / unarchives.** Per Q2, toggles only show the most recent "on" transition. The data is preserved in `unstarred_at` etc., but the renderer ignores it.
-- **Multi-clone deduplication.** Each clone is its own event, even if cloning to the same path twice. Reasonable for V1.
 - **Right panel content.** Stays empty. Will be planned separately.
 - **Cross-repo aggregation.** This feed is per-repo only.
 - **Library activity feed changes.** Unchanged. The Library feed reads GitHub-side events, not local action events.
+- **Detecting actual fork completion.** Fork is logged optimistically on click. We don't poll GitHub to confirm `is_forked = true`. Acceptable trade-off; if it becomes annoying we can revisit by polling or pulling fork events from GitHub's user-events stream.
