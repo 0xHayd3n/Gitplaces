@@ -44,7 +44,7 @@ function repoOwnerAvatarUrl(fullName: string): string {
   return `https://avatars.githubusercontent.com/${owner}?s=200`
 }
 
-function releaseToBannerProps(
+export function releaseToBannerProps(
   event: GitHubFeedEvent,
   onOpenModal: (event: GitHubFeedEvent) => void,
 ): BannerCardProps {

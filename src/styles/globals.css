@@ -4293,6 +4293,13 @@ a {
   text-overflow: ellipsis;
 }
 
+/* Activities tab feed (per-repo release stream rendered as BannerCards) */
+.repo-activity-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* Releases */
 .repo-releases { display: flex; flex-direction: column; gap: 0; }
 .repo-release-item {

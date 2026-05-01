@@ -4,8 +4,13 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import RepoDetail from './RepoDetail'
 import { SavedReposProvider } from '../contexts/SavedRepos'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
+import { AppearanceProvider } from '../contexts/Appearance'
 import { parseSkillDepths } from '../utils/skillParse'
 import type { SkillRow } from '../types/repo'
+
+// BannerCard renders DitherBackground directly; mock it so jsdom doesn't choke
+// on canvas operations while the Activities tab renders cards in tests.
+vi.mock('../components/DitherBackground', () => ({ default: () => <div data-testid="dither" /> }))
 
 // ── parseSkillDepths unit tests ──────────────────────────────────────
 describe('parseSkillDepths', () => {
@@ -34,17 +39,30 @@ const repoRow = {
   updated_at: '2024-01-01', saved_at: null,
 }
 
+const sampleRelease = {
+  tag_name: 'v1.0.0',
+  name: 'v1.0.0',
+  published_at: '2026-04-01T00:00:00Z',
+  body: 'release notes',
+  assets: [],
+  prerelease: false,
+}
+
 function setupDetail(
   skillRow: SkillRow | null,
   apiKey: string | null = null,
   generateFn: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue({ content: '## [CORE]\nfoo', version: 'v1' }),
   relatedRepos: object[] = [],
+  releases: object[] | 'reject' = [],
 ) {
+  const releasesFn = releases === 'reject'
+    ? vi.fn().mockRejectedValue(new Error('boom'))
+    : vi.fn().mockResolvedValue(releases)
   Object.defineProperty(window, 'api', {
     value: {
       github: {
         getRepo: vi.fn().mockResolvedValue(repoRow),
-        getReleases: vi.fn().mockResolvedValue([]),
+        getReleases: releasesFn,
         getRelatedRepos: vi.fn().mockResolvedValue(relatedRepos),
         getReadme: vi.fn().mockResolvedValue(null),
         saveRepo: vi.fn().mockResolvedValue(undefined),
@@ -58,8 +76,8 @@ function setupDetail(
         getVerified: vi.fn().mockResolvedValue(false),
       },
       settings: {
-        get: vi.fn(),
-        set: vi.fn(),
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockResolvedValue(undefined),
         getApiKey: vi.fn().mockResolvedValue(apiKey),
         setApiKey: vi.fn(),
       },
@@ -92,13 +110,15 @@ function setupDetail(
   })
   return render(
     <MemoryRouter initialEntries={['/repo/vercel/next.js']}>
-      <ProfileOverlayProvider>
-        <SavedReposProvider>
-          <Routes>
-            <Route path="/repo/:owner/:name" element={<RepoDetail />} />
-          </Routes>
-        </SavedReposProvider>
-      </ProfileOverlayProvider>
+      <AppearanceProvider>
+        <ProfileOverlayProvider>
+          <SavedReposProvider>
+            <Routes>
+              <Route path="/repo/:owner/:name" element={<RepoDetail />} />
+            </Routes>
+          </SavedReposProvider>
+        </ProfileOverlayProvider>
+      </AppearanceProvider>
     </MemoryRouter>
   )
 }
@@ -187,5 +207,79 @@ describe('RepoDetail related tab', () => {
     const relatedTab = await waitFor(() => screen.getByRole('button', { name: 'Related' }))
     fireEvent.click(relatedTab)
     await waitFor(() => screen.getByText('react'))
+  })
+})
+
+describe('RepoDetail activities tab', () => {
+  it('shows the Activities tab and selects it by default when releases is non-empty', async () => {
+    const { container } = setupDetail(null, null, vi.fn(), [], [sampleRelease])
+    await waitFor(() => screen.getAllByText('next.js'))
+    const activitiesTab = await waitFor(() =>
+      screen.getByRole('button', { name: 'Activities' })
+    )
+    // It's the active tab — assert via the BannerCard rendering.
+    await waitFor(
+      () => {
+        const card = container.querySelector('.banner-card')
+        if (!card) throw new Error('banner-card not yet rendered')
+        return card
+      },
+      { timeout: 3000 },
+    )
+    expect(activitiesTab).toBeInTheDocument()
+  })
+
+  it('hides the Activities tab and falls back to README default when releases is empty', async () => {
+    setupDetail(null, null, vi.fn(), [], [])
+    await waitFor(() => screen.getAllByText('next.js'))
+    expect(screen.queryByRole('button', { name: 'Activities' })).not.toBeInTheDocument()
+  })
+
+  it('hides Activities and falls back to README when getReleases rejects', async () => {
+    setupDetail(null, null, vi.fn(), [], 'reject')
+    await waitFor(() => screen.getAllByText('next.js'))
+    expect(screen.queryByRole('button', { name: 'Activities' })).not.toBeInTheDocument()
+  })
+
+  it('opens the ActivityModal when a release card is clicked', async () => {
+    const { container } = setupDetail(null, null, vi.fn(), [], [sampleRelease])
+    await waitFor(() => screen.getAllByText('next.js'))
+    const card = await waitFor(
+      () => {
+        const el = container.querySelector('.banner-card')
+        if (!el) throw new Error('banner-card not yet rendered')
+        return el
+      },
+      { timeout: 3000 },
+    )
+    fireEvent.click(card)
+    // Modal renders — the close × button is a stable assertion target.
+    await waitFor(() => screen.getByLabelText('Close'))
+  })
+})
+
+describe('releaseRowToFeedEvent', () => {
+  it('maps a ReleaseRow to a synthetic ReleaseEvent with the expected shape', async () => {
+    const { releaseRowToFeedEvent } = await import('./RepoDetail')
+    const row = {
+      tag_name: 'v2.0.0',
+      name: 'Two Point Oh',
+      published_at: '2026-03-15T12:00:00Z',
+      body: 'big release',
+      assets: [{ name: 'a.zip', size: 100, browser_download_url: 'u', download_count: 0 }],
+      prerelease: false,
+    }
+    const event = releaseRowToFeedEvent(row, 'acme/widget')
+    expect(event.id).toBe('release-v2.0.0')
+    expect(event.type).toBe('ReleaseEvent')
+    expect(event.repo.full_name).toBe('acme/widget')
+    expect(event.created_at).toBe('2026-03-15T12:00:00Z')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const release = (event.payload as any).release
+    expect(release.tag_name).toBe('v2.0.0')
+    expect(release.name).toBe('Two Point Oh')
+    expect(release.body).toBe('big release')
+    expect(release.prerelease).toBe(false)
+    expect(release.assets).toHaveLength(1)
   })
 })

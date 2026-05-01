@@ -47,6 +47,10 @@ import {
 } from '../utils/socialParser'
 import { extractCommands, type CommandBlock } from '../utils/commandParser'
 // websiteParser import removed — website links are now shown in the README's References section
+import { BannerCard } from '../components/BannerCard'
+import { releaseToBannerProps } from '../components/ActivityEvent'
+import { ActivityModal } from '../components/ActivityModal'
+import type { GitHubFeedEvent } from '../hooks/useFeed'
 import FilesTab from '../components/FilesTab'
 import { useRepoNav } from '../contexts/RepoNav'
 const StorybookExplorer = lazy(() => import('../components/StorybookExplorer'))
@@ -408,12 +412,12 @@ function SidebarLabel({ children, action }: { children: React.ReactNode; action?
 }
 
 // ── Tab IDs ────────────────────────────────────────────────────────
-type Tab = 'readme' | 'files' | 'skill' | 'releases' | 'collections' | 'related' | 'videos' | 'posts' | 'commands' | 'components'
+type Tab = 'activities' | 'readme' | 'files' | 'skill' | 'collections' | 'related' | 'videos' | 'posts' | 'commands' | 'components'
 const ALL_TABS: { id: Tab; label: string }[] = [
+  { id: 'activities',  label: 'Activities' },
   { id: 'readme',      label: 'README' },
   { id: 'files',       label: 'Files' },
   { id: 'skill',       label: 'Skills Folder' },
-  { id: 'releases',    label: 'Releases' },
   { id: 'collections', label: 'Collections' },
   { id: 'related',     label: 'Related' },
   { id: 'videos',      label: 'Videos' },
@@ -421,6 +425,32 @@ const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'commands',    label: 'Commands' },
   { id: 'components',  label: 'Components' },
 ]
+
+// ── Synthetic ReleaseEvent adapter ─────────────────────────────────
+// Maps a ReleaseRow (from getReleases) into the GitHubFeedEvent shape that
+// BannerCard / ActivityModal expect, so the Activities tab can reuse the same
+// presentation pieces as the Library feed without a parallel rendering path.
+// actor.login/avatar_url are empty: BannerCard derives the card avatar from
+// repo.full_name, and ActivityModalEntry computes bylineActor but never
+// displays it. ReleaseRow has no author field, so we can't populate them.
+export function releaseRowToFeedEvent(r: ReleaseRow, repoFullName: string): GitHubFeedEvent {
+  return {
+    id: `release-${r.tag_name}`,
+    type: 'ReleaseEvent',
+    actor: { login: '', avatar_url: '' },
+    repo: { full_name: repoFullName },
+    payload: {
+      release: {
+        tag_name: r.tag_name,
+        name: r.name,
+        body: r.body,
+        prerelease: r.prerelease,
+        assets: r.assets,
+      },
+    },
+    created_at: r.published_at,
+  }
+}
 
 // ── Related repo shape (from GitHub search API items) ─────────────
 interface RelatedRepo {
@@ -462,8 +492,10 @@ export default function RepoDetail() {
 
   const [repo, setRepo] = useState<RepoRow | null>(null)
   const [repoError, setRepoError] = useState(false)
-  const [activeTab, setActiveTab] = useState<Tab>('readme')
+  const [activeTab, setActiveTab] = useState<Tab>('activities')
   const [filesTargetPath, setFilesTargetPath] = useState<string | null>(null)
+  const fellBackRef = useRef(false)
+  const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(null)
 
   // TOC panel state + refs (shared with ArticleLayout, ReadmeRenderer, and TocNav)
   const [tocHeadings, setTocHeadings] = useState<TocItem[]>([])
@@ -483,10 +515,27 @@ export default function RepoDetail() {
   const [cleanedReadme, setCleanedReadme] = useState<string>('')
   const [cleanedDisplayReadme, setCleanedDisplayReadme] = useState<string>('')
   const [releases, setReleases] = useState<ReleaseRow[] | 'loading' | 'error'>('loading')
-  const [expandedReleases, setExpandedReleases] = useState<Set<string>>(new Set())
   const [versionedLearns, setVersionedLearns] = useState<Set<string>>(new Set())
   const [versionLearnStates, setVersionLearnStates] = useState<Map<string, 'UNLEARNED' | 'LEARNING' | 'LEARNED' | 'ERROR'>>(new Map())
   const [related, setRelated] = useState<RepoRow[]>([])
+  // Memoised synthetic events for the Activities tab; rebuilt only when the
+  // releases data or the repo identity changes.
+  const activityEvents = useMemo(
+    () => Array.isArray(releases)
+      ? (releases as ReleaseRow[]).map(r => releaseRowToFeedEvent(r, `${owner}/${name}`))
+      : [],
+    [releases, owner, name],
+  )
+  // First-resolve fallback: if releases comes back empty/error, drop from the
+  // optimistic 'activities' default to README. The ref ensures we only apply
+  // the fallback once — subsequent navigations to Activities by the user stick.
+  useEffect(() => {
+    if (fellBackRef.current) return
+    if (releases === 'loading') return
+    fellBackRef.current = true
+    const hasActivity = Array.isArray(releases) && (releases as ReleaseRow[]).length > 0
+    if (!hasActivity && activeTab === 'activities') setActiveTab('readme')
+  }, [releases, activeTab])
   const [sidebarRelated, setSidebarRelated] = useState<RelatedRepo[]>([])
   const [repoCols, setRepoCols] = useState<{ id: string; name: string }[]>([])
 
@@ -589,7 +638,6 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     setStorybookState('detecting')
     setStorybookReadmeScanned(false)
     setReleases('loading')
-    setExpandedReleases(new Set())
     setRelated([])
     setSidebarRelated([])
     setRepoCols([])
@@ -598,7 +646,11 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     setSkillRow(null)
     setComponentsSkillRow(null)
     setSelectedSkillFile('master')
-    setActiveTab('readme')
+    // Default to 'activities' (shows release feed); fellBackRef effect will
+    // demote to 'readme' if releases resolves empty/error. Reset the ref so
+    // the demotion runs again for the new repo.
+    fellBackRef.current = false
+    setActiveTab('activities')
 
     window.api.github.getRepo(owner, name)
       .then((row) => {
@@ -960,7 +1012,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   const version = Array.isArray(releases) && releases.length > 0 ? releases[0].tag_name : '—'
   const hasReleases = Array.isArray(releases) && releases.length > 0
   const visibleTabs = ALL_TABS.filter(t =>
-    (t.id !== 'releases'   || releases === 'loading' || hasReleases) &&
+    (t.id !== 'activities' || releases === 'loading' || hasReleases) &&
     (t.id !== 'related'    || related.length > 0) &&
     (t.id !== 'videos'     || videoLinks.length > 0) &&
     (t.id !== 'posts'      || socialPosts.length > 0) &&
@@ -1480,95 +1532,26 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                   )
                 )}
 
-                {activeTab === 'releases' && (
+                {activeTab === 'activities' && (
                   releases === 'loading' ? (
-                    <p className="repo-detail-placeholder">Loading releases…</p>
+                    <p className="repo-detail-placeholder">Loading activity…</p>
                   ) : releases === 'error' ? (
-                    <p className="repo-detail-placeholder">Failed to load releases.</p>
+                    <p className="repo-detail-placeholder">Failed to load activity.</p>
                   ) : (releases as ReleaseRow[]).length === 0 ? (
-                    <p className="repo-detail-placeholder">No releases found.</p>
+                    // Defensive: the visibility rule normally hides the
+                    // Activities tab when releases is empty, so this branch
+                    // is reached only if a user explicitly clicks Activities
+                    // on a no-release repo (which the tab strip wouldn't
+                    // expose). Kept as a safe fallback.
+                    <p className="repo-detail-placeholder">No activity yet.</p>
                   ) : (
-                    <div className="repo-releases">
-                      {(releases as ReleaseRow[]).map(r => {
-                        const isLearned = versionedLearns.has(r.tag_name)
-                        const rowState = isLearned ? 'LEARNED' : (versionLearnStates.get(r.tag_name) ?? 'UNLEARNED')
-                        const safe = sanitiseRef(r.tag_name)
-                        const isExpanded = expandedReleases.has(r.tag_name)
-                        const bodyLong = (r.body?.length ?? 0) > 300
-                        const hasAssets = r.assets && r.assets.length > 0
-                        return (
-                          <div key={r.tag_name} className="repo-release-item">
-                            <div className="repo-release-row">
-                              <div className="repo-release-timestamp">
-                                {formatDate(r.published_at)}
-                              </div>
-                              <div className="repo-release-content">
-                                <div className="repo-release-header">
-                                  <span className="repo-release-tag">{r.tag_name}</span>
-                                  {r.name && r.name !== r.tag_name && <span className="repo-release-name">{r.name}</span>}
-                                  <div className="repo-release-install">
-                                    {rowState === 'LEARNED' ? (
-                                      <span className="repo-release-installed-label">{name}@{safe}.skill.md</span>
-                                    ) : rowState === 'LEARNING' ? (
-                                      <span className="repo-release-installing-label">Learning…</span>
-                                    ) : rowState === 'ERROR' ? (
-                                      <button className="repo-release-install-btn repo-release-install-btn--error" onClick={() => handleVersionLearn(r.tag_name)}>
-                                        Failed — retry
-                                      </button>
-                                    ) : (
-                                      <button className="repo-release-install-btn" disabled={versionLearnStates.get(r.tag_name) === 'LEARNING'} onClick={() => handleVersionLearn(r.tag_name)}>
-                                        Learn this version
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                                {r.body && (
-                                  <div className={`repo-release-body${!isExpanded && bodyLong ? ' collapsed' : ''}`}>
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{isExpanded || !bodyLong ? r.body : r.body.slice(0, 300)}</ReactMarkdown>
-                                    {!isExpanded && bodyLong && (
-                                      <button
-                                        className="repo-release-expand-btn"
-                                        onClick={() => setExpandedReleases(prev => new Set([...prev, r.tag_name]))}
-                                      >
-                                        Show more
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                                {isExpanded && hasAssets && (
-                                  <div className="repo-release-assets">
-                                    <div className="repo-release-assets-label">Assets</div>
-                                    {r.assets.map(a => (
-                                      <a
-                                        key={a.name}
-                                        className="repo-release-asset"
-                                        href={a.browser_download_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      >
-                                        <FileDown size={12} />
-                                        <span className="repo-release-asset-name">{a.name}</span>
-                                        <span className="repo-release-asset-size">{formatBytes(a.size)}</span>
-                                        {a.download_count > 0 && (
-                                          <span className="repo-release-asset-downloads">{formatCount(a.download_count)} downloads</span>
-                                        )}
-                                      </a>
-                                    ))}
-                                  </div>
-                                )}
-                                {isExpanded && (
-                                  <button
-                                    className="repo-release-expand-btn"
-                                    onClick={() => setExpandedReleases(prev => { const s = new Set(prev); s.delete(r.tag_name); return s })}
-                                  >
-                                    Show less
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
+                    <div className="repo-activity-feed">
+                      {activityEvents.map(event => (
+                        <BannerCard
+                          key={event.id}
+                          {...releaseToBannerProps(event, () => setSelectedReleaseId(event.id))}
+                        />
+                      ))}
                     </div>
                   )
                 )}
@@ -1804,6 +1787,16 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
           </div>
         </div>
       </div>
+      {selectedReleaseId && (
+        <ActivityModal
+          events={activityEvents}
+          initialEventId={selectedReleaseId}
+          onClose={() => setSelectedReleaseId(null)}
+          onLearnVersion={handleVersionLearn}
+          versionLearnStates={versionLearnStates}
+          versionedLearns={versionedLearns}
+        />
+      )}
     </div>
   )
 }
