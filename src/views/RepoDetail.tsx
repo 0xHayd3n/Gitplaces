@@ -46,6 +46,8 @@ import { extractCommands, type CommandBlock } from '../utils/commandParser'
 import { BannerCard } from '../components/BannerCard'
 import { releaseToBannerProps } from '../components/ActivityEvent'
 import { ActivityModal } from '../components/ActivityModal'
+import { DateDivider } from '../components/DateDivider'
+import { groupEventsByDay } from '../utils/groupEventsByDay'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
 import FilesTab from '../components/FilesTab'
 import { useRepoNav } from '../contexts/RepoNav'
@@ -410,7 +412,7 @@ function SidebarLabel({ children, action }: { children: React.ReactNode; action?
 type Tab = 'activities' | 'readme' | 'files' | 'skill' | 'collections' | 'related' | 'videos' | 'posts' | 'commands' | 'components'
 const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'activities',  label: 'Activities' },
-  { id: 'readme',      label: 'README' },
+  { id: 'readme',      label: 'Readme' },
   { id: 'files',       label: 'Files' },
   { id: 'skill',       label: 'Skills Folder' },
   { id: 'collections', label: 'Collections' },
@@ -521,6 +523,9 @@ export default function RepoDetail() {
       : [],
     [releases, owner, name],
   )
+  // Day-grouped form for rendering Today / Yesterday / Apr 27 dividers between
+  // BannerCards — same shape the Library's ActivityFeed produces.
+  const activityGroups = useMemo(() => groupEventsByDay(activityEvents), [activityEvents])
   // First-resolve fallback: if releases comes back empty/error, drop from the
   // optimistic 'activities' default to README. The ref ensures we only apply
   // the fallback once — subsequent navigations to Activities by the user stick.
@@ -1540,13 +1545,21 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                     // expose). Kept as a safe fallback.
                     <p className="repo-detail-placeholder">No activity yet.</p>
                   ) : (
-                    <div className="repo-activity-feed">
-                      {activityEvents.map(event => (
-                        <BannerCard
-                          key={event.id}
-                          {...releaseToBannerProps(event, () => setSelectedReleaseId(event.id))}
-                        />
-                      ))}
+                    <div className="repo-activity-split">
+                      <div className="repo-activity-split-left">
+                        {activityGroups.map(group => (
+                          <div key={group.label} className="repo-activity-group">
+                            <DateDivider label={group.label} />
+                            {group.events.map(event => (
+                              <BannerCard
+                                key={event.id}
+                                {...releaseToBannerProps(event, () => setSelectedReleaseId(event.id))}
+                              />
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="repo-activity-split-right" />
                     </div>
                   )
                 )}

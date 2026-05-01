@@ -4293,11 +4293,28 @@ a {
   text-overflow: ellipsis;
 }
 
-/* Activities tab feed (per-repo release stream rendered as BannerCards) */
-.repo-activity-feed {
+/* Activities tab — two-column layout: left = release feed grouped by day,
+   right = reserved for future content. */
+.repo-activity-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+.repo-activity-split-left {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0;
+}
+.repo-activity-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.repo-activity-split-right {
+  /* Empty for now — placeholder cell. */
+  min-width: 0;
 }
 
 /* Releases */
