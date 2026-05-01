@@ -84,16 +84,18 @@ The `<!-- updated: ... -->` comment is invisible when rendered on GitHub and car
 
 - `startNotesSyncService(db, win)` — captures db/win refs at startup
 - `pushNote(repoId, owner, repoName, content)` — calls `putFileContents` with the stored `github_sha`; updates `sync_status` + `github_sha` on success, marks `failed` on error
-- `pushAllPendingNotes()` — bulk push of all `pending | failed` rows with 250ms delay between calls; called as fire-and-forget from `main.ts` immediately after `startNotesSyncService()` at app startup (same pattern as `skillSyncService` calling `pushAll()` from `setupRepo`)
+- `pushAllPendingNotes()` — bulk push of all `pending | failed` rows with 250ms delay between calls; called as fire-and-forget from `main.ts` at app startup, but only after confirming `getSyncEnabled() === true` — mirrors the guard inside `skillSyncService.pushAll()`
 
 ### Conflict resolution (pull on app start)
 
-Called lazily when `RepoDetail` mounts, only if sync is enabled and the repo has a note with a `github_sha`:
+Called lazily when `RepoDetail` mounts, only if sync is enabled and the repo has a note row (regardless of whether `github_sha` is set — a note that failed its first push has no SHA but a remote copy may still exist from a previous install):
 
-1. Fetch `notes/{owner}/{repoName}.md` from GitHub API
-2. Decode base64, parse `<!-- updated: N -->` timestamp
+1. Fetch `notes/{owner}/{repoName}.md` from GitHub API using a new `getFileContentWithSha` helper (see below); if 404, no-op
+2. Decode base64, parse `<!-- updated: N -->` timestamp from line 1 via `/^<!-- updated: (\d+) -->$/`
 3. If remote `updated` > local `updated_at` → overwrite local row, store new `github_sha`, mark `synced`
 4. If local is newer or equal → no-op (local wins, will push on next sync)
+
+**New GitHub API helper required:** add `getFileContentWithSha(token, owner, name, path): Promise<{ content: string; sha: string } | null>` to `electron/github.ts`. The existing `getFileContent` discards the SHA; this new helper returns both the decoded text and the blob SHA needed for future `putFileContents` calls.
 
 ---
 
@@ -124,7 +126,7 @@ Self-contained component. All notes logic stays here — nothing leaks into `Rep
 
 ### Integration in `RepoDetail.tsx`
 
-`<RepoNotes>` inserted as the first child of the `.stats-sidebar` div, above the Stats tile. No other changes to `RepoDetail.tsx`.
+`<RepoNotes>` inserted as the first child of the `.stats-sidebar` div, above the Stats tile. The stats sidebar is only rendered when `activeTab === 'activities'`, so Notes will appear on the Activities tab only — this is intentional. No other changes to `RepoDetail.tsx`.
 
 ### Styling
 
@@ -139,6 +141,7 @@ New `.repo-notes-*` classes added to `src/styles/globals.css`, following the exi
 | `electron/db.ts` | Add `repo_notes` table definition |
 | `electron/main.ts` | Add `notes:get`, `notes:set`, `notes:pullFromGitHub` IPC handlers; call `startNotesSyncService` at startup |
 | `electron/preload.ts` | Expose `window.api.notes.get`, `window.api.notes.set`, and `window.api.notes.pullFromGitHub` |
+| `electron/github.ts` | Add `getFileContentWithSha` helper |
 | `electron/services/notesSyncService.ts` | New file — push/pull note sync logic |
 | `src/components/RepoNotes.tsx` | New file — notes tile component |
 | `src/styles/globals.css` | Add `.repo-notes-*` styles |
