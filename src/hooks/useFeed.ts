@@ -20,6 +20,57 @@ const POLL_MS = 5 * 60 * 1000
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000
 const RELEASE_FETCH_CONCURRENCY = 6
 
+// Module-level cache survives ActivityFeed unmount/remount within a session,
+// so navigating away and back renders the previous feed instantly instead of
+// flashing a skeleton while the next fetch resolves. The cache is hydrated
+// from localStorage at module load and rewritten after every successful fetch
+// so it also survives full app restarts — opening the app two days later
+// shows the last-known feed first, then silently merges in anything new.
+const STORAGE_KEY = 'feed-cache:v1'
+const CACHE_EVENT_LIMIT = 200
+
+interface PersistedCache {
+  login: string
+  events: GitHubFeedEvent[]
+  cachedAt: number
+}
+
+function loadPersisted(): PersistedCache | null {
+  try {
+    if (typeof localStorage === 'undefined') return null
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as PersistedCache
+    if (!parsed || typeof parsed.login !== 'string' || !Array.isArray(parsed.events)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function savePersisted(cache: PersistedCache): void {
+  try {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cache))
+  } catch {
+    // Quota exceeded or storage disabled — fall back to memory-only cache.
+  }
+}
+
+const initialPersisted = loadPersisted()
+let cachedEvents: GitHubFeedEvent[] = initialPersisted?.events ?? []
+let cachedLogin: string | null = initialPersisted?.login ?? null
+
+export function __resetFeedCache() {
+  cachedEvents = []
+  cachedLogin = null
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 // Bounded-concurrency Promise.allSettled. Workers share `cursor` but the
 // `cursor++` runs synchronously before the await, so JS's single-threaded
 // model makes the increment atomic — no extra locking needed.
@@ -46,7 +97,9 @@ async function pMapSettled<T, R>(
 
 export function useFeed(): FeedState & { refresh: () => void } {
   const { user } = useGitHubAuth()
-  const [events, setEvents] = useState<GitHubFeedEvent[]>([])
+  const [events, setEvents] = useState<GitHubFeedEvent[]>(() =>
+    user?.login && cachedLogin === user.login ? cachedEvents : [],
+  )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -55,10 +108,13 @@ export function useFeed(): FeedState & { refresh: () => void } {
     setLoading(true)
     setError(null)
     try {
-      const [received, feedRepos] = await Promise.all([
+      const [receivedSettled, feedReposSettled] = await Promise.allSettled([
         window.api.github.getReceivedEvents(login) as Promise<GitHubFeedEvent[]>,
         window.api.github.getFeedRepos(),
       ])
+
+      const received = receivedSettled.status === 'fulfilled' ? receivedSettled.value : []
+      const feedRepos = feedReposSettled.status === 'fulfilled' ? feedReposSettled.value : []
 
       const cutoff = Date.now() - NINETY_DAYS_MS
       const releaseResults = await pMapSettled(
@@ -96,10 +152,37 @@ export function useFeed(): FeedState & { refresh: () => void } {
           return !receivedKeys.has(`${e.repo.full_name}::${tag}`)
         })
 
-      const merged = [...received, ...repoReleases]
+      // Preserve cached events not in the fresh payload — keeps "where you left
+      // off" intact across long gaps where the API window has rolled past older
+      // entries. Only merge when the cache belongs to the current login.
+      const fetched = [...received, ...repoReleases]
+      const fetchedIds = new Set(fetched.map(e => e.id))
+      const preserved = cachedLogin === login
+        ? cachedEvents.filter(e => !fetchedIds.has(e.id))
+        : []
+      const merged = [...fetched, ...preserved]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-      setEvents(merged)
+      const anyFailure =
+        receivedSettled.status === 'rejected' ||
+        feedReposSettled.status === 'rejected' ||
+        releaseResults.some(r => r.status === 'rejected')
+
+      // Total failure: leave any cached events in place so the user keeps seeing
+      // their last-known feed; surface the error for the empty-state path.
+      // Partial success (or full success): replace events with what we got.
+      if (merged.length === 0 && anyFailure) {
+        setError('Couldn\'t load activity')
+      } else {
+        // Cap the cache so a long-running install doesn't grow localStorage
+        // unboundedly across sessions. Already sorted newest-first, so the
+        // slice keeps the most recent CACHE_EVENT_LIMIT events.
+        const capped = merged.slice(0, CACHE_EVENT_LIMIT)
+        setEvents(capped)
+        cachedEvents = capped
+        cachedLogin = login
+        savePersisted({ login, events: capped, cachedAt: Date.now() })
+      }
     } catch {
       setError('Couldn\'t load activity')
     } finally {
