@@ -71,9 +71,10 @@ The handler returns an extended shape:
 // src/types/components.ts
 export interface ComponentScanResult {
   framework: Framework
-  pkg: { name: string; version: string } | null  // NEW
-  components: ScannedComponent[]                   // existing shape
-  stories: ScannedStory[]                          // NEW
+  pkg: { name: string; version: string } | null     // NEW
+  components: ScannedComponent[]                     // existing shape
+  stories: ScannedStory[]                            // NEW
+  error: 'rate-limit' | 'network' | 'timeout' | null // NEW — non-null only on whole-scan failure
 }
 
 export interface ScannedStory {
@@ -116,9 +117,9 @@ A new function in `src/utils/componentBundle.ts`:
 export type RenderTier = 'bundled' | 'source'
 
 export interface BundledRender {
-  importUrl: string         // e.g. "https://esm.sh/@shadcn/ui@1.2.3"
-  exportName: string        // e.g. "Button"
-  cssUrls: string[]         // e.g. ["https://esm.sh/@shadcn/ui@1.2.3/dist/style.css"]
+  importUrl: string         // e.g. "https://esm.sh/@radix-ui/react-dialog@1.0.5"
+  exportName: string        // e.g. "Root"
+  cssUrls: string[]         // e.g. ["https://esm.sh/@mantine/core@7.6.0/styles.css"]
 }
 
 export async function chooseRenderer(
@@ -255,8 +256,13 @@ component because one of its stories was unparseable.
 Each story's `default.component` is an identifier. We resolve it by:
 
 1. Finding `import \{ <ident> \}` or `import <ident>` in the story file
-2. Extracting the import path (relative)
-3. Resolving against scanned `components[].path` from the same directory
+2. Extracting the relative import path
+3. Resolving against scanned `components[].path` by trying each suffix in
+   order: exact match, `+ '.tsx'`, `+ '.ts'`, `+ '.jsx'`, `+ '.js'`,
+   `+ '/index.tsx'`, `+ '/index.ts'`, `+ '/index.jsx'`, `+ '/index.js'`. The
+   plan should decide whether this is a shared helper (also reused by the
+   source-tier import-stub logic in `iframeTemplate.ts`) or inline logic in
+   `storyParser.ts`.
 
 Stories whose imports use path aliases (`@/lib/...`), bare specifiers, or files
 outside the scan set are dropped.
@@ -370,10 +376,16 @@ Three slots, in order:
 
 ### LRU iframe eviction
 
-A module-scope `Set<string>` (paths of currently-mounted iframe cards) capped
-at 24. When a 25th would mount, the oldest is evicted by setting that card's
-internal `evicted: true`, which unmounts its iframe and shows the placeholder
+The LRU registry lives **inside `ComponentExplorer`** (not module scope) — a
+`useRef<Set<string>>` of paths whose iframe is currently mounted, capped at 24.
+When a 25th would mount, the oldest is evicted by flipping the offending card's
+internal `evicted` state, which unmounts its iframe and shows the placeholder
 again. Re-entering view re-mounts.
+
+This deliberately ties the LRU lifetime to the Components tab mount, matching
+the rest of the explorer's state. Switching repos or closing the tab disposes
+the registry along with all other state. Compiled blob URLs (next paragraph)
+follow the same lifecycle.
 
 ### Theme toggle
 
@@ -398,10 +410,10 @@ Per-library theme provider shims (`MuiThemeProvider`, `ChakraProvider`) are
 
 | Cause | Detection | UI |
 |---|---|---|
-| Network failure | `components:scan` rejects | `<p>Couldn't reach GitHub. <Retry></p>` |
-| API rate limit | Scan returns `{ framework: 'unknown', components: [], stories: [], pkg: null }` AND we infer rate-limit (HTTP 403) — extend scanner to surface this | `<p>GitHub rate limit hit. Try again in a few minutes.</p>` |
-| No components found | Scan returns empty `components` | `<p>No components found in this repo.</p>` (existing) |
-| Repo too large (timeout) | Scan exceeds 30s | `<p>Repo too large to scan.</p>` |
+| Network failure | `scan.error === 'network'` (scanner catches `fetch` rejection at the tree-fetch level) | `<p>Couldn't reach GitHub. <Retry></p>` |
+| API rate limit | `scan.error === 'rate-limit'` (scanner detects HTTP 403 with `x-ratelimit-remaining: 0` from the tree-fetch call and sets the field) | `<p>GitHub rate limit hit. Try again in a few minutes.</p>` |
+| No components found | `scan.error === null` AND `components.length === 0` | `<p>No components found in this repo.</p>` (existing) |
+| Repo too large (timeout) | `scan.error === 'timeout'` (scanner aborts after 30s) | `<p>Repo too large to scan.</p>` |
 
 ### Per-component bundled-tier failures
 
@@ -436,7 +448,7 @@ state.
 | Time to first skeleton | < 200ms after tab activation | Skeleton renders as soon as scan completes; no waiting on iframes |
 | Time to first iframe | < 2s after card scrolls into view | Lazy-mount via IntersectionObserver |
 | Mounted iframe count | ≤ 24 | LRU eviction (module-scope `Set`) |
-| Memory pressure | Compiled blobs cached per component, freed on tab unmount | Existing `createdUrls.current` pattern, extended to module-scope keyed by `<owner>/<name>/<path>` |
+| Memory pressure | Compiled blobs cached per component, freed on tab unmount or LRU eviction | Existing `createdUrls.current` pattern (component-scoped ref); blob URLs revoked when the card is evicted from the LRU set or when `ComponentExplorer` unmounts |
 
 The CSS probe (Section 3) runs once per repo scan, costing 4 HEAD requests in
 the worst case (all probes 404). Cached for the lifetime of the scan.
