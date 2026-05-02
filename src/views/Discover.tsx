@@ -108,8 +108,9 @@ export default function Discover() {
     if (restoredSnapshot.current?.repos?.length) return restoredSnapshot.current.repos
     // Seed from persistent cache only when the URL describes a default-popular
     // landing — any filter param means the cache is for the wrong query.
-    const params = new URLSearchParams(window.location.search)
-    const isDefaultUrl = (params.get('view') ?? 'all') === 'all' && !params.get('lang')
+    // Use the router-aware searchParams (not window.location) so any non-browser
+    // router setup wouldn't silently disagree with the rest of the component.
+    const isDefaultUrl = (searchParams.get('view') ?? 'all') === 'all' && !searchParams.get('lang')
     if (isDefaultUrl && _popularModuleCache) return _popularModuleCache.repos
     return []
   })
@@ -509,8 +510,12 @@ export default function Discover() {
     } catch (e: unknown) {
       if (gen !== fetchGeneration.current) return
       // If the user already sees cached cards, suppress the error overlay and
-      // keep the stale cards visible — better UX than blanking the page.
-      if (!hasCachedPopular) {
+      // keep the stale cards visible — better UX than blanking the page. Log so
+      // repeated background-fetch failures aren't completely invisible during
+      // debugging; the user-visible signal is intentionally absent for now.
+      if (hasCachedPopular) {
+        console.warn('[discover] popular refetch failed; keeping cached cards', e)
+      } else {
         setError(e instanceof Error ? e.message : 'Unknown error')
       }
     } finally {
