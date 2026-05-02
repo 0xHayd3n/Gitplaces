@@ -1,8 +1,10 @@
 import type Database from 'better-sqlite3'
 import { githubHeaders } from '../github'
-import type { RepoStats, SecurityAlert } from '../../src/types/repoStats'
+import type {
+  RepoStats, SecurityAlert, SeverityCounts, CodeScanningCounts, SecretScanningCounts,
+} from '../../src/types/repoStats'
 
-const TTL_MS = 86_400_000 // 24h
+const TTL_MS = 21_600_000 // 6h
 
 interface RawAlert {
   number: number
@@ -22,10 +24,35 @@ interface RawAlert {
   }
 }
 
+interface RawCodeScanAlert {
+  rule: { severity: string }
+}
+
+interface RawSecretAlert {
+  validity: 'active' | 'inactive' | 'unknown'
+}
+
 function extractNextLink(linkHeader: string | null): string | null {
   if (!linkHeader) return null
   const m = linkHeader.match(/<([^>]+)>;\s*rel="next"/)
   return m ? m[1] : null
+}
+
+async function fetchAllPages<T>(firstRes: Response, headers: HeadersInit): Promise<T[]> {
+  const items: T[] = await firstRes.json().catch(() => [])
+  let nextUrl = extractNextLink(firstRes.headers.get('Link'))
+  while (nextUrl) {
+    try {
+      const res = await fetch(nextUrl, { headers })
+      if (!res.ok) break
+      const page: T[] = await res.json().catch(() => [])
+      items.push(...page)
+      nextUrl = extractNextLink(res.headers.get('Link'))
+    } catch {
+      break
+    }
+  }
+  return items
 }
 
 function mapAlert(raw: RawAlert): SecurityAlert {
@@ -43,11 +70,23 @@ function mapAlert(raw: RawAlert): SecurityAlert {
   }
 }
 
+function countBySeverity(alerts: SecurityAlert[]): SeverityCounts {
+  return {
+    critical: alerts.filter(a => a.severity === 'critical').length,
+    high:     alerts.filter(a => a.severity === 'high').length,
+    moderate: alerts.filter(a => a.severity === 'moderate').length,
+    low:      alerts.filter(a => a.severity === 'low').length,
+  }
+}
+
 const UNAVAILABLE: RepoStats['security'] = {
   available: false,
+  permissionDenied: false,
   vulnerabilities: null,
+  dismissedVulnerabilities: null,
   hasSecurityPolicy: null,
-  codeScanningEnabled: null,
+  codeScanning: null,
+  secretScanning: null,
   alerts: null,
 }
 
@@ -68,35 +107,29 @@ export async function getRepoSecurity(
   const h = githubHeaders(token)
   const base = `https://api.github.com/repos/${owner}/${name}`
 
-  // First alerts page + profile + scan fire in parallel
-  const [alertsRes, profileRes, scanRes] = await Promise.all([
+  const [alertsRes, dismissedRes, profileRes, scanRes, secretRes] = await Promise.all([
     fetch(`${base}/dependabot/alerts?state=open&per_page=100`, { headers: h }).catch(() => null),
+    fetch(`${base}/dependabot/alerts?state=dismissed&per_page=100`, { headers: h }).catch(() => null),
     fetch(`${base}/community/profile`, { headers: h }).catch(() => null),
-    fetch(`${base}/code-scanning/alerts?per_page=1`, { headers: h }).catch(() => null),
+    fetch(`${base}/code-scanning/alerts?state=open&per_page=100`, { headers: h }).catch(() => null),
+    fetch(`${base}/secret-scanning/alerts?state=open&per_page=100`, { headers: h }).catch(() => null),
   ])
 
-  if (alertsRes?.status === 403) return UNAVAILABLE
+  if (alertsRes?.status === 403) return { ...UNAVAILABLE, permissionDenied: true }
   if (!alertsRes?.ok) return UNAVAILABLE
 
-  const rawAlerts: RawAlert[] = await alertsRes.json().catch(() => [])
+  const [openRawAlerts, dismissedRawAlerts, scanAlerts, secretAlerts] = await Promise.all([
+    fetchAllPages<RawAlert>(alertsRes, h),
+    dismissedRes?.ok ? fetchAllPages<RawAlert>(dismissedRes, h) : Promise.resolve([]),
+    scanRes?.ok && scanRes.status !== 404
+      ? fetchAllPages<RawCodeScanAlert>(scanRes, h)
+      : Promise.resolve([]),
+    secretRes?.ok ? fetchAllPages<RawSecretAlert>(secretRes, h) : Promise.resolve([]),
+  ])
 
-  // Paginate remaining alert pages sequentially
-  let nextUrl = extractNextLink(alertsRes.headers.get('Link'))
-  while (nextUrl) {
-    try {
-      const res = await fetch(nextUrl, { headers: h })
-      if (!res.ok) break
-      const page: RawAlert[] = await res.json().catch(() => [])
-      rawAlerts.push(...page)
-      nextUrl = extractNextLink(res.headers.get('Link'))
-    } catch {
-      break
-    }
-  }
+  const alerts = openRawAlerts.map(mapAlert)
+  const dismissedMapped = dismissedRawAlerts.map(mapAlert)
 
-  const alerts = rawAlerts.map(mapAlert)
-
-  // Parse profile — guard against non-object responses (e.g. [] from the test fixture)
   let profileData: { files?: { security?: unknown } } | null = null
   if (profileRes?.ok) {
     const parsed = await profileRes.json().catch(() => null)
@@ -105,18 +138,38 @@ export async function getRepoSecurity(
     }
   }
 
+  let codeScanning: CodeScanningCounts | false | null = null
+  if (scanRes?.status === 404) {
+    codeScanning = false
+  } else if (scanRes?.ok) {
+    codeScanning = {
+      critical: scanAlerts.filter(a => a.rule.severity === 'critical').length,
+      high:     scanAlerts.filter(a => a.rule.severity === 'high').length,
+      medium:   scanAlerts.filter(a => a.rule.severity === 'medium').length,
+      low:      scanAlerts.filter(a => a.rule.severity === 'low').length,
+      note:     scanAlerts.filter(a => a.rule.severity === 'note').length,
+      warning:  scanAlerts.filter(a => a.rule.severity === 'warning').length,
+    }
+  }
+
+  const secretScanning: SecretScanningCounts | null = secretRes?.ok
+    ? {
+        active:   secretAlerts.filter(a => a.validity === 'active').length,
+        inactive: secretAlerts.filter(a => a.validity === 'inactive').length,
+        unknown:  secretAlerts.filter(a => a.validity === 'unknown').length,
+      }
+    : null
+
   const result: RepoStats['security'] = {
     available: true,
-    vulnerabilities: {
-      critical: alerts.filter(a => a.severity === 'critical').length,
-      high:     alerts.filter(a => a.severity === 'high').length,
-      moderate: alerts.filter(a => a.severity === 'moderate').length,
-      low:      alerts.filter(a => a.severity === 'low').length,
-    },
+    permissionDenied: false,
+    vulnerabilities: countBySeverity(alerts),
+    dismissedVulnerabilities: dismissedRes?.ok ? countBySeverity(dismissedMapped) : null,
     hasSecurityPolicy: profileData?.files?.security !== undefined
       ? profileData.files!.security !== null
       : null,
-    codeScanningEnabled: scanRes?.status === 200 ? true : scanRes?.status === 404 ? false : null,
+    codeScanning,
+    secretScanning,
     alerts,
   }
 
