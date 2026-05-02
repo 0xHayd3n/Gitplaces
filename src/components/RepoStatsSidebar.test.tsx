@@ -13,8 +13,8 @@ const mockStats: RepoStats = {
   momentum: { monthlyCommits: [12, 18, 10, 22, 19, 31], trend: 'up' },
   security: {
     available: true,
-    vulnerabilities: { high: 2, moderate: 1, low: 0 },
-    hasSecurityPolicy: true, codeScanningEnabled: false,
+    vulnerabilities: { critical: 0, high: 2, moderate: 1, low: 0 },
+    hasSecurityPolicy: true, codeScanningEnabled: false, alerts: null,
   },
   engagement: { starredAt: '2026-01-12T00:00:00Z', forkedAt: '2026-02-03T00:00:00Z', skillsLearned: 2 },
 }
@@ -22,25 +22,25 @@ const mockStats: RepoStats = {
 const healthyStats: RepoStats = {
   ...mockStats,
   health: { score: 80, maintenance: 'active', issueVelocity: 'healthy', lastReleaseDate: '2026-04-20T00:00:00Z', lastReleaseDaysAgo: 12 },
-  security: { available: true, vulnerabilities: { high: 0, moderate: 0, low: 0 }, hasSecurityPolicy: true, codeScanningEnabled: true },
+  security: { available: true, vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 }, hasSecurityPolicy: true, codeScanningEnabled: true, alerts: null },
   momentum: { monthlyCommits: [10, 15, 20, 25, 28, 31], trend: 'up' },
 }
 
 const criticalStats: RepoStats = {
   ...mockStats,
-  security: { available: true, vulnerabilities: { high: 3, moderate: 1, low: 2 }, hasSecurityPolicy: false, codeScanningEnabled: false },
+  security: { available: true, vulnerabilities: { critical: 0, high: 3, moderate: 1, low: 2 }, hasSecurityPolicy: false, codeScanningEnabled: false, alerts: null },
 }
 
 const staleStats: RepoStats = {
   ...mockStats,
   health: { score: 30, maintenance: 'stale', issueVelocity: 'healthy', lastReleaseDate: null, lastReleaseDaysAgo: null },
-  security: { available: true, vulnerabilities: { high: 0, moderate: 0, low: 0 }, hasSecurityPolicy: null, codeScanningEnabled: null },
+  security: { available: true, vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 }, hasSecurityPolicy: null, codeScanningEnabled: null, alerts: null },
 }
 
 const middlingStats: RepoStats = {
   ...mockStats,
   health: { score: 55, maintenance: 'slow', issueVelocity: 'healthy', lastReleaseDate: null, lastReleaseDaysAgo: null },
-  security: { available: true, vulnerabilities: { high: 0, moderate: 0, low: 0 }, hasSecurityPolicy: null, codeScanningEnabled: null },
+  security: { available: true, vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 }, hasSecurityPolicy: null, codeScanningEnabled: null, alerts: null },
 }
 
 describe('RepoStatsSidebar', () => {
@@ -75,7 +75,7 @@ describe('RepoStatsSidebar', () => {
   it('renders security unavailable state', () => {
     const stats: RepoStats = {
       ...mockStats,
-      security: { available: false, vulnerabilities: null, hasSecurityPolicy: null, codeScanningEnabled: null },
+      security: { available: false, vulnerabilities: null, hasSecurityPolicy: null, codeScanningEnabled: null, alerts: null },
     }
     render(<RepoStatsSidebar stats={stats} />)
     expect(screen.getByText(/not available/i)).toBeInTheDocument()

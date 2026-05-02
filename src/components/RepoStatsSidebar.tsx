@@ -24,14 +24,16 @@ type Verdict = { label: string; color: string; sub: string }
 function computeVerdict(stats: RepoStats): Verdict {
   const { health, security, momentum } = stats
   const vulns = security.vulnerabilities
+  const criticalVulns = vulns?.critical ?? 0
   const highVulns = vulns?.high ?? 0
-  const totalVulns = vulns ? vulns.high + vulns.moderate + vulns.low : 0
+  const totalVulns = vulns ? vulns.critical + vulns.high + vulns.moderate + vulns.low : 0
 
-  if (security.available && highVulns > 0) {
+  if (security.available && (criticalVulns > 0 || highVulns > 0)) {
+    const severeCount = criticalVulns + highVulns
     return {
       label: 'Critical issues',
       color: 'var(--red)',
-      sub: `${highVulns} high-severity vulnerabilit${highVulns === 1 ? 'y' : 'ies'}`,
+      sub: `${severeCount} high-severity vulnerabilit${severeCount === 1 ? 'y' : 'ies'}`,
     }
   }
   if (
@@ -70,7 +72,7 @@ export function RepoStatsSidebar({ stats }: Props) {
 
   const { vitals, health, momentum, security, engagement } = stats
   const totalVulns = security.vulnerabilities
-    ? security.vulnerabilities.high + security.vulnerabilities.moderate + security.vulnerabilities.low
+    ? security.vulnerabilities.critical + security.vulnerabilities.high + security.vulnerabilities.moderate + security.vulnerabilities.low
     : 0
 
   const verdict = computeVerdict(stats)
@@ -192,7 +194,7 @@ export function RepoStatsSidebar({ stats }: Props) {
                     {totalVulns} {totalVulns === 1 ? 'vulnerability' : 'vulnerabilities'}
                   </div>
                   <div className="stats-vuln-breakdown">
-                    {security.vulnerabilities.high}h · {security.vulnerabilities.moderate}m · {security.vulnerabilities.low}l
+                    {security.vulnerabilities.critical}c · {security.vulnerabilities.high}h · {security.vulnerabilities.moderate}m · {security.vulnerabilities.low}l
                   </div>
                 </div>
               </div>
