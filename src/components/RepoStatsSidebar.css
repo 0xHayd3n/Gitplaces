@@ -36,6 +36,48 @@
   background: var(--bg3);
 }
 
+/* Verdict */
+.stats-verdict {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg2);
+  border-left: 3px solid;
+  margin: 10px 0 2px;
+}
+
+.stats-verdict-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stats-verdict-sub {
+  font-size: 9px;
+  color: var(--t3);
+  margin-top: 2px;
+}
+
+/* Collapsible section toggle */
+.stats-section-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.stats-section-toggle .stats-section-label {
+  margin-bottom: 0;
+}
+
+.stats-chevron {
+  font-size: 8px;
+  color: var(--t3);
+}
+
 /* Vitals */
 .stats-vitals-grid {
   display: grid;

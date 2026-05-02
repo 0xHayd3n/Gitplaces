@@ -1,4 +1,6 @@
 // src/components/RepoStatsSidebar.tsx
+import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { relativeTime } from '../utils/relativeTime'
 import type { RepoStats, HealthStatus, IssueVelocity } from '../types/repoStats'
 import './RepoStatsSidebar.css'
@@ -17,6 +19,51 @@ const STATUS_COLOR: Record<'active' | 'slow' | 'stale' | 'healthy' | 'backlogged
   healthy: 'var(--green)', backlogged: 'var(--yellow)', critical: 'var(--red)',
 }
 
+type Verdict = { label: string; color: string; sub: string }
+
+function computeVerdict(stats: RepoStats): Verdict {
+  const { health, security, momentum } = stats
+  const vulns = security.vulnerabilities
+  const highVulns = vulns?.high ?? 0
+  const totalVulns = vulns ? vulns.high + vulns.moderate + vulns.low : 0
+
+  if (security.available && highVulns > 0) {
+    return {
+      label: 'Critical issues',
+      color: 'var(--red)',
+      sub: `${highVulns} high-severity vulnerabilit${highVulns === 1 ? 'y' : 'ies'}`,
+    }
+  }
+  if (
+    health.score < 40 ||
+    health.maintenance === 'stale' ||
+    health.issueVelocity === 'critical' ||
+    (security.available && totalVulns > 0)
+  ) {
+    const sub = health.maintenance === 'stale'
+      ? 'Repository activity is stalling'
+      : health.issueVelocity === 'critical'
+      ? 'Issue backlog is critical'
+      : totalVulns > 0
+      ? `${totalVulns} known vulnerabilit${totalVulns === 1 ? 'y' : 'ies'}`
+      : 'Low health score'
+    return { label: 'Needs attention', color: 'var(--yellow)', sub }
+  }
+  if (
+    health.score >= 70 &&
+    health.maintenance === 'active' &&
+    (!security.available || totalVulns === 0)
+  ) {
+    const sub = momentum?.trend === 'up'
+      ? 'Trending up'
+      : momentum?.trend === 'down'
+      ? 'Commit activity declining'
+      : 'Actively maintained'
+    return { label: 'Healthy', color: 'var(--green)', sub }
+  }
+  return { label: 'Stable', color: 'var(--t2)', sub: 'No critical signals' }
+}
+
 export function RepoStatsSidebar({ stats }: Props) {
   if (stats === 'loading') return <div className="stats-sidebar-loading" />
   if (stats === 'error')   return <div className="stats-sidebar-error">Failed to load stats.</div>
@@ -26,12 +73,21 @@ export function RepoStatsSidebar({ stats }: Props) {
     ? security.vulnerabilities.high + security.vulnerabilities.moderate + security.vulnerabilities.low
     : 0
 
+  const verdict = computeVerdict(stats)
   const healthColor = health.score >= 70 ? 'var(--green)' : health.score >= 40 ? 'var(--yellow)' : 'var(--red)'
   const circumference = 2 * Math.PI * 16
   const filled = (health.score / 100) * circumference
 
   return (
     <div className="stats-sidebar-enriched">
+
+      {/* ── Verdict ── */}
+      <div className="stats-verdict" style={{ borderLeftColor: verdict.color }}>
+        <div className="stats-verdict-label" style={{ color: verdict.color }}>{verdict.label}</div>
+        <div className="stats-verdict-sub">{verdict.sub}</div>
+      </div>
+
+      <div className="stats-divider" />
 
       {/* ── Vitals ── */}
       <section className="stats-section">
@@ -94,8 +150,7 @@ export function RepoStatsSidebar({ stats }: Props) {
       <div className="stats-divider" />
 
       {/* ── Momentum ── */}
-      <section className="stats-section">
-        <div className="stats-section-label">Momentum</div>
+      <CollapsibleSection label="Momentum">
         {momentum === null ? (
           <div className="stats-computing">Stats computing on GitHub…</div>
         ) : (
@@ -119,13 +174,12 @@ export function RepoStatsSidebar({ stats }: Props) {
             <div className="stats-bars-legend">Commits/month — last 6mo</div>
           </>
         )}
-      </section>
+      </CollapsibleSection>
 
       <div className="stats-divider" />
 
       {/* ── Security ── */}
-      <section className="stats-section">
-        <div className="stats-section-label">Security</div>
+      <CollapsibleSection label="Security">
         {!security.available ? (
           <div className="stats-computing">Security data not available</div>
         ) : (
@@ -165,13 +219,12 @@ export function RepoStatsSidebar({ stats }: Props) {
             </div>
           </>
         )}
-      </section>
+      </CollapsibleSection>
 
       <div className="stats-divider" />
 
       {/* ── Your Engagement ── */}
-      <section className="stats-section">
-        <div className="stats-section-label">Your Engagement</div>
+      <CollapsibleSection label="Your Engagement">
         <div className="stats-signal-list">
           <div className="stats-signal">
             <span className="stats-signal-label">Starred</span>
@@ -190,9 +243,22 @@ export function RepoStatsSidebar({ stats }: Props) {
             <span className="stats-signal-val">{engagement.skillsLearned}</span>
           </div>
         </div>
-      </section>
+      </CollapsibleSection>
 
     </div>
+  )
+}
+
+function CollapsibleSection({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(true)
+  return (
+    <section className="stats-section">
+      <button className="stats-section-toggle" onClick={() => setOpen(o => !o)}>
+        <span className="stats-section-label">{label}</span>
+        <span className="stats-chevron">{open ? '▴' : '▾'}</span>
+      </button>
+      {open && children}
+    </section>
   )
 }
 
