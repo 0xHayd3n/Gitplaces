@@ -28,7 +28,7 @@ const mockStats: RepoStats = {
   momentum: { monthlyCommits: [10, 20, 15, 30, 25, 40], trend: 'up' },
   security: {
     available: true,
-    vulnerabilities: { high: 0, moderate: 1, low: 2 },
+    vulnerabilities: { critical: 0, high: 0, moderate: 1, low: 2 },
     hasSecurityPolicy: true, codeScanningEnabled: false,
   },
   engagement: { starredAt: '2026-01-12T00:00:00Z', forkedAt: null, skillsLearned: 2 },

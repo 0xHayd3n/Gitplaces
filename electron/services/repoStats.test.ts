@@ -46,6 +46,11 @@ function createTestDb(): Database.Database {
     );
     CREATE TABLE skills (repo_id TEXT, filename TEXT, generated_at TEXT);
     CREATE TABLE sub_skills (repo_id TEXT, skill_type TEXT, filename TEXT, generated_at TEXT);
+    CREATE TABLE repo_security_cache (
+      owner TEXT NOT NULL, name TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL, data TEXT NOT NULL,
+      PRIMARY KEY (owner, name)
+    );
   `)
   return db
 }
@@ -63,8 +68,20 @@ const repoPayload = {
 const commitsPayload = [{ commit: { committer: { date: new Date().toISOString() } } }]
 const activityPayload = Array.from({ length: 52 }, (_, i) => ({ week: i, total: i < 26 ? 5 : 10 }))
 const alertsPayload = [
-  { security_vulnerability: { severity: 'high' } },
-  { security_vulnerability: { severity: 'moderate' } },
+  {
+    number: 1,
+    html_url: 'https://github.com/owner/repo/security/dependabot/1',
+    dependency: { package: { name: 'lodash', ecosystem: 'npm' }, manifest_path: 'package.json' },
+    security_vulnerability: { severity: 'high', first_patched_version: { identifier: '4.17.21' } },
+    security_advisory: { ghsa_id: 'GHSA-1234', cve_id: 'CVE-2021-1234', summary: 'Prototype pollution' },
+  },
+  {
+    number: 2,
+    html_url: 'https://github.com/owner/repo/security/dependabot/2',
+    dependency: { package: { name: 'axios', ecosystem: 'npm' }, manifest_path: 'package.json' },
+    security_vulnerability: { severity: 'moderate', first_patched_version: null },
+    security_advisory: { ghsa_id: 'GHSA-5678', cve_id: null, summary: 'SSRF vulnerability' },
+  },
 ]
 const profilePayload = { files: { security: { url: 'https://...' } } }
 
@@ -96,7 +113,8 @@ describe('getRepoStats', () => {
     expect(result.vitals.openIssues).toBe(5)
     expect(result.vitals.contributors).toBe(1)
     expect(result.security.available).toBe(true)
-    expect(result.security.vulnerabilities).toEqual({ high: 1, moderate: 1, low: 0 })
+    expect(result.security.vulnerabilities).toEqual({ critical: 0, high: 1, moderate: 1, low: 0 })
+    expect(result.security.alerts).toHaveLength(2)
     expect(result.momentum).not.toBeNull()
     expect(result.momentum?.monthlyCommits).toHaveLength(6)
   })
