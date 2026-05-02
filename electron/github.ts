@@ -248,7 +248,7 @@ export async function getStarred(token: string): Promise<GitHubStarredRepo[]> {
 }
 
 export async function getRepo(token: string | null, owner: string, name: string): Promise<GitHubRepo> {
-  const res = await fetch(`${BASE}/repos/${owner}/${name}`, { headers: githubHeaders(token) })
+  const res = await fetch(`${BASE}/repos/${owner}/${name}`, { headers: githubHeaders(token), signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   return res.json() as Promise<GitHubRepo>
 }

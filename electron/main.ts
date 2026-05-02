@@ -626,7 +626,12 @@ ipcMain.handle('github:getRepo', async (_event, owner: string, name: string) => 
   const token = getToken()
   if (!token) return null // GitHub disconnected — skip API call
   const db = getDb(app.getPath('userData'))
-  const repo = await getRepo(token, owner, name)
+  let repo: Awaited<ReturnType<typeof getRepo>>
+  try {
+    repo = await getRepo(token, owner, name)
+  } catch {
+    return null // network error / timeout — return gracefully
+  }
 
   const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: JSON.stringify(repo.topics ?? []) })
   const rid = String(repo.id)
