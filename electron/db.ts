@@ -112,6 +112,14 @@ export function initSchema(db: Database.Database): void {
       updated_at     TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS repo_security_cache (
+      owner      TEXT NOT NULL,
+      name       TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL,
+      data       TEXT NOT NULL,
+      PRIMARY KEY (owner, name)
+    );
+
     CREATE UNIQUE INDEX IF NOT EXISTS repos_owner_name ON repos (owner, name);
     CREATE INDEX IF NOT EXISTS repos_saved_at         ON repos(saved_at);
   `)
