@@ -6,6 +6,7 @@ export interface ParsedProp {
   type: string
   required: boolean
   defaultValue?: string
+  stringUnion?: string[]
 }
 
 export interface ParsedComponent {
@@ -37,7 +38,6 @@ export function parseComponent(
 
 function parsePropBlock(block: string): ParsedProp[] {
   const props: ParsedProp[] = []
-  // Strip JSDoc and line comments
   const clean = block
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\/\/[^\n]*/g, '')
@@ -45,16 +45,31 @@ function parsePropBlock(block: string): ParsedProp[] {
   for (const line of clean.split('\n')) {
     const trimmed = line.trim()
     if (!trimmed) continue
-    // Match: propName?: type  or  propName: type  (with optional trailing semicolon/comma)
     const m = trimmed.match(/^(\w+)(\?)?:\s*(.+?)[,;]?\s*$/)
     if (!m) continue
+    const type = m[3].replace(/[,;]\s*$/, '').trim()
+    const stringUnion = parseStringUnion(type)
     props.push({
       name:     m[1],
-      type:     m[3].replace(/[,;]\s*$/, '').trim(),
+      type,
       required: !m[2],
+      ...(stringUnion ? { stringUnion } : {}),
     })
   }
   return props
+}
+
+function parseStringUnion(type: string): string[] | undefined {
+  // Match: 'a' | 'b' | 'c'  or  "a" | "b" | "c"  (no other types interleaved)
+  const parts = type.split('|').map(p => p.trim())
+  if (parts.length < 2) return undefined
+  const literals: string[] = []
+  for (const p of parts) {
+    const m = p.match(/^['"]([^'"]+)['"]$/)
+    if (!m) return undefined  // any non-string-literal disqualifies the whole union
+    literals.push(m[1])
+  }
+  return literals
 }
 
 function parseReactProps(source: string): ParsedProp[] {

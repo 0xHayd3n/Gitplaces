@@ -132,3 +132,41 @@ describe('parseComponent — Angular / unknown', () => {
     expect(result.props).toEqual([])
   })
 })
+
+describe('parseComponent — string-literal unions', () => {
+  it('extracts a string-union prop into stringUnion', () => {
+    const source = `
+      interface ButtonProps {
+        variant: 'primary' | 'secondary' | 'ghost'
+      }
+    `
+    const result = parseComponent('Button.tsx', source, 'react')
+    const variant = result.props.find(p => p.name === 'variant')
+    expect(variant?.stringUnion).toEqual(['primary', 'secondary', 'ghost'])
+  })
+
+  it('handles double-quoted union members', () => {
+    const source = `
+      interface Props { size: "sm" | "md" | "lg" }
+    `
+    const result = parseComponent('X.tsx', source, 'react')
+    const size = result.props.find(p => p.name === 'size')
+    expect(size?.stringUnion).toEqual(['sm', 'md', 'lg'])
+  })
+
+  it('does not set stringUnion for non-union types', () => {
+    const source = `
+      interface Props { label: string }
+    `
+    const result = parseComponent('X.tsx', source, 'react')
+    expect(result.props[0].stringUnion).toBeUndefined()
+  })
+
+  it('does not set stringUnion for unions with non-string members', () => {
+    const source = `
+      interface Props { x: 'a' | number }
+    `
+    const result = parseComponent('X.tsx', source, 'react')
+    expect(result.props[0].stringUnion).toBeUndefined()
+  })
+})
