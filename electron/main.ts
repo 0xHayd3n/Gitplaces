@@ -45,6 +45,7 @@ import { startSkillSyncService, push as skillSyncPush, pushAll as skillSyncPushA
 import { startNotesSyncService, pushNote as notesSyncPush, pushAllPendingNotes, pullNote } from './services/notesSyncService'
 import { parseOgImage, isGenericGitHubOg } from './services/ogImageService'
 import { getRepoUserEvents } from './services/repoUserEvents'
+import { getRepoStats } from './services/repoStats'
 import { sanitiseRef } from './sanitiseRef'
 import type { CollectionRow, CollectionRepoRow } from '../src/types/repo'
 import { classifyRepoBucket } from '../src/lib/classifyRepoType'
@@ -705,6 +706,14 @@ ipcMain.handle('github:getReleases', async (_event, owner: string, name: string)
 ipcMain.handle('github:getRepoUserEvents', async (_event, owner: string, name: string) => {
   const db = getDb(app.getPath('userData'))
   return getRepoUserEvents(db, owner, name)
+})
+
+ipcMain.handle('github:getRepoStats', async (
+  _event, owner: string, name: string, lastReleaseDate: string | null
+) => {
+  const db = getDb(app.getPath('userData'))
+  const token = getToken() ?? null
+  return getRepoStats(db, owner, name, token, lastReleaseDate)
 })
 
 ipcMain.handle('github:recordFork', async (_event, owner: string, name: string) => {

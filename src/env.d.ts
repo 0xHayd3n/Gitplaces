@@ -81,6 +81,7 @@ declare global {
         getFileContent:   (owner: string, name: string, path: string) => Promise<string | null>
         getReleases:   (owner: string, name: string) => Promise<ReleaseRow[]>
         getRepoUserEvents: (owner: string, name: string) => Promise<RepoUserEvent[]>
+        getRepoStats: (owner: string, name: string, lastReleaseDate: string | null) => Promise<import('./types/repoStats').RepoStats>
         recordFork:       (owner: string, name: string) => Promise<void>
         setArchivedAt:    (owner: string, name: string, archived: boolean) => Promise<void>
         saveRepo:         (owner: string, name: string) => Promise<void>
