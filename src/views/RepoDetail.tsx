@@ -53,6 +53,8 @@ import { useGitHubAuth } from '../contexts/GitHubAuth'
 import { groupRepoActivityByDay } from '../utils/groupRepoActivityByDay'
 import { RepoUserEventRow } from '../components/RepoUserEventRow'
 import RepoNotes from '../components/RepoNotes'
+import { useRepoStats } from '../hooks/useRepoStats'
+import { RepoStatsSidebar } from '../components/RepoStatsSidebar'
 import type { RepoActivityItem } from '../types/repoActivity'
 import FilesTab from '../components/FilesTab'
 import { useRepoNav } from '../contexts/RepoNav'
@@ -532,6 +534,10 @@ export default function RepoDetail() {
   // User-action events (star / archive / fork / learn) recorded locally by
   // write IPCs; merged with releases below to form the unified Activities feed.
   const userEvents = useRepoUserEvents(owner, name)
+  const lastReleaseDate = Array.isArray(releases) && releases.length > 0
+    ? (releases as ReleaseRow[])[0].published_at
+    : null
+  const repoStats = useRepoStats(owner, name, lastReleaseDate)
   const { user: authedUser } = useGitHubAuth()
   const userLogin = authedUser?.login ?? ''
   const userAvatarUrl = userLogin ? `https://avatars.githubusercontent.com/${userLogin}?s=64` : ''
@@ -1170,33 +1176,8 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
         <RepoNotes repoId={repo.id} owner={owner!} repoName={name!} />
       )}
 
-      {/* ── Stats tile ── */}
-      {repo && (
-        <div className="stats-tile">
-          <SidebarLabel>Stats</SidebarLabel>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {([
-              { key: 'Stars',   val: formatCount(repo.stars),       icon: 'star'  as const },
-              { key: 'Forks',   val: formatCount(repo.forks),       icon: 'fork'  as const },
-              { key: 'Issues',  val: formatCount(repo.open_issues), icon: 'issue' as const },
-              ...(version !== '—' ? [{ key: 'Version', val: version, icon: 'tag' as const }] : []),
-            ]).map(({ key, val, icon }) => (
-              <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
-                <span style={{ fontFamily: 'Inter, sans-serif', color: 'var(--t3)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  {icon === 'star'  && <span style={{ fontSize: 12 }}>★</span>}
-                  {icon === 'fork'  && <span style={{ fontSize: 12 }}>⑂</span>}
-                  {icon === 'issue' && <span style={{ fontSize: 12 }}>◎</span>}
-                  {icon === 'tag'   && <span style={{ fontSize: 12 }}>🏷</span>}
-                  {key}
-                </span>
-                <span style={{ fontFamily: icon === 'tag' ? 'JetBrains Mono, monospace' : 'Inter, sans-serif', color: 'var(--t2)', fontWeight: 500 }}>
-                  {val}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ── Enriched stats sidebar ── */}
+      <RepoStatsSidebar stats={repoStats} />
 
       {/* ── Skills Folder tile (only when learned) ── */}
       {learnState === 'LEARNED' && skillRow && (

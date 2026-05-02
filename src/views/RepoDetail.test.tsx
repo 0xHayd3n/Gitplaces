@@ -78,6 +78,7 @@ function setupDetail(
         isStarred: vi.fn().mockResolvedValue(false),
         getUser: vi.fn().mockResolvedValue({ login: 'tester' }),
         getRepoUserEvents: userEventsFn,
+        getRepoStats: vi.fn().mockResolvedValue('loading'),
         recordFork: vi.fn().mockResolvedValue(undefined),
         setArchivedAt: vi.fn().mockResolvedValue(undefined),
       },
