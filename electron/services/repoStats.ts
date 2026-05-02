@@ -126,11 +126,13 @@ export async function getRepoStats(
   let momentum: RepoStats['momentum'] = null
   if (activityRes?.status === 200) {
     const weeks: WeekActivity[] = await activityRes.json().catch(() => [])
-    if (weeks.length >= 24) {
-      const last24 = weeks.slice(-24)
-      const monthly = Array.from({ length: 6 }, (_, i) =>
-        last24.slice(i * 4, i * 4 + 4).reduce((s, w) => s + w.total, 0)
-      )
+    if (weeks.length >= 26) {
+      const last26 = weeks.slice(-26)
+      const monthly = Array.from({ length: 6 }, (_, i) => {
+        const start = Math.floor(i * 26 / 6)
+        const end   = Math.floor((i + 1) * 26 / 6)
+        return last26.slice(start, end).reduce((s, w) => s + w.total, 0)
+      })
       const first3 = monthly.slice(0, 3).reduce((a, b) => a + b, 0) / 3
       const last3  = monthly.slice(3).reduce((a, b) => a + b, 0) / 3
       const trend: 'up' | 'stable' | 'down' =
@@ -153,7 +155,7 @@ export async function getRepoStats(
   const maintenance: HealthStatus =
     daysSinceCommit < 30 ? 'active' : daysSinceCommit < 90 ? 'slow' : 'stale'
   const issueVelocity: IssueVelocity =
-    openIssues < 50 ? 'healthy' : openIssues < 200 ? 'backlogged' : 'critical'
+    openIssues < 50 ? 'healthy' : openIssues <= 200 ? 'backlogged' : 'critical'
 
   return {
     vitals: {
