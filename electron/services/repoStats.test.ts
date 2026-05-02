@@ -26,9 +26,11 @@ describe('computeHealthScore', () => {
       .toBe(80)
   })
 
-  it('returns 0 for the issue component when openIssues >= 200', () => {
+  it('returns 0 for the issue component at the boundary (openIssues = 200) and beyond', () => {
     // commit=100 (0.4), issue=0 (0.4), release=100 (0.2) → 60
     expect(computeHealthScore({ daysSinceCommit: 0, openIssues: 200, lastReleaseDaysAgo: 0 }))
+      .toBe(60)
+    expect(computeHealthScore({ daysSinceCommit: 0, openIssues: 201, lastReleaseDaysAgo: 0 }))
       .toBe(60)
   })
 })

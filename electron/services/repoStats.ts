@@ -44,16 +44,16 @@ async function fetchSecurity(
     if (alertsRes.status === 403) {
       return { available: false, vulnerabilities: null, hasSecurityPolicy: null, codeScanningEnabled: null }
     }
-    const alerts: Array<{ security_vulnerability: { severity: string } }> =
+    const alerts: Array<{ security_vulnerability: { severity: string } | null }> =
       alertsRes.ok ? await alertsRes.json().catch(() => []) : []
     const profile: { files: { security: unknown } } | null =
       profileRes.ok ? await profileRes.json().catch(() => null) : null
     return {
       available: true,
       vulnerabilities: {
-        high:     alerts.filter(a => a.security_vulnerability.severity === 'high').length,
-        moderate: alerts.filter(a => a.security_vulnerability.severity === 'moderate').length,
-        low:      alerts.filter(a => a.security_vulnerability.severity === 'low').length,
+        high:     alerts.filter(a => a.security_vulnerability?.severity === 'high').length,
+        moderate: alerts.filter(a => a.security_vulnerability?.severity === 'moderate').length,
+        low:      alerts.filter(a => a.security_vulnerability?.severity === 'low').length,
       },
       hasSecurityPolicy:  profile ? profile.files.security !== null : null,
       codeScanningEnabled: scanRes.status === 200 ? true : scanRes.status === 404 ? false : null,
