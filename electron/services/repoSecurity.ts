@@ -69,18 +69,11 @@ export async function getRepoSecurity(
   const base = `https://api.github.com/repos/${owner}/${name}`
 
   // First alerts page + profile + scan fire in parallel
-  let alertsRes: Response | null = null
-  let profileRes: Response | null = null
-  let scanRes: Response | null = null
-  try {
-    ;[alertsRes, profileRes, scanRes] = await Promise.all([
-      fetch(`${base}/dependabot/alerts?state=open&per_page=100`, { headers: h }).catch(() => null),
-      fetch(`${base}/community/profile`, { headers: h }).catch(() => null),
-      fetch(`${base}/code-scanning/alerts?per_page=1`, { headers: h }).catch(() => null),
-    ])
-  } catch {
-    return UNAVAILABLE
-  }
+  const [alertsRes, profileRes, scanRes] = await Promise.all([
+    fetch(`${base}/dependabot/alerts?state=open&per_page=100`, { headers: h }).catch(() => null),
+    fetch(`${base}/community/profile`, { headers: h }).catch(() => null),
+    fetch(`${base}/code-scanning/alerts?per_page=1`, { headers: h }).catch(() => null),
+  ])
 
   if (alertsRes?.status === 403) return UNAVAILABLE
   if (!alertsRes?.ok) return UNAVAILABLE
