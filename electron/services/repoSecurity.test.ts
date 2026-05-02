@@ -42,6 +42,14 @@ function makeAlert(severity: string, n = 1): object {
   }
 }
 
+function makeCodeScanAlert(severity: string): object {
+  return { rule: { severity } }
+}
+
+function makeSecretAlert(validity: string): object {
+  return { validity }
+}
+
 describe('getRepoSecurity', () => {
   const mockFetch = vi.fn()
   beforeEach(() => {
@@ -53,9 +61,12 @@ describe('getRepoSecurity', () => {
     const db = createDb()
     const cached = {
       available: true,
+      permissionDenied: false,
       vulnerabilities: { critical: 0, high: 1, moderate: 0, low: 0 },
+      dismissedVulnerabilities: null,
       hasSecurityPolicy: true,
-      codeScanningEnabled: false,
+      codeScanning: false,
+      secretScanning: null,
       alerts: [],
     }
     db.prepare('INSERT INTO repo_security_cache VALUES (?,?,?,?)').run(
@@ -68,21 +79,29 @@ describe('getRepoSecurity', () => {
     expect(mockFetch).not.toHaveBeenCalled()
   })
 
-  it('re-fetches and updates cache when cached data is stale (>24h)', async () => {
+  it('re-fetches and updates cache when cached data is stale (>6h)', async () => {
     const db = createDb()
-    const staleAt = Date.now() - 86_400_001
+    const staleAt = Date.now() - 21_600_001
     db.prepare('INSERT INTO repo_security_cache VALUES (?,?,?,?)').run(
-      'owner', 'repo', staleAt, JSON.stringify({ available: true, vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 }, hasSecurityPolicy: null, codeScanningEnabled: null, alerts: [] })
+      'owner', 'repo', staleAt,
+      JSON.stringify({
+        available: true, permissionDenied: false,
+        vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 },
+        dismissedVulnerabilities: null, hasSecurityPolicy: null,
+        codeScanning: null, secretScanning: null, alerts: [],
+      })
     )
 
     mockFetch
-      .mockResolvedValueOnce(okJson([makeAlert('high', 1)]))
+      .mockResolvedValueOnce(okJson([makeAlert('high', 1)]))  // open dependabot
+      .mockResolvedValueOnce(okJson([]))                       // dismissed
       .mockResolvedValueOnce(okJson({ files: { security: null } }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
       .mockResolvedValueOnce(new Response('', { status: 404 }))
 
     const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
 
-    expect(mockFetch).toHaveBeenCalledTimes(3)
+    expect(mockFetch).toHaveBeenCalledTimes(5)
     expect(result.available).toBe(true)
     expect(result.vulnerabilities?.high).toBe(1)
 
@@ -92,16 +111,19 @@ describe('getRepoSecurity', () => {
     expect(row.fetched_at).toBeGreaterThan(staleAt)
   })
 
-  it('returns available:false and does not cache on 403', async () => {
+  it('returns available:false with permissionDenied:true and does not cache on 403', async () => {
     const db = createDb()
     mockFetch
       .mockResolvedValueOnce(new Response('', { status: 403 }))
-      .mockResolvedValueOnce(okJson({ files: { security: null } }))
-      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson({ files: {} }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
 
     const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
 
     expect(result.available).toBe(false)
+    expect(result.permissionDenied).toBe(true)
     expect(result.alerts).toBeNull()
     const row = db.prepare(
       'SELECT * FROM repo_security_cache WHERE owner=? AND name=?'
@@ -113,8 +135,10 @@ describe('getRepoSecurity', () => {
     const db = createDb()
     mockFetch
       .mockResolvedValueOnce(okJson([makeAlert('critical', 5)]))
+      .mockResolvedValueOnce(okJson([]))
       .mockResolvedValueOnce(okJson({ files: { security: { url: 'https://example.com' } } }))
-      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(okJson([]))  // code scan enabled, 0 alerts
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
 
     const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
 
@@ -133,10 +157,11 @@ describe('getRepoSecurity', () => {
     })
     expect(result.vulnerabilities).toEqual({ critical: 1, high: 0, moderate: 0, low: 0 })
     expect(result.hasSecurityPolicy).toBe(true)
-    expect(result.codeScanningEnabled).toBe(true)
+    expect(result.codeScanning).toEqual({ critical: 0, high: 0, medium: 0, low: 0, note: 0, warning: 0 })
+    expect(result.permissionDenied).toBe(false)
   })
 
-  it('accumulates alerts across paginated responses', async () => {
+  it('accumulates open dependabot alerts across paginated responses', async () => {
     const db = createDb()
     const page1 = [makeAlert('high', 1), makeAlert('high', 2)]
     const page2 = [makeAlert('moderate', 3)]
@@ -151,15 +176,189 @@ describe('getRepoSecurity', () => {
           },
         })
       )
+      .mockResolvedValueOnce(okJson([]))
       .mockResolvedValueOnce(okJson({ files: { security: null } }))
-      .mockResolvedValueOnce(new Response('', { status: 200 }))
-      .mockResolvedValueOnce(okJson(page2)) // second alerts page (no Link header = last page)
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(okJson(page2))
 
     const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
 
     expect(result.alerts).toHaveLength(3)
     expect(result.vulnerabilities?.high).toBe(2)
     expect(result.vulnerabilities?.moderate).toBe(1)
-    expect(mockFetch).toHaveBeenCalledTimes(4)
+    expect(mockFetch).toHaveBeenCalledTimes(6)
+  })
+
+  // ── New test cases ──────────────────────────────────────────────────────────
+
+  it('counts dismissed vulnerabilities by severity', async () => {
+    const db = createDb()
+    mockFetch
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([makeAlert('high', 10), makeAlert('high', 11), makeAlert('low', 12)]))
+      .mockResolvedValueOnce(okJson({ files: {} }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+
+    const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
+
+    expect(result.dismissedVulnerabilities).toEqual({ critical: 0, high: 2, moderate: 0, low: 1 })
+  })
+
+  it('sets codeScanning to false when endpoint returns 404', async () => {
+    const db = createDb()
+    mockFetch
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson({ files: {} }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+
+    const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
+
+    expect(result.codeScanning).toBe(false)
+  })
+
+  it('counts code scanning alerts by rule.severity when endpoint returns 200', async () => {
+    const db = createDb()
+    mockFetch
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson({ files: {} }))
+      .mockResolvedValueOnce(okJson([
+        makeCodeScanAlert('critical'),
+        makeCodeScanAlert('high'),
+        makeCodeScanAlert('high'),
+        makeCodeScanAlert('medium'),
+        makeCodeScanAlert('note'),
+      ]))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+
+    const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
+
+    expect(result.codeScanning).toEqual({ critical: 1, high: 2, medium: 1, low: 0, note: 1, warning: 0 })
+  })
+
+  it('sets codeScanning to null when endpoint returns non-200/non-404', async () => {
+    const db = createDb()
+    mockFetch
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson({ files: {} }))
+      .mockResolvedValueOnce(new Response('', { status: 403 }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+
+    const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
+
+    expect(result.codeScanning).toBeNull()
+  })
+
+  it('counts secret scanning alerts by validity', async () => {
+    const db = createDb()
+    mockFetch
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson({ files: {} }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(okJson([
+        makeSecretAlert('active'),
+        makeSecretAlert('active'),
+        makeSecretAlert('inactive'),
+        makeSecretAlert('unknown'),
+      ]))
+
+    const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
+
+    expect(result.secretScanning).toEqual({ active: 2, inactive: 1, unknown: 1 })
+  })
+
+  it('sets secretScanning to null when endpoint returns non-ok', async () => {
+    const db = createDb()
+    mockFetch
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson({ files: {} }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+
+    const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
+
+    expect(result.secretScanning).toBeNull()
+  })
+
+  it('paginates dismissed dependabot alerts', async () => {
+    const db = createDb()
+    const dismissedP1 = [makeAlert('high', 101), makeAlert('high', 102)]
+    const dismissedP2 = [makeAlert('critical', 103)]
+
+    mockFetch
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(new Response(JSON.stringify(dismissedP1), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          Link: '<https://api.github.com/repos/owner/repo/dependabot/alerts?state=dismissed&page=2>; rel="next"',
+        },
+      }))
+      .mockResolvedValueOnce(okJson({ files: {} }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(okJson(dismissedP2))
+
+    const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
+
+    expect(result.dismissedVulnerabilities).toEqual({ critical: 1, high: 2, moderate: 0, low: 0 })
+    expect(mockFetch).toHaveBeenCalledTimes(6)
+  })
+
+  it('paginates code scanning alerts', async () => {
+    const db = createDb()
+    const scanP1 = [makeCodeScanAlert('high'), makeCodeScanAlert('medium')]
+    const scanP2 = [makeCodeScanAlert('critical')]
+
+    mockFetch
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson({ files: {} }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(scanP1), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          Link: '<https://api.github.com/repos/owner/repo/code-scanning/alerts?page=2>; rel="next"',
+        },
+      }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(okJson(scanP2))
+
+    const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
+
+    expect(result.codeScanning).toEqual({ critical: 1, high: 1, medium: 1, low: 0, note: 0, warning: 0 })
+    expect(mockFetch).toHaveBeenCalledTimes(6)
+  })
+
+  it('paginates secret scanning alerts', async () => {
+    const db = createDb()
+    const secretP1 = [makeSecretAlert('active'), makeSecretAlert('active')]
+    const secretP2 = [makeSecretAlert('inactive')]
+
+    mockFetch
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson({ files: {} }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(secretP1), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          Link: '<https://api.github.com/repos/owner/repo/secret-scanning/alerts?page=2>; rel="next"',
+        },
+      }))
+      .mockResolvedValueOnce(okJson(secretP2))
+
+    const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
+
+    expect(result.secretScanning).toEqual({ active: 2, inactive: 1, unknown: 0 })
+    expect(mockFetch).toHaveBeenCalledTimes(6)
   })
 })
