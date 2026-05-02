@@ -1,8 +1,22 @@
 // src/components/RepoStatsSidebar.test.tsx
-import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { RepoStatsSidebar } from './RepoStatsSidebar'
 import type { RepoStats } from '../types/repoStats'
+
+// Momentum is fetched lazily via window.api.github.getRepoMomentum (Phase 1C).
+// Stub the IPC so the lazy MomentumSection inside the sidebar can resolve.
+const mockGetRepoMomentum = vi.fn()
+beforeAll(() => {
+  Object.defineProperty(window, 'api', {
+    value: { github: { getRepoMomentum: mockGetRepoMomentum } },
+    configurable: true,
+  })
+})
+beforeEach(() => {
+  mockGetRepoMomentum.mockReset()
+  mockGetRepoMomentum.mockResolvedValue({ monthlyCommits: [10, 12, 14, 16, 18, 22], trend: 'up' })
+})
 
 const mockStats: RepoStats = {
   vitals: { stars: 100, forks: 10, openIssues: 5, contributors: 89 },
@@ -87,7 +101,7 @@ const middlingStats: RepoStats = {
 describe('RepoStatsSidebar', () => {
   it('renders loading skeleton when stats is loading', () => {
     const { container } = render(<RepoStatsSidebar stats="loading" />)
-    expect(container.querySelector('.stats-sidebar-loading')).not.toBeNull()
+    expect(container.querySelector('.stats-sidebar-skeleton')).not.toBeNull()
   })
 
   it('renders error message when stats is error', () => {
@@ -125,10 +139,12 @@ describe('RepoStatsSidebar', () => {
     expect(screen.getByText(/not available/i)).toBeInTheDocument()
   })
 
-  it('renders computing label when momentum is null', () => {
-    const stats: RepoStats = { ...mockStats, momentum: null }
-    render(<RepoStatsSidebar stats={stats} />)
-    expect(screen.getByText(/computing/i)).toBeInTheDocument()
+  it('renders computing label when momentum lazily fetches null (e.g., GitHub returns 202)', async () => {
+    mockGetRepoMomentum.mockResolvedValueOnce(null)
+    render(<RepoStatsSidebar stats={mockStats} owner="o" name="r" />)
+    // Momentum section is closed by default — open it to trigger the fetch
+    fireEvent.click(screen.getByRole('button', { name: /Momentum/i }))
+    await waitFor(() => expect(screen.getByText(/computing/i)).toBeInTheDocument())
   })
 
   it('renders engagement section with skills learned count', () => {
@@ -158,11 +174,15 @@ describe('RepoStatsSidebar', () => {
   })
 
   // Collapse tests
-  it('collapses Momentum section when header is clicked', () => {
-    render(<RepoStatsSidebar stats={healthyStats} />)
-    expect(screen.getByText(/Commits\/month/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Momentum/i }))
+  it('Momentum section is collapsed by default and lazily fetches on first expand', async () => {
+    render(<RepoStatsSidebar stats={healthyStats} owner="o" name="r" />)
+    // Default closed — content not rendered, no fetch yet
     expect(screen.queryByText(/Commits\/month/i)).not.toBeInTheDocument()
+    expect(mockGetRepoMomentum).not.toHaveBeenCalled()
+    // Click to open → fetch fires → content appears
+    fireEvent.click(screen.getByRole('button', { name: /Momentum/i }))
+    await waitFor(() => expect(screen.getByText(/Commits\/month/i)).toBeInTheDocument())
+    expect(mockGetRepoMomentum).toHaveBeenCalledTimes(1)
   })
 
   it('collapses Security section when header is clicked', () => {
@@ -172,13 +192,17 @@ describe('RepoStatsSidebar', () => {
     expect(screen.queryByText(/Security policy/i)).not.toBeInTheDocument()
   })
 
-  it('re-expands a collapsed section when header is clicked again', () => {
-    render(<RepoStatsSidebar stats={healthyStats} />)
+  it('Momentum re-expands when toggled, and the IPC is NOT called a second time', async () => {
+    render(<RepoStatsSidebar stats={healthyStats} owner="o" name="r" />)
     const btn = screen.getByRole('button', { name: /Momentum/i })
-    fireEvent.click(btn)
+    fireEvent.click(btn) // open
+    await waitFor(() => expect(screen.getByText(/Commits\/month/i)).toBeInTheDocument())
+    fireEvent.click(btn) // close
     expect(screen.queryByText(/Commits\/month/i)).not.toBeInTheDocument()
-    fireEvent.click(btn)
-    expect(screen.getByText(/Commits\/month/i)).toBeInTheDocument()
+    fireEvent.click(btn) // re-open
+    await waitFor(() => expect(screen.getByText(/Commits\/month/i)).toBeInTheDocument())
+    // Hook deps haven't changed — should NOT refetch
+    expect(mockGetRepoMomentum).toHaveBeenCalledTimes(1)
   })
 
   // ── New test cases ──────────────────────────────────────────────────────────

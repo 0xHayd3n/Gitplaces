@@ -115,7 +115,7 @@
 }
 
 .article-layout-dither-spacer {
-  height: 204px; /* 240px banner minus ~36px navBar = content starts below navBar */
+  height: 240px; /* navbar lives in drag strip now, so full 240px needed here */
   flex-shrink: 0;
 }
 
@@ -191,12 +191,10 @@
   background: var(--surface-1);
 }
 
-/* Extend the dither banner up behind the (default-transparent) drag strip
-   so the banner visually still reaches the top edge when not scrolled.
-   We shift only the dither (absolute-positioned) — not the whole top
-   section — because the navbar inside .article-layout-top has
-   -webkit-app-region: no-drag on its full-width wrapper, which would
-   otherwise cancel the drag strip's drag region if pulled up to overlap. */
+/* Extend the dither banner up behind the drag strip so the banner visually
+   reaches the top edge. article-layout-top starts at y=32 (below the drag
+   strip), so top: -32px offsets it back to y=0. Height is 272px = 240px
+   banner + 32px drag strip zone. */
 .article-layout-dither-bg {
   top: -32px;
   height: 272px;
@@ -245,7 +243,7 @@
 }
 
 .article-layout-body--with-toc > .article-layout-body-content {
-  flex: 1;
+  flex: 2;
   min-width: 0;
   padding: 20px 22px;
 }
@@ -261,8 +259,9 @@
 }
 
 .article-layout-body--with-toc > .article-layout-stats-slot {
-  width: 220px;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
+  padding-right: 40px;
   position: sticky;
   top: 39px;
   align-self: flex-start;

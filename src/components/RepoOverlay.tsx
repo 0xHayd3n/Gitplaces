@@ -13,14 +13,6 @@ export default function RepoOverlay() {
 
   return (
     <div className="repo-overlay">
-      <button
-        type="button"
-        className="repo-overlay-close btn-close-overlay"
-        onClick={() => navigate(-1)}
-        aria-label="Close"
-      >
-        ✕
-      </button>
       <RepoDetail />
     </div>
   )

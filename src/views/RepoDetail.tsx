@@ -45,6 +45,7 @@ import { extractCommands, type CommandBlock } from '../utils/commandParser'
 // websiteParser import removed — website links are now shown in the README's References section
 import { BannerCard } from '../components/BannerCard'
 import { releaseToBannerProps } from '../components/ActivityEvent'
+import { classifyRelease } from '../utils/classifyRelease'
 import { ActivityModal } from '../components/ActivityModal'
 import { DateDivider } from '../components/DateDivider'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
@@ -54,6 +55,7 @@ import { groupRepoActivityByDay } from '../utils/groupRepoActivityByDay'
 import { RepoUserEventRow } from '../components/RepoUserEventRow'
 import RepoNotes from '../components/RepoNotes'
 import { useRepoStats } from '../hooks/useRepoStats'
+import { computeHealthScore } from '../lib/healthScore'
 import { RepoStatsSidebar } from '../components/RepoStatsSidebar'
 import type { RepoActivityItem } from '../types/repoActivity'
 import FilesTab from '../components/FilesTab'
@@ -456,16 +458,6 @@ export function releaseRowToFeedEvent(r: ReleaseRow, repoFullName: string): GitH
   }
 }
 
-// ── Related repo shape (from GitHub search API items) ─────────────
-interface RelatedRepo {
-  id: number
-  name: string
-  full_name: string
-  owner: { login: string; avatar_url: string }
-  description: string | null
-  stargazers_count: number
-}
-
 // ── Per-repo data cache (survives navigations in the same session) ──
 interface CachedRepoEntry {
   repo: RepoRow
@@ -478,6 +470,25 @@ interface CachedRepoEntry {
 const _repoCache = new Map<string, Partial<CachedRepoEntry>>()
 function patchRepoCache(key: string, patch: Partial<CachedRepoEntry>) {
   _repoCache.set(key, { ..._repoCache.get(key), ...patch })
+}
+
+// ── Module-level session caches for endpoints that don't merit their own
+// SQLite-backed cache but ARE worth skipping on a same-session revisit. Each
+// entry is invalidated by writes (e.g., `_starredCache.delete()` on (un)star).
+// 5-minute TTL is enough to cover "browse around then come back" flows
+// without serving stale data for very long.
+const SESSION_CACHE_TTL_MS = 5 * 60 * 1000
+
+const _releasesCache = new Map<string, { value: ReleaseRow[]; ts: number }>()
+const _starredCache  = new Map<string, { value: boolean;       ts: number }>()
+function readSessionCache<T>(map: Map<string, { value: T; ts: number }>, key: string): T | undefined {
+  const entry = map.get(key)
+  if (!entry) return undefined
+  if (Date.now() - entry.ts >= SESSION_CACHE_TTL_MS) { map.delete(key); return undefined }
+  return entry.value
+}
+function writeSessionCache<T>(map: Map<string, { value: T; ts: number }>, key: string, value: T): void {
+  map.set(key, { value, ts: Date.now() })
 }
 
 export default function RepoDetail() {
@@ -537,7 +548,30 @@ export default function RepoDetail() {
   const lastReleaseDate = Array.isArray(releases) && releases.length > 0
     ? (releases as ReleaseRow[])[0].published_at
     : null
-  const repoStats = useRepoStats(owner, name, lastReleaseDate)
+  // Stats fetches once per repo (no `lastReleaseDate` dep). When releases
+  // later resolve, we recompute the release-affected score components in
+  // `enrichedRepoStats` below — no second network round-trip.
+  const rawRepoStats = useRepoStats(owner, name)
+  const repoStats = useMemo(() => {
+    if (rawRepoStats === 'loading' || rawRepoStats === 'error') return rawRepoStats
+    if (lastReleaseDate === null || rawRepoStats.health.daysSinceCommit === undefined) {
+      // Either there are no releases yet (or they failed) or this is a stats
+      // payload from before `daysSinceCommit` was exposed — leave score as-is.
+      return rawRepoStats
+    }
+    const lastReleaseDaysAgo = Math.floor(
+      (Date.now() - new Date(lastReleaseDate).getTime()) / 86_400_000,
+    )
+    const score = computeHealthScore({
+      daysSinceCommit: rawRepoStats.health.daysSinceCommit,
+      openIssues: rawRepoStats.vitals.openIssues,
+      lastReleaseDaysAgo,
+    })
+    return {
+      ...rawRepoStats,
+      health: { ...rawRepoStats.health, score, lastReleaseDate, lastReleaseDaysAgo },
+    }
+  }, [rawRepoStats, lastReleaseDate])
   const { user: authedUser } = useGitHubAuth()
   const userLogin = authedUser?.login ?? ''
   const userAvatarUrl = userLogin ? `https://avatars.githubusercontent.com/${userLogin}?s=64` : ''
@@ -561,6 +595,17 @@ export default function RepoDetail() {
     () => groupRepoActivityByDay(repoActivityItems),
     [repoActivityItems],
   )
+  // The most recent major release (v1.0.0, v2.0.0, …) gets pinned as FEATURED
+  // at the top of the Activities tab and is removed from the regular timeline.
+  const featuredActivityItem = useMemo(() => {
+    for (const item of repoActivityItems) {
+      if (item.kind !== 'release') continue
+      const release = (item.event.payload as { release: { tag_name: string; prerelease?: boolean | null } }).release
+      const tier = classifyRelease({ tagName: release.tag_name, prereleaseFlag: release.prerelease === true })
+      if (tier === 'major') return item
+    }
+    return null
+  }, [repoActivityItems])
   // First-resolve fallback: if BOTH releases and user events come back empty/error,
   // drop from the optimistic 'activities' default to README. The ref ensures we
   // only apply the fallback once — subsequent navigations to Activities by the
@@ -573,7 +618,6 @@ export default function RepoDetail() {
                      || (Array.isArray(userEvents) && userEvents.length > 0)
     if (!hasActivity && activeTab === 'activities') setActiveTab('readme')
   }, [releases, userEvents, activeTab])
-  const [sidebarRelated, setSidebarRelated] = useState<RelatedRepo[]>([])
   const [repoCols, setRepoCols] = useState<{ id: string; name: string }[]>([])
 
   // Learn state
@@ -648,6 +692,15 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   useEffect(() => {
     if (!owner || !name) return
 
+    // Cancellation guard: when the route changes (or React StrictMode unmounts
+    // and remounts the component in dev), the in-flight fetches from the
+    // previous run must NOT overwrite state that belongs to the new repo.
+    // Without this, a stale fetch resolving after a successful new fetch can
+    // wipe valid data — e.g. a stale `setReleases('error')` clobbering a fresh
+    // `setReleases([data])`, leaving the Activities tab showing only the
+    // user-events fallback (such as the lone "created" event).
+    let cancelled = false
+
     const cacheKey = `${owner}/${name}`
     const cached = _repoCache.get(cacheKey)
 
@@ -676,7 +729,6 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     setStorybookReadmeScanned(false)
     setReleases('loading')
     setRelated([])
-    setSidebarRelated([])
     setRepoCols([])
     setLearnState('UNLEARNED')
     setLearnError(null)
@@ -689,53 +741,134 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     fellBackRef.current = false
     setActiveTab('activities')
 
-    window.api.github.getRepo(owner, name)
-      .then((row) => {
+    // Phase 4H — bundled GraphQL fetch. One round-trip replaces the separate
+    // getRepo + getReleases + isStarred REST calls. On failure we degrade
+    // gracefully to the per-endpoint IPCs (which themselves still benefit from
+    // ETag and DB caches from Phases 2-3).
+    window.api.github.fetchRepoBundle(owner, name)
+      .then((bundle) => {
+        if (cancelled) return
+        if (!bundle) {
+          // GraphQL failed (no token, network error, etc.) — fall back to
+          // per-endpoint REST. github:getRepo handles its own DB upsert.
+          window.api.github.getRepo(owner, name)
+            .then(row => {
+              if (cancelled) return
+              if (!row) { setRepoError(true); return }
+              setRepo(row)
+              patchRepoCache(cacheKey, { repo: row })
+              setStarred(!!row.starred_at)
+              window.api.verification.getScore(row.id)
+                .then(s => { if (!cancelled && s) { setSeedTier(s.tier); setSeedSignals(s.signals) } })
+                .catch(() => {})
+              window.api.github.getRelatedRepos(owner, name, row.topics ?? '[]')
+                .then(items => { if (!cancelled) setRelated(items) })
+                .catch(() => {})
+            })
+            .catch(() => { if (!cancelled) setRepoError(true) })
+          // Fallback live star check — only if session cache doesn't have it.
+          if (readSessionCache(_starredCache, cacheKey) === undefined) {
+            window.api.github.isStarred(owner, name)
+              .then(s => {
+                if (cancelled) return
+                setStarred(s)
+                writeSessionCache(_starredCache, cacheKey, s)
+              })
+              .catch(() => {})
+          }
+          return
+        }
+        // Bundle hit — one GraphQL call satisfies repo + releases + starred.
+        const row = bundle.repoRow
         if (!row) { setRepoError(true); return }
         setRepo(row)
         patchRepoCache(cacheKey, { repo: row })
+        setStarred(bundle.isStarred)
+        writeSessionCache(_starredCache, cacheKey, bundle.isStarred)
+        // Releases from the bundle pre-populates state and the session cache —
+        // the deferred-releases effect below will see the cache and skip its
+        // own fetch.
+        setReleases(bundle.releases)
+        writeSessionCache(_releasesCache, cacheKey, bundle.releases)
+        releasesFetchedRef.current = cacheKey
         window.api.verification.getScore(row.id)
-          .then(s => { if (s) { setSeedTier(s.tier); setSeedSignals(s.signals) } })
+          .then(s => { if (!cancelled && s) { setSeedTier(s.tier); setSeedSignals(s.signals) } })
           .catch(() => {})
-        // Use cached DB value as initial state; live check runs separately
-        setStarred(!!row.starred_at)
         window.api.github.getRelatedRepos(owner, name, row.topics ?? '[]')
-          .then(setRelated)
+          .then(items => { if (!cancelled) setRelated(items) })
           .catch(() => {})
-        // Fetch related repos for sidebar via topic search
-        fetchSidebarRelated(owner, name, row.topics ?? '[]')
       })
-      .catch(() => setRepoError(true))
+      .catch(() => { if (!cancelled) setRepoError(true) })
 
-    window.api.github.getReleases(owner, name)
-      .then((r) => setReleases(r))
-      .catch(() => setReleases('error'))
+    // Releases are deferred to a tab-gated effect below — only fetched once
+    // the user is actually on the Activities tab. Saves one GitHub call when
+    // the user navigates straight to README/Files/etc.
 
     window.api.skill.getVersionedInstalls(owner, name)
-      .then(refs => setVersionedLearns(new Set(refs)))
+      .then(refs => { if (!cancelled) setVersionedLearns(new Set(refs)) })
       .catch(() => {})
 
     window.api.skill.get(owner, name)
       .then(async (row) => {
-        if (row) {
-          setSkillRow(row)
-          setLearnState('LEARNED')
-          const compRow = await window.api.skill.getSubSkill(owner, name, 'components').catch(() => null)
-          setComponentsSkillRow(compRow)
-        }
+        if (cancelled || !row) return
+        setSkillRow(row)
+        setLearnState('LEARNED')
+        const compRow = await window.api.skill.getSubSkill(owner, name, 'components').catch(() => null)
+        if (!cancelled) setComponentsSkillRow(compRow)
       })
       .catch(() => {})
 
-    // Live star check (non-blocking)
-    window.api.github.isStarred(owner, name)
-      .then(setStarred)
-      .catch(() => {})
+    // Live star check is now folded into the bundle (see fetchRepoBundle
+    // above) — bundle.isStarred = repository.viewerHasStarred. We only fall
+    // back to the standalone isStarred IPC if the bundle returned null AND
+    // the session cache doesn't already have a fresh answer.
+    const cachedStar = readSessionCache(_starredCache, cacheKey)
+    if (cachedStar !== undefined) setStarred(cachedStar)
 
     // Storybook detection (non-blocking)
     window.api.storybook.detect(owner, name)
-      .then(url => setStorybookState(url))
-      .catch(() => setStorybookState(null))
+      .then(url => { if (!cancelled) setStorybookState(url) })
+      .catch(() => { if (!cancelled) setStorybookState(null) })
+
+    return () => { cancelled = true }
   }, [owner, name])
+
+  // Releases — deferred fetch. Fires only when the user is on (or navigates
+  // to) the Activities tab, since `releases` is no longer used outside of
+  // that tab. A session cache (5-min TTL) skips the IPC entirely on
+  // same-session revisits. The `releasesFetchedRef` ensures we don't refire
+  // on every tab switch within the same repo.
+  const releasesFetchedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!owner || !name) return
+    if (activeTab !== 'activities') return
+    const cacheKey = `${owner}/${name}`
+    if (releasesFetchedRef.current === cacheKey) return
+    releasesFetchedRef.current = cacheKey
+
+    const cached = readSessionCache(_releasesCache, cacheKey)
+    if (cached !== undefined) {
+      setReleases(cached)
+      return
+    }
+
+    let cancelled = false
+    window.api.github.getReleases(owner, name)
+      .then((r) => {
+        if (cancelled) return
+        // The IPC handler returns `null` instead of throwing on network error /
+        // timeout (avoids spamming the main-process console). `.catch` is still
+        // wired up as a backstop in case the handler itself rejects.
+        if (r === null) {
+          setReleases('error')
+        } else {
+          setReleases(r)
+          writeSessionCache(_releasesCache, cacheKey, r)
+        }
+      })
+      .catch(() => { if (!cancelled) setReleases('error') })
+    return () => { cancelled = true }
+  }, [owner, name, activeTab])
 
   // Load collections
   useEffect(() => {
@@ -897,26 +1030,6 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     loadAndTranslate()
   }, [activeTab, readmeFetched, owner, name]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Sidebar related repos (from GitHub search API, not DB) ────────
-  async function fetchSidebarRelated(o: string, n: string, topicsJson: string) {
-    try {
-      const topics = JSON.parse(topicsJson) as string[]
-      if (!topics.length) return
-      const topicQ = topics.slice(0, 2).map(t => `topic:${encodeURIComponent(t)}`).join('+')
-      const q = `${topicQ}+NOT+${n}`
-      const res = await fetch(
-        `https://api.github.com/search/repositories?q=${q}&sort=stars&per_page=5`,
-        { headers: { Accept: 'application/vnd.github+json' } }
-      )
-      if (!res.ok) return
-      const data = await res.json() as { items: RelatedRepo[] }
-      const filtered = data.items
-        .filter(r => r.full_name !== `${o}/${n}`)
-        .slice(0, 3)
-      setSidebarRelated(filtered)
-    } catch { /* silently ignore — non-critical */ }
-  }
-
   // ── Handlers ──────────────────────────────────────────────────────
   const handleFork = () => {
     if (!owner || !name) return
@@ -932,13 +1045,16 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   const handleStar = async () => {
     if (starWorking || !owner || !name) return
     setStarWorking(true)
+    const cacheKey = `${owner}/${name}`
     try {
       if (starred) {
         await window.api.github.unstarRepo(owner, name)
         setStarred(false)
+        writeSessionCache(_starredCache, cacheKey, false)
       } else {
         await window.api.github.starRepo(owner, name)
         setStarred(true)
+        writeSessionCache(_starredCache, cacheKey, true)
         window.api.svgCache.prefetch(owner, name, repo?.default_branch ?? 'main').catch(() => {})
       }
       window.dispatchEvent(new CustomEvent('library:changed'))
@@ -1047,8 +1163,6 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   )
   const miscBadges    = readmeBadges.filter(b => b.category === 'badge')
 
-  const version = Array.isArray(releases) && releases.length > 0 ? releases[0].tag_name : '—'
-  const hasReleases = Array.isArray(releases) && releases.length > 0
   const visibleTabs = ALL_TABS.filter(t =>
     // 'activities' is always visible — the empty-state placeholder handles
     // repos with no releases. README is still the default landing tab when
@@ -1169,7 +1283,18 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
 
   const isFullBleedTab = activeTab === 'components' || activeTab === 'files'
 
+  // While stats is loading, show ONLY the layout-mirroring skeleton — the user
+  // explicitly asked for a unified loading state ("just appearing all in the
+  // one") rather than the previous behavior of partial real tiles (Repository,
+  // Topics, Notes) appearing alongside a small stats placeholder. Once stats
+  // resolve, the right panel renders the full sidebar atomically.
+  const isStatsLoading = repoStats === 'loading'
   const statsSlotNode = !repoError ? (
+    isStatsLoading ? (
+      <div className="stats-sidebar">
+        <RepoStatsSidebar stats={repoStats} />
+      </div>
+    ) : (
     <div className="stats-sidebar">
 
       {repo && (
@@ -1177,7 +1302,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
       )}
 
       {/* ── Enriched stats sidebar ── */}
-      <RepoStatsSidebar stats={repoStats} />
+      <RepoStatsSidebar stats={repoStats} owner={owner} name={name} />
 
       {/* ── Skills Folder tile (only when learned) ── */}
       {learnState === 'LEARNED' && skillRow && (
@@ -1334,6 +1459,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
 
 
     </div>
+    )
   ) : null
 
   // ── Render ────────────────────────────────────────────────────────
@@ -1400,31 +1526,59 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                 <div key={i} className="repo-detail-sk-tab" style={{ width: w }} />
               ))}
             </div>
-            {/* Body — mirrors .article-layout-body--with-toc (3 columns) */}
+            {/* Body — Activities is the new default tab, so we mirror its
+                2-column layout (no TOC): activity feed (flex-1) | stats slot
+                (220px). Earlier this skeleton mirrored the README tab's
+                3-column layout, which caused a visible layout shift the moment
+                `repo` resolved and the actual ArticleLayout swapped in. */}
             <div className="repo-detail-sk-split">
-              {/* Left: TOC nav — mirrors .article-layout-toc-slot (200px) */}
-              <div className="repo-detail-sk-toc">
-                <div className="repo-detail-sk-bar" style={{ width: '55%', height: 8 }} />
-                {[72, 58, 88, 64, 78, 52].map((pct, i) => (
-                  <div key={i} className="repo-detail-sk-line" style={{ width: `${pct}%` }} />
-                ))}
-              </div>
-              {/* Center: content — mirrors .article-layout-body-content (flex-1) */}
+              {/* Left: activity feed — mirrors .repo-activity-split-left */}
               <div className="repo-detail-sk-body-main">
-                {[90, 76, 85, 62, 94, 70, 80, 55, 88, 73].map((pct, i) => (
-                  <div key={i} className="repo-detail-sk-line" style={{ width: `${pct}%` }} />
+                {/* Featured release banner placeholder */}
+                <div className="repo-detail-sk-featured" />
+                {/* Date divider + activity rows × 2 groups */}
+                {[0, 1].map(g => (
+                  <div key={g} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+                    <div className="repo-detail-sk-bar" style={{ width: 64, height: 8 }} />
+                    {[0, 1].map(r => <div key={r} className="repo-detail-sk-activity-row" />)}
+                  </div>
                 ))}
               </div>
-              {/* Right: stats sidebar — mirrors .article-layout-stats-slot (220px) */}
+              {/* Right: stats sidebar — mirrors .article-layout-stats-slot
+                  (220px). Tiles match the new sidebar shape: verdict block,
+                  vitals 2×2 grid, health donut row, then collapsed section
+                  headers. */}
               <div className="repo-detail-sk-sidebar-col">
-                <div className="repo-detail-sk-tile">
-                  <div className="repo-detail-sk-bar" style={{ width: 36 }} />
-                  {[0, 1, 2, 3].map(i => <div key={i} className="repo-detail-sk-stat" />)}
+                <div className="repo-detail-sk-verdict">
+                  <div className="repo-detail-sk-bar" style={{ width: '55%', height: 11 }} />
+                  <div className="repo-detail-sk-bar" style={{ width: '75%', height: 7, marginTop: 6 }} />
                 </div>
-                <div className="repo-detail-sk-tile">
-                  <div className="repo-detail-sk-bar" style={{ width: 60 }} />
-                  {[0, 1, 2, 3].map(i => <div key={i} className="repo-detail-sk-stat" />)}
+                <div className="repo-detail-sk-section">
+                  <div className="repo-detail-sk-bar" style={{ width: 36, height: 7, marginBottom: 8 }} />
+                  <div className="repo-detail-sk-vitals-grid">
+                    {[0, 1, 2, 3].map(i => (
+                      <div key={i} className="repo-detail-sk-vitals-cell">
+                        <div className="repo-detail-sk-bar" style={{ width: 28, height: 12 }} />
+                        <div className="repo-detail-sk-bar" style={{ width: 44, height: 6, marginTop: 4 }} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
+                <div className="repo-detail-sk-section">
+                  <div className="repo-detail-sk-bar" style={{ width: 40, height: 7, marginBottom: 8 }} />
+                  <div className="repo-detail-sk-health-row">
+                    <div className="repo-detail-sk-circle" style={{ width: 40, height: 40 }} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div className="repo-detail-sk-bar" style={{ width: '85%', height: 10 }} />
+                      <div className="repo-detail-sk-bar" style={{ width: 50, height: 6 }} />
+                    </div>
+                  </div>
+                </div>
+                {[60, 52, 84].map((w, i) => (
+                  <div key={i} className="repo-detail-sk-section-collapsed">
+                    <div className="repo-detail-sk-bar" style={{ width: w, height: 7 }} />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -1554,43 +1708,81 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                   )
                 )}
 
-                {activeTab === 'activities' && (
-                  (releases === 'loading' || userEvents === 'loading') ? (
-                    <p className="repo-detail-placeholder">Loading activity…</p>
-                  ) : (releases === 'error' && userEvents === 'error') ? (
-                    <p className="repo-detail-placeholder">Failed to load activity.</p>
-                  ) : repoActivityItems.length === 0 ? (
-                    <p className="repo-detail-placeholder">No activity yet.</p>
-                  ) : (
+                {activeTab === 'activities' && (() => {
+                  const stillLoading = releases === 'loading' || userEvents === 'loading'
+                  const releasesFailed = releases === 'error'
+                  const userEventsFailed = userEvents === 'error'
+                  const bothFailed = releasesFailed && userEventsFailed
+                  // Releases is the GitHub network call and fails far more often than
+                  // userEvents (a local SQLite read). Without this branch, a releases
+                  // failure silently falls through to the render path below — and since
+                  // every repo in the local DB has a "created" event in userEvents, the
+                  // user would see ONLY that lone "created" row with no indication that
+                  // releases failed (the original "second fetch wiped my activities" bug).
+                  const releasesOnlyFailed = releasesFailed && !userEventsFailed
+                  if (stillLoading) {
+                    return <p className="repo-detail-placeholder">Loading activity…</p>
+                  }
+                  if (bothFailed || (releasesFailed && repoActivityItems.length === 0)) {
+                    return <p className="repo-detail-placeholder">Failed to load activity.</p>
+                  }
+                  if (repoActivityItems.length === 0) {
+                    return <p className="repo-detail-placeholder">No activity yet.</p>
+                  }
+                  return (
                     <div className="repo-activity-split">
                       <div className="repo-activity-split-left">
-                        {repoActivityGroups.map(group => (
-                          <div key={group.label} className="repo-activity-group">
-                            <DateDivider label={group.label} />
-                            {group.items.map(item => (
-                              item.kind === 'release' ? (
-                                <BannerCard
-                                  key={item.event.id}
-                                  {...releaseToBannerProps(item.event, () => setSelectedReleaseId(item.event.id))}
-                                />
-                              ) : (
-                                <RepoUserEventRow
-                                  key={`${item.event.type}-${item.ts}`}
-                                  event={item.event}
-                                  repoOwner={owner!}
-                                  repoName={name!}
-                                  userLogin={userLogin}
-                                  userAvatarUrl={userAvatarUrl}
-                                />
-                              )
-                            ))}
+                        {releasesOnlyFailed && (
+                          <p className="repo-activity-partial-error">
+                            Couldn't load releases — showing local events only.
+                          </p>
+                        )}
+                        {featuredActivityItem && (
+                          <div className="repo-activity-featured">
+                            <div className="repo-activity-featured__header">
+                              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                                <polygon points="5,0.5 6.5,3.5 9.5,4 7.25,6.25 7.75,9.5 5,8 2.25,9.5 2.75,6.25 0.5,4 3.5,3.5" />
+                              </svg>
+                              Featured
+                            </div>
+                            <BannerCard
+                              {...releaseToBannerProps(featuredActivityItem.event, () => setSelectedReleaseId(featuredActivityItem.event.id))}
+                            />
                           </div>
-                        ))}
+                        )}
+                        {repoActivityGroups.map(group => {
+                          const items = group.items.filter(item =>
+                            !(featuredActivityItem && item.kind === 'release' && item.event.id === featuredActivityItem.event.id)
+                          )
+                          if (items.length === 0) return null
+                          return (
+                            <div key={group.label} className="repo-activity-group">
+                              <DateDivider label={group.label} />
+                              {items.map(item => (
+                                item.kind === 'release' ? (
+                                  <BannerCard
+                                    key={item.event.id}
+                                    {...releaseToBannerProps(item.event, () => setSelectedReleaseId(item.event.id))}
+                                  />
+                                ) : (
+                                  <RepoUserEventRow
+                                    key={`${item.event.type}-${item.ts}`}
+                                    event={item.event}
+                                    repoOwner={owner!}
+                                    repoName={name!}
+                                    userLogin={userLogin}
+                                    userAvatarUrl={userAvatarUrl}
+                                  />
+                                )
+                              ))}
+                            </div>
+                          )
+                        })}
                       </div>
                       <div className="repo-activity-split-right" />
                     </div>
                   )
-                )}
+                })()}
 
                 {activeTab === 'collections' && (
                   <div style={{ padding: '4px 0' }}>

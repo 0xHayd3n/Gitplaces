@@ -54,4 +54,13 @@ describe('RepoUserEventRow', () => {
     expect(screen.getByText('learned components for')).toBeInTheDocument()
     expect(screen.getByText('next.js.components.skill.md')).toBeInTheDocument()
   })
+
+  it('renders a created event with repo owner as actor and "created" verb', () => {
+    const event: RepoUserEvent = { type: 'created', ts: '2024-01-10T00:00:00Z' }
+    render(<RepoUserEventRow event={event} {...baseProps} />)
+    expect(screen.getByText('vercel')).toBeInTheDocument()
+    expect(screen.getByText('created')).toBeInTheDocument()
+    expect(screen.getByText('vercel/next.js')).toBeInTheDocument()
+    expect(screen.queryByText('hayden')).toBeNull()
+  })
 })

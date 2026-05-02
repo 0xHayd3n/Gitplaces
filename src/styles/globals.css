@@ -2348,7 +2348,8 @@ a {
 .app-navbar {
   background: transparent;
   padding: 0 20px;
-  min-height: 48px;
+  height: 32px;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2360,7 +2361,8 @@ a {
 .app-navbar-controls {
   position: absolute;
   left: 10px;
-  top: 10px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2762,7 +2764,7 @@ a {
   margin: 14px 6px;
 }
 
-/* Mirrors .article-layout-body--with-toc — flex-row, three columns */
+/* Activities is the default tab — body is a 2-column flex row (no TOC). */
 .repo-detail-sk-split {
   display: flex;
   flex-direction: row;
@@ -2771,17 +2773,7 @@ a {
   min-height: 200px;
 }
 
-/* Mirrors .article-layout-toc-slot — width: 200px, sticky */
-.repo-detail-sk-toc {
-  width: 200px;
-  flex-shrink: 0;
-  padding: 18px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-/* Mirrors .article-layout-body-content — flex: 1, padding: 0 22px 20px */
+/* Mirrors .article-layout-body-content — flex: 1, holds the activity feed */
 .repo-detail-sk-body-main {
   flex: 1;
   min-width: 0;
@@ -2804,21 +2796,65 @@ a {
   background: var(--bg3);
   animation: shimmer 1.4s infinite linear;
 }
-.repo-detail-sk-tile {
+
+/* Featured release banner placeholder — mirrors .repo-activity-featured */
+.repo-detail-sk-featured {
+  height: 132px;
+  border-radius: var(--radius-lg, 10px);
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
+  margin: 0 16px;
+  animation: shimmer 1.4s infinite linear;
+}
+
+/* Activity row placeholder — mirrors a BannerCard or RepoUserEventRow line */
+.repo-detail-sk-activity-row {
+  height: 56px;
+  border-radius: 8px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  animation: shimmer 1.4s infinite linear;
+}
+
+/* Stats sidebar skeleton — mirrors RepoStatsSidebar's structural sections */
+.repo-detail-sk-verdict {
+  margin: 4px 0 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg2);
+  border-left: 3px solid var(--bg3);
+}
+.repo-detail-sk-section {
+  padding: 10px 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 10px;
+  border-top: 1px solid var(--bg3);
 }
-.repo-detail-sk-stat {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--bg3);
-  animation: shimmer 1.4s infinite linear;
+.repo-detail-sk-section:first-of-type {
+  border-top: none;
+}
+.repo-detail-sk-section-collapsed {
+  padding: 10px 0;
+  border-top: 1px solid var(--bg3);
+  display: flex;
+  align-items: center;
+}
+.repo-detail-sk-vitals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.repo-detail-sk-vitals-cell {
+  background: var(--bg2);
+  padding: 6px 8px;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+}
+.repo-detail-sk-health-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 /* ── Breadcrumb bar ─────────────────────────────────────────────────── */
@@ -4287,13 +4323,10 @@ a {
   text-overflow: ellipsis;
 }
 
-/* Activities tab — two-column layout: left = release feed grouped by day,
-   right = reserved for future content. */
+/* Activities tab — single column feed; stats are in the ArticleLayout statsSlot. */
 .repo-activity-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
 }
 .repo-activity-split-left {
   display: flex;
@@ -4307,8 +4340,60 @@ a {
   gap: 12px;
 }
 .repo-activity-split-right {
-  /* Empty for now — placeholder cell. */
-  min-width: 0;
+  display: none;
+}
+
+/* Inline notice when releases fetch failed but local userEvents are still rendered */
+.repo-activity-partial-error {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: var(--t2);
+  margin: 0 16px 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+/* Featured activity banner (most recent major release pinned at top) */
+.repo-activity-featured {
+  margin: 0 16px 4px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.repo-activity-featured__header {
+  background: var(--accent-border);
+  padding: 5px 10px 5px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+/* Strip the card's own border/radius/margin when nested inside featured */
+.repo-activity-featured .banner-card {
+  margin: 0;
+  max-width: none;
+  border: none;
+  border-radius: 0;
+  border-top: 1px solid var(--accent-border);
+  box-shadow: none;
+}
+
+.repo-activity-featured .banner-card:hover {
+  border-color: var(--accent-border);
+  box-shadow: none;
+}
+
+/* Cards in the regular timeline fill the full column width */
+.repo-activity-split-left .banner-card {
+  max-width: none;
 }
 
 /* Releases */
@@ -11256,24 +11341,23 @@ a {
 
 /* ── Repo Notes tile ──────────────────────────────────────── */
 .repo-notes-tile {
-  padding: 12px 14px;
+  padding: 14px 16px 16px;
   border-bottom: 1px solid var(--glass-border);
 }
 .repo-notes-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 .repo-notes-label {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--t3);
+  letter-spacing: 0.04em;
+  color: var(--t2);
 }
 .repo-notes-save-status {
-  font-size: 9px;
+  font-size: 10px;
   color: #4ade80;
   opacity: 0.7;
 }
@@ -11282,14 +11366,14 @@ a {
   opacity: 1;
 }
 .repo-notes-preview {
-  min-height: 40px;
-  font-size: 11px;
+  min-height: 90px;
+  font-size: 12px;
   color: var(--t2);
   line-height: 1.6;
-  padding: 7px 8px;
+  padding: 10px 10px;
   background: rgba(255,255,255,0.02);
-  border: 1px solid var(--glass-border);
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
   cursor: text;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -11310,31 +11394,34 @@ a {
   font-size: 10px;
 }
 .repo-notes-empty {
-  min-height: 40px;
-  font-size: 11px;
-  color: var(--t4);
+  min-height: 90px;
+  font-size: 12px;
+  color: var(--t3);
   font-style: italic;
-  padding: 7px 8px;
+  padding: 10px 10px;
   background: rgba(255,255,255,0.02);
-  border: 1px solid var(--glass-border);
-  border-radius: 6px;
+  border: 1px dashed var(--border2);
+  border-radius: 7px;
   cursor: text;
   transition: border-color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
 }
 .repo-notes-empty:hover {
-  border-color: var(--border2);
+  border-color: var(--t3);
   background: rgba(255,255,255,0.04);
 }
 .repo-notes-textarea {
   width: 100%;
-  max-height: 160px;
+  min-height: 90px;
+  max-height: 260px;
   background: rgba(255,255,255,0.04);
   border: 1px solid var(--border2);
-  border-radius: 6px;
+  border-radius: 7px;
   color: var(--t2);
-  font-size: 11px;
+  font-size: 12px;
   font-family: inherit;
-  padding: 7px 8px;
+  padding: 10px;
   resize: none;
   outline: none;
   box-sizing: border-box;
@@ -11353,7 +11440,7 @@ a {
 .repo-notes-edit-hint {
   font-size: 9px;
   color: var(--t4);
-  margin-top: 4px;
+  margin-top: 5px;
   text-align: right;
 }
 

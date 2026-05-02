@@ -70,13 +70,17 @@ export function ArticleLayout({
       ref={resolvedScrollRef}
       className={`article-layout${fullBleedBody ? ' article-layout--fullbleed' : ''}${(tocSlot || statsSlot) ? ' article-layout--has-toc' : ''}${collapsedHeader ? ' article-layout--collapsed-header' : ''}${isScrolled ? ' article-layout--scrolled' : ''}`}
     >
-      {/* Drag strip docks at top: 0 to reserve the title-bar zone (window
-          drag region) and push the sticky tabs row below it, keeping the
-          tabs reliably clickable when scrolled. */}
-      <div className="article-layout-drag-strip" aria-hidden="true" />
+      {/* Drag strip occupies the title-bar zone (top 32px). The navbar sits
+          inside it so the breadcrumb and back arrow are vertically aligned
+          with the portalled window controls (fixed top: 3px). The navbar has
+          -webkit-app-region: no-drag on its root, so interactive controls
+          remain clickable; empty areas of the strip stay draggable when no
+          navbar is present. */}
+      <div className="article-layout-drag-strip">
+        {navBar && <div className="article-layout-navbar-slot">{navBar}</div>}
+      </div>
       <div className="article-layout-top">
         {!collapsedHeader && dither && <div className="article-layout-dither-bg">{dither}</div>}
-        {navBar && <div className="article-layout-navbar-slot">{navBar}</div>}
         <div className="article-layout-top-panel">
           {!collapsedHeader && dither && <div className="article-layout-dither-spacer" />}
           {!collapsedHeader && (

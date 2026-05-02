@@ -3,9 +3,16 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { relativeTime } from '../utils/relativeTime'
 import type { RepoStats, HealthStatus, IssueVelocity } from '../types/repoStats'
+import { useRepoMomentum } from '../hooks/useRepoMomentum'
 import './RepoStatsSidebar.css'
 
-interface Props { stats: RepoStats | 'loading' | 'error' }
+interface Props {
+  stats: RepoStats | 'loading' | 'error'
+  /** Owner/name passed through so the Momentum section can lazily fetch its
+   *  own data on first expand — see Phase 1C in the GitHub-call reduction work. */
+  owner?: string
+  name?: string
+}
 
 function fmt(n: number | null | undefined): string {
   if (n == null) return '--'
@@ -73,11 +80,11 @@ function computeVerdict(stats: RepoStats): Verdict {
   return { label: 'Stable', color: 'var(--t2)', sub: 'No critical signals' }
 }
 
-export function RepoStatsSidebar({ stats }: Props) {
-  if (stats === 'loading') return <div className="stats-sidebar-loading" />
+export function RepoStatsSidebar({ stats, owner, name }: Props) {
+  if (stats === 'loading') return <StatsSidebarSkeleton />
   if (stats === 'error')   return <div className="stats-sidebar-error">Failed to load stats.</div>
 
-  const { vitals, health, momentum, security, engagement } = stats
+  const { vitals, health, security, engagement } = stats
   const totalVulns = security.vulnerabilities
     ? security.vulnerabilities.critical + security.vulnerabilities.high + security.vulnerabilities.moderate + security.vulnerabilities.low
     : 0
@@ -158,32 +165,8 @@ export function RepoStatsSidebar({ stats }: Props) {
 
       <div className="stats-divider" />
 
-      {/* ── Momentum ── */}
-      <CollapsibleSection label="Momentum">
-        {momentum === null ? (
-          <div className="stats-computing">Stats computing on GitHub…</div>
-        ) : (
-          <>
-            <div className="stats-bars">
-              {(() => {
-                const max = Math.max(...momentum.monthlyCommits, 1)
-                return momentum.monthlyCommits.map((count, i) => (
-                  <div
-                    key={i}
-                    className={`stats-bar${i === 5 ? ' stats-bar--current' : ''}`}
-                    style={{ height: `${Math.round((count / max) * 100)}%` }}
-                  />
-                ))
-              })()}
-            </div>
-            <div className="stats-trend">
-              {momentum.trend === 'up' ? '↑ Trending up' :
-               momentum.trend === 'down' ? '↓ Declining' : '→ Stable'}
-            </div>
-            <div className="stats-bars-legend">Commits/month — last 6mo</div>
-          </>
-        )}
-      </CollapsibleSection>
+      {/* ── Momentum (lazy — fetched on first expand) ── */}
+      <MomentumSection owner={owner} name={name} />
 
       <div className="stats-divider" />
 
@@ -301,16 +284,82 @@ export function RepoStatsSidebar({ stats }: Props) {
   )
 }
 
-function CollapsibleSection({ label, children }: { label: string; children: ReactNode }) {
-  const [open, setOpen] = useState(true)
+function CollapsibleSection({
+  label,
+  defaultOpen = true,
+  onOpenChange,
+  children,
+}: {
+  label: string
+  defaultOpen?: boolean
+  /** Called whenever `open` flips. The Momentum section uses this to start
+   *  fetching its data only after the user actually opens the section. */
+  onOpenChange?: (open: boolean) => void
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
     <section className="stats-section">
-      <button className="stats-section-toggle" onClick={() => setOpen(o => !o)}>
+      <button
+        className="stats-section-toggle"
+        onClick={() => {
+          setOpen(o => {
+            const next = !o
+            onOpenChange?.(next)
+            return next
+          })
+        }}
+      >
         <span className="stats-section-label">{label}</span>
         <span className="stats-chevron">{open ? '▴' : '▾'}</span>
       </button>
       {open && children}
     </section>
+  )
+}
+
+// Momentum is fetched lazily — the call to /stats/commit_activity only fires
+// once the user expands this section. Defaults closed so a user who never
+// opens it pays zero GitHub calls for momentum (and the endpoint is the
+// heaviest in the bundle, often returning 202 = "still computing").
+function MomentumSection({ owner, name }: { owner?: string; name?: string }) {
+  const [hasOpened, setHasOpened] = useState(false)
+  const momentum = useRepoMomentum(owner, name, hasOpened)
+
+  return (
+    <CollapsibleSection
+      label="Momentum"
+      defaultOpen={false}
+      onOpenChange={(open) => { if (open) setHasOpened(true) }}
+    >
+      {momentum === 'loading' ? (
+        <div className="stats-computing">Loading momentum…</div>
+      ) : momentum === 'error' ? (
+        <div className="stats-computing">Couldn't load momentum.</div>
+      ) : momentum === null ? (
+        <div className="stats-computing">Stats computing on GitHub…</div>
+      ) : (
+        <>
+          <div className="stats-bars">
+            {(() => {
+              const max = Math.max(...momentum.monthlyCommits, 1)
+              return momentum.monthlyCommits.map((count, i) => (
+                <div
+                  key={i}
+                  className={`stats-bar${i === 5 ? ' stats-bar--current' : ''}`}
+                  style={{ height: `${Math.round((count / max) * 100)}%` }}
+                />
+              ))
+            })()}
+          </div>
+          <div className="stats-trend">
+            {momentum.trend === 'up' ? '↑ Trending up' :
+             momentum.trend === 'down' ? '↓ Declining' : '→ Stable'}
+          </div>
+          <div className="stats-bars-legend">Commits/month — last 6mo</div>
+        </>
+      )}
+    </CollapsibleSection>
   )
 }
 
@@ -334,5 +383,66 @@ function Dot({ active }: { active: boolean }) {
     <span style={{ color: active ? 'var(--green)' : 'var(--red)' }}>
       ● {active ? 'Present' : 'Absent'}
     </span>
+  )
+}
+
+// Layout-mirroring loading state. The previous version was a single 120px gray
+// rectangle, which read as a bare placeholder rather than a skeleton — the user
+// described it as "the mockup of the right panel without the info filled in."
+// This version mirrors the actual sidebar's structural shape so it reads as a
+// genuine loading state alongside the left panel's "Loading activity…" text.
+function StatsSidebarSkeleton() {
+  return (
+    <div className="stats-sidebar-skeleton" aria-busy="true" aria-label="Loading repository stats">
+      {/* Verdict */}
+      <div className="stats-sk-verdict">
+        <div className="stats-sk-bar" style={{ width: '55%', height: 12 }} />
+        <div className="stats-sk-bar" style={{ width: '75%', height: 8, marginTop: 6 }} />
+      </div>
+      <div className="stats-sk-divider" />
+      {/* Vitals */}
+      <div className="stats-sk-section">
+        <div className="stats-sk-bar" style={{ width: 36, height: 8, marginBottom: 8 }} />
+        <div className="stats-sk-vitals-grid">
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className="stats-sk-vitals-cell">
+              <div className="stats-sk-bar" style={{ width: 28, height: 13 }} />
+              <div className="stats-sk-bar" style={{ width: 44, height: 7, marginTop: 4 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="stats-sk-divider" />
+      {/* Health */}
+      <div className="stats-sk-section">
+        <div className="stats-sk-bar" style={{ width: 40, height: 8, marginBottom: 8 }} />
+        <div className="stats-sk-health-row">
+          <div className="stats-sk-circle" />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div className="stats-sk-bar" style={{ width: '85%', height: 11 }} />
+            <div className="stats-sk-bar" style={{ width: '50%', height: 7 }} />
+          </div>
+        </div>
+        <div className="stats-sk-signal-list">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="stats-sk-signal-row">
+              <div className="stats-sk-bar" style={{ width: '42%', height: 7 }} />
+              <div className="stats-sk-bar" style={{ width: '28%', height: 7 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="stats-sk-divider" />
+      {/* Collapsible section headers (Momentum, Security, Engagement) */}
+      {[60, 52, 84].map((labelW, i) => (
+        <div key={i}>
+          <div className="stats-sk-section stats-sk-section--collapsed">
+            <div className="stats-sk-bar" style={{ width: labelW, height: 8 }} />
+            <div className="stats-sk-bar" style={{ width: 8, height: 8, borderRadius: '50%' }} />
+          </div>
+          {i < 2 && <div className="stats-sk-divider" />}
+        </div>
+      ))}
+    </div>
   )
 }

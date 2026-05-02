@@ -7,6 +7,76 @@
   opacity: 0.5;
 }
 
+/* ── Loading skeleton (mirrors the real sidebar's structural shape) ── */
+.stats-sidebar-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.stats-sk-bar {
+  border-radius: 4px;
+  background: var(--bg3);
+  animation: shimmer 1.4s infinite linear;
+}
+.stats-sk-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg3);
+  animation: shimmer 1.4s infinite linear;
+  flex-shrink: 0;
+}
+.stats-sk-divider {
+  height: 1px;
+  background: var(--bg3);
+}
+.stats-sk-section {
+  padding: 10px 0;
+  display: flex;
+  flex-direction: column;
+}
+.stats-sk-section--collapsed {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.stats-sk-verdict {
+  margin: 10px 0 2px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg2);
+  border-left: 3px solid var(--bg3);
+}
+.stats-sk-vitals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.stats-sk-vitals-cell {
+  background: var(--bg2);
+  padding: 6px 8px;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+}
+.stats-sk-health-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.stats-sk-signal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.stats-sk-signal-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .stats-sidebar-error {
   font-size: 11px;
   color: var(--t3);

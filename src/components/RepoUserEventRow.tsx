@@ -12,11 +12,13 @@ interface Props {
 }
 
 export function RepoUserEventRow({ event, repoOwner, repoName, userLogin, userAvatarUrl }: Props) {
-  const { verb, chip } = buildContent(event, repoOwner, repoName, userLogin)
+  const { verb, chip, actor } = buildContent(event, repoOwner, repoName, userLogin)
+  const displayLogin = actor?.login ?? userLogin
+  const displayAvatar = actor?.avatarUrl ?? userAvatarUrl
   return (
     <div className="repo-user-event">
-      <img src={userAvatarUrl} alt={userLogin} className="repo-user-event__avatar" />
-      <span className="repo-user-event__user">{userLogin}</span>
+      <img src={displayAvatar} alt={displayLogin} className="repo-user-event__avatar" />
+      <span className="repo-user-event__user">{displayLogin}</span>
       <span className="repo-user-event__verb">{verb}</span>
       {chip}
       <span className="repo-user-event__time">{relativeTime(event.ts)}</span>
@@ -29,7 +31,7 @@ function buildContent(
   repoOwner: string,
   repoName: string,
   userLogin: string,
-): { verb: string; chip: React.ReactNode } {
+): { verb: string; chip: React.ReactNode; actor?: { login: string; avatarUrl: string } } {
   const repoAvatar = `https://avatars.githubusercontent.com/${repoOwner}?s=64`
   const userAvatar = `https://avatars.githubusercontent.com/${userLogin}?s=64`
 
@@ -44,6 +46,12 @@ function buildContent(
       return {
         verb: event.skillType === 'components' ? 'learned components for' : 'learned',
         chip: <SkillChip filename={event.skillFilename} />,
+      }
+    case 'created':
+      return {
+        verb: 'created',
+        chip: <RepoChip avatar={repoAvatar} text={`${repoOwner}/${repoName}`} />,
+        actor: { login: repoOwner, avatarUrl: repoAvatar },
       }
   }
 }
