@@ -1071,13 +1071,15 @@ export async function scanComponents(
       .slice(0, 30)
 
     // Stage D: parallel fetch with 30s overall timeout
+    let timerHandle: ReturnType<typeof setTimeout> | undefined
     const fetched = await Promise.race([
       Promise.all([
         batchFetch(componentCandidates, 10, p => getFileContent(token, owner, name, p).catch(() => null)),
         batchFetch(storyCandidates,     10, p => getFileContent(token, owner, name, p).catch(() => null)),
       ]),
-      new Promise<null>(resolve => setTimeout(() => resolve(null), 30_000)),
+      new Promise<null>(resolve => { timerHandle = setTimeout(() => resolve(null), 30_000) }),
     ])
+    if (timerHandle !== undefined) clearTimeout(timerHandle)
 
     if (fetched === null) {
       return { framework, components: [], stories: [], pkg, error: 'timeout' }
