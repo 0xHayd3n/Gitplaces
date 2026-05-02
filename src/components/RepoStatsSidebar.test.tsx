@@ -13,8 +13,13 @@ const mockStats: RepoStats = {
   momentum: { monthlyCommits: [12, 18, 10, 22, 19, 31], trend: 'up' },
   security: {
     available: true,
+    permissionDenied: false,
     vulnerabilities: { critical: 0, high: 2, moderate: 1, low: 0 },
-    hasSecurityPolicy: true, codeScanningEnabled: false, alerts: null,
+    dismissedVulnerabilities: null,
+    hasSecurityPolicy: true,
+    codeScanning: null,
+    secretScanning: null,
+    alerts: null,
   },
   engagement: { starredAt: '2026-01-12T00:00:00Z', forkedAt: '2026-02-03T00:00:00Z', skillsLearned: 2 },
 }
@@ -22,25 +27,61 @@ const mockStats: RepoStats = {
 const healthyStats: RepoStats = {
   ...mockStats,
   health: { score: 80, maintenance: 'active', issueVelocity: 'healthy', lastReleaseDate: '2026-04-20T00:00:00Z', lastReleaseDaysAgo: 12 },
-  security: { available: true, vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 }, hasSecurityPolicy: true, codeScanningEnabled: true, alerts: null },
+  security: {
+    available: true,
+    permissionDenied: false,
+    vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 },
+    dismissedVulnerabilities: null,
+    hasSecurityPolicy: true,
+    codeScanning: null,
+    secretScanning: null,
+    alerts: null,
+  },
   momentum: { monthlyCommits: [10, 15, 20, 25, 28, 31], trend: 'up' },
 }
 
 const criticalStats: RepoStats = {
   ...mockStats,
-  security: { available: true, vulnerabilities: { critical: 0, high: 3, moderate: 1, low: 2 }, hasSecurityPolicy: false, codeScanningEnabled: false, alerts: null },
+  security: {
+    available: true,
+    permissionDenied: false,
+    vulnerabilities: { critical: 0, high: 3, moderate: 1, low: 2 },
+    dismissedVulnerabilities: null,
+    hasSecurityPolicy: false,
+    codeScanning: false,
+    secretScanning: null,
+    alerts: null,
+  },
 }
 
 const staleStats: RepoStats = {
   ...mockStats,
   health: { score: 30, maintenance: 'stale', issueVelocity: 'healthy', lastReleaseDate: null, lastReleaseDaysAgo: null },
-  security: { available: true, vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 }, hasSecurityPolicy: null, codeScanningEnabled: null, alerts: null },
+  security: {
+    available: true,
+    permissionDenied: false,
+    vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 },
+    dismissedVulnerabilities: null,
+    hasSecurityPolicy: null,
+    codeScanning: null,
+    secretScanning: null,
+    alerts: null,
+  },
 }
 
 const middlingStats: RepoStats = {
   ...mockStats,
   health: { score: 55, maintenance: 'slow', issueVelocity: 'healthy', lastReleaseDate: null, lastReleaseDaysAgo: null },
-  security: { available: true, vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 }, hasSecurityPolicy: null, codeScanningEnabled: null, alerts: null },
+  security: {
+    available: true,
+    permissionDenied: false,
+    vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 },
+    dismissedVulnerabilities: null,
+    hasSecurityPolicy: null,
+    codeScanning: null,
+    secretScanning: null,
+    alerts: null,
+  },
 }
 
 describe('RepoStatsSidebar', () => {
@@ -68,14 +109,17 @@ describe('RepoStatsSidebar', () => {
 
   it('renders total vulnerability count when security is available', () => {
     render(<RepoStatsSidebar stats={mockStats} />)
-    // 2 high + 1 moderate + 0 low = 3 total
     expect(screen.getByText(/3 vulnerabilit/i)).toBeInTheDocument()
   })
 
-  it('renders security unavailable state', () => {
+  it('renders "Security data not available" when available is false and not permission denied', () => {
     const stats: RepoStats = {
       ...mockStats,
-      security: { available: false, vulnerabilities: null, hasSecurityPolicy: null, codeScanningEnabled: null, alerts: null },
+      security: {
+        available: false, permissionDenied: false, vulnerabilities: null,
+        dismissedVulnerabilities: null, hasSecurityPolicy: null,
+        codeScanning: null, secretScanning: null, alerts: null,
+      },
     }
     render(<RepoStatsSidebar stats={stats} />)
     expect(screen.getByText(/not available/i)).toBeInTheDocument()
@@ -135,5 +179,90 @@ describe('RepoStatsSidebar', () => {
     expect(screen.queryByText(/Commits\/month/i)).not.toBeInTheDocument()
     fireEvent.click(btn)
     expect(screen.getByText(/Commits\/month/i)).toBeInTheDocument()
+  })
+
+  // ── New test cases ──────────────────────────────────────────────────────────
+
+  it('renders "Token lacks permission" when permissionDenied is true', () => {
+    const stats: RepoStats = {
+      ...mockStats,
+      security: {
+        available: false, permissionDenied: true, vulnerabilities: null,
+        dismissedVulnerabilities: null, hasSecurityPolicy: null,
+        codeScanning: null, secretScanning: null, alerts: null,
+      },
+    }
+    render(<RepoStatsSidebar stats={stats} />)
+    expect(screen.getByText(/token lacks permission/i)).toBeInTheDocument()
+  })
+
+  it('renders dismissed vulnerabilities count when total > 0', () => {
+    const stats: RepoStats = {
+      ...mockStats,
+      security: {
+        ...mockStats.security,
+        dismissedVulnerabilities: { critical: 1, high: 2, moderate: 0, low: 0 },
+      },
+    }
+    render(<RepoStatsSidebar stats={stats} />)
+    expect(screen.getByText(/3 dismissed/i)).toBeInTheDocument()
+  })
+
+  it('renders code scanning alert count when codeScanning is a counts object', () => {
+    const stats: RepoStats = {
+      ...mockStats,
+      security: {
+        ...mockStats.security,
+        codeScanning: { critical: 0, high: 1, medium: 2, low: 0, note: 0, warning: 0 },
+      },
+    }
+    render(<RepoStatsSidebar stats={stats} />)
+    expect(screen.getByText(/3 alerts/i)).toBeInTheDocument()
+  })
+
+  it('renders code scanning Absent dot when codeScanning is false', () => {
+    const stats: RepoStats = {
+      ...mockStats,
+      security: { ...mockStats.security, hasSecurityPolicy: null, codeScanning: false },
+    }
+    render(<RepoStatsSidebar stats={stats} />)
+    expect(screen.getByText(/Code scanning/i)).toBeInTheDocument()
+    expect(screen.getByText(/● Absent/)).toBeInTheDocument()
+  })
+
+  it('renders secret scanning row with active count when active > 0', () => {
+    const stats: RepoStats = {
+      ...mockStats,
+      security: {
+        ...mockStats.security,
+        secretScanning: { active: 2, inactive: 0, unknown: 1 },
+      },
+    }
+    render(<RepoStatsSidebar stats={stats} />)
+    expect(screen.getByText(/2 active/i)).toBeInTheDocument()
+  })
+
+  it('renders "Critical issues" verdict when secretScanning has active > 0', () => {
+    const stats: RepoStats = {
+      ...healthyStats,
+      security: {
+        ...healthyStats.security,
+        secretScanning: { active: 1, inactive: 0, unknown: 0 },
+      },
+    }
+    render(<RepoStatsSidebar stats={stats} />)
+    expect(screen.getByText('Critical issues')).toBeInTheDocument()
+  })
+
+  it('renders "Critical issues" verdict when codeScanning has critical > 0', () => {
+    const stats: RepoStats = {
+      ...healthyStats,
+      security: {
+        ...healthyStats.security,
+        codeScanning: { critical: 1, high: 0, medium: 0, low: 0, note: 0, warning: 0 },
+      },
+    }
+    render(<RepoStatsSidebar stats={stats} />)
+    expect(screen.getByText('Critical issues')).toBeInTheDocument()
   })
 })
