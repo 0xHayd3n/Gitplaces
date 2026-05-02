@@ -95,15 +95,17 @@ describe('getRepoStats', () => {
   })
 
   it('maps GitHub API responses to RepoStats', async () => {
-    // 4 main calls + 3 security calls
+    // 4 main calls + 5 security calls (open, dismissed, profile, code scan, secret scan)
     mockFetch
       .mockResolvedValueOnce(okJson(repoPayload))                    // repo
       .mockResolvedValueOnce(okJson([{ login: 'a' }]))              // contributors (1, no Link)
       .mockResolvedValueOnce(okJson(commitsPayload))                 // commits
       .mockResolvedValueOnce(okJson(activityPayload))                // commit_activity
-      .mockResolvedValueOnce(okJson(alertsPayload))                  // dependabot alerts
+      .mockResolvedValueOnce(okJson(alertsPayload))                  // open dependabot alerts
+      .mockResolvedValueOnce(okJson([]))                             // dismissed dependabot alerts
       .mockResolvedValueOnce(okJson(profilePayload))                 // community/profile
       .mockResolvedValueOnce(new Response('[]', { status: 200 }))   // code scanning
+      .mockResolvedValueOnce(new Response('', { status: 404 }))     // secret scanning
 
     const db = createTestDb()
     const result = await getRepoStats(db, 'owner', 'repo', 'token', null)
@@ -125,8 +127,10 @@ describe('getRepoStats', () => {
       .mockResolvedValueOnce(okJson([]))
       .mockResolvedValueOnce(okJson(commitsPayload))
       .mockResolvedValueOnce(new Response('', { status: 202 }))     // 202 computing
-      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))                             // open dependabot
+      .mockResolvedValueOnce(okJson([]))                             // dismissed dependabot
       .mockResolvedValueOnce(okJson(profilePayload))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))     // code scanning
       .mockResolvedValueOnce(new Response('', { status: 404 }))
 
     const db = createTestDb()
@@ -141,9 +145,11 @@ describe('getRepoStats', () => {
       .mockResolvedValueOnce(okJson([]))
       .mockRejectedValueOnce(new Error('timeout'))                   // commits fails
       .mockResolvedValueOnce(okJson(activityPayload))
-      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))                             // open dependabot
+      .mockResolvedValueOnce(okJson([]))                             // dismissed dependabot
       .mockResolvedValueOnce(okJson(profilePayload))
-      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))     // code scanning
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
 
     const db = createTestDb()
     const result = await getRepoStats(db, 'owner', 'repo', 'token', null)
@@ -178,9 +184,11 @@ describe('getRepoStats', () => {
       .mockResolvedValueOnce(contribRes)
       .mockResolvedValueOnce(okJson(commitsPayload))
       .mockResolvedValueOnce(okJson(activityPayload))
-      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))                             // open dependabot
+      .mockResolvedValueOnce(okJson([]))                             // dismissed dependabot
       .mockResolvedValueOnce(okJson(profilePayload))
-      .mockResolvedValueOnce(new Response('', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }))     // code scanning
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
 
     const db = createTestDb()
     const result = await getRepoStats(db, 'owner', 'repo', 'token', null)
