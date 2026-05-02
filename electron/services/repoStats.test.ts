@@ -51,6 +51,22 @@ function createTestDb(): Database.Database {
       fetched_at INTEGER NOT NULL, data TEXT NOT NULL,
       PRIMARY KEY (owner, name)
     );
+    CREATE TABLE repo_stats_cache (
+      owner TEXT NOT NULL, name TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL, data TEXT NOT NULL,
+      PRIMARY KEY (owner, name)
+    );
+    CREATE TABLE repo_momentum_cache (
+      owner TEXT NOT NULL, name TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL, data TEXT NOT NULL,
+      PRIMARY KEY (owner, name)
+    );
+    CREATE TABLE http_etag_cache (
+      url TEXT PRIMARY KEY,
+      etag TEXT NOT NULL,
+      body TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL
+    );
   `)
   return db
 }
@@ -95,12 +111,13 @@ describe('getRepoStats', () => {
   })
 
   it('maps GitHub API responses to RepoStats', async () => {
-    // 4 main calls + 5 security calls (open, dismissed, profile, code scan, secret scan)
+    // 3 main calls (repo, contributors, commits) + 5 security calls.
+    // /stats/commit_activity is NO LONGER part of getRepoStats — it's lazy
+    // (fetched only when the user expands the Momentum section). See Phase 1C.
     mockFetch
       .mockResolvedValueOnce(okJson(repoPayload))                    // repo
       .mockResolvedValueOnce(okJson([{ login: 'a' }]))              // contributors (1, no Link)
-      .mockResolvedValueOnce(okJson(commitsPayload))                 // commits
-      .mockResolvedValueOnce(okJson(activityPayload))                // commit_activity
+      .mockResolvedValueOnce(okJson(commitsPayload))                 // commits (no pushed_at supplied)
       .mockResolvedValueOnce(okJson(alertsPayload))                  // open dependabot alerts
       .mockResolvedValueOnce(okJson([]))                             // dismissed dependabot alerts
       .mockResolvedValueOnce(okJson(profilePayload))                 // community/profile
@@ -108,7 +125,7 @@ describe('getRepoStats', () => {
       .mockResolvedValueOnce(new Response('', { status: 404 }))     // secret scanning
 
     const db = createTestDb()
-    const result = await getRepoStats(db, 'owner', 'repo', 'token', null)
+    const result = await getRepoStats(db, 'owner', 'repo', 'token')
 
     expect(result.vitals.stars).toBe(100)
     expect(result.vitals.forks).toBe(10)
@@ -117,25 +134,7 @@ describe('getRepoStats', () => {
     expect(result.security.available).toBe(true)
     expect(result.security.vulnerabilities).toEqual({ critical: 0, high: 1, moderate: 1, low: 0 })
     expect(result.security.alerts).toHaveLength(2)
-    expect(result.momentum).not.toBeNull()
-    expect(result.momentum?.monthlyCommits).toHaveLength(6)
-  })
-
-  it('returns momentum: null when commit_activity returns 202', async () => {
-    mockFetch
-      .mockResolvedValueOnce(okJson(repoPayload))
-      .mockResolvedValueOnce(okJson([]))
-      .mockResolvedValueOnce(okJson(commitsPayload))
-      .mockResolvedValueOnce(new Response('', { status: 202 }))     // 202 computing
-      .mockResolvedValueOnce(okJson([]))                             // open dependabot
-      .mockResolvedValueOnce(okJson([]))                             // dismissed dependabot
-      .mockResolvedValueOnce(okJson(profilePayload))
-      .mockResolvedValueOnce(new Response('', { status: 404 }))     // code scanning
-      .mockResolvedValueOnce(new Response('', { status: 404 }))
-
-    const db = createTestDb()
-    const result = await getRepoStats(db, 'owner', 'repo', 'token', null)
-
+    // Momentum is null until the user expands the Momentum section (lazy).
     expect(result.momentum).toBeNull()
   })
 
@@ -144,7 +143,6 @@ describe('getRepoStats', () => {
       .mockResolvedValueOnce(okJson(repoPayload))
       .mockResolvedValueOnce(okJson([]))
       .mockRejectedValueOnce(new Error('timeout'))                   // commits fails
-      .mockResolvedValueOnce(okJson(activityPayload))
       .mockResolvedValueOnce(okJson([]))                             // open dependabot
       .mockResolvedValueOnce(okJson([]))                             // dismissed dependabot
       .mockResolvedValueOnce(okJson(profilePayload))
@@ -152,7 +150,7 @@ describe('getRepoStats', () => {
       .mockResolvedValueOnce(new Response('', { status: 404 }))
 
     const db = createTestDb()
-    const result = await getRepoStats(db, 'owner', 'repo', 'token', null)
+    const result = await getRepoStats(db, 'owner', 'repo', 'token')
 
     expect(result.vitals.stars).toBe(100)         // vitals still populated
     expect(result.health.score).toBeGreaterThanOrEqual(0)  // score computed with fallback
@@ -168,10 +166,62 @@ describe('getRepoStats', () => {
     db.prepare('INSERT INTO skills VALUES (?,?,?)').run('r1', 'repo.skill.md', '2026-02-01T00:00:00Z')
     db.prepare('INSERT INTO sub_skills VALUES (?,?,?,?)').run('r1', 'components', 'repo.comp.skill.md', '2026-03-01T00:00:00Z')
 
-    const result = await getRepoStats(db, 'owner', 'repo', 'token', null)
+    const result = await getRepoStats(db, 'owner', 'repo', 'token')
 
     expect(result.engagement.starredAt).toBe('2026-01-12T00:00:00Z')
     expect(result.engagement.skillsLearned).toBe(2)
+  })
+
+  it('skips both /repos/{o}/{n} AND /commits when cachedRepoCore (with pushedAt) is provided', async () => {
+    // Only 6 calls now: contributors + 5 security. Both /repos/ AND /commits
+    // are skipped because cachedRepoCore supplies stars/forks/openIssues
+    // (Win 3) AND pushedAt (Phase 1A — daysSinceCommit derives from it).
+    mockFetch
+      .mockResolvedValueOnce(okJson([]))                             // contributors
+      .mockResolvedValueOnce(okJson([]))                             // open dependabot
+      .mockResolvedValueOnce(okJson([]))                             // dismissed dependabot
+      .mockResolvedValueOnce(okJson(profilePayload))                 // community/profile
+      .mockResolvedValueOnce(new Response('[]', { status: 200 }))   // code scanning
+      .mockResolvedValueOnce(new Response('', { status: 404 }))     // secret scanning
+
+    const db = createTestDb()
+    const result = await getRepoStats(db, 'owner', 'repo', 'token',
+      { stars: 250, forks: 12, openIssues: 7, pushedAt: new Date().toISOString() })
+
+    // Vitals come from the cached core, not from a /repos/ fetch
+    expect(result.vitals.stars).toBe(250)
+    expect(result.vitals.forks).toBe(12)
+    expect(result.vitals.openIssues).toBe(7)
+    // Confirm no /repos or /commits call was made
+    expect(mockFetch.mock.calls[0][0]).toContain('/contributors')
+    expect(mockFetch.mock.calls.some(c => /\/commits\?/.test(c[0]))).toBe(false)
+    // Total fetches: 6 (down from 9 in original; -1 for /repos, -1 for /commits, -1 for /commit_activity)
+    expect(mockFetch).toHaveBeenCalledTimes(6)
+    // daysSinceCommit derived from cached pushedAt
+    expect(result.health.daysSinceCommit).toBeLessThanOrEqual(1)
+  })
+
+  it('exposes daysSinceCommit and leaves lastReleaseDate null (renderer enriches)', async () => {
+    mockFetch
+      .mockResolvedValueOnce(okJson(repoPayload))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson(commitsPayload))
+      .mockResolvedValueOnce(okJson(activityPayload))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson(profilePayload))
+      .mockResolvedValueOnce(new Response('[]', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+
+    const db = createTestDb()
+    const result = await getRepoStats(db, 'owner', 'repo', 'token')
+
+    // Service no longer takes lastReleaseDate; the renderer recomputes once
+    // releases resolve via `computeHealthScore`.
+    expect(result.health.lastReleaseDate).toBeNull()
+    expect(result.health.lastReleaseDaysAgo).toBeNull()
+    // daysSinceCommit is exposed so the renderer can do the recompute.
+    expect(typeof result.health.daysSinceCommit).toBe('number')
   })
 
   it('parses contributor count from Link header', async () => {
@@ -191,8 +241,156 @@ describe('getRepoStats', () => {
       .mockResolvedValueOnce(new Response('', { status: 404 }))
 
     const db = createTestDb()
-    const result = await getRepoStats(db, 'owner', 'repo', 'token', null)
+    const result = await getRepoStats(db, 'owner', 'repo', 'token')
 
     expect(result.vitals.contributors).toBe(42)
+  })
+
+  // Tier 2 — 6h cache for the network-derived intermediates (contributors,
+  // last commit). On a warm visit within the TTL these calls are served
+  // entirely from the local DB.
+  it('caches the stats intermediate after a fresh fetch and serves from cache on next call', async () => {
+    // First call — full fetch path. 8 mocked responses (3 main + 5 security)
+    mockFetch
+      .mockResolvedValueOnce(okJson(repoPayload))
+      .mockResolvedValueOnce(okJson([{ login: 'a' }]))
+      .mockResolvedValueOnce(okJson(commitsPayload))
+      .mockResolvedValueOnce(okJson([]))                             // open dependabot
+      .mockResolvedValueOnce(okJson([]))                             // dismissed dependabot
+      .mockResolvedValueOnce(okJson(profilePayload))
+      .mockResolvedValueOnce(new Response('[]', { status: 200 }))   // code scanning
+      .mockResolvedValueOnce(new Response('', { status: 404 }))     // secret scanning
+
+    const db = createTestDb()
+    const first = await getRepoStats(db, 'owner', 'repo', 'token')
+    expect(first.vitals.contributors).toBe(1)
+
+    const callsAfterFirst = mockFetch.mock.calls.length
+
+    // Second call — security writes its own cache row in the first call so on
+    // the warm path we expect: 0 stats-intermediate calls + 0 security calls
+    // + 1 /repos/{o}/{n} call (no cachedRepoCore passed in this test).
+    const second = await getRepoStats(db, 'owner', 'repo', 'token')
+    const callsAfterSecond = mockFetch.mock.calls.length
+    expect(callsAfterSecond - callsAfterFirst).toBe(1)
+    expect(mockFetch.mock.calls[callsAfterFirst][0]).toBe('https://api.github.com/repos/owner/repo')
+
+    // Cached values come through identically
+    expect(second.vitals.contributors).toBe(1)
+    expect(second.health.daysSinceCommit).toBe(first.health.daysSinceCommit)
+  })
+
+  it('warm load with cachedRepoCore + cached intermediate makes ZERO stats GitHub calls', async () => {
+    // Seed both caches manually to simulate a 6h-warm visit
+    const db = createTestDb()
+    db.prepare(
+      'INSERT INTO repo_stats_cache (owner, name, fetched_at, data) VALUES (?,?,?,?)'
+    ).run('owner', 'repo', Date.now(), JSON.stringify({
+      daysSinceCommit: 5,
+      contributors: 42,
+    }))
+    db.prepare(
+      'INSERT INTO repo_security_cache (owner, name, fetched_at, data) VALUES (?,?,?,?)'
+    ).run('owner', 'repo', Date.now(), JSON.stringify({
+      available: true, permissionDenied: false,
+      vulnerabilities: { critical: 0, high: 0, moderate: 0, low: 0 },
+      dismissedVulnerabilities: null, hasSecurityPolicy: true,
+      codeScanning: null, secretScanning: null, alerts: [],
+    }))
+
+    const result = await getRepoStats(db, 'owner', 'repo', 'token',
+      { stars: 100, forks: 10, openIssues: 5 })
+
+    // The whole point: zero GitHub calls on a hot warm visit.
+    expect(mockFetch).not.toHaveBeenCalled()
+    expect(result.vitals.stars).toBe(100)
+    expect(result.vitals.contributors).toBe(42)
+    expect(result.health.daysSinceCommit).toBe(5)
+    // Momentum is now lazy (separate IPC), not part of the stats bundle.
+    expect(result.momentum).toBeNull()
+    expect(result.security.available).toBe(true)
+  })
+
+  it('refetches when the stats cache row is older than the 6h TTL', async () => {
+    const db = createTestDb()
+    // Insert an expired cache row (> 6h ago)
+    db.prepare(
+      'INSERT INTO repo_stats_cache (owner, name, fetched_at, data) VALUES (?,?,?,?)'
+    ).run('owner', 'repo', Date.now() - 21_600_001, JSON.stringify({
+      daysSinceCommit: 999, contributors: 1,
+    }))
+
+    // Full mock chain for the refetch (8 calls now: 3 main + 5 security)
+    mockFetch
+      .mockResolvedValueOnce(okJson(repoPayload))
+      .mockResolvedValueOnce(okJson([{ login: 'a' }, { login: 'b' }]))  // 2 contributors
+      .mockResolvedValueOnce(okJson(commitsPayload))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson([]))
+      .mockResolvedValueOnce(okJson(profilePayload))
+      .mockResolvedValueOnce(new Response('[]', { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 404 }))
+
+    const result = await getRepoStats(db, 'owner', 'repo', 'token')
+
+    // Got the fresh value, not the expired cached one
+    expect(result.vitals.contributors).toBe(2)
+    // Stale cache row was overwritten with fresh data
+    const refreshed = db.prepare(
+      'SELECT data FROM repo_stats_cache WHERE owner=? AND name=?'
+    ).get('owner', 'repo') as { data: string }
+    expect(JSON.parse(refreshed.data).contributors).toBe(2)
+  })
+})
+
+// ── getRepoMomentum ──────────────────────────────────────────────────────────
+
+describe('getRepoMomentum', () => {
+  const mockFetch = vi.fn()
+  beforeEach(() => {
+    vi.stubGlobal('fetch', mockFetch)
+    mockFetch.mockReset()
+  })
+
+  it('fetches and returns commit_activity-derived momentum on cache miss', async () => {
+    mockFetch.mockResolvedValueOnce(okJson(activityPayload))
+    const db = createTestDb()
+    const { getRepoMomentum } = await import('./repoStats')
+    const result = await getRepoMomentum(db, 'owner', 'repo', 'token')
+
+    expect(result?.monthlyCommits).toHaveLength(6)
+    expect(['up', 'down', 'stable']).toContain(result?.trend)
+    // Cached for next call
+    const cached = db.prepare('SELECT data FROM repo_momentum_cache WHERE owner=? AND name=?')
+      .get('owner', 'repo') as { data: string }
+    expect(cached).toBeDefined()
+  })
+
+  it('returns null on 202 (computing) and does NOT cache the null', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('', { status: 202 }))
+    const db = createTestDb()
+    const { getRepoMomentum } = await import('./repoStats')
+    const result = await getRepoMomentum(db, 'owner', 'repo', 'token')
+
+    expect(result).toBeNull()
+    // No cache row written — next call will retry
+    const cached = db.prepare('SELECT data FROM repo_momentum_cache WHERE owner=? AND name=?')
+      .get('owner', 'repo') as { data: string } | undefined
+    expect(cached).toBeUndefined()
+  })
+
+  it('serves cached momentum without a network call on warm hit', async () => {
+    const db = createTestDb()
+    db.prepare(
+      'INSERT INTO repo_momentum_cache (owner, name, fetched_at, data) VALUES (?,?,?,?)'
+    ).run('owner', 'repo', Date.now(), JSON.stringify({
+      monthlyCommits: [1, 2, 3, 4, 5, 6], trend: 'up',
+    }))
+
+    const { getRepoMomentum } = await import('./repoStats')
+    const result = await getRepoMomentum(db, 'owner', 'repo', 'token')
+
+    expect(mockFetch).not.toHaveBeenCalled()
+    expect(result?.trend).toBe('up')
   })
 })

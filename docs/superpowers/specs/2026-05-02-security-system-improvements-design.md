@@ -14,6 +14,7 @@ Extend the repository security system from Dependabot-only coverage to full GitH
 - `electron/services/repoSecurity.test.ts` — service tests
 - `src/components/RepoStatsSidebar.tsx` — UI rendering
 - `src/components/RepoStatsSidebar.test.tsx` — UI tests
+- `src/hooks/useRepoStats.test.ts` — fixture update only (`codeScanningEnabled` → `codeScanning`, add new fields)
 
 ---
 
@@ -122,6 +123,8 @@ if (!alertsRes?.ok) return UNAVAILABLE
 
 ### Concurrent Pagination (replaces inline loop)
 
+The existing `const rawAlerts: RawAlert[] = await alertsRes.json()` call and the sequential pagination `while` loop are **removed entirely**. `fetchAllPages` is the sole consumer of every first-page response body — calling `.json()` on a response before passing it to `fetchAllPages` would silently produce empty results.
+
 ```typescript
 const [openAlerts, dismissedAlerts, scanAlerts, secretAlerts] = await Promise.all([
   fetchAllPages<RawAlert>(alertsRes, h),
@@ -131,6 +134,8 @@ const [openAlerts, dismissedAlerts, scanAlerts, secretAlerts] = await Promise.al
 ])
 ```
 
+Partial results (any combination of null secondary fields due to secondary endpoint failures) are always cached. Only the primary Dependabot 403 early-returns without caching.
+
 ### Field Derivation
 
 **`codeScanning`**:
@@ -139,6 +144,7 @@ const [openAlerts, dismissedAlerts, scanAlerts, secretAlerts] = await Promise.al
 - otherwise → `null`
 
 **`secretScanning`**:
+- Secret scanning is fetched with `state=open` only. The `validity` field reflects the credential status of *unresolved* alerts: `active` = credential still live, `inactive` = credential rotated/revoked but alert not yet dismissed, `unknown` = GitHub cannot verify. This is intentional — `inactive` open alerts indicate unresolved housekeeping, while `active` open alerts are live threats.
 - `secretRes?.ok` → count `secretAlerts` by `validity` into `SecretScanningCounts`
 - otherwise → `null`
 
@@ -189,9 +195,17 @@ New row, rendered only when `secretScanning` is non-null:
 
 ### Verdict Logic (`computeVerdict`)
 
-Two new escalation conditions added to the "Critical issues" branch:
-- `secretScanning?.active > 0`
-- `codeScanning` is a counts object with `critical > 0 || high > 0`
+Two new escalation conditions added to the "Critical issues" branch. Use these exact guards (TypeScript requires the discriminant check for the `false | null | object` union):
+
+```typescript
+// secret scanning active credential leak
+security.secretScanning != null && security.secretScanning.active > 0
+
+// code scanning critical/high findings (guard against false and null)
+typeof security.codeScanning === 'object' &&
+  security.codeScanning !== null &&
+  (security.codeScanning.critical > 0 || security.codeScanning.high > 0)
+```
 
 ---
 

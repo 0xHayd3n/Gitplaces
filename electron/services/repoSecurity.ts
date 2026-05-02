@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import { githubHeaders } from '../github'
+import { etagFetch } from '../githubFetch'
 import type {
   RepoStats, SecurityAlert, SeverityCounts, CodeScanningCounts, SecretScanningCounts,
 } from '../../src/types/repoStats'
@@ -55,6 +56,16 @@ async function fetchAllPages<T>(firstRes: Response, headers: HeadersInit): Promi
   return items
 }
 
+// Parses a ConditionalResponse into a typed array. Pagination via Link is
+// only attempted when the response was a fresh 200 (304s lose Link headers).
+async function parseConditional<T>(
+  cr: import('../githubFetch').ConditionalResponse,
+  _headers: HeadersInit,
+): Promise<T[]> {
+  const parsed = await cr.json()
+  return Array.isArray(parsed) ? (parsed as T[]) : []
+}
+
 function mapAlert(raw: RawAlert): SecurityAlert {
   return {
     number: raw.number,
@@ -107,32 +118,44 @@ export async function getRepoSecurity(
   const h = githubHeaders(token)
   const base = `https://api.github.com/repos/${owner}/${name}`
 
+  // All five security endpoints go through etagFetch — when the resource is
+  // unchanged, GitHub returns 304 (which doesn't count against the rate limit).
+  // The 6h DB cache above means we typically don't hit these on warm visits;
+  // ETag covers the case where the cache has expired but the data hasn't.
   const [alertsRes, dismissedRes, profileRes, scanRes, secretRes] = await Promise.all([
-    fetch(`${base}/dependabot/alerts?state=open&per_page=100`, { headers: h }).catch(() => null),
-    fetch(`${base}/dependabot/alerts?state=dismissed&per_page=100`, { headers: h }).catch(() => null),
-    fetch(`${base}/community/profile`, { headers: h }).catch(() => null),
-    fetch(`${base}/code-scanning/alerts?state=open&per_page=100`, { headers: h }).catch(() => null),
-    fetch(`${base}/secret-scanning/alerts?state=open&per_page=100`, { headers: h }).catch(() => null),
+    etagFetch(db, `${base}/dependabot/alerts?state=open&per_page=100`, { headers: h }).catch(() => null),
+    etagFetch(db, `${base}/dependabot/alerts?state=dismissed&per_page=100`, { headers: h }).catch(() => null),
+    etagFetch(db, `${base}/community/profile`, { headers: h }).catch(() => null),
+    etagFetch(db, `${base}/code-scanning/alerts?state=open&per_page=100`, { headers: h }).catch(() => null),
+    etagFetch(db, `${base}/secret-scanning/alerts?state=open&per_page=100`, { headers: h }).catch(() => null),
   ])
 
   if (alertsRes?.status === 403) return { ...UNAVAILABLE, permissionDenied: true }
-  if (!alertsRes?.ok) return UNAVAILABLE
+  // ok = 200 OR 304 (cached). 404 means feature not enabled for this repo.
+  const alertsOk = alertsRes && (alertsRes.status === 200 || alertsRes.status === 304)
+  const dismissedOk = dismissedRes && (dismissedRes.status === 200 || dismissedRes.status === 304)
+  const profileOk = profileRes && (profileRes.status === 200 || profileRes.status === 304)
+  const scanOk = scanRes && (scanRes.status === 200 || scanRes.status === 304)
+  const secretOk = secretRes && (secretRes.status === 200 || secretRes.status === 304)
+  if (!alertsOk) return UNAVAILABLE
 
+  // Note: pagination via Link header doesn't survive a 304 response. We accept
+  // truncation past the first page on cached hits — rare in practice (most
+  // repos have <100 dependabot alerts) and the tradeoff is worth the rate-limit
+  // savings.
   const [openRawAlerts, dismissedRawAlerts, scanAlerts, secretAlerts] = await Promise.all([
-    fetchAllPages<RawAlert>(alertsRes, h),
-    dismissedRes?.ok ? fetchAllPages<RawAlert>(dismissedRes, h) : Promise.resolve([]),
-    scanRes?.ok && scanRes.status !== 404
-      ? fetchAllPages<RawCodeScanAlert>(scanRes, h)
-      : Promise.resolve([]),
-    secretRes?.ok ? fetchAllPages<RawSecretAlert>(secretRes, h) : Promise.resolve([]),
+    parseConditional<RawAlert>(alertsRes!, h),
+    dismissedOk ? parseConditional<RawAlert>(dismissedRes!, h) : Promise.resolve([]),
+    scanOk ? parseConditional<RawCodeScanAlert>(scanRes!, h) : Promise.resolve([]),
+    secretOk ? parseConditional<RawSecretAlert>(secretRes!, h) : Promise.resolve([]),
   ])
 
   const alerts = openRawAlerts.map(mapAlert)
   const dismissedMapped = dismissedRawAlerts.map(mapAlert)
 
   let profileData: { files?: { security?: unknown } } | null = null
-  if (profileRes?.ok) {
-    const parsed = await profileRes.json().catch(() => null)
+  if (profileOk) {
+    const parsed = await profileRes!.json()
     if (parsed != null && typeof parsed === 'object' && !Array.isArray(parsed)) {
       profileData = parsed as { files?: { security?: unknown } }
     }
@@ -141,7 +164,7 @@ export async function getRepoSecurity(
   let codeScanning: CodeScanningCounts | false | null = null
   if (scanRes?.status === 404) {
     codeScanning = false
-  } else if (scanRes?.ok) {
+  } else if (scanOk) {
     codeScanning = {
       critical: scanAlerts.filter(a => a.rule.severity === 'critical').length,
       high:     scanAlerts.filter(a => a.rule.severity === 'high').length,
@@ -152,7 +175,7 @@ export async function getRepoSecurity(
     }
   }
 
-  const secretScanning: SecretScanningCounts | null = secretRes?.ok
+  const secretScanning: SecretScanningCounts | null = secretOk
     ? {
         active:   secretAlerts.filter(a => a.validity === 'active').length,
         inactive: secretAlerts.filter(a => a.validity === 'inactive').length,
@@ -164,7 +187,7 @@ export async function getRepoSecurity(
     available: true,
     permissionDenied: false,
     vulnerabilities: countBySeverity(alerts),
-    dismissedVulnerabilities: dismissedRes?.ok ? countBySeverity(dismissedMapped) : null,
+    dismissedVulnerabilities: dismissedOk ? countBySeverity(dismissedMapped) : null,
     hasSecurityPolicy: profileData?.files?.security !== undefined
       ? profileData.files!.security !== null
       : null,

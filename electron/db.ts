@@ -120,6 +120,50 @@ export function initSchema(db: Database.Database): void {
       PRIMARY KEY (owner, name)
     );
 
+    -- Caches the network-derived intermediates from getRepoStats:
+    --   { daysSinceCommit, contributors }
+    -- (from /contributors; pushed_at on the repos row supplies daysSinceCommit).
+    -- 6h TTL — see STATS_CACHE_TTL_MS in services/repoStats.ts.
+    CREATE TABLE IF NOT EXISTS repo_stats_cache (
+      owner      TEXT NOT NULL,
+      name       TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL,
+      data       TEXT NOT NULL,
+      PRIMARY KEY (owner, name)
+    );
+
+    -- Caches /stats/commit_activity payload. Separate table because momentum
+    -- is now lazily fetched (only when the Momentum section is expanded), so
+    -- it has a different fetch lifecycle than the rest of the stats bundle.
+    CREATE TABLE IF NOT EXISTS repo_momentum_cache (
+      owner      TEXT NOT NULL,
+      name       TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL,
+      data       TEXT NOT NULL,
+      PRIMARY KEY (owner, name)
+    );
+
+    -- Caches /releases?per_page=100 payload. 1h TTL — releases publish
+    -- infrequently and stale-by-an-hour is acceptable for the Activities tab.
+    CREATE TABLE IF NOT EXISTS repo_releases_cache (
+      owner      TEXT NOT NULL,
+      name       TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL,
+      data       TEXT NOT NULL,
+      PRIMARY KEY (owner, name)
+    );
+
+    -- ETag cache for conditional GitHub REST requests (If-None-Match).
+    -- Rows are keyed by full URL since the same URL may be hit from multiple
+    -- code paths. A 304 response from GitHub does NOT count against the
+    -- primary rate limit, so this is the cheapest way to keep data fresh.
+    CREATE TABLE IF NOT EXISTS http_etag_cache (
+      url        TEXT PRIMARY KEY,
+      etag       TEXT NOT NULL,
+      body       TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL
+    );
+
     CREATE UNIQUE INDEX IF NOT EXISTS repos_owner_name ON repos (owner, name);
     CREATE INDEX IF NOT EXISTS repos_saved_at         ON repos(saved_at);
   `)
@@ -182,6 +226,12 @@ export function initSchema(db: Database.Database): void {
 
   // Phase 22 migration — recently-unstarred tracking (powers the Unstarred filter)
   try { db.exec(`ALTER TABLE repos ADD COLUMN unstarred_at TEXT`) } catch {}
+
+  // Phase 23 migration — call-reduction caches:
+  //   fetched_at         = epoch ms when /repos/{o}/{n} last refreshed (TTL skip in github:getRepo)
+  //   starred_checked_at = epoch ms when /user/starred/{o}/{n} last verified (TTL skip in github:isStarred)
+  try { db.exec(`ALTER TABLE repos ADD COLUMN fetched_at INTEGER`) } catch {}
+  try { db.exec(`ALTER TABLE repos ADD COLUMN starred_checked_at INTEGER`) } catch {}
 
   // Phase 20 – AI chat history
   db.exec(`CREATE TABLE IF NOT EXISTS ai_chats (

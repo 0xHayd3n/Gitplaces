@@ -10,7 +10,13 @@ function createDb(): Database.Database {
       owner TEXT NOT NULL, name TEXT NOT NULL,
       fetched_at INTEGER NOT NULL, data TEXT NOT NULL,
       PRIMARY KEY (owner, name)
-    )
+    );
+    CREATE TABLE http_etag_cache (
+      url TEXT PRIMARY KEY,
+      etag TEXT NOT NULL,
+      body TEXT NOT NULL,
+      fetched_at INTEGER NOT NULL
+    );
   `)
   return db
 }

@@ -45,7 +45,8 @@ import { startSkillSyncService, push as skillSyncPush, pushAll as skillSyncPushA
 import { startNotesSyncService, pushNote as notesSyncPush, pushAllPendingNotes, pullNote } from './services/notesSyncService'
 import { parseOgImage, isGenericGitHubOg } from './services/ogImageService'
 import { getRepoUserEvents } from './services/repoUserEvents'
-import { getRepoStats } from './services/repoStats'
+import { getRepoStats, getRepoMomentum } from './services/repoStats'
+import { fetchRepoBundle, type RepoBundle } from './githubGraphql'
 import { sanitiseRef } from './sanitiseRef'
 import type { CollectionRow, CollectionRepoRow } from '../src/types/repo'
 import { classifyRepoBucket } from '../src/lib/classifyRepoType'
@@ -622,15 +623,27 @@ ipcMain.handle('github:searchRepos', async (_event, query: string, sort?: string
   return rows
 })
 
+// 30-min TTL skip: if the local repos row was refreshed recently, return it
+// directly without a /repos/{o}/{n} call. Saves one GitHub call per warm
+// cross-session visit.
+const REPO_FETCH_TTL_MS = 30 * 60 * 1000
 ipcMain.handle('github:getRepo', async (_event, owner: string, name: string) => {
   const token = getToken()
   if (!token) return null // GitHub disconnected — skip API call
   const db = getDb(app.getPath('userData'))
+
+  // Skip the GitHub call entirely if our local row was refreshed within TTL.
+  const fresh = db.prepare(
+    'SELECT * FROM repos WHERE owner = ? AND name = ? AND fetched_at IS NOT NULL AND fetched_at > ?'
+  ).get(owner, name, Date.now() - REPO_FETCH_TTL_MS)
+  if (fresh) return fresh
+
   let repo: Awaited<ReturnType<typeof getRepo>>
   try {
-    repo = await getRepo(token, owner, name)
+    repo = await getRepo(token, owner, name, db)
   } catch {
-    return null // network error / timeout — return gracefully
+    // On network error, fall back to the (possibly stale) DB row if we have one
+    return db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(owner, name) ?? null
   }
 
   const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: JSON.stringify(repo.topics ?? []) })
@@ -675,6 +688,11 @@ ipcMain.handle('github:getRepo', async (_event, owner: string, name: string) => 
     classified?.bucket ?? null, classified?.subType ?? null,
   )
 
+  // Stamp the refresh time so the next call within REPO_FETCH_TTL_MS skips
+  // the network round-trip.
+  db.prepare('UPDATE repos SET fetched_at = ? WHERE owner = ? AND name = ?')
+    .run(Date.now(), owner, name)
+
   // Non-blocking: extract colour if missing
   if (repo.owner.avatar_url) {
     const existing = db.prepare('SELECT banner_color FROM repos WHERE owner = ? AND name = ?')
@@ -702,10 +720,36 @@ ipcMain.handle('github:getFileContent', async (_event, owner: string, name: stri
   return getFileContent(token, owner, name, path)
 })
 
+// 1h DB cache for releases — they publish infrequently. Skips the GitHub call
+// entirely on warm cross-session visits within the TTL.
+const RELEASES_CACHE_TTL_MS = 60 * 60 * 1000
 ipcMain.handle('github:getReleases', async (_event, owner: string, name: string) => {
   const token = getToken()
-  if (!token) return [] // GitHub disconnected — skip API call
-  return getReleases(token, owner, name)  // errors propagate to renderer → "Failed to load releases." UI state
+  if (!token) return [] // GitHub disconnected — skip API call (renders as "no activity")
+  const db = getDb(app.getPath('userData'))
+
+  const cached = db.prepare(
+    'SELECT fetched_at, data FROM repo_releases_cache WHERE owner=? AND name=?'
+  ).get(owner, name) as { fetched_at: number; data: string } | undefined
+  if (cached && Date.now() - cached.fetched_at < RELEASES_CACHE_TTL_MS) {
+    try { return JSON.parse(cached.data) } catch { /* fall through to refetch */ }
+  }
+
+  try {
+    const fresh = await getReleases(token, owner, name, db)
+    db.prepare(
+      'INSERT OR REPLACE INTO repo_releases_cache (owner, name, fetched_at, data) VALUES (?,?,?,?)'
+    ).run(owner, name, Date.now(), JSON.stringify(fresh))
+    return fresh
+  } catch {
+    // On network error: serve a stale cache row if we have one (better than
+    // showing 'error'), else return null so the renderer can show the
+    // "Couldn't load releases" notice.
+    if (cached) {
+      try { return JSON.parse(cached.data) } catch { /* fall through */ }
+    }
+    return null
+  }
 })
 
 ipcMain.handle('github:getRepoUserEvents', async (_event, owner: string, name: string) => {
@@ -714,11 +758,126 @@ ipcMain.handle('github:getRepoUserEvents', async (_event, owner: string, name: s
 })
 
 ipcMain.handle('github:getRepoStats', async (
-  _event, owner: string, name: string, lastReleaseDate: string | null
+  _event, owner: string, name: string
 ) => {
   const db = getDb(app.getPath('userData'))
   const token = getToken() ?? null
-  return getRepoStats(db, owner, name, token, lastReleaseDate)
+  // Reuse the cached repo row (populated by `github:getRepo`) so the stats
+  // service can skip its own /repos/{o}/{n} fetch AND skip the /commits
+  // fetch (pushed_at is the same date). Saves up to two GitHub calls per
+  // stats fetch. If the row is missing (uncommon — getRepo runs first in
+  // RepoDetail), the service falls back to fetching.
+  const repoRow = db.prepare(
+    'SELECT stars, forks, open_issues, pushed_at FROM repos WHERE owner=? AND name=?'
+  ).get(owner, name) as { stars: number | null; forks: number | null; open_issues: number | null; pushed_at: string | null } | undefined
+  const cachedCore = repoRow && repoRow.stars != null && repoRow.forks != null && repoRow.open_issues != null
+    ? { stars: repoRow.stars, forks: repoRow.forks, openIssues: repoRow.open_issues, pushedAt: repoRow.pushed_at }
+    : undefined
+  return getRepoStats(db, owner, name, token, cachedCore)
+})
+
+ipcMain.handle('github:getRepoMomentum', async (_event, owner: string, name: string) => {
+  const db = getDb(app.getPath('userData'))
+  const token = getToken() ?? null
+  try {
+    return await getRepoMomentum(db, owner, name, token)
+  } catch {
+    return null
+  }
+})
+
+// Single GraphQL bundle that replaces 3 REST calls (getRepo + getReleases +
+// isStarred) on the RepoDetail page, plus collects vulnerability + security
+// policy data for future use. Falls back gracefully (returns null) on any
+// error so the renderer can degrade to per-endpoint REST.
+//
+// Returns:
+//   - `repoRow`: the canonical DB row (matches what github:getRepo returns)
+//   - `releases`: array of release rows (matches what github:getReleases returns)
+//   - `isStarred`: viewer's star state on this repo
+//   - `vulnerabilities`, `securityPolicyUrl`: bonus payloads for future caching
+//
+// Side-effects on success:
+//   - Inserts/updates the local repos row (mirrors github:getRepo)
+//   - Stamps repos.fetched_at and starred_checked_at so subsequent same-repo
+//     calls within their TTLs hit the cache
+//   - Caches the releases payload in repo_releases_cache (1h TTL)
+ipcMain.handle('github:fetchRepoBundle', async (_event, owner: string, name: string) => {
+  const token = getToken()
+  if (!token) return null
+  const db = getDb(app.getPath('userData'))
+  let bundle: RepoBundle | null
+  try {
+    bundle = await fetchRepoBundle(db, token, owner, name)
+  } catch {
+    return null
+  }
+  if (!bundle) return null
+
+  const r = bundle.repo
+  const classified = classifyRepoBucket({ name: r.name, description: r.description, topics: JSON.stringify(r.topics ?? []) })
+  cascadeRepoId(db, owner, name, String(r.id))
+  db.prepare(`
+    INSERT INTO repos (id, owner, name, description, language, topics, stars, forks, license,
+                       homepage, updated_at, pushed_at, created_at, saved_at, type, banner_svg,
+                       discovered_at, discover_query, watchers, size, open_issues, default_branch, avatar_url,
+                       type_bucket, type_sub)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      owner          = excluded.owner,
+      name           = excluded.name,
+      description    = excluded.description,
+      language       = excluded.language,
+      topics         = excluded.topics,
+      stars          = excluded.stars,
+      forks          = excluded.forks,
+      updated_at     = excluded.updated_at,
+      pushed_at      = excluded.pushed_at,
+      created_at     = excluded.created_at,
+      watchers       = excluded.watchers,
+      size           = excluded.size,
+      open_issues    = excluded.open_issues,
+      default_branch = excluded.default_branch,
+      avatar_url     = COALESCE(excluded.avatar_url, repos.avatar_url),
+      saved_at       = repos.saved_at,
+      discovered_at  = repos.discovered_at,
+      discover_query = repos.discover_query,
+      banner_color   = repos.banner_color,
+      type_bucket    = excluded.type_bucket,
+      type_sub       = excluded.type_sub
+  `).run(
+    String(r.id), owner, name, r.description, r.language,
+    JSON.stringify(r.topics ?? []), r.stargazers_count, r.forks_count,
+    r.license?.spdx_id ?? null, r.homepage, r.updated_at, r.pushed_at,
+    r.created_at ?? null,
+    r.watchers_count, r.size, r.open_issues_count,
+    r.default_branch ?? 'main', r.owner.avatar_url ?? null,
+    classified?.bucket ?? null, classified?.subType ?? null,
+  )
+
+  // Stamp TTL columns and update starred_at to reflect the live truth.
+  const now = Date.now()
+  const starredAt = bundle.isStarred ? new Date().toISOString() : null
+  db.prepare(
+    'UPDATE repos SET fetched_at = ?, starred_checked_at = ?, starred_at = COALESCE(?, starred_at) WHERE owner = ? AND name = ?'
+  ).run(now, now, starredAt, owner, name)
+
+  // Cache the releases payload so the per-endpoint github:getReleases handler
+  // serves from cache if anything else asks (1h TTL — same as that handler).
+  db.prepare(
+    'INSERT OR REPLACE INTO repo_releases_cache (owner, name, fetched_at, data) VALUES (?,?,?,?)'
+  ).run(owner, name, now, JSON.stringify(bundle.releases))
+
+  // Return the canonical DB row alongside the bundle so the renderer can
+  // setRepo(row) directly (matches the github:getRepo contract).
+  const repoRow = db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(owner, name)
+  return {
+    repoRow,
+    releases: bundle.releases,
+    isStarred: bundle.isStarred,
+    vulnerabilities: bundle.vulnerabilities,
+    securityPolicyUrl: bundle.securityPolicyUrl,
+  }
 })
 
 ipcMain.handle('github:recordFork', async (_event, owner: string, name: string) => {
@@ -743,13 +902,16 @@ ipcMain.handle('github:starRepo', async (_event, owner: string, name: string) =>
   const db = getDb(app.getPath('userData'))
   const now = new Date().toISOString()
   // Re-starring also clears unstarred_at so the row leaves the Unstarred filter.
-  const updated = db.prepare('UPDATE repos SET starred_at = ?, unstarred_at = NULL WHERE owner = ? AND name = ?').run(now, owner, name)
+  // starred_checked_at is bumped so isStarred TTL skip can trust this row.
+  const updated = db.prepare(
+    'UPDATE repos SET starred_at = ?, unstarred_at = NULL, starred_checked_at = ? WHERE owner = ? AND name = ?'
+  ).run(now, Date.now(), owner, name)
   if (updated.changes === 0) {
     db.prepare(`
       INSERT INTO repos (id, owner, name, description, language, topics, stars, forks,
-                         license, homepage, updated_at, saved_at, type, banner_svg, starred_at)
-      VALUES (?, ?, ?, NULL, NULL, '[]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
-    `).run(`${owner}/${name}`, owner, name, now)
+                         license, homepage, updated_at, saved_at, type, banner_svg, starred_at, starred_checked_at)
+      VALUES (?, ?, ?, NULL, NULL, '[]', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?)
+    `).run(`${owner}/${name}`, owner, name, now, Date.now())
   }
 })
 
@@ -759,12 +921,38 @@ ipcMain.handle('github:unstarRepo', async (_event, owner: string, name: string) 
   await unstarRepo(token, owner, name)
   const db = getDb(app.getPath('userData'))
   const now = new Date().toISOString()
-  db.prepare('UPDATE repos SET starred_at = NULL, unstarred_at = ? WHERE owner = ? AND name = ?').run(now, owner, name)
+  db.prepare(
+    'UPDATE repos SET starred_at = NULL, unstarred_at = ?, starred_checked_at = ? WHERE owner = ? AND name = ?'
+  ).run(now, Date.now(), owner, name)
 })
 
+// 30-min TTL skip: if we've verified the star state with GitHub recently, trust
+// the local row instead of re-checking. The star/unstar handlers update both
+// `starred_at` and `starred_checked_at`, so user actions through the app keep
+// the cache fresh.
+const STAR_CHECK_TTL_MS = 30 * 60 * 1000
 ipcMain.handle('github:isStarred', async (_event, owner: string, name: string) => {
   const token = getToken() ?? null
-  return isRepoStarred(token, owner, name)
+  const db = getDb(app.getPath('userData'))
+
+  const cached = db.prepare(
+    'SELECT starred_at, starred_checked_at FROM repos WHERE owner=? AND name=?'
+  ).get(owner, name) as { starred_at: string | null; starred_checked_at: number | null } | undefined
+  if (cached?.starred_checked_at && Date.now() - cached.starred_checked_at < STAR_CHECK_TTL_MS) {
+    return !!cached.starred_at
+  }
+
+  try {
+    const live = await isRepoStarred(token, owner, name)
+    db.prepare('UPDATE repos SET starred_checked_at = ? WHERE owner=? AND name=?')
+      .run(Date.now(), owner, name)
+    return live
+  } catch {
+    // Network error — fall back to the cached DB value so we don't toggle the
+    // star button incorrectly (returning false here would mark a starred repo
+    // as unstarred whenever the network blips).
+    return !!cached?.starred_at
+  }
 })
 
 ipcMain.handle('github:saveRepo', async (_event, owner: string, name: string) => {

@@ -247,8 +247,22 @@ export async function getStarred(token: string): Promise<GitHubStarredRepo[]> {
   return results
 }
 
-export async function getRepo(token: string | null, owner: string, name: string): Promise<GitHubRepo> {
-  const res = await fetch(`${BASE}/repos/${owner}/${name}`, { headers: githubHeaders(token), signal: AbortSignal.timeout(10_000) })
+export async function getRepo(
+  token: string | null,
+  owner: string,
+  name: string,
+  db?: import('better-sqlite3').Database,
+): Promise<GitHubRepo> {
+  const url = `${BASE}/repos/${owner}/${name}`
+  const init = { headers: githubHeaders(token), signal: AbortSignal.timeout(10_000) }
+  if (db) {
+    const { etagFetch } = await import('./githubFetch')
+    const res = await etagFetch(db, url, init)
+    if (res.status !== 200 && res.status !== 304) throw new Error(`GitHub API error: ${res.status}`)
+    const data = await res.json()
+    return data as GitHubRepo
+  }
+  const res = await fetch(url, init)
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   return res.json() as Promise<GitHubRepo>
 }
@@ -288,12 +302,27 @@ export async function getDefaultBranch(
   return repo.default_branch ?? 'main'
 }
 
-export async function getReleases(token: string | null, owner: string, name: string): Promise<GitHubRelease[]> {
+export async function getReleases(
+  token: string | null,
+  owner: string,
+  name: string,
+  db?: import('better-sqlite3').Database,
+): Promise<GitHubRelease[]> {
   // per_page=100 is GitHub's hard max for a single page. Covers ~all repos in
   // one call. Repos with >100 releases (rare — e.g. react ~360, next.js ~580)
   // are still truncated; full pagination deferred until we have a real
   // "load older" affordance.
-  const res = await fetch(`${BASE}/repos/${owner}/${name}/releases?per_page=100`, { headers: githubHeaders(token) })
+  // 10s timeout matches getRepo — without it, a slow/dropped GitHub connection
+  // leaves the Activities tab pinned at "Loading activity…" forever.
+  const url = `${BASE}/repos/${owner}/${name}/releases?per_page=100`
+  const init = { headers: githubHeaders(token), signal: AbortSignal.timeout(10_000) }
+  if (db) {
+    const { etagFetch } = await import('./githubFetch')
+    const res = await etagFetch(db, url, init)
+    if (res.status !== 200 && res.status !== 304) throw new Error(`GitHub API error: ${res.status}`)
+    return (await res.json()) as GitHubRelease[]
+  }
+  const res = await fetch(url, init)
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   return res.json() as Promise<GitHubRelease[]>
 }
@@ -385,10 +414,24 @@ export async function unstarRepo(token: string, owner: string, name: string): Pr
   if (!res.ok && res.status !== 204) throw new Error(`GitHub API error: ${res.status}`)
 }
 
-export async function isRepoStarred(token: string | null, owner: string, name: string): Promise<boolean> {
+export async function isRepoStarred(
+  token: string | null,
+  owner: string,
+  name: string,
+  // Note: this endpoint returns 204/404 (no body), so it can't benefit from
+  // ETag caching — there's nothing to compare. We accept `db` for signature
+  // symmetry with the other two but don't use it. Kept here so future callers
+  // don't have to treat this differently.
+  _db?: import('better-sqlite3').Database,
+): Promise<boolean> {
   if (!token) return false
+  // 10s timeout matches getRepo / getReleases — without it, a slow or dropped
+  // GitHub connection leaks an unhandled rejection into the main-process log
+  // ("TypeError: fetch failed → ConnectTimeoutError") even though the renderer
+  // catches it.
   const res = await fetch(`${BASE}/user/starred/${owner}/${name}`, {
     headers: githubHeaders(token),
+    signal: AbortSignal.timeout(10_000),
   })
   return res.status === 204
 }

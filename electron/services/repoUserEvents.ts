@@ -6,6 +6,7 @@ interface RepoRow {
   starred_at: string | null
   archived_at: string | null
   forked_at: string | null
+  created_at: string | null
 }
 interface SkillRow { filename: string; generated_at: string | null }
 interface SubSkillRow { filename: string; generated_at: string | null }
@@ -16,7 +17,7 @@ export function getRepoUserEvents(
   name: string,
 ): RepoUserEvent[] {
   const repo = db.prepare(
-    'SELECT id, starred_at, archived_at, forked_at FROM repos WHERE owner=? AND name=?'
+    'SELECT id, starred_at, archived_at, forked_at, created_at FROM repos WHERE owner=? AND name=?'
   ).get(owner, name) as RepoRow | undefined
   if (!repo) return []
 
@@ -24,6 +25,7 @@ export function getRepoUserEvents(
   if (repo.starred_at)  events.push({ type: 'star',    ts: repo.starred_at })
   if (repo.archived_at) events.push({ type: 'archive', ts: repo.archived_at })
   if (repo.forked_at)   events.push({ type: 'fork',    ts: repo.forked_at })
+  if (repo.created_at)  events.push({ type: 'created', ts: repo.created_at })
 
   const master = db.prepare(
     'SELECT filename, generated_at FROM skills WHERE repo_id=? AND generated_at IS NOT NULL'

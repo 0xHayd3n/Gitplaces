@@ -36,8 +36,12 @@ contextBridge.exposeInMainWorld('api', {
     getReleases:   (owner: string, name: string) => ipcRenderer.invoke('github:getReleases', owner, name),
     getRepoUserEvents: (owner: string, name: string) =>
       ipcRenderer.invoke('github:getRepoUserEvents', owner, name),
-    getRepoStats: (owner: string, name: string, lastReleaseDate: string | null) =>
-      ipcRenderer.invoke('github:getRepoStats', owner, name, lastReleaseDate),
+    getRepoStats: (owner: string, name: string) =>
+      ipcRenderer.invoke('github:getRepoStats', owner, name),
+    getRepoMomentum: (owner: string, name: string) =>
+      ipcRenderer.invoke('github:getRepoMomentum', owner, name),
+    fetchRepoBundle: (owner: string, name: string) =>
+      ipcRenderer.invoke('github:fetchRepoBundle', owner, name),
     recordFork: (owner: string, name: string) =>
       ipcRenderer.invoke('github:recordFork', owner, name),
     setArchivedAt: (owner: string, name: string, archived: boolean) =>
