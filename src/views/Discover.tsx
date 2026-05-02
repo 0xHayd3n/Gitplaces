@@ -30,6 +30,10 @@ import DiscoverSuggestions, { type Suggestion, type SubtypeSuggestion, type Topi
 import DiscoverGrid from '../components/DiscoverGrid'
 import { useKeyboardNav } from '../hooks/useKeyboardNav'
 import { setDitherScrollHint } from '../hooks/useBayerDither'
+import {
+  loadCachedPopular, saveCachedPopular,
+  loadCachedRecommended, saveCachedRecommended,
+} from '../lib/discoverCache'
 
 // ── Layout prefs loader ───────────────────────────────────────────
 
@@ -56,9 +60,39 @@ function loadLayoutPrefs(): LayoutPrefs {
   }
 }
 
-// ── Module-level recommended cache (survives component unmount) ───
+// ── Module-level caches (survive component unmount and app restart) ──
+// RECOMMENDED_TTL_MS gates *in-session* refresh: hits within the hour skip
+// the network. Persistent localStorage hydration uses its own 24h TTL inside
+// loadCachedRecommended/Popular, so older-than-1h cache still seeds the UI
+// (SWR-style) but triggers a background refetch.
 const RECOMMENDED_TTL_MS = 60 * 60 * 1000
-let _recommendedModuleCache: { items: RecommendationItem[]; fetchedAt: number } | null = null
+
+let _recommendedModuleCache: { items: RecommendationItem[]; fetchedAt: number } | null = (() => {
+  const persisted = loadCachedRecommended()
+  return persisted ? { items: persisted.items, fetchedAt: persisted.fetchedAt } : null
+})()
+
+let _popularModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
+  const persisted = loadCachedPopular()
+  return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
+})()
+
+// Only the unfiltered "Most Popular" landing is cached — caching every filter
+// permutation would bloat localStorage without meaningfully improving cold-start
+// UX. Filtered views still hit the network.
+function isPopularDefaultState(
+  viewMode: ViewModeKey,
+  selectedLanguages: string[],
+  selectedSubtypes: string[],
+  filters: SearchFilters,
+): boolean {
+  return viewMode === 'all'
+    && selectedLanguages.length === 0
+    && selectedSubtypes.length === 0
+    && !filters.activity
+    && !filters.stars
+    && !filters.license
+}
 
 // ── Discover view ─────────────────────────────────────────────────
 export default function Discover() {
@@ -70,7 +104,15 @@ export default function Discover() {
   const restoredSnapshot = useRef(navigationType === 'POP' ? peekDiscoverSnapshot() : null)
   const restoredFromSnapshot = useRef(restoredSnapshot.current !== null)
 
-  const [repos, setRepos] = useState<RepoRow[]>(() => restoredSnapshot.current?.repos ?? [])
+  const [repos, setRepos] = useState<RepoRow[]>(() => {
+    if (restoredSnapshot.current?.repos?.length) return restoredSnapshot.current.repos
+    // Seed from persistent cache only when the URL describes a default-popular
+    // landing — any filter param means the cache is for the wrong query.
+    const params = new URLSearchParams(window.location.search)
+    const isDefaultUrl = (params.get('view') ?? 'all') === 'all' && !params.get('lang')
+    if (isDefaultUrl && _popularModuleCache) return _popularModuleCache.repos
+    return []
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const recommendedCache = useRef<RepoRow[] | null>(null)
@@ -217,21 +259,28 @@ export default function Discover() {
 
   useEffect(() => {
     async function loadHeroData() {
+      // SWR: render any cached items now (the persistent cache may be older
+      // than RECOMMENDED_TTL_MS but is still useful for instant cold-start),
+      // then refresh in the background unless the in-session TTL says we're
+      // already fresh enough to skip the network call.
+      const cached = recommendedItemsCache.current ?? _recommendedModuleCache?.items ?? null
+      if (cached) {
+        recommendedItemsCache.current = cached
+        recommendedCache.current = cached.map(i => i.repo)
+        setRowRepos(cached.slice(0, 16).map(i => i.repo))
+      }
+
+      const isFreshInSession = _recommendedModuleCache
+        && Date.now() - _recommendedModuleCache.fetchedAt < RECOMMENDED_TTL_MS
+      if (cached && isFreshInSession) return
+
       try {
-        let items: RecommendationItem[]
-        if (recommendedItemsCache.current) {
-          items = recommendedItemsCache.current
-        } else if (_recommendedModuleCache && Date.now() - _recommendedModuleCache.fetchedAt < RECOMMENDED_TTL_MS) {
-          items = _recommendedModuleCache.items
-          recommendedItemsCache.current = items
-          recommendedCache.current = items.map(i => i.repo)
-        } else {
-          const response = await window.api.github.getRecommended()
-          items = response.items
-          _recommendedModuleCache = { items, fetchedAt: Date.now() }
-          recommendedItemsCache.current = items
-          recommendedCache.current = items.map(i => i.repo)
-        }
+        const response = await window.api.github.getRecommended()
+        const items = response.items
+        _recommendedModuleCache = { items, fetchedAt: Date.now() }
+        saveCachedRecommended(items)
+        recommendedItemsCache.current = items
+        recommendedCache.current = items.map(i => i.repo)
         setRowRepos(items.slice(0, 16).map(i => i.repo))
       } catch {
         // non-critical — hero/row simply won't render
@@ -393,9 +442,25 @@ export default function Discover() {
   }
 
   const loadTrending = useCallback(async (filters?: SearchFilters) => {
-    setLoading(true)
+    const popularDefault = isPopularDefaultState(viewMode, selectedLanguages, selectedSubtypes, filters ?? {})
+    const hasCachedPopular = popularDefault && _popularModuleCache != null
+
+    if (hasCachedPopular) {
+      // SWR: keep cached cards visible while the background refetch runs.
+      // Switching back to default popular from a filtered view also lands here,
+      // so we explicitly setRepos to the cached set rather than relying on
+      // whatever was previously rendered.
+      const cachedRepos = _popularModuleCache!.repos
+      setRepos(cachedRepos)
+      ensureClassified(cachedRepos)
+      extractMissingColors(cachedRepos)
+      const cachedIds = cachedRepos.map(r => r.id).filter(Boolean)
+      if (cachedIds.length) window.api.verification.prioritise(cachedIds).catch(() => {})
+    } else {
+      setLoading(true)
+      setRepos([])
+    }
     setError(null)
-    setRepos([])
     setRelatedTags([])
     setSearchPath('trending')
     setPage(1)
@@ -417,6 +482,7 @@ export default function Discover() {
           recommendedCache.current = data
           recommendedItemsCache.current = response.items
           _recommendedModuleCache = { items: response.items, fetchedAt: Date.now() }
+          saveCachedRecommended(response.items)
         }
       } else {
         const subKw = selectedSubtypes.length === 1
@@ -434,9 +500,19 @@ export default function Discover() {
       const ids = data.map(r => r.id).filter(Boolean)
       if (ids.length) window.api.verification.prioritise(ids).catch(() => {})
       extractMissingColors(data)
+
+      // Persist fresh popular-default results so the next cold launch renders instantly.
+      if (popularDefault) {
+        _popularModuleCache = { repos: data, fetchedAt: Date.now() }
+        saveCachedPopular(data)
+      }
     } catch (e: unknown) {
       if (gen !== fetchGeneration.current) return
-      setError(e instanceof Error ? e.message : 'Unknown error')
+      // If the user already sees cached cards, suppress the error overlay and
+      // keep the stale cards visible — better UX than blanking the page.
+      if (!hasCachedPopular) {
+        setError(e instanceof Error ? e.message : 'Unknown error')
+      }
     } finally {
       if (gen === fetchGeneration.current) setLoading(false)
     }
