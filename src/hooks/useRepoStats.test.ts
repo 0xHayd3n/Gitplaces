@@ -29,7 +29,7 @@ const mockStats: RepoStats = {
   security: {
     available: true,
     vulnerabilities: { critical: 0, high: 0, moderate: 1, low: 2 },
-    hasSecurityPolicy: true, codeScanningEnabled: false,
+    hasSecurityPolicy: true, codeScanningEnabled: false, alerts: null,
   },
   engagement: { starredAt: '2026-01-12T00:00:00Z', forkedAt: null, skillsLearned: 2 },
 }
