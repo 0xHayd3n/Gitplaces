@@ -173,12 +173,12 @@ export function RepoStatsSidebar({ stats }: Props) {
               {engagement.starredAt ? relativeTime(engagement.starredAt) : '—'}
             </span>
           </div>
-          {engagement.forkedAt && (
-            <div className="stats-signal">
-              <span className="stats-signal-label">Forked</span>
-              <span className="stats-signal-val">{relativeTime(engagement.forkedAt)}</span>
-            </div>
-          )}
+          <div className="stats-signal">
+            <span className="stats-signal-label">Forked</span>
+            <span className="stats-signal-val">
+              {engagement.forkedAt ? relativeTime(engagement.forkedAt) : '—'}
+            </span>
+          </div>
           <div className="stats-signal">
             <span className="stats-signal-label">Skills learned</span>
             <span className="stats-signal-val">{engagement.skillsLearned}</span>
