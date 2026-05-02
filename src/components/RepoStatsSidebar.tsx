@@ -130,7 +130,7 @@ export function RepoStatsSidebar({ stats }: Props) {
           <div className="stats-computing">Security data not available</div>
         ) : (
           <>
-            {security.vulnerabilities && (
+            {security.vulnerabilities && totalVulns > 0 && (
               <div className="stats-vuln-row">
                 <span className="stats-vuln-icon">⚠</span>
                 <div>
@@ -141,6 +141,12 @@ export function RepoStatsSidebar({ stats }: Props) {
                     {security.vulnerabilities.high}h · {security.vulnerabilities.moderate}m · {security.vulnerabilities.low}l
                   </div>
                 </div>
+              </div>
+            )}
+            {security.vulnerabilities && totalVulns === 0 && (
+              <div className="stats-signal">
+                <span className="stats-signal-label">Vulnerabilities</span>
+                <Dot active={true} />
               </div>
             )}
             <div className="stats-signal-list">
