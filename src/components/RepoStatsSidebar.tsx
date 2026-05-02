@@ -64,7 +64,7 @@ export function RepoStatsSidebar({ stats }: Props) {
               stroke={healthColor}
               strokeWidth="5"
               strokeDasharray={`${filled} ${circumference}`}
-              strokeDashoffset={circumference / 4}
+              strokeDashoffset={-(circumference / 4)}
               strokeLinecap="round"
             />
             <text x="22" y="26" textAnchor="middle" fill="var(--t1)" fontSize="10" fontFamily="inherit" fontWeight="bold">
@@ -101,16 +101,16 @@ export function RepoStatsSidebar({ stats }: Props) {
         ) : (
           <>
             <div className="stats-bars">
-              {momentum.monthlyCommits.map((count, i) => {
+              {(() => {
                 const max = Math.max(...momentum.monthlyCommits, 1)
-                return (
+                return momentum.monthlyCommits.map((count, i) => (
                   <div
                     key={i}
                     className={`stats-bar${i === 5 ? ' stats-bar--current' : ''}`}
                     style={{ height: `${Math.round((count / max) * 100)}%` }}
                   />
-                )
-              })}
+                ))
+              })()}
             </div>
             <div className="stats-trend">
               {momentum.trend === 'up' ? '↑ Trending up' :
