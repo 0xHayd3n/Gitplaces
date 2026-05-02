@@ -1,6 +1,19 @@
 export type HealthStatus = 'active' | 'slow' | 'stale'
 export type IssueVelocity = 'healthy' | 'backlogged' | 'critical'
 
+export interface SecurityAlert {
+  number: number
+  package: string
+  ecosystem: string
+  manifestPath: string
+  severity: 'critical' | 'high' | 'moderate' | 'low'
+  cveId: string | null
+  ghsaId: string
+  summary: string
+  fixVersion: string | null
+  url: string
+}
+
 export interface RepoStats {
   vitals: {
     stars: number
@@ -21,9 +34,10 @@ export interface RepoStats {
   } | null                           // null = GitHub returned 202 (computing)
   security: {
     available: boolean
-    vulnerabilities: { high: number; moderate: number; low: number } | null
+    vulnerabilities: { critical: number; high: number; moderate: number; low: number } | null
     hasSecurityPolicy: boolean | null
     codeScanningEnabled: boolean | null
+    alerts: SecurityAlert[] | null   // null when !available
   }
   engagement: {
     starredAt: string | null
