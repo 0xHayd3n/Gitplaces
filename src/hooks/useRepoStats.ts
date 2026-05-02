@@ -14,7 +14,7 @@ export function useRepoStats(
     let cancelled = false
     setStats('loading')
     window.api.github.getRepoStats(owner, name, lastReleaseDate)
-      .then(s  => { if (!cancelled) setStats(s ?? 'error') })
+      .then(s => { if (!cancelled) setStats(s) })
       .catch(() => { if (!cancelled) setStats('error') })
     return () => { cancelled = true }
   }, [owner, name, lastReleaseDate])
