@@ -28,7 +28,13 @@ function computeVerdict(stats: RepoStats): Verdict {
   const highVulns = vulns?.high ?? 0
   const totalVulns = vulns ? vulns.critical + vulns.high + vulns.moderate + vulns.low : 0
 
-  if (security.available && (criticalVulns > 0 || highVulns > 0)) {
+  const hasActiveSecrets = security.secretScanning != null && security.secretScanning.active > 0
+  const hasCriticalCodeScan =
+    typeof security.codeScanning === 'object' &&
+    security.codeScanning !== null &&
+    (security.codeScanning.critical > 0 || security.codeScanning.high > 0)
+
+  if (security.available && (criticalVulns > 0 || highVulns > 0 || hasActiveSecrets || hasCriticalCodeScan)) {
     const severeCount = criticalVulns + highVulns
     return {
       label: 'Critical issues',
@@ -183,7 +189,11 @@ export function RepoStatsSidebar({ stats }: Props) {
       {/* ── Security ── */}
       <CollapsibleSection label="Security">
         {!security.available ? (
-          <div className="stats-computing">Security data not available</div>
+          <div className="stats-computing">
+            {security.permissionDenied
+              ? 'Token lacks permission — grant security_events scope'
+              : 'Security data not available'}
+          </div>
         ) : (
           <>
             {security.vulnerabilities && totalVulns > 0 && (
@@ -199,6 +209,20 @@ export function RepoStatsSidebar({ stats }: Props) {
                 </div>
               </div>
             )}
+            {security.dismissedVulnerabilities && (() => {
+              const d = security.dismissedVulnerabilities!
+              const dismissedTotal = d.critical + d.high + d.moderate + d.low
+              return dismissedTotal > 0 ? (
+                <div className="stats-vuln-dismissed">
+                  <div className="stats-vuln-count" style={{ color: 'var(--t3)', fontSize: '0.82em' }}>
+                    {dismissedTotal} dismissed
+                  </div>
+                  <div className="stats-vuln-breakdown">
+                    {d.critical}c · {d.high}h · {d.moderate}m · {d.low}l
+                  </div>
+                </div>
+              ) : null
+            })()}
             {security.vulnerabilities && totalVulns === 0 && (
               <div className="stats-signal">
                 <span className="stats-signal-label">Vulnerabilities</span>
@@ -212,12 +236,37 @@ export function RepoStatsSidebar({ stats }: Props) {
                   <Dot active={security.hasSecurityPolicy} />
                 </div>
               )}
-              {security.codeScanningEnabled !== null && (
+              {security.codeScanning !== null && (
                 <div className="stats-signal">
                   <span className="stats-signal-label">Code scanning</span>
-                  <Dot active={security.codeScanningEnabled} />
+                  {security.codeScanning === false ? (
+                    <Dot active={false} />
+                  ) : (() => {
+                    const cs = security.codeScanning!
+                    const csTotal = cs.critical + cs.high + cs.medium + cs.low + cs.note + cs.warning
+                    const csHasCritical = cs.critical > 0 || cs.high > 0
+                    return (
+                      <span style={{ color: csHasCritical ? 'var(--red)' : 'var(--green)' }}>
+                        ● {csTotal} {csTotal === 1 ? 'alert' : 'alerts'}
+                      </span>
+                    )
+                  })()}
                 </div>
               )}
+              {security.secretScanning !== null && (() => {
+                const ss = security.secretScanning!
+                const hasActive = ss.active > 0
+                return (
+                  <div className="stats-signal">
+                    <span className="stats-signal-label">Secret scanning</span>
+                    <span style={{ color: hasActive ? 'var(--red)' : 'var(--green)' }}>
+                      ● {hasActive
+                        ? `${ss.active} active · ${ss.inactive} inactive · ${ss.unknown} unknown`
+                        : '0 active'}
+                    </span>
+                  </div>
+                )
+              })()}
             </div>
           </>
         )}
