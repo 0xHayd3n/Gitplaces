@@ -14,6 +14,18 @@ export interface SecurityAlert {
   url: string
 }
 
+export interface SeverityCounts {
+  critical: number; high: number; moderate: number; low: number
+}
+
+export interface CodeScanningCounts {
+  critical: number; high: number; medium: number; low: number; note: number; warning: number
+}
+
+export interface SecretScanningCounts {
+  active: number; inactive: number; unknown: number
+}
+
 export interface RepoStats {
   vitals: {
     stars: number
@@ -22,22 +34,25 @@ export interface RepoStats {
     contributors: number | null
   }
   health: {
-    score: number                    // 0–100
+    score: number
     maintenance: HealthStatus
     issueVelocity: IssueVelocity
-    lastReleaseDate: string | null   // ISO date string; null = no releases
+    lastReleaseDate: string | null
     lastReleaseDaysAgo: number | null
   }
   momentum: {
-    monthlyCommits: number[]         // length 6, oldest first
+    monthlyCommits: number[]
     trend: 'up' | 'stable' | 'down'
-  } | null                           // null = GitHub returned 202 (computing)
+  } | null
   security: {
     available: boolean
-    vulnerabilities: { critical: number; high: number; moderate: number; low: number } | null
+    permissionDenied: boolean
+    vulnerabilities: SeverityCounts | null
+    dismissedVulnerabilities: SeverityCounts | null
     hasSecurityPolicy: boolean | null
-    codeScanningEnabled: boolean | null
-    alerts: SecurityAlert[] | null   // null when !available
+    codeScanning: CodeScanningCounts | false | null
+    secretScanning: SecretScanningCounts | null
+    alerts: SecurityAlert[] | null
   }
   engagement: {
     starredAt: string | null
