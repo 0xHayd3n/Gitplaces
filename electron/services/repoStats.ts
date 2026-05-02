@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
 import { githubHeaders } from '../github'
 import type { RepoStats, HealthStatus, IssueVelocity } from '../../src/types/repoStats'
+import { getRepoSecurity } from './repoSecurity'
 
 export function computeHealthScore(data: {
   daysSinceCommit: number
@@ -31,37 +32,6 @@ interface CommitItem {
 
 interface WeekActivity { week: number; total: number }
 
-async function fetchSecurity(
-  base: string,
-  headers: Record<string, string>,
-): Promise<RepoStats['security']> {
-  try {
-    const [alertsRes, profileRes, scanRes] = await Promise.all([
-      fetch(`${base}/dependabot/alerts?state=open`, { headers }),
-      fetch(`${base}/community/profile`,            { headers }),
-      fetch(`${base}/code-scanning/alerts?per_page=1`, { headers }),
-    ])
-    if (alertsRes.status === 403) {
-      return { available: false, vulnerabilities: null, hasSecurityPolicy: null, codeScanningEnabled: null }
-    }
-    const alerts: Array<{ security_vulnerability: { severity: string } | null }> =
-      alertsRes.ok ? await alertsRes.json().catch(() => []) : []
-    const profile: { files: { security: unknown } } | null =
-      profileRes.ok ? await profileRes.json().catch(() => null) : null
-    return {
-      available: true,
-      vulnerabilities: {
-        high:     alerts.filter(a => a.security_vulnerability?.severity === 'high').length,
-        moderate: alerts.filter(a => a.security_vulnerability?.severity === 'moderate').length,
-        low:      alerts.filter(a => a.security_vulnerability?.severity === 'low').length,
-      },
-      hasSecurityPolicy:  profile ? profile.files.security !== null : null,
-      codeScanningEnabled: scanRes.status === 200 ? true : scanRes.status === 404 ? false : null,
-    }
-  } catch {
-    return { available: false, vulnerabilities: null, hasSecurityPolicy: null, codeScanningEnabled: null }
-  }
-}
 
 function getEngagement(
   db: Database.Database,
@@ -102,7 +72,7 @@ export async function getRepoStats(
     fetch(`${base}/contributors?per_page=1`,             { headers: h }).catch(() => null),
     fetch(`${base}/commits?per_page=1`,                  { headers: h }).catch(() => null),
     fetch(`${base}/stats/commit_activity`,               { headers: h }).catch(() => null),
-    fetchSecurity(base, h),
+    getRepoSecurity(db, owner, name, token),
   ])
 
   const repoData: RepoCoreData | null =
