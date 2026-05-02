@@ -1,0 +1,161 @@
+/* src/components/RepoStatsSidebar.css */
+
+.stats-sidebar-loading {
+  height: 120px;
+  border-radius: 6px;
+  background: var(--bg2);
+  opacity: 0.5;
+}
+
+.stats-sidebar-error {
+  font-size: 11px;
+  color: var(--t3);
+  padding: 8px 0;
+}
+
+.stats-sidebar-enriched {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.stats-section {
+  padding: 10px 0;
+}
+
+.stats-section-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.stats-divider {
+  height: 1px;
+  background: var(--bg3);
+}
+
+/* Vitals */
+.stats-vitals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.stats-vitals-cell {
+  background: var(--bg2);
+  padding: 6px 8px;
+  border-radius: 5px;
+}
+
+.stats-vitals-val {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t1);
+}
+
+.stats-vitals-key {
+  display: block;
+  font-size: 9px;
+  color: var(--t3);
+}
+
+/* Health */
+.stats-health-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.stats-health-label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.stats-health-sub {
+  font-size: 9px;
+  color: var(--t3);
+}
+
+/* Signals */
+.stats-signal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stats-signal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.stats-signal-label { color: var(--t3); }
+.stats-signal-val   { color: var(--t2); }
+.stats-signal-status { font-size: 10px; }
+
+/* Momentum bars */
+.stats-bars {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  height: 36px;
+  margin-bottom: 4px;
+}
+
+.stats-bar {
+  flex: 1;
+  background: var(--bg3);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+}
+
+.stats-bar--current {
+  background: var(--accent);
+  opacity: 0.85;
+}
+
+.stats-trend {
+  font-size: 10px;
+  color: var(--t2);
+  margin-bottom: 2px;
+}
+
+.stats-bars-legend {
+  font-size: 9px;
+  color: var(--t3);
+}
+
+.stats-computing {
+  font-size: 10px;
+  color: var(--t3);
+  font-style: italic;
+}
+
+/* Security */
+.stats-vuln-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  border-radius: 5px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+}
+
+.stats-vuln-icon { font-size: 14px; }
+
+.stats-vuln-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--red);
+}
+
+.stats-vuln-breakdown {
+  font-size: 9px;
+  color: var(--t3);
+}
