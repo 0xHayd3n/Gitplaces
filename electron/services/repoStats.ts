@@ -96,12 +96,13 @@ export async function getRepoStats(
   const h = githubHeaders(token)
   const base = `https://api.github.com/repos/${owner}/${name}`
 
-  // Parallel main fetches — each wrapped in .catch so one failure doesn't reject all
-  const [repoRes, contributorRes, commitRes, activityRes] = await Promise.all([
+  // All network calls run in parallel — security bundle is independent of the others
+  const [repoRes, contributorRes, commitRes, activityRes, security] = await Promise.all([
     fetch(base,                                          { headers: h }).catch(() => null),
     fetch(`${base}/contributors?per_page=1`,             { headers: h }).catch(() => null),
     fetch(`${base}/commits?per_page=1`,                  { headers: h }).catch(() => null),
     fetch(`${base}/stats/commit_activity`,               { headers: h }).catch(() => null),
+    fetchSecurity(base, h),
   ])
 
   const repoData: RepoCoreData | null =
@@ -166,7 +167,7 @@ export async function getRepoStats(
     },
     health: { score, maintenance, issueVelocity, lastReleaseDate, lastReleaseDaysAgo },
     momentum,
-    security: await fetchSecurity(base, h),
+    security,
     engagement: getEngagement(db, owner, name),
   }
 }
