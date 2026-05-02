@@ -3,3 +3,4 @@ export type RepoUserEvent =
   | { type: 'archive'; ts: string }
   | { type: 'fork';    ts: string }
   | { type: 'learn';   ts: string; skillFilename: string; skillType: 'master' | 'components' }
+  | { type: 'created'; ts: string }

@@ -79,9 +79,17 @@ declare global {
         getRepo:       (owner: string, name: string) => Promise<RepoRow | null>
         getReadme:        (owner: string, name: string) => Promise<string | null>
         getFileContent:   (owner: string, name: string, path: string) => Promise<string | null>
-        getReleases:   (owner: string, name: string) => Promise<ReleaseRow[]>
+        getReleases:   (owner: string, name: string) => Promise<ReleaseRow[] | null>
         getRepoUserEvents: (owner: string, name: string) => Promise<RepoUserEvent[]>
-        getRepoStats: (owner: string, name: string, lastReleaseDate: string | null) => Promise<import('./types/repoStats').RepoStats>
+        getRepoStats: (owner: string, name: string) => Promise<import('./types/repoStats').RepoStats>
+        getRepoMomentum: (owner: string, name: string) => Promise<import('./types/repoStats').RepoStats['momentum']>
+        fetchRepoBundle: (owner: string, name: string) => Promise<{
+          repoRow: RepoRow
+          releases: ReleaseRow[]
+          isStarred: boolean
+          vulnerabilities: import('../../electron/githubGraphql').RepoBundle['vulnerabilities']
+          securityPolicyUrl: string | null
+        } | null>
         recordFork:       (owner: string, name: string) => Promise<void>
         setArchivedAt:    (owner: string, name: string, archived: boolean) => Promise<void>
         saveRepo:         (owner: string, name: string) => Promise<void>

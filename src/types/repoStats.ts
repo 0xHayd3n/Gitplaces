@@ -39,6 +39,10 @@ export interface RepoStats {
     issueVelocity: IssueVelocity
     lastReleaseDate: string | null
     lastReleaseDaysAgo: number | null
+    /** Exposed so the renderer can recompute `score` when releases later resolve,
+     *  without refetching the entire stats bundle (`releaseScore` is just one of
+     *  three weighted components in `computeHealthScore`). */
+    daysSinceCommit?: number
   }
   momentum: {
     monthlyCommits: number[]
