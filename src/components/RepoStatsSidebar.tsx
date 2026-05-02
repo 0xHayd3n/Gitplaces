@@ -36,11 +36,12 @@ function computeVerdict(stats: RepoStats): Verdict {
 
   if (security.available && (criticalVulns > 0 || highVulns > 0 || hasActiveSecrets || hasCriticalCodeScan)) {
     const severeCount = criticalVulns + highVulns
-    return {
-      label: 'Critical issues',
-      color: 'var(--red)',
-      sub: `${severeCount} high-severity vulnerabilit${severeCount === 1 ? 'y' : 'ies'}`,
-    }
+    const sub = hasActiveSecrets && severeCount === 0 && !hasCriticalCodeScan
+      ? `${security.secretScanning!.active} active secret${security.secretScanning!.active === 1 ? '' : 's'} leaked`
+      : hasCriticalCodeScan && severeCount === 0
+      ? 'Critical or high code scanning findings'
+      : `${severeCount} high-severity vulnerabilit${severeCount === 1 ? 'y' : 'ies'}`
+    return { label: 'Critical issues', color: 'var(--red)', sub }
   }
   if (
     health.score < 40 ||
