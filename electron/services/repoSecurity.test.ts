@@ -280,7 +280,7 @@ describe('getRepoSecurity', () => {
       .mockResolvedValueOnce(okJson([]))
       .mockResolvedValueOnce(okJson({ files: {} }))
       .mockResolvedValueOnce(new Response('', { status: 404 }))
-      .mockResolvedValueOnce(new Response('', { status: 404 }))
+      .mockResolvedValueOnce(new Response('', { status: 403 }))
 
     const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
 
