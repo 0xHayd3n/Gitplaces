@@ -132,7 +132,19 @@ export async function getRepoSecurity(
 | `electron/db.ts` | Add `repo_security_cache` table to `initSchema` |
 | `electron/services/repoSecurity.ts` | New file — full service implementation |
 | `electron/services/repoStats.ts` | Remove `fetchSecurity`; import + call `getRepoSecurity` |
-| `src/components/RepoStatsSidebar.tsx` | Handle new `critical` severity in vulnerability display |
+| `src/components/RepoStatsSidebar.tsx` | Handle new `critical` severity — see exact touch-points below |
+
+### 5. Sidebar touch-points — `src/components/RepoStatsSidebar.tsx`
+
+Four specific locations must be updated to include `critical`:
+
+1. **`computeVerdict` — `highVulns` check (line ~28):** The "Critical issues" verdict currently triggers on `highVulns > 0`. This should also trigger on `criticalVulns > 0`, with the sub-text updated to reflect critical-severity count. Add `const criticalVulns = vulns?.critical ?? 0` alongside `highVulns`.
+
+2. **`computeVerdict` — `totalVulns` (line ~28):** `totalVulns = vulns.high + vulns.moderate + vulns.low` must add `vulns.critical`.
+
+3. **Main body `totalVulns` (line ~73):** Same calculation outside `computeVerdict` — must add `security.vulnerabilities.critical`.
+
+4. **Breakdown display string (line ~195):** `{h}h · {m}m · {l}l` → `{c}c · {h}h · {m}m · {l}l` (or equivalent formatting showing critical count).
 
 ## Testing
 
@@ -143,3 +155,8 @@ export async function getRepoSecurity(
   - Pagination: accumulates alerts across multiple pages
   - Field mapping: GitHub alert shape → `SecurityAlert` shape
 - Existing `repoStats.test.ts` tests should continue to pass (no logic change there)
+
+## Notes
+
+- `repo_security_cache.fetched_at` uses `INTEGER` (Unix epoch ms) rather than `TEXT` like other cache tables (`topic_cache`, `search_cache`, etc.). This is intentional — integer comparison for TTL checks is simpler and more correct than string-based timestamp comparison.
+- `INSERT OR REPLACE` on cache writes resets `fetched_at` on every write; this is correct and intended — a stale cache row is always fully replaced.
