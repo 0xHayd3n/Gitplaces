@@ -59,6 +59,24 @@ function AppContent() {
     })
   }, [navigate])
 
+  // Preload sibling page chunks on idle so first navigation to each tab is
+  // instant — no chunk fetch + parse + execute on click.
+  useEffect(() => {
+    const handle = window.requestIdleCallback(() => {
+      void import('./views/Discover')
+      void import('./views/Library')
+      void import('./views/Starred')
+      void import('./views/Profile')
+      void import('./views/Create')
+      void import('./views/RepoDetail')
+      void import('./views/Settings')
+      void import('./views/LocalProjectDetail')
+      void import('./components/RepoOverlay')
+      void import('./components/AiDialogue')
+    }, { timeout: 8000 })
+    return () => window.cancelIdleCallback(handle)
+  }, [])
+
   return (
     <div className={`app-shell${background === 'dither' ? ' app-shell--dither' : ''}`}>
       <div className={`app-main-column${isDiscoverPage ? ' titlebar-overlay' : ''}`}>

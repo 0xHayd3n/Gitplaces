@@ -2603,18 +2603,12 @@ a {
   color: var(--t2);
 }
 
-/* ── Page transition fade-in ─────────────────────────────────────── */
-@keyframes pageFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
 .page-transition {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  animation: pageFadeIn 0.18s ease-out forwards;
 }
 
 /* ── Repo Detail content fade-in (skeleton → real layout transition) */
