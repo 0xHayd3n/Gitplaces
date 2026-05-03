@@ -63,13 +63,27 @@ export function isComponentFile(path: string, framework: Framework): boolean {
   // Include patterns
   const inIncludeDir = INCLUDE_PATTERNS.some(p => path.includes(p))
   const isFlatSrcRoot = /^src\/[A-Z][^/]+\.(tsx|jsx|js|vue|svelte)$/.test(path)
-  const isMonorepoSrc = /^packages\/[^/]+\/src\//.test(path) && INCLUDE_PATTERNS.some(p => path.includes(p))
+  // Monorepo with a /components|/ui|/etc dir under any depth of packages/...
+  const isMonorepoIncludeDir = /^packages\/(?:[^/]+\/)+src\//.test(path) && inIncludeDir
+  // Radix-style "package main entry": packages/.../<name>/src/<name>.{ext}
+  // where the file basename matches the grandparent dir name. This is the
+  // common pattern for one-component-per-package monorepos.
+  const parts = path.split('/')
+  const grandparent = parts.length >= 5 ? parts[parts.length - 3] : null
+  const isMonorepoPackageEntry =
+    parts.length >= 5
+    && parts[0] === 'packages'
+    && parts[parts.length - 2] === 'src'
+    && grandparent === nameWithoutExt
 
-  if (!inIncludeDir && !isFlatSrcRoot && !isMonorepoSrc) return false
+  if (!inIncludeDir && !isFlatSrcRoot && !isMonorepoIncludeDir && !isMonorepoPackageEntry) return false
 
   // Outside a known component directory, require PascalCase to avoid picking up
   // utility modules. Inside /components/, /ui/, etc. trust the directory.
-  if (!inIncludeDir && !isMonorepoSrc && nameWithoutExt === nameWithoutExt.toLowerCase()) return false
+  // Monorepo package-entry files (basename matches grandparent dir) are also
+  // trusted — they're the canonical export for that package.
+  if (!inIncludeDir && !isMonorepoIncludeDir && !isMonorepoPackageEntry
+      && nameWithoutExt === nameWithoutExt.toLowerCase()) return false
 
   return true
 }

@@ -78,6 +78,20 @@ describe('isComponentFile', () => {
   it('rejects monorepo file outside include directories', () => {
     expect(isComponentFile('packages/core/src/stores/AuthStore.tsx', 'react')).toBe(false)
   })
+  it('accepts a Radix-style package-entry file (lowercase, name matches dir)', () => {
+    // packages/react/dialog/src/dialog.tsx — radix-ui/primitives style
+    expect(isComponentFile('packages/react/dialog/src/dialog.tsx', 'react')).toBe(true)
+  })
+  it('accepts package-entry under deeply nested scope (@mantine/core/src/core.tsx)', () => {
+    expect(isComponentFile('packages/@mantine/core/src/core.tsx', 'react')).toBe(true)
+  })
+  it('rejects package-entry-shaped file when name does not match parent dir', () => {
+    // packages/react/dialog/src/utils.ts — utility, not the package main
+    expect(isComponentFile('packages/react/dialog/src/utils.ts', 'react')).toBe(false)
+  })
+  it('accepts /components/ files in nested monorepos', () => {
+    expect(isComponentFile('packages/@mantine/core/src/components/Button/Button.tsx', 'react')).toBe(true)
+  })
   it('rejects a test file', () => {
     expect(isComponentFile('src/components/Button.test.tsx', 'react')).toBe(false)
   })
