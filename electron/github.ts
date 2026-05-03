@@ -275,8 +275,21 @@ export async function searchRepos(
   order = 'desc',
   page = 1,
 ): Promise<GitHubRepo[]> {
-  const url = `${BASE}/search/repositories?q=${encodeURIComponent(query)}&sort=${sort}&order=${order}&per_page=${perPage}&page=${page}`
+  // GitHub Search rejects empty queries with 422. Skip the round-trip and
+  // return no results — semantically equivalent and avoids the noisy error.
+  const trimmed = query.trim()
+  if (!trimmed) return []
+
+  const url = `${BASE}/search/repositories?q=${encodeURIComponent(trimmed)}&sort=${sort}&order=${order}&per_page=${perPage}&page=${page}`
   const res = await fetch(url, { headers: githubHeaders(token) })
+  // 422 = "Unprocessable Entity" — GitHub couldn't parse the query (too long,
+  // bad qualifier syntax, reserved chars in unexpected places, etc.). Treat
+  // it as "no results" rather than crashing the IPC handler. Other failure
+  // statuses still throw so callers can distinguish auth/rate-limit/network.
+  if (res.status === 422) {
+    console.warn(`[searchRepos] GitHub rejected query as unprocessable: ${trimmed.slice(0, 120)}`)
+    return []
+  }
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   const data = (await res.json()) as { items: GitHubRepo[] }
   return data.items

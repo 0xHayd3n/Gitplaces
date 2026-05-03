@@ -184,6 +184,32 @@ describe('searchRepos', () => {
     mockFetch.mockResolvedValue(makeResponse({}, {}, false))
     await expect(searchRepos(null, 'q')).rejects.toThrow('GitHub API error: 401')
   })
+
+  it('returns [] without fetching for an empty query', async () => {
+    const result = await searchRepos(null, '')
+    expect(result).toEqual([])
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns [] without fetching for a whitespace-only query', async () => {
+    const result = await searchRepos(null, '   \n\t')
+    expect(result).toEqual([])
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns [] (not throws) when GitHub responds 422 unprocessable', async () => {
+    // GitHub Search returns 422 when a query is too long, has bad qualifier
+    // syntax, or otherwise can't be parsed. Surfacing it as an unhandled
+    // exception crashes the IPC handler — return empty results instead.
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: () => Promise.resolve({ message: 'Validation Failed' }),
+      headers: { get: () => null },
+    })
+    const result = await searchRepos(null, 'some malformed:::query')
+    expect(result).toEqual([])
+  })
 })
 
 describe('getReadme', () => {
