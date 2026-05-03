@@ -102,8 +102,16 @@ function escapeScriptContent(s: string): string {
 //   • stubs LOCAL relative imports (we don't have those files)
 //   • leaves ALL third-party bare specifiers unchanged so the import map
 //     in the iframe can resolve them at runtime
+//
+// `stubReturn` controls what stubbed function imports return when called.
+// The default `'null'` is the safest "rendered as nothing" choice for
+// components used as JSX, but it makes destructuring throw — many libraries
+// have utility helpers like `const { value } = parseLength(input)` that
+// crash when stubbed as `() => null`. Passing `'_$stubEl'` (a React element
+// defined in the iframe prolog) makes destructuring return undefined for
+// any key while still being a valid React node when used as JSX.
 // ---------------------------------------------------------------------------
-function prepareForCompile(source: string): string {
+function prepareForCompile(source: string, stubReturn: string = 'null'): string {
   let r = source
 
   // 1. Side-effect imports: import 'anything'  (CSS, SCSS, JSON, bare strings)
@@ -123,11 +131,11 @@ function prepareForCompile(source: string): string {
         .split(',')
         .map((n: string) => {
           const fin = (n.trim().split(/\s+as\s+/).pop() ?? '').trim()
-          return fin ? `const ${fin} = () => null` : ''
+          return fin ? `const ${fin} = () => ${stubReturn}` : ''
         })
         .filter(Boolean)
         .join('\n')
-      return `const ${def} = () => null\n${stubs}`
+      return `const ${def} = () => ${stubReturn}\n${stubs}`
     },
   )
 
@@ -141,7 +149,7 @@ function prepareForCompile(source: string): string {
           const parts = n.trim().split(/\s+as\s+/)
           const fin = (parts[parts.length - 1] ?? '').trim()
           if (!fin || n.trim().startsWith('type ')) return ''
-          return `const ${fin} = () => null`
+          return `const ${fin} = () => ${stubReturn}`
         })
         .filter(Boolean)
         .join('\n'),
@@ -150,7 +158,7 @@ function prepareForCompile(source: string): string {
   // 5. Default: import X from './relative'
   r = r.replace(
     /^import\s+(\w+)\s+from\s+(['"])(\.[^'"]+)\2\s*;?$/gm,
-    (_m, name: string) => `const ${name} = () => null`,
+    (_m, name: string) => `const ${name} = () => ${stubReturn}`,
   )
 
   // Third-party bare specifiers (not starting with '.') are left as-is.
@@ -245,7 +253,10 @@ export async function buildIframeHtml(
   const propsJson = JSON.stringify(props)
   switch (component.framework) {
     case 'react': {
-      const compiled = await compileSource(prepareForCompile(source), 'react')
+      // Stubs return the prolog-defined `_$stubEl` so destructuring on
+      // helper-import return values yields undefined (no throw) while still
+      // producing a valid React node when used as JSX.
+      const compiled = await compileSource(prepareForCompile(source, '_$stubEl'), 'react')
       if (compiled === null) return null
       return buildReactHtml(component.name, compiled, propsJson, theme)
     }
@@ -304,8 +315,13 @@ function baseHead(theme: 'light' | 'dark', importMap = ''): string {
 function buildReactHtml(name: string, compiledCode: string, propsJson: string, theme: 'light' | 'dark'): string {
   let code = stripExports(compiledCode, name)
   const importMap = buildImportMap(code)
-  const renderTail = [
+  // Prolog runs before user code so `_$stubEl` (the dummy React element used
+  // by stubbed local imports — see prepareForCompile) is in scope.
+  const prolog = [
     `import{createElement as _$cc}from'react'`,
+    `const _$stubEl=_$cc('span',null)`,
+  ].join('\n')
+  const renderTail = [
     `import{createRoot as _$cr}from'react-dom/client'`,
     `try{_$cr(document.getElementById('root')).render(_$cc(${name},${propsJson}));}` +
       `catch(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');}`,
@@ -314,7 +330,7 @@ function buildReactHtml(name: string, compiledCode: string, propsJson: string, t
   return `<!DOCTYPE html><html><head>${baseHead(theme, importMap)}
 </head><body ${themeBodyAttrs(theme)}><div id="root"></div>
 <script type="module">
-${escapeScriptContent(code + '\n' + renderTail)}
+${escapeScriptContent(prolog + '\n' + code + '\n' + renderTail)}
 </script></body></html>`
 }
 
