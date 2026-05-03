@@ -405,3 +405,66 @@ ${autoInit}
 
 // escapeScriptContent kept for potential use by callers
 export { escapeScriptContent }
+
+// ---------------------------------------------------------------------------
+// buildBundledIframeHtml — bundled-tier renderer.
+//
+// Renders a component fetched directly from esm.sh (no local compilation).
+// Uses a fixed import map for React 18 so the CDN module shares one instance.
+// ---------------------------------------------------------------------------
+import type { BundledRender } from '../types/components'
+
+export function buildBundledIframeHtml(
+  render: BundledRender,
+  propsJson: string,
+  theme: 'light' | 'dark',
+): string {
+  const importMap = `<script type="importmap">${JSON.stringify({
+    imports: {
+      'react':            'https://esm.sh/react@18',
+      'react-dom':        'https://esm.sh/react-dom@18',
+      'react-dom/client': 'https://esm.sh/react-dom@18/client',
+      'react/jsx-runtime':'https://esm.sh/react@18/jsx-runtime',
+    },
+  })}</script>`
+
+  const cssLinks = render.cssUrls
+    .map(u => `<link rel="stylesheet" href="${u}" onerror="this.remove()">`)
+    .join('')
+
+  const themeAttr = `data-theme="${theme}"${theme === 'dark' ? ' class="dark"' : ''}`
+  const themeStyle = theme === 'dark'
+    ? 'background:#0e0e0e;color:#eee'
+    : 'background:#fff;color:#000'
+
+  const renderTail = [
+    `import { ${render.exportName} as _$C } from '${render.importUrl}'`,
+    `import { createElement } from 'react'`,
+    `import { createRoot } from 'react-dom/client'`,
+    `try {`,
+    `  createRoot(document.getElementById('root')).render(createElement(_$C, ${propsJson}))`,
+    `} catch (e) {`,
+    `  window.parent.postMessage({type:'render-error',tier:'bundled',message:String(e)},'*')`,
+    `}`,
+  ].join('\n')
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">${ERROR_BRIDGE_BUNDLED}${importMap}${cssLinks}
+<style>body{margin:0;padding:16px;font-family:system-ui,sans-serif;${themeStyle}}</style>
+</head><body ${themeAttr}><div id="root"></div>
+<script type="module">
+${escapeScriptContent(renderTail)}
+</script></body></html>`
+}
+
+const ERROR_BRIDGE_BUNDLED = `<script>
+window.onerror=function(m,s,l,c,e){
+  var msg=e?(e.message+(e.stack?'\\n'+e.stack:'')):m;
+  window.parent.postMessage({type:'render-error',tier:'bundled',message:String(msg)},'*');
+  return true;
+};
+window.addEventListener('unhandledrejection',function(e){
+  var r=e.reason;
+  var msg=r instanceof Error?(r.message+(r.stack?'\\n'+r.stack:'')):String(r);
+  window.parent.postMessage({type:'render-error',tier:'bundled',message:msg},'*');
+});
+</script>`

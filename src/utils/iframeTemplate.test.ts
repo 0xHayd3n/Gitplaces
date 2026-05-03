@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
-import { stubLocalImports, buildIframeHtml } from './iframeTemplate'
+import { stubLocalImports, buildIframeHtml, buildBundledIframeHtml } from './iframeTemplate'
+import type { BundledRender } from '../types/components'
 import type { ParsedComponent } from './componentParser'
 
 // Compilation now goes through window.api.components.compile (IPC → esbuild in main).
@@ -201,5 +202,57 @@ describe('buildIframeHtml — import map approach', () => {
     const html = await buildIframeHtml(reactComp(), source, {})
     expect(html).not.toContain('export default')
     expect(html).toContain('function OutlinedAlerts')
+  })
+})
+
+const baseRender: BundledRender = {
+  importUrl: 'https://esm.sh/@radix-ui/react-dialog@1.0.5',
+  exportName: 'Root',
+  cssUrls: [],
+}
+
+describe('buildBundledIframeHtml', () => {
+  it('imports the named export from the package URL', () => {
+    const html = buildBundledIframeHtml(baseRender, '{}', 'dark')
+    expect(html).toContain("import { Root as _$C } from 'https://esm.sh/@radix-ui/react-dialog@1.0.5'")
+  })
+
+  it('renders with createRoot from react-dom/client', () => {
+    const html = buildBundledIframeHtml(baseRender, '{}', 'dark')
+    expect(html).toContain('react-dom/client')
+    expect(html).toContain('createRoot')
+  })
+
+  it('emits render-error postMessage with tier=bundled on failure', () => {
+    const html = buildBundledIframeHtml(baseRender, '{}', 'dark')
+    expect(html).toContain("tier:'bundled'")
+    expect(html).toContain('render-error')
+  })
+
+  it('sets data-theme attribute and dark class on body for dark theme', () => {
+    const html = buildBundledIframeHtml(baseRender, '{}', 'dark')
+    expect(html).toContain('data-theme="dark"')
+    expect(html).toContain('class="dark"')
+  })
+
+  it('sets data-theme attribute for light theme without dark class', () => {
+    const html = buildBundledIframeHtml(baseRender, '{}', 'light')
+    expect(html).toContain('data-theme="light"')
+    expect(html).not.toContain('class="dark"')
+  })
+
+  it('emits each css URL as a stylesheet link with onerror remove', () => {
+    const html = buildBundledIframeHtml(
+      { ...baseRender, cssUrls: ['https://x.test/a.css', 'https://x.test/b.css'] },
+      '{}', 'dark',
+    )
+    expect(html).toContain('href="https://x.test/a.css"')
+    expect(html).toContain('href="https://x.test/b.css"')
+    expect(html).toMatch(/onerror=["']this\.remove\(\)["']/)
+  })
+
+  it('serializes propsJson into the createElement call', () => {
+    const html = buildBundledIframeHtml(baseRender, '{"x":1}', 'dark')
+    expect(html).toContain('createElement(_$C, {"x":1})')
   })
 })
