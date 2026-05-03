@@ -7,7 +7,14 @@ import type { ComponentScanResult, Framework, ScannedComponent, ScannedStory } f
 
 async function probeNpmRegistry(name: string, version: string): Promise<boolean> {
   try {
-    const res = await fetch(`https://registry.npmjs.org/${name}/${version}`)
+    // encodeURIComponent handles scoped packages (`@scope/pkg` → `%40scope%2Fpkg`),
+    // which CouchDB-spec registries (Verdaccio etc.) require as a single path
+    // segment. AbortSignal.timeout bounds the probe so a stalled registry can't
+    // hang Stage A indefinitely.
+    const res = await fetch(
+      `https://registry.npmjs.org/${encodeURIComponent(name)}/${version}`,
+      { signal: AbortSignal.timeout(5_000) },
+    )
     return res.ok
   } catch {
     return false
