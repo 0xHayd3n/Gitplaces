@@ -73,6 +73,32 @@ describe('chooseRenderer', () => {
     expect(exportProbeCalls).toHaveLength(1)
   })
 
+  it('dedups parallel calls for the same package (single export probe)', async () => {
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => 'export { Button }' })
+      .mockResolvedValue({ ok: false, status: 404 })
+
+    // 25 parallel calls → without dedup, would fire 25 export probes + 100 CSS probes
+    await Promise.all(
+      Array.from({ length: 25 }, () => chooseRenderer(reactComp, baseScan())),
+    )
+
+    const exportProbeCalls = fetchMock.mock.calls.filter(
+      c => typeof c[0] === 'string' && (c[0] as string).includes('list-exports'),
+    )
+    expect(exportProbeCalls).toHaveLength(1)
+  })
+
+  it('returns bundled tier when exports list is empty (lenient — `export * from` re-export packages)', async () => {
+    fetchMock
+      // Export probe returns ONLY `export * from "..."` — our parser finds 0 names
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => 'export * from "/v135/react-spinners@0.17.0/X.tsx"' })
+      .mockResolvedValue({ ok: false, status: 404 })
+
+    const result = await chooseRenderer(reactComp, baseScan())
+    expect(result.tier).toBe('bundled')
+  })
+
   it('includes CSS URLs that returned 200 from probe', async () => {
     fetchMock
       .mockResolvedValueOnce({ ok: true, status: 200, text: async () => 'export { Button }' })

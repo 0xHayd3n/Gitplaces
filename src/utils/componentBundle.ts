@@ -7,9 +7,14 @@ import type { ParsedComponent } from './componentParser'
 // the same package reuses the same export set.
 type CacheEntry = { exports: Set<string>; cssUrls: string[] }
 const bundleCache = new Map<string, CacheEntry>()
+// Dedup parallel `chooseRenderer` calls for the same package — without this,
+// a 25-component scan races into 25 simultaneous export+CSS probes before
+// any of them populates the cache, producing ~100 redundant requests.
+const inflightProbes = new Map<string, Promise<CacheEntry | null>>()
 
 export function resetBundleCache(): void {
   bundleCache.clear()
+  inflightProbes.clear()
 }
 
 export type RenderChoice =
@@ -35,7 +40,15 @@ export async function chooseRenderer(
   const cacheKey = `${scan.pkg.name}@${scan.pkg.version}`
   const entry = await ensureCacheEntry(cacheKey, scan.pkg.name, scan.pkg.version)
   if (!entry) return { tier: 'source' }
-  if (!entry.exports.has(component.name)) return { tier: 'source' }
+  // Lenient membership check: if our parser couldn't find any named exports
+  // (common for packages whose esm.sh entrypoint is just `export * from "..."`,
+  // which we don't follow), assume the component name is valid and let the
+  // iframe render attempt confirm. If the export doesn't actually exist,
+  // the iframe will postMessage a render-error and ComponentCard falls back
+  // to the source tier. Better than always rejecting.
+  if (entry.exports.size > 0 && !entry.exports.has(component.name)) {
+    return { tier: 'source' }
+  }
 
   return {
     tier: 'bundled',
@@ -55,13 +68,23 @@ async function ensureCacheEntry(
   const cached = bundleCache.get(key)
   if (cached) return cached
 
-  const exports = await probeExports(name, version)
-  if (!exports) return null
+  const inflight = inflightProbes.get(key)
+  if (inflight) return inflight
 
-  const cssUrls = await probeCssUrls(name, version)
-  const entry: CacheEntry = { exports, cssUrls }
-  bundleCache.set(key, entry)
-  return entry
+  const probe = (async (): Promise<CacheEntry | null> => {
+    try {
+      const exports = await probeExports(name, version)
+      if (!exports) return null
+      const cssUrls = await probeCssUrls(name, version)
+      const entry: CacheEntry = { exports, cssUrls }
+      bundleCache.set(key, entry)
+      return entry
+    } finally {
+      inflightProbes.delete(key)
+    }
+  })()
+  inflightProbes.set(key, probe)
+  return probe
 }
 
 async function probeExports(name: string, version: string): Promise<Set<string> | null> {
@@ -96,17 +119,18 @@ function parseExports(source: string): Set<string> {
 }
 
 async function probeCssUrls(name: string, version: string): Promise<string[]> {
-  const found: string[] = []
-  for (const path of CSS_PROBE_PATHS) {
+  // Run all probes in parallel — they're independent and we keep whichever
+  // ones came back 200. Order is preserved by indexing into CSS_PROBE_PATHS.
+  const results = await Promise.all(CSS_PROBE_PATHS.map(async path => {
     const url = `https://esm.sh/${name}@${version}${path}`
     try {
       const res = await fetch(url, { method: 'HEAD' })
-      if (res.ok) found.push(url)
+      return res.ok ? url : null
     } catch {
-      // network error → skip
+      return null
     }
-  }
-  return found
+  }))
+  return results.filter((u): u is string => u !== null)
 }
 
 export type { RenderTier }
