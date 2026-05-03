@@ -185,3 +185,82 @@ describe('parseComponent — string-literal unions', () => {
     expect(result.props[0].stringUnion).toBeUndefined()
   })
 })
+
+describe('parseComponent — destructure defaults', () => {
+  it('extracts numeric, string, and boolean defaults from a function declaration', () => {
+    const source = `
+      import { LoaderProps } from './helpers/props'
+      function BarLoader({
+        loading = true,
+        color = '#000000',
+        size = 15,
+        margin = 2,
+        cssOverride,
+      }: LoaderProps) {
+        return null
+      }
+    `
+    const result = parseComponent('BarLoader.tsx', source, 'react')
+    const byName = Object.fromEntries(result.props.map(p => [p.name, p.extractedDefault]))
+    expect(byName.loading).toBe(true)
+    expect(byName.color).toBe('#000000')
+    expect(byName.size).toBe(15)
+    expect(byName.margin).toBe(2)
+    // cssOverride has no default → no extractedDefault, but the prop won't
+    // appear at all because the type is imported from another file.
+    expect(result.props.find(p => p.name === 'cssOverride')).toBeUndefined()
+  })
+
+  it('extracts defaults from arrow function with type annotation', () => {
+    const source = `
+      const ClipLoader: React.FC<Props> = ({
+        loading = true,
+        color = '#36d7b7',
+      }) => null
+    `
+    const result = parseComponent('ClipLoader.tsx', source, 'react')
+    expect(result.props.find(p => p.name === 'color')?.extractedDefault).toBe('#36d7b7')
+    expect(result.props.find(p => p.name === 'loading')?.extractedDefault).toBe(true)
+  })
+
+  it('extracts empty object and array defaults', () => {
+    const source = `
+      function Foo({ cssOverride = {}, items = [] }: Props) { return null }
+    `
+    const result = parseComponent('Foo.tsx', source, 'react')
+    expect(result.props.find(p => p.name === 'cssOverride')?.extractedDefault).toEqual({})
+    expect(result.props.find(p => p.name === 'items')?.extractedDefault).toEqual([])
+  })
+
+  it('drops complex defaults (function calls, references) silently', () => {
+    const source = `
+      function Foo({ size = computeSize(), color = DEFAULT_COLOR }: Props) { return null }
+    `
+    const result = parseComponent('Foo.tsx', source, 'react')
+    expect(result.props.find(p => p.name === 'size')).toBeUndefined()
+    expect(result.props.find(p => p.name === 'color')).toBeUndefined()
+  })
+
+  it('skips rest patterns', () => {
+    const source = `
+      function Foo({ a = 1, ...rest }: Props) { return null }
+    `
+    const result = parseComponent('Foo.tsx', source, 'react')
+    expect(result.props.find(p => p.name === 'rest')).toBeUndefined()
+    expect(result.props.find(p => p.name === 'a')?.extractedDefault).toBe(1)
+  })
+
+  it('merges defaults onto props from interface (not duplicate)', () => {
+    const source = `
+      interface ButtonProps {
+        size: number
+        label: string
+      }
+      function Button({ size = 15, label = 'Click' }: ButtonProps) { return null }
+    `
+    const result = parseComponent('Button.tsx', source, 'react')
+    expect(result.props).toHaveLength(2)
+    expect(result.props.find(p => p.name === 'size')?.extractedDefault).toBe(15)
+    expect(result.props.find(p => p.name === 'label')?.extractedDefault).toBe('Click')
+  })
+})

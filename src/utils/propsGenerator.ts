@@ -29,6 +29,13 @@ function inferValue(type: string): unknown {
 export function generateProps(props: ParsedProp[]): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const prop of props) {
+    // Prefer a literal default we extracted from the function destructure —
+    // it reflects what the library author actually intended. Fall back to
+    // type-inference only when no default is available.
+    if (prop.extractedDefault !== undefined) {
+      result[prop.name] = prop.extractedDefault
+      continue
+    }
     const value = inferValue(prop.type)
     if (value !== OMIT) result[prop.name] = value
   }

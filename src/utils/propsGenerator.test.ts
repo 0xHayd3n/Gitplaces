@@ -80,4 +80,21 @@ describe('generateProps', () => {
   it('returns empty object for empty props array', () => {
     expect(generateProps([])).toEqual({})
   })
+
+  it('uses extractedDefault when present, overriding type inference', () => {
+    const result = generateProps([
+      { name: 'size', type: 'number', required: false, extractedDefault: 15 },
+      { name: 'color', type: 'string', required: false, extractedDefault: '#36d7b7' },
+      { name: 'loading', type: 'boolean', required: false, extractedDefault: true },
+    ])
+    expect(result).toEqual({ size: 15, color: '#36d7b7', loading: true })
+  })
+
+  it('falls back to type inference when extractedDefault is missing', () => {
+    const result = generateProps([
+      { name: 'size', type: 'number', required: false, extractedDefault: 15 },
+      { name: 'label', type: 'string', required: false },
+    ])
+    expect(result).toEqual({ size: 15, label: 'Text' })
+  })
 })

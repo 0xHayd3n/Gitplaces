@@ -7,6 +7,10 @@ export interface ParsedProp {
   required: boolean
   defaultValue?: string
   stringUnion?: string[]
+  // A literal default extracted from the function signature destructure
+  // (e.g. `function Foo({ size = 15 })` → 15). Filled for React/Solid only;
+  // Svelte has its own `defaultValue: string` shape.
+  extractedDefault?: unknown
 }
 
 export interface ParsedComponent {
@@ -33,6 +37,29 @@ export function parseComponent(
     else if (framework === 'vue')                        props = parseVueProps(source)
     else if (framework === 'svelte')                     props = parseSvelteProps(source)
   } catch { /* leave props empty on parse error */ }
+
+  // Pull literal defaults from the function destructure (React/Solid only).
+  // Many libraries import their props type from a sibling file we don't
+  // scan, so `parseReactProps` returns []. The destructure is the only
+  // remaining signal in those cases — and even when the props type IS
+  // parseable, the destructure typically supplies better defaults than
+  // our type-inference fallback (`'Text'`, 0, false).
+  if (framework === 'react' || framework === 'solid') {
+    const defaults = extractDestructureDefaults(source, name)
+    for (const [propName, value] of Object.entries(defaults)) {
+      const existing = props.find(p => p.name === propName)
+      if (existing) {
+        existing.extractedDefault = value
+      } else {
+        props.push({
+          name: propName,
+          type: typeof value === 'object' ? 'unknown' : typeof value,
+          required: false,
+          extractedDefault: value,
+        })
+      }
+    }
+  }
 
   return { path, name, props, framework, renderable }
 }
@@ -82,6 +109,81 @@ function parseStringUnion(type: string): string[] | undefined {
     literals.push(m[1])
   }
   return literals
+}
+
+// Extract `{ key = value, key = value }` defaults from the component
+// function's signature. Tries three patterns in order:
+//   function Name({ ... }: Props)
+//   const Name = ({ ... }: Props) => ...
+//   const Name: TypeAnnotation = ({ ... }) => ...
+// The destructure body is then split at top-level commas (skipping nested
+// braces/brackets/parens) and each `key = expr` is parsed as a JS literal.
+// Anything that isn't a literal we can recognize is dropped — it's better
+// to omit a default than to guess wrong.
+function extractDestructureDefaults(source: string, name: string): Record<string, unknown> {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const patterns = [
+    new RegExp(`function\\s+${escaped}\\s*\\(\\s*\\{([\\s\\S]*?)\\}\\s*(?::|\\))`),
+    new RegExp(`const\\s+${escaped}\\s*(?::[^=]+)?\\s*=\\s*\\(?\\s*\\{([\\s\\S]*?)\\}\\s*(?::|\\)|=>)`),
+  ]
+  for (const re of patterns) {
+    const m = source.match(re)
+    if (!m) continue
+    return parseDestructureBody(m[1])
+  }
+  return {}
+}
+
+function parseDestructureBody(body: string): Record<string, unknown> {
+  const defaults: Record<string, unknown> = {}
+  // Strip block + line comments before splitting
+  const clean = body
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '')
+
+  // Split on top-level commas — track nesting so we don't split inside
+  // object/array/paren expressions.
+  const parts: string[] = []
+  let depth = 0
+  let start = 0
+  for (let i = 0; i < clean.length; i++) {
+    const c = clean[i]
+    if (c === '{' || c === '[' || c === '(') depth++
+    else if (c === '}' || c === ']' || c === ')') depth--
+    else if (c === ',' && depth === 0) {
+      parts.push(clean.slice(start, i))
+      start = i + 1
+    }
+  }
+  parts.push(clean.slice(start))
+
+  for (const raw of parts) {
+    const part = raw.trim()
+    if (!part) continue
+    if (part.startsWith('...')) continue   // rest pattern, no default
+    const m = part.match(/^(\w+)\s*=\s*([\s\S]+)$/)
+    if (!m) continue
+    const value = parseLiteralValue(m[2].trim())
+    if (value !== undefined) defaults[m[1]] = value
+  }
+  return defaults
+}
+
+function parseLiteralValue(text: string): unknown {
+  if (text === 'true') return true
+  if (text === 'false') return false
+  if (text === 'null') return null
+  // Numbers (including negative + decimals)
+  if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text)
+  // String literals (single, double, or backtick — backtick must be plain)
+  const str = text.match(/^['"`]([^'"`]*)['"`]$/)
+  if (str) return str[1]
+  // Empty object/array
+  if (/^\{\s*\}$/.test(text)) return {}
+  if (/^\[\s*\]$/.test(text)) return []
+  // Anything else — function calls, references, JSX, complex expressions —
+  // we can't safely parse, so omit
+  return undefined
 }
 
 function parseReactProps(source: string): ParsedProp[] {
