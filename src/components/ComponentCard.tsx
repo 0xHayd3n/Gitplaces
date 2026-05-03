@@ -25,6 +25,7 @@ export function ComponentCard({
   const [currentTier, setCurrentTier] = useState<RenderTier>(tier)
   const [state, setState] = useState<State>('idle')
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const triedTiersRef = useRef<Set<RenderTier>>(new Set())
 
   // If the parent re-resolves and passes a new tier (e.g. after a re-scan),
@@ -33,6 +34,7 @@ export function ComponentCard({
   useEffect(() => {
     setCurrentTier(tier)
     triedTiersRef.current = new Set()
+    setErrorMessage(null)
   }, [tier])
 
   useEffect(() => {
@@ -60,7 +62,10 @@ export function ComponentCard({
 
     void buildHtml.then(html => {
       if (cancelled || !html) {
-        if (!cancelled) handleTierFailure()
+        if (!cancelled) {
+          if (!html) setErrorMessage(`Compile returned null (${currentTier} tier)`)
+          handleTierFailure()
+        }
         return
       }
       const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
@@ -87,6 +92,8 @@ export function ComponentCard({
       if (e.data?.type !== 'render-error') return
       const failedTier = (e.data.tier as RenderTier | undefined) ?? currentTier
       if (failedTier !== currentTier) return
+      const msg = typeof e.data.message === 'string' ? e.data.message : null
+      if (msg) setErrorMessage(msg.split('\n')[0])
       handleTierFailure()
     }
     window.addEventListener('message', onMessage)
@@ -114,6 +121,9 @@ export function ComponentCard({
         {state === 'failed' ? (
           <div className="cg-card-failed">
             <div>Preview failed</div>
+            {errorMessage && (
+              <div className="cg-card-failed-msg" title={errorMessage}>{errorMessage}</div>
+            )}
             <button onClick={(e) => { e.stopPropagation(); onClick() }}>View source</button>
           </div>
         ) : visible && blobUrl ? (

@@ -20,6 +20,21 @@ describe('parseComponent — React', () => {
     expect(result.name).toBe('Button')
   })
 
+  it('converts kebab-case filenames to PascalCase (Radix-style)', () => {
+    const result = parseComponent('packages/react/dialog/src/dialog.tsx', '', 'react')
+    expect(result.name).toBe('Dialog')
+  })
+
+  it('converts multi-word kebab-case filenames to PascalCase', () => {
+    const result = parseComponent('packages/react/alert-dialog/src/alert-dialog.tsx', '', 'react')
+    expect(result.name).toBe('AlertDialog')
+  })
+
+  it('leaves PascalCase filenames unchanged', () => {
+    const result = parseComponent('src/components/MyComponent.tsx', '', 'react')
+    expect(result.name).toBe('MyComponent')
+  })
+
   it('marks react as renderable', () => {
     const result = parseComponent('src/components/Button.tsx', source, 'react')
     expect(result.renderable).toBe(true)

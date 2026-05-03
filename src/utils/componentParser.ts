@@ -23,7 +23,8 @@ export function parseComponent(
   framework: Framework,
 ): ParsedComponent {
   const filename = path.split('/').pop() ?? path
-  const name = filename.replace(/\.[^.]+$/, '')
+  const rawName = filename.replace(/\.[^.]+$/, '')
+  const name = toPascalCase(rawName)
   const renderable = true
 
   let props: ParsedProp[] = []
@@ -34,6 +35,17 @@ export function parseComponent(
   } catch { /* leave props empty on parse error */ }
 
   return { path, name, props, framework, renderable }
+}
+
+// Convert filenames to a PascalCase identifier so the renderer's
+// `createElement(<name>, props)` resolves to the actual exported symbol.
+// `dialog` → `Dialog`, `alert-dialog` → `AlertDialog`, `Button` → `Button`.
+function toPascalCase(s: string): string {
+  return s
+    .split(/[-_]/)
+    .filter(part => part.length > 0)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('')
 }
 
 function parsePropBlock(block: string): ParsedProp[] {
