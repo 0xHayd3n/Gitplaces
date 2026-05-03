@@ -58,9 +58,14 @@ export function ComponentCard({
     setState('rendering')
     triedTiersRef.current.add(currentTier)
 
+    // Override black-by-default color props to white in dark mode. Many
+    // libraries (most spinners, simple icon sets) ship with `color = '#000'`
+    // baked into the destructure, which renders invisibly on the dark iframe
+    // background. Swap to white so the component is visible.
+    const themedProps = applyThemeOverrides(variant.props, theme)
     const buildHtml = currentTier === 'bundled' && bundled
-      ? Promise.resolve(buildBundledIframeHtml(bundled, JSON.stringify(variant.props), theme))
-      : buildIframeHtml(component, source, variant.props, theme, helpers)
+      ? Promise.resolve(buildBundledIframeHtml(bundled, JSON.stringify(themedProps), theme))
+      : buildIframeHtml(component, source, themedProps, theme, helpers)
 
     void buildHtml.then(html => {
       if (cancelled || !html) {
@@ -149,4 +154,25 @@ export function ComponentCard({
       </div>
     </div>
   )
+}
+
+const BLACK_COLOR_VALUE = /^(#0{3}|#0{6}|black|rgb\(\s*0\s*,\s*0\s*,\s*0\s*\)|rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*1\s*\))$/i
+
+function applyThemeOverrides(
+  props: Record<string, unknown>,
+  theme: 'light' | 'dark',
+): Record<string, unknown> {
+  if (theme !== 'dark') return props
+  const colorKeys = ['color', 'background', 'backgroundColor', 'fill', 'stroke']
+  let modified = false
+  const result: Record<string, unknown> = {}
+  for (const [key, val] of Object.entries(props)) {
+    if (colorKeys.includes(key) && typeof val === 'string' && BLACK_COLOR_VALUE.test(val)) {
+      result[key] = '#fff'
+      modified = true
+    } else {
+      result[key] = val
+    }
+  }
+  return modified ? result : props
 }

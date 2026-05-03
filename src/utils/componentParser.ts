@@ -28,7 +28,15 @@ export function parseComponent(
 ): ParsedComponent {
   const filename = path.split('/').pop() ?? path
   const rawName = filename.replace(/\.[^.]+$/, '')
-  const name = toPascalCase(rawName)
+  const filenameBased = toPascalCase(rawName)
+  // Prefer the actual exported identifier from the source over the filename.
+  // Filenames can mismatch their exports — `color-picker.tsx` may export
+  // `ColorPicker` (matches), but `Code.tsx` might export `InstallCode`, or
+  // a class component named `CPicker` aliased through `export default`.
+  // Reading the source removes that guesswork.
+  const name = (framework === 'react' || framework === 'solid')
+    ? extractExportName(source, filenameBased)
+    : filenameBased
   const renderable = true
 
   let props: ParsedProp[] = []
@@ -73,6 +81,36 @@ function toPascalCase(s: string): string {
     .filter(part => part.length > 0)
     .map(part => part.charAt(0).toUpperCase() + part.slice(1))
     .join('')
+}
+
+// Find the actual exported component identifier in a source file. Tries
+// patterns in priority order; returns `fallback` (typically the PascalCase'd
+// filename) when nothing parseable is found. Only PascalCase identifiers
+// are accepted — lowercase exports are usually utilities, not components.
+function extractExportName(source: string, fallback: string): string {
+  // 1. `export default function ComponentName` / `export default class ComponentName`
+  let m = source.match(/^export\s+default\s+(?:function|class)\s+([A-Z]\w*)/m)
+  if (m) return m[1]
+
+  // 2. `export default ComponentName` (separate declaration)
+  m = source.match(/^export\s+default\s+([A-Z]\w*)\s*;?\s*$/m)
+  if (m) return m[1]
+
+  // 3. Single named PascalCase export (`export const Foo = ...`,
+  //    `export function Foo`, `export class Foo`). When the file has
+  //    exactly one such export, it's almost always the component.
+  const namedExports: string[] = []
+  const re = /^export\s+(?:const|function|class)\s+([A-Z]\w*)/gm
+  let m2: RegExpExecArray | null
+  while ((m2 = re.exec(source)) !== null) {
+    namedExports.push(m2[1])
+  }
+  if (namedExports.length === 1) return namedExports[0]
+  // If there are multiple named exports and one of them matches the
+  // filename-derived name, prefer that one.
+  if (namedExports.length > 1 && namedExports.includes(fallback)) return fallback
+
+  return fallback
 }
 
 function parsePropBlock(block: string): ParsedProp[] {

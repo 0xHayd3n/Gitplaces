@@ -109,26 +109,25 @@
   flex-shrink: 0;
 }
 
-/* Card */
+/* Card — borderless. The label sits above; the iframe fills the rest. */
 .cg-card {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: 6px;
   cursor: pointer;
   overflow: hidden;
-  background: var(--bg2);
+  border-radius: 6px;
 }
 .cg-card-name {
-  padding: 4px 8px;
+  padding: 4px 8px 6px;
   font-size: 11px;
-  color: var(--t2);
-  border-bottom: 1px solid var(--border);
+  color: var(--t3);
 }
 .cg-card-frame {
   flex: 1;
   min-height: 120px;
   position: relative;
+  border-radius: 6px;
+  overflow: hidden;
 }
 .cg-card-frame iframe {
   width: 100%;

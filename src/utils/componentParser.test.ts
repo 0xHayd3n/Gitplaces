@@ -35,6 +35,42 @@ describe('parseComponent — React', () => {
     expect(result.name).toBe('MyComponent')
   })
 
+  it('uses the exported identifier from `export default function Name`', () => {
+    const result = parseComponent(
+      'examples/code.tsx',
+      'export default function InstallCode() { return null }',
+      'react',
+    )
+    expect(result.name).toBe('InstallCode')
+  })
+
+  it('uses the exported identifier from `export default Identifier`', () => {
+    const result = parseComponent(
+      'examples/picker.tsx',
+      'class CPicker extends Component {}\nexport default CPicker',
+      'react',
+    )
+    expect(result.name).toBe('CPicker')
+  })
+
+  it('uses single named PascalCase export when present', () => {
+    const result = parseComponent(
+      'examples/loader-item.tsx',
+      'export const LoaderItem = () => null',
+      'react',
+    )
+    expect(result.name).toBe('LoaderItem')
+  })
+
+  it('falls back to filename PascalCase when no usable export found', () => {
+    const result = parseComponent(
+      'src/utils/helpers.ts',
+      'export const foo = 1\nexport const bar = 2',
+      'react',
+    )
+    expect(result.name).toBe('Helpers')
+  })
+
   it('marks react as renderable', () => {
     const result = parseComponent('src/components/Button.tsx', source, 'react')
     expect(result.renderable).toBe(true)
