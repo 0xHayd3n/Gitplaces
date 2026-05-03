@@ -121,9 +121,13 @@ export default function Discover() {
   const [rowRepos, setRowRepos] = useState<RepoRow[]>([])
   const [heroIndex, setHeroIndex] = useState(0)
   const [heroPaused, setHeroPaused] = useState(false)
+  const [recentlyVisited, setRecentlyVisited] = useState<RepoRow[]>([])
+  const [recentlyVisitedIndex, setRecentlyVisitedIndex] = useState(0)
   const viewMode: ViewModeKey = (() => {
     const v = searchParams.get('view')
-    return v === 'recommended' ? 'recommended' : 'all'
+    if (v === 'recommended') return 'recommended'
+    if (v === 'last-visited') return 'last-visited'
+    return 'all'
   })()
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(() => {
     const snap = restoredSnapshot.current
@@ -298,6 +302,17 @@ export default function Discover() {
     return () => clearInterval(timer)
   }, [heroPaused, rowRepos.length])
 
+  useEffect(() => {
+    window.api.engagement.getRecentlyVisited(16)
+      .then(rows => {
+        setRecentlyVisited(rows)
+        setRecentlyVisitedIndex(0)
+        ensureClassified(rows)
+        extractMissingColors(rows)
+      })
+      .catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Always-current snapshot data — updated after every render so the unmount
   // cleanup can save accurate state regardless of how we leave the page.
   const liveSnapshotRef = useRef<import('../lib/discoverStateStore').DiscoverSnapshot | null>(null)
@@ -470,7 +485,10 @@ export default function Discover() {
     const gen = ++fetchGeneration.current
     try {
       let data: RepoRow[]
-      if (viewMode === 'recommended' && selectedSubtypes.length === 0) {
+      if (viewMode === 'last-visited') {
+        data = await window.api.engagement.getRecentlyVisited(200)
+        setHasMore(false) // local DB query — no pagination
+      } else if (viewMode === 'recommended' && selectedSubtypes.length === 0) {
         if (recommendedCache.current) {
           data = recommendedCache.current
         } else if (_recommendedModuleCache && Date.now() - _recommendedModuleCache.fetchedAt < RECOMMENDED_TTL_MS) {
@@ -991,6 +1009,21 @@ export default function Discover() {
     setSelectedSubtypes([])
   }, [])
 
+  const handleBackFromSearch = useCallback(() => {
+    setDiscoverQuery('')
+    setContextQuery('')
+    setDetectedTags([])
+    setActiveTags([])
+    setRelatedTags([])
+    loadTrending(appliedFilters)
+  }, [setContextQuery, loadTrending, appliedFilters])
+
+  const inSearchResults =
+    searchPath !== 'trending' &&
+    !topicMode &&
+    selectedSubtypes.length === 0 &&
+    (!!discoverQuery.trim() || activeTags.length > 0)
+
   const handleSelectTopic = (label: string) => {
     setShowSuggestions(false)
     setSuggestionIndex(-1)
@@ -1051,16 +1084,16 @@ export default function Discover() {
           inputRef={topNavInputRef}
           layoutPrefs={layoutPrefs}
           onLayoutChange={handleLayoutChange}
-          compact={navCompact || viewMode === 'recommended'}
+          compact={navCompact || viewMode !== 'all' || topicMode || selectedSubtypes.length > 0 || inSearchResults}
         />
         <div className="discover-main">
           <div ref={scrollRef} className={`discover-content ${aiChatVisible ? 'discover-content-dimmed' : ''}`} onKeyDown={kbNav.containerProps.onKeyDown} tabIndex={-1}>
-                {viewMode !== 'recommended' && !topicMode && selectedSubtypes.length === 0 && (
+                {viewMode === 'all' && !topicMode && selectedSubtypes.length === 0 && !inSearchResults && (
                   rowRepos.length > 0
                     ? <DiscoverHero repo={rowRepos[heroIndex] ?? null} onNavigate={navigateToRepo} />
                     : <div className="discover-hero discover-hero--skeleton" />
                 )}
-                {viewMode !== 'recommended' && !topicMode && selectedSubtypes.length === 0 && (
+                {viewMode === 'all' && !topicMode && selectedSubtypes.length === 0 && !inSearchResults && (
                   rowRepos.length > 0
                     ? <DiscoverRow
                         repos={rowRepos}
@@ -1070,7 +1103,9 @@ export default function Discover() {
                         onMore={() => setViewMode('recommended')}
                         onPause={setHeroPaused}
                         onAdvance={(delta) => {
-                          setHeroIndex((i) => (i + delta + rowRepos.length) % rowRepos.length)
+                          const visible = Math.min(effectiveCols, rowRepos.length)
+                          const max = Math.max(0, rowRepos.length - visible)
+                          setHeroIndex((i) => Math.max(0, Math.min(max, i + delta)))
                         }}
                       />
                     : <div className="discover-row discover-row--skeleton">
@@ -1079,6 +1114,21 @@ export default function Discover() {
                         </div>
                         <div className="discover-row-carousel discover-row-skeleton-carousel" />
                       </div>
+                )}
+                {viewMode === 'all' && !topicMode && selectedSubtypes.length === 0 && !inSearchResults && recentlyVisited.length > 0 && (
+                  <DiscoverRow
+                    title="Last Visited"
+                    repos={recentlyVisited}
+                    activeIndex={recentlyVisitedIndex}
+                    columns={effectiveCols}
+                    onNavigate={navigateToRepo}
+                    onMore={() => setViewMode('last-visited')}
+                    onAdvance={(delta) => {
+                      const visible = Math.min(effectiveCols, recentlyVisited.length)
+                      const max = Math.max(0, recentlyVisited.length - visible)
+                      setRecentlyVisitedIndex((i) => Math.max(0, Math.min(max, i + delta)))
+                    }}
+                  />
                 )}
                 <div className="discover-content-inner">
                   <GridHeader
@@ -1090,16 +1140,24 @@ export default function Discover() {
                           ? (selectedSubtypes.length === 1 && selectedLanguages.length === 0
                               ? (getSubTypeConfig(selectedSubtypes[0])?.label ?? 'Custom Search')
                               : 'Custom Search')
-                          : (viewMode === 'recommended' ? 'Recommended for You' : 'Most Popular')
+                          : inSearchResults
+                            ? `Searched '${discoverQuery.trim()}'`
+                            : viewMode === 'recommended'
+                              ? 'Recommended for You'
+                              : viewMode === 'last-visited'
+                                ? 'Last Visited'
+                                : 'Most Popular'
                     }
                     onBack={
                       topicMode
                         ? handleBackFromTopicMode
                         : selectedSubtypes.length > 0
                           ? handleBackFromSubtypeMode
-                          : (viewMode === 'recommended' ? () => setViewMode('all') : undefined)
+                          : inSearchResults
+                            ? handleBackFromSearch
+                            : (viewMode !== 'all' ? () => setViewMode('all') : undefined)
                     }
-                    onTitleClick={!topicMode && selectedSubtypes.length === 0 && viewMode !== 'recommended' ? () => setViewMode('all') : undefined}
+                    onTitleClick={!topicMode && selectedSubtypes.length === 0 && !inSearchResults && viewMode === 'all' ? () => setViewMode('all') : undefined}
                     viewMode={viewMode}
                     onViewModeChange={setViewMode}
                     activeFilters={{

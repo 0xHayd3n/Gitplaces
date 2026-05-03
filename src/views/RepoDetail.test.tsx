@@ -123,6 +123,10 @@ function setupDetail(
       skillSync: {
         getStatus: vi.fn().mockResolvedValue({ enabled: false }),
       },
+      engagement: {
+        logClick: vi.fn().mockResolvedValue(undefined),
+        getRecentlyVisited: vi.fn().mockResolvedValue([]),
+      },
     },
     writable: true, configurable: true,
   })

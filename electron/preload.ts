@@ -350,6 +350,8 @@ contextBridge.exposeInMainWorld('api', {
   engagement: {
     logClick: (repoId: string, source: string) =>
       ipcRenderer.invoke('engagement:logClick', repoId, source),
+    getRecentlyVisited: (limit?: number) =>
+      ipcRenderer.invoke('engagement:getRecentlyVisited', limit),
   },
 
   skillSync: {

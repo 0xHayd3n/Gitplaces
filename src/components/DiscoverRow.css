@@ -41,6 +41,12 @@
   transform: translateX(2px);
 }
 
+.discover-row-title-static {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t2);
+}
+
 /* ── Carousel container ── */
 .discover-row-carousel {
   position: relative;
@@ -66,14 +72,15 @@
   flex-direction: column;
   align-items: stretch;
   transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.45s ease,
               border-color 0.25s,
               background 0.2s;
-  will-change: transform, opacity;
+  will-change: transform;
 }
 
-/* ── Position slots — width/transform/opacity set via inline styles ── */
-.discover-row-card--prev {
+/* ── Off-screen peek slots (prev to the left, next to the right) ──
+   Pre-rendered just outside the carousel so transitions slide cards in
+   from off-screen instead of popping into the visible track. */
+.discover-row-card--peek {
   pointer-events: none;
 }
 
@@ -256,8 +263,13 @@
   transition: opacity 0.2s ease, background 0.2s ease;
 }
 
-.discover-row-nav-zone:hover {
+.discover-row-nav-zone:hover:not(:disabled) {
   opacity: 1;
+}
+
+.discover-row-nav-zone:disabled {
+  cursor: default;
+  pointer-events: none;
 }
 
 .discover-row-nav-zone--prev {

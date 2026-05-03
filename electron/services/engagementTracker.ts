@@ -28,3 +28,17 @@ export function getRecentClicks(
 export function pruneOldEvents(db: Database.Database, olderThanMs: number): void {
   db.prepare('DELETE FROM engagement_events WHERE ts < ?').run(olderThanMs)
 }
+
+export function getRecentlyVisited(db: Database.Database, limit = 16): unknown[] {
+  return db.prepare(`
+    SELECT r.* FROM repos r
+    INNER JOIN (
+      SELECT repo_id, MAX(ts) AS last_ts
+      FROM engagement_events
+      WHERE event_type = 'click'
+      GROUP BY repo_id
+    ) e ON e.repo_id = r.id
+    ORDER BY e.last_ts DESC
+    LIMIT ?
+  `).all(limit) as unknown[]
+}

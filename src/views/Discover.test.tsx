@@ -114,6 +114,7 @@ function makeDiscoverApi(overrides?: {
       },
       engagement: {
         logClick: vi.fn().mockResolvedValue(undefined),
+        getRecentlyVisited: vi.fn().mockResolvedValue([]),
       },
       ai: {
         getChats:       vi.fn().mockResolvedValue([]),

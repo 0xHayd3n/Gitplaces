@@ -298,6 +298,7 @@ declare global {
       }
       engagement: {
         logClick: (repoId: string, source: string) => Promise<void>
+        getRecentlyVisited: (limit?: number) => Promise<RepoRow[]>
       }
       updates: {
         checkNow: () => Promise<void>

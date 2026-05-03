@@ -12,20 +12,23 @@ interface DiscoverRowProps {
   activeIndex: number
   columns: number
   onNavigate: (path: string) => void
-  onMore: () => void
-  onPause: (paused: boolean) => void
   onAdvance: (delta: number) => void
+  title?: string
+  onMore?: () => void
+  onPause?: (paused: boolean) => void
 }
 
 function DiscoverRowCardItem({
   repo,
   posIndex,
   columns,
+  visible,
   onNavigate,
 }: {
   repo: RepoRow
   posIndex: number
   columns: number
+  visible: number
   onNavigate: (path: string) => void
 }) {
   const [starred, setStarred] = useState(!!repo.starred_at)
@@ -86,16 +89,15 @@ function DiscoverRowCardItem({
   const langColor = getLangColor(repo.language)
   const typeConfig = getSubTypeConfig(repo.type_sub)
   const gradient = getBucketGradient(typeConfig?.accentColor ?? getBucketColor(repo.type))
-  const isPrev = posIndex === -1
+  const isPeek = posIndex < 0 || posIndex >= visible
   const isActive = posIndex === 0
   const GAP = 16 // must match discover-grid gap
   // Card width = (100% - (N-1)*16px) / N  — identical to grid 1fr columns
   // translateX: 100% = element's own width (= parent/N), so no /N divisor needed
   const cardWidth = `calc((100% - ${(columns - 1) * GAP}px) / ${columns})`
-  const cardLeft = isPrev
-    ? `calc(-1 * (100% + ${GAP}px))`
-    : posIndex === 0 ? '0px' : `calc(${posIndex} * (100% + ${GAP}px))`
-  const targetOpacity = isPrev ? 0.22 : 1
+  const cardLeft = posIndex === 0
+    ? '0px'
+    : `calc(${posIndex} * (100% + ${GAP}px))`
   const topics = parseTopics(repo.topics).slice(0, 3)
   const recency = formatRecency(repo.pushed_at)
   const licenseText = repo.license && repo.license !== 'NOASSERTION' ? repo.license : 'N/A'
@@ -109,18 +111,19 @@ function DiscoverRowCardItem({
   return (
     <button
       key={repo.id}
-      className={`discover-row-card${isPrev ? ' discover-row-card--prev' : isActive ? ' discover-row-card--p0' : ''}${starred ? ' discover-row-card--starred' : ''}`}
-      style={{ width: cardWidth, transform: `translateX(${cardLeft})`, opacity: targetOpacity, '--target-opacity': targetOpacity } as React.CSSProperties}
-      onClick={!isPrev ? () => onNavigate(`/repo/${repo.owner}/${repo.name}`) : undefined}
+      className={`discover-row-card${isPeek ? ' discover-row-card--peek' : isActive ? ' discover-row-card--p0' : ''}${starred ? ' discover-row-card--starred' : ''}`}
+      style={{ width: cardWidth, transform: `translateX(${cardLeft})` } as React.CSSProperties}
+      onClick={!isPeek ? () => onNavigate(`/repo/${repo.owner}/${repo.name}`) : undefined}
       aria-label={`${repo.owner}/${repo.name}`}
-      tabIndex={isPrev ? -1 : undefined}
+      tabIndex={isPeek ? -1 : undefined}
+      aria-hidden={isPeek}
     >
       <div className="discover-row-card-dither">
         <DitherBackground avatarUrl={repo.avatar_url} fallbackGradient={gradient} />
         <button
           className={`repo-card-badge-br${starred ? ' starred' : ''}`}
           onClick={handleStar}
-          disabled={starWorking || isPrev}
+          disabled={starWorking || isPeek}
           title={starred ? 'Unstar' : 'Star'}
           aria-label={starred ? 'Unstar' : 'Star'}
         >
@@ -197,7 +200,7 @@ function DiscoverRowCardItem({
   )
 }
 
-export default function DiscoverRow({ repos, activeIndex, columns, onNavigate, onMore, onPause, onAdvance }: DiscoverRowProps) {
+export default function DiscoverRow({ repos, activeIndex, columns, onNavigate, onAdvance, title = 'Recommended for You', onMore, onPause }: DiscoverRowProps) {
   if (repos.length === 0) return null
 
   const visible = Math.min(columns, repos.length)
@@ -206,25 +209,42 @@ export default function DiscoverRow({ repos, activeIndex, columns, onNavigate, o
     posIndex: i,
   }))
 
+  // Off-screen peek slots so entering cards slide in from off-right and exiting
+  // cards slide out off-left (instead of popping into position). Skipped when
+  // repos.length === visible+1 — prev and next would resolve to the same repo
+  // and React would complain about duplicate keys.
   if (repos.length > visible) {
     slots.unshift({
       repo: repos[(activeIndex - 1 + repos.length) % repos.length],
       posIndex: -1,
     })
   }
+  if (repos.length >= visible + 2) {
+    slots.push({
+      repo: repos[(activeIndex + visible) % repos.length],
+      posIndex: visible,
+    })
+  }
+
+  const atStart = activeIndex === 0
+  const atEnd = activeIndex >= Math.max(0, repos.length - visible)
 
   return (
     <div className="discover-row">
       <div className="discover-row-header">
-        <button className="discover-row-title-btn" onClick={onMore} aria-label="See all recommended repos">
-          <span>Recommended for You</span>
-          <span className="discover-row-title-chevron" aria-hidden="true">›</span>
-        </button>
+        {onMore ? (
+          <button className="discover-row-title-btn" onClick={onMore} aria-label={`See all ${title}`}>
+            <span>{title}</span>
+            <span className="discover-row-title-chevron" aria-hidden="true">›</span>
+          </button>
+        ) : (
+          <span className="discover-row-title-static">{title}</span>
+        )}
       </div>
       <div
         className="discover-row-carousel"
-        onMouseEnter={() => onPause(true)}
-        onMouseLeave={() => onPause(false)}
+        onMouseEnter={() => onPause?.(true)}
+        onMouseLeave={() => onPause?.(false)}
       >
         {slots.map(({ repo, posIndex }) => (
           <DiscoverRowCardItem
@@ -232,12 +252,14 @@ export default function DiscoverRow({ repos, activeIndex, columns, onNavigate, o
             repo={repo}
             posIndex={posIndex}
             columns={columns}
+            visible={visible}
             onNavigate={onNavigate}
           />
         ))}
         <button
           className="discover-row-nav-zone discover-row-nav-zone--prev"
           onClick={() => onAdvance(-1)}
+          disabled={atStart}
           aria-label="Previous"
         >
           <span aria-hidden="true">‹</span>
@@ -245,6 +267,7 @@ export default function DiscoverRow({ repos, activeIndex, columns, onNavigate, o
         <button
           className="discover-row-nav-zone discover-row-nav-zone--next"
           onClick={() => onAdvance(1)}
+          disabled={atEnd}
           aria-label="Next"
         >
           <span aria-hidden="true">›</span>

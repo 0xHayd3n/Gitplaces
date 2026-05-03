@@ -8,7 +8,7 @@ import VerifiedBadge from './VerifiedBadge'
 import { getSubTypeConfig, getBucketGradient, getBucketColor } from '../config/repoTypeConfig'
 import LanguageIcon from './LanguageIcon'
 import VerificationBadge from './VerificationBadge'
-import { getViewModeAccent } from '../lib/discoverQueries'
+import { getViewModeAccent, type ViewModeKey } from '../lib/discoverQueries'
 import { getLangColor } from '../lib/languages'
 
 // ── Module-level IPC caches (shared across all card instances) ────
@@ -129,7 +129,7 @@ interface RepoCardProps {
   verificationSignals?:   string[]
   verificationResolving?: boolean
   focused?: boolean
-  viewMode?: 'recommended' | 'all'
+  viewMode?: ViewModeKey
   anchors?: Anchor[]
   onStar?: (repoId: string, starred: boolean) => void
   onLanguageClick?: (lang: string) => void

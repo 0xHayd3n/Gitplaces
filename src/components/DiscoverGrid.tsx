@@ -3,6 +3,7 @@ import type { RepoRow } from '../types/repo'
 import type { Anchor } from '../types/recommendation'
 import type { LayoutPrefs } from './LayoutDropdown'
 import type { useVerification } from '../hooks/useVerification'
+import type { ViewModeKey } from '../lib/discoverQueries'
 import RepoCard from './RepoCard'
 import RepoListRow from './RepoListRow'
 import ViewportWindow from './ViewportWindow'
@@ -21,7 +22,7 @@ export interface DiscoverGridProps {
   onTagClick: (tag: string) => void
   onOwnerClick: (owner: string) => void
   focusIndex?: number
-  viewMode?: 'recommended' | 'all'
+  viewMode?: ViewModeKey
   onStar?: (repoId: string, starred: boolean) => void
   onLanguageClick?: (lang: string) => void
   onSubtypeClick?: (subtypeId: string) => void

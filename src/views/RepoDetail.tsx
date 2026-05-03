@@ -876,6 +876,11 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     window.api.library.getCollections(repo.id).then(cols => setRepoCols(cols))
   }, [repo?.id])
 
+  useEffect(() => {
+    if (!repo?.id) return
+    window.api.engagement.logClick(repo.id, 'detail').catch(() => {})
+  }, [repo?.id])
+
   // Extract YouTube video links, social posts, and commands when README loads
   useEffect(() => {
     if (typeof readme !== 'string' || !readme) return
