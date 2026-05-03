@@ -27,6 +27,14 @@ export function ComponentCard({
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const triedTiersRef = useRef<Set<RenderTier>>(new Set())
 
+  // If the parent re-resolves and passes a new tier (e.g. after a re-scan),
+  // reset the per-card fallback state so the card honors the new tier instead
+  // of being stuck on whatever was selected at first mount.
+  useEffect(() => {
+    setCurrentTier(tier)
+    triedTiersRef.current = new Set()
+  }, [tier])
+
   useEffect(() => {
     const el = wrapRef.current
     if (!el) return
