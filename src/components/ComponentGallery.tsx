@@ -16,9 +16,11 @@ interface Props {
 
 const LRU_CAP = 24
 // Show the "many components need providers" banner once at least this many
-// cards have failed. Calibrated for monorepo libraries — for tiny libs we
-// don't want a banner from one or two failures.
-const FAILURE_BANNER_THRESHOLD = 4
+// cards have failed. Tuned low because most failures look like blank cards
+// to the user (component renders nothing visible) and only a fraction surface
+// as explicit "Preview failed" — so even a few hard failures usually mean
+// the library has structural issues we can't preview.
+const FAILURE_BANNER_THRESHOLD = 2
 
 export function ComponentGallery({
   components, variantsByPath, tierByPath, bundledByPath, sourceByPath, theme, onSelect,

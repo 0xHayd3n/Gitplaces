@@ -253,10 +253,16 @@ export async function buildIframeHtml(
   const propsJson = JSON.stringify(props)
   switch (component.framework) {
     case 'react': {
-      // Stubs return the prolog-defined `_$stubEl` so destructuring on
-      // helper-import return values yields undefined (no throw) while still
-      // producing a valid React node when used as JSX.
-      const compiled = await compileSource(prepareForCompile(source, '_$stubEl'), 'react')
+      // Stubs default to `() => null`. We tried `_$stubEl` (a real React
+      // element) so destructuring on helper-import return values would yield
+      // undefined instead of throwing — but that caused React error #31
+      // ("Objects are not valid as a React child") on a wide range of
+      // libraries because component code uses stub return values in
+      // contexts React validates strictly. The result was silent half-
+      // renders that looked broken. Falling back to `null` makes failures
+      // honest: destructuring throws → ComponentCard shows "Preview failed"
+      // with the error message → user knows what's happening.
+      const compiled = await compileSource(prepareForCompile(source), 'react')
       if (compiled === null) return null
       return buildReactHtml(component.name, compiled, propsJson, theme)
     }
@@ -315,13 +321,8 @@ function baseHead(theme: 'light' | 'dark', importMap = ''): string {
 function buildReactHtml(name: string, compiledCode: string, propsJson: string, theme: 'light' | 'dark'): string {
   let code = stripExports(compiledCode, name)
   const importMap = buildImportMap(code)
-  // Prolog runs before user code so `_$stubEl` (the dummy React element used
-  // by stubbed local imports — see prepareForCompile) is in scope.
-  const prolog = [
-    `import{createElement as _$cc}from'react'`,
-    `const _$stubEl=_$cc('span',null)`,
-  ].join('\n')
   const renderTail = [
+    `import{createElement as _$cc}from'react'`,
     `import{createRoot as _$cr}from'react-dom/client'`,
     `try{_$cr(document.getElementById('root')).render(_$cc(${name},${propsJson}));}` +
       `catch(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');}`,
@@ -330,7 +331,7 @@ function buildReactHtml(name: string, compiledCode: string, propsJson: string, t
   return `<!DOCTYPE html><html><head>${baseHead(theme, importMap)}
 </head><body ${themeBodyAttrs(theme)}><div id="root"></div>
 <script type="module">
-${escapeScriptContent(prolog + '\n' + code + '\n' + renderTail)}
+${escapeScriptContent(code + '\n' + renderTail)}
 </script></body></html>`
 }
 

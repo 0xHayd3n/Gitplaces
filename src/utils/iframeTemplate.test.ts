@@ -185,10 +185,10 @@ describe('buildIframeHtml — import map approach', () => {
   it('stubs local/relative imports as function placeholders', async () => {
     const source = "import Card from './Card'\nexport default function C() { return null }"
     const html = await buildIframeHtml(reactComp(), source, {})
-    // Local import stubbed — returns the prolog-defined React element so
-    // destructuring works AND JSX use renders nothing harmful. Not sent to esm.sh.
-    expect(html).toContain('const Card = () => _$stubEl')
-    expect(html).toContain("const _$stubEl=_$cc('span',null)")
+    // Local import stubbed — returns null. Used as JSX renders nothing harmful;
+    // destructuring throws, which is surfaced as "Preview failed" in the card UI.
+    // Not sent to esm.sh.
+    expect(html).toContain('const Card = () => null')
     expect(html).not.toContain('esm.sh/./Card')
   })
 
