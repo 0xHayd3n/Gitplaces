@@ -3,7 +3,20 @@ import { ipcMain } from 'electron'
 import { getToken } from './store'
 import { getRepoTree, getFileContent } from './github'
 import { detectFramework, detectFrameworkFromTree, isComponentFile } from '../src/utils/componentScanner'
-import type { ComponentScanResult, Framework, ScannedComponent } from '../src/types/components'
+import type { ComponentScanResult, Framework, ScannedComponent, ScannedStory } from '../src/types/components'
+
+async function probeNpmRegistry(name: string, version: string): Promise<boolean> {
+  try {
+    const res = await fetch(`https://registry.npmjs.org/${name}/${version}`)
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+function isStoryFile(path: string): boolean {
+  return /\.stor(y|ies)\.(tsx?|jsx?)$/.test(path)
+}
 
 async function batchFetch<T>(
   items: string[],
@@ -33,54 +46,78 @@ export async function scanComponents(
   name: string,
   branch: string,
 ): Promise<ComponentScanResult> {
-  // Validate inputs — values come from renderer via IPC and are interpolated into URLs
   const safe = /^[\w.\-]+$/
   if (!safe.test(owner) || !safe.test(name) || !safe.test(branch)) {
-    return { framework: 'unknown', components: [] }
+    return { framework: 'unknown', components: [], stories: [], pkg: null, error: null }
   }
 
   try {
-    const token = getToken() ?? null   // getToken() returns string | undefined; helpers need string | null
+    const token = getToken() ?? null
 
-    // 1. Detect framework from package.json
+    // Stage A: package.json — framework + maybe pkg
     let framework: Framework = 'unknown'
+    let pkg: { name: string; version: string } | null = null
     const pkgSource = await getFileContent(token, owner, name, 'package.json').catch(() => null)
     if (pkgSource) {
       try {
-        const pkg = JSON.parse(pkgSource) as {
-          dependencies?: Record<string, string>
-          devDependencies?: Record<string, string>
+        const parsed = JSON.parse(pkgSource) as {
+          name?: string; version?: string;
+          dependencies?: Record<string, string>;
+          devDependencies?: Record<string, string>;
         }
-        const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) }
+        const deps = { ...(parsed.dependencies ?? {}), ...(parsed.devDependencies ?? {}) }
         framework = detectFramework(deps)
-      } catch { /* malformed package.json — leave as unknown */ }
+        if (parsed.name && parsed.version) {
+          if (await probeNpmRegistry(parsed.name, parsed.version)) {
+            pkg = { name: parsed.name, version: parsed.version }
+          }
+        }
+      } catch { /* malformed package.json */ }
     }
 
-    // 2. Fetch the full file tree
-    const tree = await getRepoTree(token, owner, name, branch).catch(() => [] as { path: string; type: string }[])
+    // Stage B: file tree
+    const tree = await getRepoTree(token, owner, name, branch).catch(() => null)
+    if (!tree) {
+      return { framework, components: [], stories: [], pkg, error: 'network' }
+    }
     const filePaths = tree.filter(n => n.type === 'blob').map(n => n.path)
 
-    // 3. Fallback: detect framework from file extensions
-    if (framework === 'unknown') {
-      framework = detectFrameworkFromTree(filePaths)
+    if (framework === 'unknown') framework = detectFrameworkFromTree(filePaths)
+
+    // Stage C: candidates (cap components at 50, stories at 30 → 80 source fetches max)
+    const componentCandidates = filePaths
+      .filter(p => isComponentFile(p, framework))
+      .slice(0, 50)
+    const storyCandidates = filePaths
+      .filter(p => isStoryFile(p))
+      .slice(0, 30)
+
+    // Stage D: parallel fetch with 30s overall timeout
+    let timerHandle: ReturnType<typeof setTimeout> | undefined
+    const fetched = await Promise.race([
+      Promise.all([
+        batchFetch(componentCandidates, 10, p => getFileContent(token, owner, name, p).catch(() => null)),
+        batchFetch(storyCandidates,     10, p => getFileContent(token, owner, name, p).catch(() => null)),
+      ]),
+      new Promise<null>(resolve => { timerHandle = setTimeout(() => resolve(null), 30_000) }),
+    ])
+    if (timerHandle !== undefined) clearTimeout(timerHandle)
+
+    if (fetched === null) {
+      return { framework, components: [], stories: [], pkg, error: 'timeout' }
     }
 
-    // 4. Filter to component files
-    const candidates = filePaths
-      .filter(p => isComponentFile(p, framework))
-
-    // 5. Fetch source in batches of 10
-    const sources = await batchFetch(candidates, 10, path =>
-      getFileContent(token, owner, name, path).catch(() => null),
-    )
-
-    const components: ScannedComponent[] = candidates
-      .map((path, i) => ({ path, source: sources[i] ?? '' }))
+    const [componentSources, storySources] = fetched
+    const components: ScannedComponent[] = componentCandidates
+      .map((path, i) => ({ path, source: componentSources[i] ?? '' }))
       .filter(c => c.source.length > 0)
+    const stories: ScannedStory[] = storyCandidates
+      .map((path, i) => ({ path, source: storySources[i] ?? '' }))
+      .filter(s => s.source.length > 0)
 
-    return { framework, components }
+    return { framework, components, stories, pkg, error: null }
   } catch {
-    return { framework: 'unknown', components: [] }
+    return { framework: 'unknown', components: [], stories: [], pkg: null, error: 'network' }
   }
 }
 
