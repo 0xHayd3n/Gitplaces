@@ -27,7 +27,7 @@
 }
 .cg-sidebar-search {
   width: 100%;
-  background: var(--surface);
+  background: var(--bg2);
   color: var(--t1);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -48,7 +48,7 @@
   border-radius: 4px;
 }
 .cg-sidebar-all:hover,
-.cg-sidebar-item:hover { background: var(--surface); }
+.cg-sidebar-item:hover { background: var(--bg2); }
 .cg-sidebar-all.active,
 .cg-sidebar-item.active { background: var(--accent-soft); color: var(--accent-text); }
 .cg-sidebar-group-label {
@@ -106,7 +106,7 @@
   border-radius: 6px;
   cursor: pointer;
   overflow: hidden;
-  background: var(--surface);
+  background: var(--bg2);
 }
 .cg-card-name {
   padding: 4px 8px;
@@ -209,7 +209,7 @@
 .cg-detail-props th,
 .cg-detail-props td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: left; }
 .cg-detail-source pre {
-  background: var(--surface);
+  background: var(--bg2);
   padding: 12px;
   border-radius: 4px;
   font-size: 10px;

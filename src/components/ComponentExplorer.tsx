@@ -67,6 +67,8 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
         }
       }
 
+      if (cancelled) return
+
       const tiers: Record<string, RenderTier> = {}
       const bundled: Record<string, BundledRender> = {}
       await Promise.all(parsed.map(async c => {
@@ -126,7 +128,8 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
           <button
             className="cg-theme-toggle"
             onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-            title="Toggle theme"
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           >
             {theme === 'dark' ? '☀' : '☾'}
           </button>
