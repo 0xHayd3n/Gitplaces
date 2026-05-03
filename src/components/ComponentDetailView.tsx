@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import type { ParsedComponent } from '../utils/componentParser'
 import type { Variant, RenderTier, BundledRender } from '../types/components'
+import type { HelperSources } from '../utils/iframeTemplate'
 import { ComponentCard } from './ComponentCard'
 
 interface Props {
@@ -11,13 +12,14 @@ interface Props {
   bundled?: BundledRender
   theme: 'light' | 'dark'
   source: string
+  helpers?: HelperSources
   onBack: () => void
 }
 
 const VARIANT_VISIBLE_CAP = 6
 
 export function ComponentDetailView({
-  component, variants, tier, bundled, theme, source, onBack,
+  component, variants, tier, bundled, theme, source, helpers, onBack,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [sourceOpen, setSourceOpen] = useState(false)
@@ -36,7 +38,7 @@ export function ComponentDetailView({
         <div className="cg-detail-hero">
           <ComponentCard
             component={component} variant={heroVariant} tier={tier}
-            bundled={bundled} theme={theme} source={source}
+            bundled={bundled} theme={theme} source={source} helpers={helpers}
             onClick={() => {/* hero click is a no-op in detail view */}}
           />
         </div>
@@ -50,7 +52,7 @@ export function ComponentDetailView({
               <div key={i} className="cg-variant-tile">
                 <ComponentCard
                   component={component} variant={v} tier={tier}
-                  bundled={bundled} theme={theme} source={source}
+                  bundled={bundled} theme={theme} source={source} helpers={helpers}
                   onClick={() => {}}
                 />
                 <div className="cg-variant-name">{v.name}</div>

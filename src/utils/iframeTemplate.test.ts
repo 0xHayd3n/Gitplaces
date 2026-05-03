@@ -192,6 +192,70 @@ describe('buildIframeHtml — import map approach', () => {
     expect(html).not.toContain('esm.sh/./Card')
   })
 
+  it('inlines helper sources when provided, not stubbed as null', async () => {
+    const compSource = "import { parseLength } from './helpers/parseLength'\n"
+      + "export default function BarLoader({ size = 4 }) {\n"
+      + "  const { value, unit } = parseLength(size)\n"
+      + "  return null\n"
+      + "}"
+    const helperSource = "export function parseLength(size) {\n"
+      + "  if (typeof size === 'number') return { value: size, unit: 'px' }\n"
+      + "  return { value: 0, unit: 'px' }\n"
+      + "}"
+    const html = await buildIframeHtml(
+      { ...reactComp(), path: 'src/spinners/BarLoader.tsx' },
+      compSource,
+      {},
+      'dark',
+      { byPath: { 'src/spinners/helpers/parseLength.ts': helperSource } },
+    )
+    // Helper code is inlined — `parseLength` defined as a real function,
+    // not stubbed as `() => null`
+    expect(html).toContain('function parseLength')
+    expect(html).toContain('inlined: src/spinners/helpers/parseLength.ts')
+    expect(html).not.toContain('const parseLength = () => null')
+  })
+
+  it('falls back to null stub when helper file is not in the helpers map', async () => {
+    const compSource = "import { unknownHelper } from './helpers/missing'\n"
+      + "export default function C() { return null }"
+    const html = await buildIframeHtml(
+      { ...reactComp(), path: 'src/Foo.tsx' },
+      compSource,
+      {},
+      'dark',
+      { byPath: {} },
+    )
+    expect(html).toContain('const unknownHelper = () => null')
+  })
+
+  it('inlines transitive helper deps in dependency order', async () => {
+    // Component imports A; A imports B. Both should be inlined, B before A.
+    const compSource = "import { A } from './A'\n"
+      + "export default function C() { return A() }"
+    const helperA = "import { B } from './B'\n"
+      + "export const A = () => B()"
+    const helperB = "export const B = () => 42"
+    const html = await buildIframeHtml(
+      { ...reactComp(), path: 'src/C.tsx' },
+      compSource,
+      {},
+      'dark',
+      { byPath: {
+        'src/A.ts': helperA,
+        'src/B.ts': helperB,
+      } },
+    )
+    const idxB = html?.indexOf('inlined: src/B.ts') ?? -1
+    const idxA = html?.indexOf('inlined: src/A.ts') ?? -1
+    const idxC = html?.indexOf('component: src/C.tsx') ?? -1
+    expect(idxB).toBeGreaterThan(-1)
+    expect(idxA).toBeGreaterThan(-1)
+    expect(idxC).toBeGreaterThan(-1)
+    expect(idxB).toBeLessThan(idxA)
+    expect(idxA).toBeLessThan(idxC)
+  })
+
   it('uses ?external=react,react-dom for third-party packages', async () => {
     const source = "import { Button } from 'some-lib'\nexport default function C() { return null }"
     const html = await buildIframeHtml(reactComp(), source, {})

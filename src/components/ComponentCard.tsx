@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ParsedComponent } from '../utils/componentParser'
 import type { Variant, RenderTier, BundledRender } from '../types/components'
-import { buildIframeHtml, buildBundledIframeHtml } from '../utils/iframeTemplate'
+import { buildIframeHtml, buildBundledIframeHtml, type HelperSources } from '../utils/iframeTemplate'
 
 interface Props {
   component: ParsedComponent
@@ -11,6 +11,7 @@ interface Props {
   bundled?: BundledRender
   theme: 'light' | 'dark'
   source: string
+  helpers?: HelperSources
   onClick: () => void
   onRenderFailed?: () => void
 }
@@ -18,7 +19,7 @@ interface Props {
 type State = 'idle' | 'rendering' | 'rendered' | 'failed'
 
 export function ComponentCard({
-  component, variant, tier, bundled, theme, source, onClick, onRenderFailed,
+  component, variant, tier, bundled, theme, source, helpers, onClick, onRenderFailed,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -59,7 +60,7 @@ export function ComponentCard({
 
     const buildHtml = currentTier === 'bundled' && bundled
       ? Promise.resolve(buildBundledIframeHtml(bundled, JSON.stringify(variant.props), theme))
-      : buildIframeHtml(component, source, variant.props, theme)
+      : buildIframeHtml(component, source, variant.props, theme, helpers)
 
     void buildHtml.then(html => {
       if (cancelled || !html) {
@@ -78,7 +79,7 @@ export function ComponentCard({
 
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, currentTier, theme, component, source, variant, bundled])
+  }, [visible, currentTier, theme, component, source, variant, bundled, helpers])
 
   useEffect(() => () => {
     if (blobUrl) URL.revokeObjectURL(blobUrl)

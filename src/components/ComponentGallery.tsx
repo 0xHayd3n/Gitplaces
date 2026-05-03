@@ -2,6 +2,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { ParsedComponent } from '../utils/componentParser'
 import type { Variant, RenderTier, BundledRender } from '../types/components'
+import type { HelperSources } from '../utils/iframeTemplate'
 import { ComponentCard } from './ComponentCard'
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
   tierByPath: Record<string, RenderTier>
   bundledByPath: Record<string, BundledRender | undefined>
   sourceByPath: Record<string, string>
+  helpers?: HelperSources
   theme: 'light' | 'dark'
   onSelect: (path: string) => void
 }
@@ -23,7 +25,7 @@ const LRU_CAP = 24
 const FAILURE_BANNER_THRESHOLD = 2
 
 export function ComponentGallery({
-  components, variantsByPath, tierByPath, bundledByPath, sourceByPath, theme, onSelect,
+  components, variantsByPath, tierByPath, bundledByPath, sourceByPath, helpers, theme, onSelect,
 }: Props) {
   // Component-scoped LRU registry. Currently unused for eviction in v1 — the
   // ComponentCard already lazy-mounts via IntersectionObserver, which keeps
@@ -68,6 +70,7 @@ export function ComponentGallery({
               bundled={bundledByPath[c.path]}
               theme={theme}
               source={sourceByPath[c.path] ?? ''}
+              helpers={helpers}
               onClick={() => onSelect(c.path)}
               onRenderFailed={() => handleCardFailed(c.path)}
             />

@@ -6,6 +6,7 @@ import { generateProps } from '../utils/propsGenerator'
 import { generateVariants } from '../utils/variantGenerator'
 import { parseStoryFile, resolveStoryComponent } from '../utils/storyParser'
 import { chooseRenderer, resetBundleCache } from '../utils/componentBundle'
+import type { HelperSources } from '../utils/iframeTemplate'
 import { ComponentSidebar } from './ComponentSidebar'
 import { ComponentGallery } from './ComponentGallery'
 import { ComponentDetailView } from './ComponentDetailView'
@@ -27,6 +28,7 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
   const [variantsByPath, setVariantsByPath] = useState<Record<string, Variant[]>>({})
   const [tierByPath, setTierByPath] = useState<Record<string, RenderTier>>({})
   const [bundledByPath, setBundledByPath] = useState<Record<string, BundledRender>>({})
+  const [helpers, setHelpers] = useState<HelperSources | null>(null)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [searchQuery, setSearchQuery] = useState('')
@@ -40,6 +42,7 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
     setVariantsByPath({})
     setTierByPath({})
     setBundledByPath({})
+    setHelpers(null)
     setSelectedPath(null)
     resetBundleCache()
 
@@ -78,11 +81,18 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
       }))
 
       if (cancelled) return
+      // Build the helpers map (path → source) once per scan. ComponentCard
+      // will look up its component's relative imports against this map and
+      // inline anything that resolves, instead of stubbing it as null.
+      const helpersByPath: Record<string, string> = {}
+      for (const h of scan.helpers ?? []) helpersByPath[h.path] = h.source
+
       setComponents(parsed)
       setSourceByPath(sources)
       setVariantsByPath(variants)
       setTierByPath(tiers)
       setBundledByPath(bundled)
+      setHelpers(Object.keys(helpersByPath).length > 0 ? { byPath: helpersByPath } : null)
       setScanState('done')
     }).catch(() => {
       if (!cancelled) {
@@ -150,6 +160,7 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
             bundled={bundledByPath[selectedComponent.path]}
             theme={theme}
             source={sourceByPath[selectedComponent.path] ?? ''}
+            helpers={helpers ?? undefined}
             onBack={() => setSelectedPath(null)}
           />
         ) : (
@@ -159,6 +170,7 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
             tierByPath={tierByPath}
             bundledByPath={bundledByPath}
             sourceByPath={sourceByPath}
+            helpers={helpers ?? undefined}
             theme={theme}
             onSelect={setSelectedPath}
           />

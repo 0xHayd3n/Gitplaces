@@ -111,6 +111,126 @@ function escapeScriptContent(s: string): string {
 // defined in the iframe prolog) makes destructuring return undefined for
 // any key while still being a valid React node when used as JSX.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// prepareForCompileWithHelpers — extends prepareForCompile by inlining helper
+// file sources before the component code. Each helper has its own imports
+// processed (helpers' helpers also inline if present in the map; otherwise
+// stubbed as null). Helper exports are stripped so identifiers land at
+// module scope.
+//
+// The component's `import { x } from './rel'` lines are removed for any
+// `./rel` we're inlining; non-resolved relatives still fall back to the
+// stub-as-null path in prepareForCompile.
+//
+// This unlocks libraries like react-spinners where the component's first
+// line is `const { value, unit } = parseLengthAndUnit(size)` — without the
+// real helper, that destructure throws on null. With it inlined, the helper
+// runs and the component renders correctly.
+// ---------------------------------------------------------------------------
+function prepareForCompileWithHelpers(
+  source: string,
+  componentPath: string,
+  helpers?: HelperSources,
+): string {
+  if (!helpers || Object.keys(helpers.byPath).length === 0) {
+    return prepareForCompile(source)
+  }
+
+  // First, identify which of the component's relative imports actually
+  // resolve to files in the helpers map. Those are the ones we'll inline.
+  // Each resolved path gets walked recursively to pick up its own helper
+  // dependencies — so the final inlined block ends up with everything in
+  // dependency order (deps before consumers).
+  const inlinedOrder: string[] = []
+  const inlinedSet = new Set<string>()
+  const visiting = new Set<string>()
+
+  function walk(fromPath: string, fileSource: string) {
+    for (const rel of extractRelativeImportPaths(fileSource)) {
+      const resolved = resolveImportPath(fromPath, rel, helpers!.byPath)
+      if (!resolved || inlinedSet.has(resolved) || visiting.has(resolved)) continue
+      visiting.add(resolved)
+      walk(resolved, helpers!.byPath[resolved])
+      visiting.delete(resolved)
+      inlinedSet.add(resolved)
+      inlinedOrder.push(resolved)
+    }
+  }
+  walk(componentPath, source)
+
+  if (inlinedOrder.length === 0) return prepareForCompile(source)
+
+  // For each file (helpers + component), remove relative-import lines
+  // whose target is in inlinedSet — they'll be in scope from the inline
+  // block. Then run prepareForCompile so remaining imports are stubbed
+  // and CSS side-effect imports stripped. Finally, for helpers, also
+  // strip exports so identifiers become bare consts at module scope.
+  const helperBlock = inlinedOrder.map(path => {
+    const stripped = stripInlinedImports(helpers.byPath[path], path, inlinedSet, helpers.byPath)
+    const prepared = prepareForCompile(stripped)
+    return `// --- inlined: ${path} ---\n${stripExports(prepared, '')}`
+  }).join('\n\n')
+
+  const componentStripped = stripInlinedImports(source, componentPath, inlinedSet, helpers.byPath)
+  const componentPrepared = prepareForCompile(componentStripped)
+
+  return `${helperBlock}\n\n// --- component: ${componentPath} ---\n${componentPrepared}`
+}
+
+function stripInlinedImports(
+  source: string,
+  fromPath: string,
+  inlinedSet: Set<string>,
+  helperMap: Record<string, string>,
+): string {
+  // Match each `import ... from './rel'` (any of: named, default, mixed,
+  // namespace, side-effect) and remove the line if the resolved path is
+  // in inlinedSet. Other relative imports stay so prepareForCompile can
+  // turn them into stubs.
+  return source.replace(
+    /^import\s+(?:[^'"\n]+?\s+from\s+)?(['"])(\.\.?\/[^'"]+)\1\s*;?$/gm,
+    (match, _quote, rel) => {
+      const resolved = resolveImportPath(fromPath, rel, helperMap)
+      return resolved && inlinedSet.has(resolved) ? '' : match
+    },
+  )
+}
+
+function extractRelativeImportPaths(source: string): string[] {
+  const paths: string[] = []
+  const re = /from\s+(['"])(\.\.?\/[^'"]+)\1/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(source)) !== null) paths.push(m[2])
+  return paths
+}
+
+function resolveImportPath(
+  fromPath: string,
+  relative: string,
+  helperMap: Record<string, string>,
+): string | null {
+  if (!relative.startsWith('./') && !relative.startsWith('../')) return null
+  const fromDir = fromPath.split('/').slice(0, -1).join('/')
+  const joined = joinRelative(fromDir, relative)
+  const suffixes = ['', '.tsx', '.ts', '.jsx', '.js',
+    '/index.tsx', '/index.ts', '/index.jsx', '/index.js']
+  for (const suffix of suffixes) {
+    const candidate = joined + suffix
+    if (helperMap[candidate] !== undefined) return candidate
+  }
+  return null
+}
+
+function joinRelative(dir: string, relative: string): string {
+  const parts = (dir ? dir.split('/') : [])
+  for (const seg of relative.split('/')) {
+    if (seg === '.' || seg === '') continue
+    if (seg === '..') parts.pop()
+    else parts.push(seg)
+  }
+  return parts.join('/')
+}
+
 function prepareForCompile(source: string, stubReturn: string = 'null'): string {
   let r = source
 
@@ -243,31 +363,36 @@ function stripExports(code: string, name: string): string {
 // ---------------------------------------------------------------------------
 // buildIframeHtml — public entry point called by ComponentExplorer.
 // ---------------------------------------------------------------------------
+export interface HelperSources {
+  // Map of file path → raw source. Same shape the scanner returns. The path
+  // is used to resolve relative imports out of the component file.
+  byPath: Record<string, string>
+}
+
 export async function buildIframeHtml(
   component: ParsedComponent,
   source: string,
   props: Record<string, unknown>,
   theme: 'light' | 'dark' = 'dark',
+  helpers?: HelperSources,
 ): Promise<string | null> {
   if (!component.renderable) return null
   const propsJson = JSON.stringify(props)
   switch (component.framework) {
     case 'react': {
-      // Stubs default to `() => null`. We tried `_$stubEl` (a real React
-      // element) so destructuring on helper-import return values would yield
-      // undefined instead of throwing — but that caused React error #31
-      // ("Objects are not valid as a React child") on a wide range of
-      // libraries because component code uses stub return values in
-      // contexts React validates strictly. The result was silent half-
-      // renders that looked broken. Falling back to `null` makes failures
-      // honest: destructuring throws → ComponentCard shows "Preview failed"
-      // with the error message → user knows what's happening.
-      const compiled = await compileSource(prepareForCompile(source), 'react')
+      // Inline any scanned helper files this component (transitively) imports
+      // so calls like `parseLengthAndUnit(15)` actually run instead of
+      // getting null-stubbed. Imports of files NOT in the helpers map still
+      // fall back to the `() => null` stub — and destructuring null still
+      // throws → "Preview failed" UI with the error message.
+      const prepared = prepareForCompileWithHelpers(source, component.path, helpers)
+      const compiled = await compileSource(prepared, 'react')
       if (compiled === null) return null
       return buildReactHtml(component.name, compiled, propsJson, theme)
     }
     case 'solid': {
-      const compiled = await compileSource(prepareForCompile(source), 'solid')
+      const prepared = prepareForCompileWithHelpers(source, component.path, helpers)
+      const compiled = await compileSource(prepared, 'solid')
       if (compiled === null) return null
       return buildSolidHtml(component.name, compiled, propsJson, theme)
     }

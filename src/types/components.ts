@@ -13,11 +13,17 @@ export interface ScannedStory {
   source: string  // raw file content
 }
 
+export interface ScannedHelper {
+  path: string    // e.g. "src/helpers/parseLengthAndUnit.ts"
+  source: string  // raw file content
+}
+
 export interface ComponentScanResult {
   framework: Framework
   pkg: { name: string; version: string } | null
   components: ScannedComponent[]
   stories: ScannedStory[]
+  helpers: ScannedHelper[]   // NEW — files transitively imported by components
   error: 'rate-limit' | 'network' | 'timeout' | null
 }
 
