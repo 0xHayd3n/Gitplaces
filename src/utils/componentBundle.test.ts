@@ -18,7 +18,7 @@ const reactComp: ParsedComponent = {
 const baseScan = (overrides: Partial<ComponentScanResult> = {}): ComponentScanResult => ({
   framework: 'react',
   pkg: { name: '@radix-ui/react-dialog', version: '1.0.5' },
-  components: [reactComp],
+  components: [{ path: reactComp.path, source: '' }],
   stories: [],
   error: null,
   ...overrides,
