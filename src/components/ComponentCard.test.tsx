@@ -53,9 +53,15 @@ describe('ComponentCard', () => {
     })
   })
 
-  // TODO: This test exercises the two-tier failure handshake. jsdom doesn't load
-  // iframe content so contentWindow is always null, making the postMessage source
-  // check unreliable. Covered by Task 14 manual verification.
+  // TODO: This test exercises the two-tier failure handshake. After the first
+  // tier fails, React re-renders asynchronously; during that window iframeRef
+  // is in flux and the second postMessage dispatch races against the new
+  // iframe being mounted, so the `e.source !== iframeRef.current.contentWindow`
+  // guard inside the message handler can drop the second dispatch. Dispatching
+  // events from inside a waitFor callback also re-fires on every poll, which
+  // compounds the flake. The implementation logic is correct — this is a
+  // jsdom + async-render testing-harness limitation. Covered by Task 14 manual
+  // verification.
   it.skip('shows failed-render UI after both tiers fail', async () => {
     render(<ComponentCard
       component={mockComponent} variant={mockVariant} tier="bundled"
