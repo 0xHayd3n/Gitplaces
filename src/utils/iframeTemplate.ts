@@ -239,6 +239,7 @@ export async function buildIframeHtml(
   component: ParsedComponent,
   source: string,
   props: Record<string, unknown>,
+  theme: 'light' | 'dark' = 'dark',
 ): Promise<string | null> {
   if (!component.renderable) return null
   const propsJson = JSON.stringify(props)
@@ -246,39 +247,49 @@ export async function buildIframeHtml(
     case 'react': {
       const compiled = await compileSource(prepareForCompile(source), 'react')
       if (compiled === null) return null
-      return buildReactHtml(component.name, compiled, propsJson)
+      return buildReactHtml(component.name, compiled, propsJson, theme)
     }
     case 'solid': {
       const compiled = await compileSource(prepareForCompile(source), 'solid')
       if (compiled === null) return null
-      return buildSolidHtml(component.name, compiled, propsJson)
+      return buildSolidHtml(component.name, compiled, propsJson, theme)
     }
     case 'vue':
-      return buildVueHtml(component.name, stubLocalImports(source), propsJson)
+      return buildVueHtml(component.name, stubLocalImports(source), propsJson, theme)
     case 'svelte':
-      return buildSvelteHtml(stubLocalImports(source), propsJson)
+      return buildSvelteHtml(stubLocalImports(source), propsJson, theme)
     case 'angular': {
       const compiled = await compileSource(prepareForCompile(source), 'angular')
       if (compiled === null) return null
-      return buildAngularHtml(component.name, compiled)
+      return buildAngularHtml(component.name, compiled, theme)
     }
     case 'typescript': {
       const compiled = await compileSource(prepareForCompile(source), 'typescript')
       if (compiled === null) return null
-      return buildTypeScriptHtml(compiled)
+      return buildTypeScriptHtml(compiled, theme)
     }
     case 'javascript':
     case 'unknown':
-      return buildJavaScriptHtml(source)
+      return buildJavaScriptHtml(source, theme)
     default:
       return null
   }
 }
 
-function baseHead(importMap = ''): string {
+function themeStyle(theme: 'light' | 'dark'): string {
+  return theme === 'dark'
+    ? 'background:#0e0e0e;color:#eee'
+    : 'background:#fff;color:#000'
+}
+
+function themeBodyAttrs(theme: 'light' | 'dark'): string {
+  return `data-theme="${theme}"${theme === 'dark' ? ' class="dark"' : ''}`
+}
+
+function baseHead(theme: 'light' | 'dark', importMap = ''): string {
   // ERROR_BRIDGE must come before the importmap (which must come before module scripts).
   return `<meta charset="utf-8">${ERROR_BRIDGE}${importMap}
-<style>body{margin:0;padding:16px;font-family:system-ui,sans-serif;background:#fff;color:#000}</style>`
+<style>body{margin:0;padding:16px;font-family:system-ui,sans-serif;${themeStyle(theme)}}</style>`
 }
 
 // ---------------------------------------------------------------------------
@@ -290,37 +301,32 @@ function baseHead(importMap = ''): string {
 //   2. Strips 'export default' so the component is in scope by name
 //   3. Renders the component via React 18 createRoot
 // ---------------------------------------------------------------------------
-function buildReactHtml(name: string, compiledCode: string, propsJson: string): string {
+function buildReactHtml(name: string, compiledCode: string, propsJson: string, theme: 'light' | 'dark'): string {
   let code = stripExports(compiledCode, name)
-
-  // Build import map from whatever bare specifiers are in the compiled code
-  // (includes react/jsx-runtime added by esbuild + any third-party libs)
   const importMap = buildImportMap(code)
-
-  // Render tail — uses bare specifiers resolved by the import map
   const renderTail = [
     `import{createElement as _$cc}from'react'`,
     `import{createRoot as _$cr}from'react-dom/client'`,
     `try{_$cr(document.getElementById('root')).render(_$cc(${name},${propsJson}));}` +
-      `catch(e){window.parent.postMessage({type:'render-error',message:String(e)},'*');}`,
+      `catch(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');}`,
   ].join('\n')
 
-  return `<!DOCTYPE html><html><head>${baseHead(importMap)}
-</head><body><div id="root"></div>
+  return `<!DOCTYPE html><html><head>${baseHead(theme, importMap)}
+</head><body ${themeBodyAttrs(theme)}><div id="root"></div>
 <script type="module">
 ${escapeScriptContent(code + '\n' + renderTail)}
 </script></body></html>`
 }
 
-function buildVueHtml(name: string, source: string, propsJson: string): string {
+function buildVueHtml(name: string, source: string, propsJson: string, theme: 'light' | 'dark'): string {
   const templateMatch = source.match(/<template>([\s\S]+?)<\/template>/)
   const template = (templateMatch?.[1] ?? '<div>Component</div>')
     .replace(/<\/script>/gi, '<\\/script>')
     .replace(/`/g, '\\`')
 
   return `<!DOCTYPE html><html><head>
-${baseHead('<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>')}
-</head><body><div id="app"></div>
+${baseHead(theme, '<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>')}
+</head><body ${themeBodyAttrs(theme)}><div id="app"></div>
 <script>
 const {createApp,ref,computed,reactive,watch,onMounted}=Vue;
 const _props=${propsJson};
@@ -329,7 +335,7 @@ createApp({setup(){return _props},render:_render}).mount('#app');
 </script></body></html>`
 }
 
-function buildSvelteHtml(source: string, propsJson: string): string {
+function buildSvelteHtml(source: string, propsJson: string, theme: 'light' | 'dark'): string {
   const escaped = source
     .replace(/\\/g, '\\\\')
     .replace(/<\/script>/gi, '<\\/script>')
@@ -337,63 +343,63 @@ function buildSvelteHtml(source: string, propsJson: string): string {
     .replace(/\$/g, '\\$')
 
   return `<!DOCTYPE html><html><head>
-${baseHead('<script src="https://unpkg.com/svelte@4/compiler.js"></script>')}
-</head><body>
+${baseHead(theme, '<script src="https://unpkg.com/svelte@4/compiler.js"></script>')}
+</head><body ${themeBodyAttrs(theme)}>
 <script type="module">
 const src=\`${escaped}\`;
 let compiled;
 try{compiled=svelte.compile(src,{generate:'dom',format:'esm'});}
-catch(e){window.parent.postMessage({type:'render-error',message:String(e)},'*');throw e;}
+catch(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');throw e;}
 const blob=new Blob([compiled.js.code],{type:'application/javascript'});
 const url=URL.createObjectURL(blob);
 import(url).then(mod=>{
   new mod.default({target:document.body,props:${propsJson}});
-}).catch(e=>{window.parent.postMessage({type:'render-error',message:String(e)},'*');});
+}).catch(e=>{window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');});
 </script></body></html>`
 }
 
-function buildSolidHtml(name: string, compiledCode: string, propsJson: string): string {
+function buildSolidHtml(name: string, compiledCode: string, propsJson: string, theme: 'light' | 'dark'): string {
   const code = stripExports(compiledCode, name)
   const importMap = buildImportMap(code)
   const renderTail = [
     `import{render as _$r,createComponent as _$cc}from'solid-js/web'`,
     `try{_$r(()=>_$cc(${name},${propsJson}),document.getElementById('root'));}` +
-    `catch(e){window.parent.postMessage({type:'render-error',message:String(e)},'*');}`,
+    `catch(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');}`,
   ].join('\n')
-  return `<!DOCTYPE html><html><head>${baseHead(importMap)}\n</head><body><div id="root"></div>\n<script type="module">\n${escapeScriptContent(code + '\n' + renderTail)}\n</script></body></html>`
+  return `<!DOCTYPE html><html><head>${baseHead(theme, importMap)}\n</head><body ${themeBodyAttrs(theme)}><div id="root"></div>\n<script type="module">\n${escapeScriptContent(code + '\n' + renderTail)}\n</script></body></html>`
 }
 
-function buildAngularHtml(name: string, compiledCode: string): string {
+function buildAngularHtml(name: string, compiledCode: string, theme: 'light' | 'dark'): string {
   const code = stripExports(compiledCode, name)
   return `<!DOCTYPE html><html><head>
-${baseHead('<script src="https://unpkg.com/zone.js/dist/zone.js"></script>')}
-</head><body><app-root></app-root>
+${baseHead(theme, '<script src="https://unpkg.com/zone.js/dist/zone.js"></script>')}
+</head><body ${themeBodyAttrs(theme)}><app-root></app-root>
 <script type="module">
 import{bootstrapApplication}from'https://esm.sh/@angular/platform-browser@17'
 ${escapeScriptContent(code)}
 try{
   if(typeof ${name}!=='undefined'){
-    bootstrapApplication(${name}).catch(function(e){window.parent.postMessage({type:'render-error',message:String(e)},'*');})
+    bootstrapApplication(${name}).catch(function(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');})
   }
-}catch(e){window.parent.postMessage({type:'render-error',message:String(e)},'*');}
+}catch(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');}
 </script></body></html>`
 }
 
-function buildTypeScriptHtml(compiledCode: string): string {
+function buildTypeScriptHtml(compiledCode: string, theme: 'light' | 'dark'): string {
   const code = stripExports(compiledCode, '')
   const importMap = buildImportMap(code)
-  return `<!DOCTYPE html><html><head>${baseHead(importMap)}\n</head><body><div id="root" style="padding:16px"></div>\n<script type="module">\n${escapeScriptContent(code)}\n</script></body></html>`
+  return `<!DOCTYPE html><html><head>${baseHead(theme, importMap)}\n</head><body ${themeBodyAttrs(theme)}><div id="root" style="padding:16px"></div>\n<script type="module">\n${escapeScriptContent(code)}\n</script></body></html>`
 }
 
-function buildJavaScriptHtml(source: string): string {
+function buildJavaScriptHtml(source: string, theme: 'light' | 'dark'): string {
   const pluginMatch = source.match(/\$\.fn\.(\w+)\s*=/)
   const pluginName = pluginMatch?.[1] ?? null
   const autoInit = pluginName
-    ? `try{if($.fn.${pluginName}){$('#demo').${pluginName}();}}catch(e){window.parent.postMessage({type:'render-error',message:String(e)},'*');}`
+    ? `try{if($.fn.${pluginName}){$('#demo').${pluginName}();}}catch(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');}`
     : ''
   return `<!DOCTYPE html><html><head>
-${baseHead('<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>')}
-</head><body>
+${baseHead(theme, '<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>')}
+</head><body ${themeBodyAttrs(theme)}>
 <div id="demo" style="padding:8px">
   <div class="accordion"><div class="title"><i class="dropdown icon"></i>Section 1</div><div class="content active"><p>Content</p></div></div>
 </div>

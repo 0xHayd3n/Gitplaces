@@ -56,7 +56,7 @@ export function ComponentCard({
 
     const buildHtml = currentTier === 'bundled' && bundled
       ? Promise.resolve(buildBundledIframeHtml(bundled, JSON.stringify(variant.props), theme))
-      : buildIframeHtml(component, source, variant.props)
+      : buildIframeHtml(component, source, variant.props, theme)
 
     void buildHtml.then(html => {
       if (cancelled || !html) {
