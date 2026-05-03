@@ -125,7 +125,13 @@ export function ComponentCard({
             title={`${component.name} preview`}
           />
         ) : (
-          <div className="cg-card-skeleton" />
+          <div className="cg-card-skeleton">
+            {state === 'rendering'
+              ? `Rendering (${currentTier})…`
+              : visible
+                ? 'Building…'
+                : ''}
+          </div>
         )}
       </div>
     </div>
