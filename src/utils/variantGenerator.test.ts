@@ -14,6 +14,7 @@ describe('generateVariants', () => {
     expect(result).toHaveLength(3)
     expect(result.map(v => v.name)).toEqual(['a', 'b', 'c'])
     expect(result[0].props.variant).toBe('a')
+    expect(result.every(v => v.source === 'auto')).toBe(true)
   })
 
   it('returns empty when no union prop matches the allowlist', () => {

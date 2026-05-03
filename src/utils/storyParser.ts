@@ -20,7 +20,10 @@ export function parseStoryFile(_path: string, source: string): StoryFile | null 
   if (!importPath) return null
 
   const stories: { name: string; args: Record<string, unknown> }[] = []
-  const namedRe = /export\s+const\s+(\w+)\s*(?::\s*\w+)?\s*=\s*(\{[\s\S]*?\}\s*\})/g
+  // Type annotation may be a bare ident (`: Story`) or a generic
+  // (`: StoryObj<ButtonProps>`) — match anything up to the `=` that isn't
+  // itself an `=`, then resync at `=\s*\{`.
+  const namedRe = /export\s+const\s+(\w+)\s*(?::\s*[^=]+?)?\s*=\s*(\{[\s\S]*?\}\s*\})/g
   let m: RegExpExecArray | null
   while ((m = namedRe.exec(source)) !== null) {
     const name = m[1]

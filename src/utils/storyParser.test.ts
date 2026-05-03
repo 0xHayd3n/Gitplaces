@@ -27,6 +27,20 @@ describe('parseStoryFile', () => {
     expect(result?.stories[1]).toEqual({ name: 'Secondary', args: { variant: 'secondary' } })
   })
 
+  it('parses stories with typed generic annotations (StoryObj<T>)', () => {
+    const source = `
+      import type { StoryObj } from '@storybook/react'
+      import { Button } from './Button'
+      export default { component: Button }
+      export const Primary: StoryObj<typeof Button> = { args: { variant: 'primary' } }
+      export const WithSize: StoryObj<{ size: string }> = { args: { size: 'md' } }
+    `
+    const result = parseStoryFile('Button.stories.tsx', source)
+    expect(result?.stories).toHaveLength(2)
+    expect(result?.stories[0]).toEqual({ name: 'Primary',  args: { variant: 'primary' } })
+    expect(result?.stories[1]).toEqual({ name: 'WithSize', args: { size: 'md' } })
+  })
+
   it('drops stories whose args fail to parse', () => {
     const source = `
       import { X } from './X'
