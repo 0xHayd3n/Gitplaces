@@ -104,6 +104,12 @@ describe('isComponentFile', () => {
   it('rejects hook files (use* pattern)', () => {
     expect(isComponentFile('src/components/useButton.tsx', 'react')).toBe(false)
   })
+  it('rejects kebab-case hook files (use-* pattern, Radix style)', () => {
+    expect(isComponentFile('packages/react/use-callback-ref/src/use-callback-ref.tsx', 'react')).toBe(false)
+  })
+  it('rejects kebab-case hooks even when in /components/', () => {
+    expect(isComponentFile('src/components/use-controllable-state.tsx', 'react')).toBe(false)
+  })
   it('accepts a lowercase .tsx file in /ui/ (shadcn/ui style)', () => {
     expect(isComponentFile('apps/www/registry/default/ui/button.tsx', 'react')).toBe(true)
   })

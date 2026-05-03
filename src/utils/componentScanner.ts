@@ -57,8 +57,9 @@ export function isComponentFile(path: string, framework: Framework): boolean {
 
   const nameWithoutExt = filename.replace(/\.[^.]+$/, '')
 
-  // Always exclude React hooks (use* pattern)
-  if (/^use[A-Z]/.test(nameWithoutExt))                             return false
+  // Always exclude React hooks. Both camelCase (`useCallback`) and kebab-case
+  // (`use-callback-ref` — Radix style) are hooks, not components.
+  if (/^use[-A-Z]/.test(nameWithoutExt))                            return false
 
   // Include patterns
   const inIncludeDir = INCLUDE_PATTERNS.some(p => path.includes(p))
