@@ -12,12 +12,13 @@ interface Props {
   theme: 'light' | 'dark'
   source: string
   onClick: () => void
+  onRenderFailed?: () => void
 }
 
 type State = 'idle' | 'rendering' | 'rendered' | 'failed'
 
 export function ComponentCard({
-  component, variant, tier, bundled, theme, source, onClick,
+  component, variant, tier, bundled, theme, source, onClick, onRenderFailed,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -108,6 +109,7 @@ export function ComponentCard({
       return
     }
     setState('failed')
+    onRenderFailed?.()
   }
 
   function handleLoad() {

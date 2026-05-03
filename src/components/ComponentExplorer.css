@@ -97,6 +97,17 @@
   overflow-y: auto;
   flex: 1;
 }
+.cg-gallery-banner {
+  margin: 8px 12px 0;
+  padding: 8px 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: 'Inter', sans-serif;
+  color: var(--t3);
+  flex-shrink: 0;
+}
 
 /* Card */
 .cg-card {
