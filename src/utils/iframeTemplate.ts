@@ -871,7 +871,7 @@ function baseHead(theme: 'light' | 'dark', importMap = '', hasTailwind = false):
 // ESM hoists all `import` statements before the module body runs, so any
 // `import` in the render tail is already bound by the time this const runs.
 // ---------------------------------------------------------------------------
-const STUB_PROLOG = `const _$stub=new Proxy(function _s(){return _$stub},{get:(_,p)=>p==='then'?undefined:_$stub,apply:()=>_$stub});`
+const STUB_PROLOG = `const _$stub=new Proxy(function _s(){return _$stub},{get:(_,p)=>typeof p==='symbol'||p==='then'?undefined:p==='valueOf'||p==='toString'?()=>'':_$stub,apply:()=>_$stub});`
 
 // ---------------------------------------------------------------------------
 // buildReactHtml
