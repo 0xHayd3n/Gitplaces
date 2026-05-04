@@ -890,6 +890,13 @@ function buildReactHtml(name: string, compiledCode: string, propsJson: string, t
     `import{createRoot as _$cr}from'react-dom/client'`,
     `try{_$cr(document.getElementById('root')).render(_$cc(${name},${propsJson}));}` +
       `catch(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');}`,
+    // React 18 concurrent mode renders asynchronously — the try/catch above only catches
+    // synchronous errors. Components that return null (e.g. context sub-components without
+    // a provider) or whose render errors React swallows both leave the root empty with no
+    // error posted. Detect this after a short delay and show a placeholder so the card
+    // isn't just a silent black rectangle.
+    `setTimeout(function(){var _$d=document.getElementById('root');` +
+      `if(_$d&&!_$d.firstChild)_$d.innerHTML='<div style="opacity:.3;font-size:13px;text-align:center;padding-top:24px;color:currentColor">&#8212;</div>';},150);`,
   ].join('\n')
 
   return `<!DOCTYPE html><html><head>${baseHead(theme, importMap, hasTailwind)}
@@ -1037,6 +1044,8 @@ export function buildBundledIframeHtml(
     `} catch (e) {`,
     `  window.parent.postMessage({type:'render-error',tier:'bundled',message:String(e)},'*')`,
     `}`,
+    `setTimeout(function(){var _$d=document.getElementById('root');` +
+      `if(_$d&&!_$d.firstChild)_$d.innerHTML='<div style="opacity:.3;font-size:13px;text-align:center;padding-top:24px;color:currentColor">&#8212;</div>';},150);`,
   ].join('\n')
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">${ERROR_BRIDGE_BUNDLED}${importMap}${cssLinks}${tailwind}
