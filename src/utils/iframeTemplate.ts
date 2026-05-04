@@ -886,9 +886,13 @@ function buildReactHtml(name: string, compiledCode: string, propsJson: string, t
   let code = stripExports(compiledCode, name)
   const importMap = buildImportMap(code)
   const renderTail = [
-    `import{createElement as _$cc}from'react'`,
+    `import{createElement as _$cc,Component as _$BC}from'react'`,
     `import{createRoot as _$cr}from'react-dom/client'`,
-    `try{_$cr(document.getElementById('root')).render(_$cc(${name},${propsJson}));}` +
+    // Error boundary: catches render-phase errors (e.g. "r is not a function" from
+    // context sub-components that need a parent provider) and renders null instead
+    // of propagating to the global error handler and triggering "Preview failed".
+    `class _$EB extends _$BC{constructor(p){super(p);this.state={e:0}}static getDerivedStateFromError(){return{e:1}}render(){return this.state.e?null:this.props.children}}`,
+    `try{_$cr(document.getElementById('root')).render(_$cc(_$EB,null,_$cc(${name},${propsJson})));}` +
       `catch(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');}`,
   ].join('\n')
 
