@@ -369,6 +369,71 @@ export interface HelperSources {
   byPath: Record<string, string>
 }
 
+// Compile-only step. The output depends on (source, helpers, framework) — but
+// NOT on theme or props. ComponentCard caches this result in a ref so theme
+// toggles and prop changes only re-template the HTML wrapper without paying
+// the IPC + esbuild cost again.
+//
+// For React/Solid the output is esbuild-transformed JS. For Vue/Svelte/JS
+// there's no precompile step — the source itself is passed straight through.
+// Returns null if the component is not renderable or compilation fails.
+export async function compileForIframe(
+  component: ParsedComponent,
+  source: string,
+  helpers?: HelperSources,
+): Promise<string | null> {
+  if (!component.renderable) return null
+  switch (component.framework) {
+    case 'react': {
+      const prepared = prepareForCompileWithHelpers(source, component.path, helpers)
+      return compileSource(prepared, 'react')
+    }
+    case 'solid': {
+      const prepared = prepareForCompileWithHelpers(source, component.path, helpers)
+      return compileSource(prepared, 'solid')
+    }
+    case 'angular':
+      return compileSource(prepareForCompile(source), 'angular')
+    case 'typescript':
+      return compileSource(prepareForCompile(source), 'typescript')
+    case 'vue':
+      return stubLocalImports(source)
+    case 'svelte':
+      return stubLocalImports(source)
+    case 'javascript':
+    case 'unknown':
+      return source
+    default:
+      return null
+  }
+}
+
+// HTML-build step. Pure function of (component, prepared, props, theme) —
+// fast, synchronous, no IPC. Pair with `compileForIframe` to avoid recompiling
+// when only the theme or props change.
+export function buildHtmlFromCompiled(
+  component: ParsedComponent,
+  prepared: string,
+  props: Record<string, unknown>,
+  theme: 'light' | 'dark' = 'dark',
+): string | null {
+  if (!component.renderable) return null
+  const propsJson = JSON.stringify(props)
+  switch (component.framework) {
+    case 'react':      return buildReactHtml(component.name, prepared, propsJson, theme)
+    case 'solid':      return buildSolidHtml(component.name, prepared, propsJson, theme)
+    case 'angular':    return buildAngularHtml(component.name, prepared, theme)
+    case 'typescript': return buildTypeScriptHtml(prepared, theme)
+    case 'vue':        return buildVueHtml(component.name, prepared, propsJson, theme)
+    case 'svelte':     return buildSvelteHtml(prepared, propsJson, theme)
+    case 'javascript':
+    case 'unknown':    return buildJavaScriptHtml(prepared, theme)
+    default:           return null
+  }
+}
+
+// Convenience: combined compile + build. Kept for callers that don't benefit
+// from caching the compiled output (e.g. one-shot renders, tests).
 export async function buildIframeHtml(
   component: ParsedComponent,
   source: string,
@@ -376,46 +441,9 @@ export async function buildIframeHtml(
   theme: 'light' | 'dark' = 'dark',
   helpers?: HelperSources,
 ): Promise<string | null> {
-  if (!component.renderable) return null
-  const propsJson = JSON.stringify(props)
-  switch (component.framework) {
-    case 'react': {
-      // Inline any scanned helper files this component (transitively) imports
-      // so calls like `parseLengthAndUnit(15)` actually run instead of
-      // getting null-stubbed. Imports of files NOT in the helpers map still
-      // fall back to the `() => null` stub — and destructuring null still
-      // throws → "Preview failed" UI with the error message.
-      const prepared = prepareForCompileWithHelpers(source, component.path, helpers)
-      const compiled = await compileSource(prepared, 'react')
-      if (compiled === null) return null
-      return buildReactHtml(component.name, compiled, propsJson, theme)
-    }
-    case 'solid': {
-      const prepared = prepareForCompileWithHelpers(source, component.path, helpers)
-      const compiled = await compileSource(prepared, 'solid')
-      if (compiled === null) return null
-      return buildSolidHtml(component.name, compiled, propsJson, theme)
-    }
-    case 'vue':
-      return buildVueHtml(component.name, stubLocalImports(source), propsJson, theme)
-    case 'svelte':
-      return buildSvelteHtml(stubLocalImports(source), propsJson, theme)
-    case 'angular': {
-      const compiled = await compileSource(prepareForCompile(source), 'angular')
-      if (compiled === null) return null
-      return buildAngularHtml(component.name, compiled, theme)
-    }
-    case 'typescript': {
-      const compiled = await compileSource(prepareForCompile(source), 'typescript')
-      if (compiled === null) return null
-      return buildTypeScriptHtml(compiled, theme)
-    }
-    case 'javascript':
-    case 'unknown':
-      return buildJavaScriptHtml(source, theme)
-    default:
-      return null
-  }
+  const prepared = await compileForIframe(component, source, helpers)
+  if (prepared === null) return null
+  return buildHtmlFromCompiled(component, prepared, props, theme)
 }
 
 function themeStyle(theme: 'light' | 'dark'): string {
@@ -430,8 +458,10 @@ function themeBodyAttrs(theme: 'light' | 'dark'): string {
 
 function baseHead(theme: 'light' | 'dark', importMap = ''): string {
   // ERROR_BRIDGE must come before the importmap (which must come before module scripts).
+  // Body fills the iframe and centers content so spinners/icons sit in the
+  // middle of each gallery cell instead of pinning to the top-left.
   return `<meta charset="utf-8">${ERROR_BRIDGE}${importMap}
-<style>body{margin:0;padding:16px;font-family:system-ui,sans-serif;${themeStyle(theme)}}</style>`
+<style>html,body{height:100%;overflow:hidden}body{margin:0;padding:16px;box-sizing:border-box;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;${themeStyle(theme)}}</style>`
 }
 
 // ---------------------------------------------------------------------------

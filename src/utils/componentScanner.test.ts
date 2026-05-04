@@ -128,6 +128,18 @@ describe('isComponentFile', () => {
   it('rejects files in scripts/', () => {
     expect(isComponentFile('scripts/components/setup.js', 'unknown')).toBe(false)
   })
+  it('rejects demo helpers in examples/components/ (react-spinners style)', () => {
+    expect(isComponentFile('examples/components/Code.tsx', 'react')).toBe(false)
+    expect(isComponentFile('examples/components/ColorPicker.tsx', 'react')).toBe(false)
+    expect(isComponentFile('examples/components/LoaderItem.tsx', 'react')).toBe(false)
+  })
+  it('rejects files in example/, demo/, demos/, playground/, sandbox/', () => {
+    expect(isComponentFile('example/components/Foo.tsx', 'react')).toBe(false)
+    expect(isComponentFile('demo/components/Foo.tsx', 'react')).toBe(false)
+    expect(isComponentFile('demos/components/Foo.tsx', 'react')).toBe(false)
+    expect(isComponentFile('playground/components/Foo.tsx', 'react')).toBe(false)
+    expect(isComponentFile('sandbox/components/Foo.tsx', 'react')).toBe(false)
+  })
   it('rejects files with wrong extension for framework', () => {
     expect(isComponentFile('src/components/Button.vue', 'react')).toBe(false)
   })

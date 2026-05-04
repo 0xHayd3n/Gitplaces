@@ -53,7 +53,7 @@ export function isComponentFile(path: string, framework: Framework): boolean {
   if (/\.(test|spec|stories)\.[^.]+$/.test(filename))              return false
   if (/\.d\.[^.]+$/.test(filename))                                return false
   if (/^index\./.test(filename))                                     return false
-  if (/(__tests__|__mocks__|node_modules|dist|\.storybook|(^|\/)tasks\/|(^|\/)scripts\/|(^|\/)build\/|(^|\/)tools\/|(^|\/)config\/)/.test(path)) return false
+  if (/(__tests__|__mocks__|node_modules|dist|\.storybook|(^|\/)tasks\/|(^|\/)scripts\/|(^|\/)build\/|(^|\/)tools\/|(^|\/)config\/|(^|\/)examples?\/|(^|\/)demos?\/|(^|\/)playground\/|(^|\/)sandbox\/)/.test(path)) return false
 
   const nameWithoutExt = filename.replace(/\.[^.]+$/, '')
 

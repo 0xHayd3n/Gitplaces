@@ -13,13 +13,14 @@ interface Props {
   theme: 'light' | 'dark'
   source: string
   helpers?: HelperSources
+  githubUrl?: string
   onBack: () => void
 }
 
 const VARIANT_VISIBLE_CAP = 6
 
 export function ComponentDetailView({
-  component, variants, tier, bundled, theme, source, helpers, onBack,
+  component, variants, tier, bundled, theme, source, helpers, githubUrl, onBack,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [sourceOpen, setSourceOpen] = useState(false)
@@ -32,7 +33,14 @@ export function ComponentDetailView({
   return (
     <div className="cg-detail">
       <button className="cg-detail-back" onClick={onBack}>◂ All components</button>
-      <h2 className="cg-detail-name">{component.name}</h2>
+      <div className="cg-detail-header">
+        <h2 className="cg-detail-name">{component.name}</h2>
+        {githubUrl && (
+          <a className="cg-gh-link" href={githubUrl} target="_blank" rel="noreferrer">
+            Open on GitHub ↗
+          </a>
+        )}
+      </div>
 
       {heroVariant && (
         <div className="cg-detail-hero">

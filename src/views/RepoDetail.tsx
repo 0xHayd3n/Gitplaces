@@ -422,6 +422,7 @@ type Tab = 'activities' | 'readme' | 'files' | 'skill' | 'collections' | 'relate
 const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'activities',  label: 'Activities' },
   { id: 'readme',      label: 'Readme' },
+  { id: 'components',  label: 'Components' },
   { id: 'files',       label: 'Files' },
   { id: 'skill',       label: 'Skills Folder' },
   { id: 'collections', label: 'Collections' },
@@ -429,7 +430,6 @@ const ALL_TABS: { id: Tab; label: string }[] = [
   { id: 'videos',      label: 'Videos' },
   { id: 'posts',       label: 'Posts' },
   { id: 'commands',    label: 'Commands' },
-  { id: 'components',  label: 'Components' },
 ]
 
 // ── Synthetic ReleaseEvent adapter ─────────────────────────────────
@@ -2013,7 +2013,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
               )
             }
             fullBleedBody={isFullBleedTab}
-            collapsedHeader={activeTab === 'files'}
+            collapsedHeader={activeTab === 'files' || activeTab === 'components'}
           />
           </div>
         )}

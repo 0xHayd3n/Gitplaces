@@ -1,9 +1,29 @@
 // electron/componentScanner.ts
 import { ipcMain } from 'electron'
+import { createHash } from 'node:crypto'
 import { getToken } from './store'
 import { getRepoTree, getFileContent } from './github'
 import { detectFramework, detectFrameworkFromTree, isComponentFile } from '../src/utils/componentScanner'
 import type { ComponentScanResult, Framework, ScannedComponent, ScannedStory, ScannedHelper } from '../src/types/components'
+
+// Compile cache — esbuild output is a pure function of (source, framework),
+// so we hash the input and reuse the result. Eliminates redundant transforms
+// when a card re-mounts (theme toggle, scroll-back, navigation between
+// gallery and detail view). Bounded LRU to prevent unbounded growth across
+// long-running sessions exploring many libraries.
+//
+// Note: this is not in-flight-deduplicated — two parallel compile requests for
+// the same key will both run esbuild and both write to the cache. The writes
+// produce identical output (esbuild is deterministic) so this is a small
+// resource waste, not a correctness bug. Adding an inflight Map<key, Promise>
+// would dedupe, but at our concurrency (one effect per visible card, ~22 max)
+// the duplication is rare enough that the simpler form is preferred.
+const COMPILE_CACHE_MAX = 500
+const compileCache = new Map<string, string>()
+
+function compileCacheKey(source: string, framework: string): string {
+  return `${framework}:${createHash('sha256').update(source).digest('hex')}`
+}
 
 // Maximum recursion depth when following relative imports out of components.
 // Most libraries have a shallow `helpers/` tree; deeper than this is rare and
@@ -80,7 +100,7 @@ async function scanHelpers(
     const remaining = HELPER_MAX_FILES - found.size
     const batch = [...frontier].slice(0, remaining)
 
-    const sources = await batchFetch(batch, 10, fetchSource)
+    const sources = await batchFetch(batch, 25, fetchSource)
 
     const nextFrontier = new Set<string>()
     for (let i = 0; i < batch.length; i++) {
@@ -158,10 +178,17 @@ export async function scanComponents(
   try {
     const token = getToken() ?? null
 
-    // Stage A: package.json — framework + maybe pkg
+    // Stages A + B run in parallel — package.json fetch and tree fetch are
+    // independent and hit different hosts (api.github.com path-based vs
+    // path-based, but no shared dependency). The npm probe (Stage A's tail)
+    // is then kicked off without awaiting so it overlaps with Stages C-E.
+    const [pkgSource, tree] = await Promise.all([
+      getFileContent(token, owner, name, 'package.json').catch(() => null),
+      getRepoTree(token, owner, name, branch).catch(() => null),
+    ])
+
     let framework: Framework = 'unknown'
-    let pkg: { name: string; version: string } | null = null
-    const pkgSource = await getFileContent(token, owner, name, 'package.json').catch(() => null)
+    let pkgPromise: Promise<{ name: string; version: string } | null> = Promise.resolve(null)
     if (pkgSource) {
       try {
         const parsed = JSON.parse(pkgSource) as {
@@ -172,17 +199,18 @@ export async function scanComponents(
         const deps = { ...(parsed.dependencies ?? {}), ...(parsed.devDependencies ?? {}) }
         framework = detectFramework(deps)
         if (parsed.name && parsed.version) {
-          if (await probeNpmRegistry(parsed.name, parsed.version)) {
-            pkg = { name: parsed.name, version: parsed.version }
-          }
+          const pkgName = parsed.name
+          const pkgVersion = parsed.version
+          // Don't await — the probe overlaps with component/helper fetches
+          pkgPromise = probeNpmRegistry(pkgName, pkgVersion)
+            .then(ok => ok ? { name: pkgName, version: pkgVersion } : null)
+            .catch(() => null)
         }
       } catch { /* malformed package.json */ }
     }
 
-    // Stage B: file tree
-    const tree = await getRepoTree(token, owner, name, branch).catch(() => null)
     if (!tree) {
-      return { framework, components: [], stories: [], helpers: [], pkg, error: 'network' }
+      return { framework, components: [], stories: [], helpers: [], pkg: await pkgPromise, error: 'network' }
     }
     const filePaths = tree.filter(n => n.type === 'blob').map(n => n.path)
     const filePathSet = new Set(filePaths)
@@ -201,15 +229,15 @@ export async function scanComponents(
     let timerHandle: ReturnType<typeof setTimeout> | undefined
     const fetched = await Promise.race([
       Promise.all([
-        batchFetch(componentCandidates, 10, p => getFileContent(token, owner, name, p).catch(() => null)),
-        batchFetch(storyCandidates,     10, p => getFileContent(token, owner, name, p).catch(() => null)),
+        batchFetch(componentCandidates, 25, p => getFileContent(token, owner, name, p).catch(() => null)),
+        batchFetch(storyCandidates,     25, p => getFileContent(token, owner, name, p).catch(() => null)),
       ]),
       new Promise<null>(resolve => { timerHandle = setTimeout(() => resolve(null), 30_000) }),
     ])
     if (timerHandle !== undefined) clearTimeout(timerHandle)
 
     if (fetched === null) {
-      return { framework, components: [], stories: [], helpers: [], pkg, error: 'timeout' }
+      return { framework, components: [], stories: [], helpers: [], pkg: await pkgPromise, error: 'timeout' }
     }
 
     const [componentSources, storySources] = fetched
@@ -236,6 +264,11 @@ export async function scanComponents(
       )
     }
 
+    // Wait for the npm probe (kicked off during Stage A) to finish; it
+    // typically resolves well before this point because it overlapped with
+    // the component+story+helper fetches.
+    const pkg = await pkgPromise
+
     return { framework, components, stories, helpers, pkg, error: null }
   } catch {
     return { framework: 'unknown', components: [], stories: [], helpers: [], pkg: null, error: 'network' }
@@ -252,6 +285,16 @@ export function registerComponentsIPC(): void {
   ipcMain.handle(
     'components:compile',
     async (_event, source: string, framework = 'react'): Promise<string | null> => {
+      // Cache hit — skip esbuild entirely. Bump the entry to MRU position
+      // (delete + re-set) so the LRU eviction below trims true stale entries.
+      const key = compileCacheKey(source, framework)
+      const cached = compileCache.get(key)
+      if (cached !== undefined) {
+        compileCache.delete(key)
+        compileCache.set(key, cached)
+        return cached
+      }
+
       try {
         // Use require() — the main process output is CJS, and esbuild ships a
         // native binary that must not be bundled.  Dynamic import() can silently
@@ -286,6 +329,13 @@ export function registerComponentsIPC(): void {
           format:    'esm',
           sourcemap: false,
         })
+
+        // Evict oldest entry if cache is full, then store result.
+        if (compileCache.size >= COMPILE_CACHE_MAX) {
+          const oldestKey = compileCache.keys().next().value
+          if (oldestKey !== undefined) compileCache.delete(oldestKey)
+        }
+        compileCache.set(key, result.code)
         return result.code
       } catch (err) {
         console.error('[components:compile] esbuild transform failed:', err)

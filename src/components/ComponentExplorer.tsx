@@ -5,7 +5,7 @@ import { parseComponent, type ParsedComponent } from '../utils/componentParser'
 import { generateProps } from '../utils/propsGenerator'
 import { generateVariants } from '../utils/variantGenerator'
 import { parseStoryFile, resolveStoryComponent } from '../utils/storyParser'
-import { chooseRenderer, resetBundleCache } from '../utils/componentBundle'
+import { chooseRenderer } from '../utils/componentBundle'
 import type { HelperSources } from '../utils/iframeTemplate'
 import { ComponentSidebar } from './ComponentSidebar'
 import { ComponentGallery } from './ComponentGallery'
@@ -44,7 +44,10 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
     setBundledByPath({})
     setHelpers(null)
     setSelectedPath(null)
-    resetBundleCache()
+    // Note: bundleCache is intentionally NOT reset here — it's keyed on
+    // `${pkg}@${version}` which is invalidation-safe across navigations.
+    // Resetting on every mount made navigating back to a previously-explored
+    // repo re-probe esm.sh for every package.
 
     void window.api.components.scan(owner, name, branch).then(async (scan: ComponentScanResult) => {
       if (cancelled) return
@@ -124,34 +127,18 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
   }
 
   return (
-    <div className="cg-explorer">
+    <div className="cg-explorer" data-theme={theme}>
       <ComponentSidebar
         components={components.map(c => ({ path: c.path, name: c.name }))}
         selectedPath={selectedPath}
         searchQuery={searchQuery}
+        theme={theme}
         onSelectPath={setSelectedPath}
         onClearSelection={() => setSelectedPath(null)}
         onSearchChange={setSearchQuery}
+        onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
       />
       <main className="cg-main">
-        <div className="cg-topbar">
-          <button
-            className="cg-theme-toggle"
-            onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          >
-            {theme === 'dark' ? '☀' : '☾'}
-          </button>
-          {selectedComponent && (
-            <a
-              className="cg-gh-link"
-              href={`https://github.com/${owner}/${name}/blob/${branch}/${selectedComponent.path}`}
-              target="_blank"
-              rel="noreferrer"
-            >Open on GitHub ↗</a>
-          )}
-        </div>
         {selectedComponent ? (
           <ComponentDetailView
             component={selectedComponent}
@@ -161,6 +148,7 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
             theme={theme}
             source={sourceByPath[selectedComponent.path] ?? ''}
             helpers={helpers ?? undefined}
+            githubUrl={`https://github.com/${owner}/${name}/blob/${branch}/${selectedComponent.path}`}
             onBack={() => setSelectedPath(null)}
           />
         ) : (

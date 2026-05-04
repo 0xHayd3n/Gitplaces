@@ -9,20 +9,36 @@ const components = [
 ]
 
 describe('ComponentSidebar', () => {
-  it('renders all components', () => {
+  it('renders all components after expanding their groups', () => {
     render(<ComponentSidebar
       components={components} selectedPath={null} searchQuery=""
-      onSelectPath={() => {}} onClearSelection={() => {}} onSearchChange={() => {}}
+      theme="dark"
+      onSelectPath={() => {}} onClearSelection={() => {}} onSearchChange={() => {}} onToggleTheme={() => {}}
     />)
+    // Groups default to collapsed — expand both before asserting items render
+    fireEvent.click(screen.getByText('src'))
+    fireEvent.click(screen.getByText(/forms/i))
     expect(screen.getByText('Button')).toBeInTheDocument()
     expect(screen.getByText('Input')).toBeInTheDocument()
     expect(screen.getByText('Select')).toBeInTheDocument()
   })
 
+  it('hides group items by default (collapsed state)', () => {
+    render(<ComponentSidebar
+      components={components} selectedPath={null} searchQuery=""
+      theme="dark"
+      onSelectPath={() => {}} onClearSelection={() => {}} onSearchChange={() => {}} onToggleTheme={() => {}}
+    />)
+    expect(screen.queryByText('Button')).toBeNull()
+    expect(screen.queryByText('Input')).toBeNull()
+    expect(screen.queryByText('Select')).toBeNull()
+  })
+
   it('groups components by parent folder', () => {
     render(<ComponentSidebar
       components={components} selectedPath={null} searchQuery=""
-      onSelectPath={() => {}} onClearSelection={() => {}} onSearchChange={() => {}}
+      theme="dark"
+      onSelectPath={() => {}} onClearSelection={() => {}} onSearchChange={() => {}} onToggleTheme={() => {}}
     />)
     expect(screen.getByText(/forms/i)).toBeInTheDocument()
   })
@@ -31,8 +47,11 @@ describe('ComponentSidebar', () => {
     const onSelectPath = vi.fn()
     render(<ComponentSidebar
       components={components} selectedPath={null} searchQuery=""
-      onSelectPath={onSelectPath} onClearSelection={() => {}} onSearchChange={() => {}}
+      theme="dark"
+      onSelectPath={onSelectPath} onClearSelection={() => {}} onSearchChange={() => {}} onToggleTheme={() => {}}
     />)
+    // Expand the group containing Button before clicking
+    fireEvent.click(screen.getByText('src'))
     fireEvent.click(screen.getByText('Button'))
     expect(onSelectPath).toHaveBeenCalledWith('src/Button.tsx')
   })
@@ -41,7 +60,8 @@ describe('ComponentSidebar', () => {
     const onClearSelection = vi.fn()
     render(<ComponentSidebar
       components={components} selectedPath="src/Button.tsx" searchQuery=""
-      onSelectPath={() => {}} onClearSelection={onClearSelection} onSearchChange={() => {}}
+      theme="dark"
+      onSelectPath={() => {}} onClearSelection={onClearSelection} onSearchChange={() => {}} onToggleTheme={() => {}}
     />)
     fireEvent.click(screen.getByText(/all components/i))
     expect(onClearSelection).toHaveBeenCalled()
@@ -50,7 +70,8 @@ describe('ComponentSidebar', () => {
   it('filters components by search query (case-insensitive substring)', () => {
     render(<ComponentSidebar
       components={components} selectedPath={null} searchQuery="sel"
-      onSelectPath={() => {}} onClearSelection={() => {}} onSearchChange={() => {}}
+      theme="dark"
+      onSelectPath={() => {}} onClearSelection={() => {}} onSearchChange={() => {}} onToggleTheme={() => {}}
     />)
     expect(screen.queryByText('Button')).toBeNull()
     expect(screen.queryByText('Input')).toBeNull()
