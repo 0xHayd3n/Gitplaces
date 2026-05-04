@@ -24,6 +24,7 @@ export interface ComponentScanResult {
   components: ScannedComponent[]
   stories: ScannedStory[]
   helpers: ScannedHelper[]   // NEW — files transitively imported by components
+  hasTailwind: boolean
   error: 'rate-limit' | 'network' | 'timeout' | null
 }
 

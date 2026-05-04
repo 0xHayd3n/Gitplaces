@@ -172,7 +172,7 @@ export async function scanComponents(
 ): Promise<ComponentScanResult> {
   const safe = /^[\w.\-]+$/
   if (!safe.test(owner) || !safe.test(name) || !safe.test(branch)) {
-    return { framework: 'unknown', components: [], stories: [], helpers: [], pkg: null, error: null }
+    return { framework: 'unknown', components: [], stories: [], helpers: [], pkg: null, hasTailwind: false, error: null }
   }
 
   try {
@@ -188,6 +188,7 @@ export async function scanComponents(
     ])
 
     let framework: Framework = 'unknown'
+    let hasTailwind = false
     let pkgPromise: Promise<{ name: string; version: string } | null> = Promise.resolve(null)
     if (pkgSource) {
       try {
@@ -198,6 +199,7 @@ export async function scanComponents(
         }
         const deps = { ...(parsed.dependencies ?? {}), ...(parsed.devDependencies ?? {}) }
         framework = detectFramework(deps)
+        hasTailwind = 'tailwindcss' in deps
         if (parsed.name && parsed.version) {
           const pkgName = parsed.name
           const pkgVersion = parsed.version
@@ -210,7 +212,7 @@ export async function scanComponents(
     }
 
     if (!tree) {
-      return { framework, components: [], stories: [], helpers: [], pkg: await pkgPromise, error: 'network' }
+      return { framework, components: [], stories: [], helpers: [], pkg: await pkgPromise, hasTailwind, error: 'network' }
     }
     const filePaths = tree.filter(n => n.type === 'blob').map(n => n.path)
     const filePathSet = new Set(filePaths)
@@ -237,7 +239,7 @@ export async function scanComponents(
     if (timerHandle !== undefined) clearTimeout(timerHandle)
 
     if (fetched === null) {
-      return { framework, components: [], stories: [], helpers: [], pkg: await pkgPromise, error: 'timeout' }
+      return { framework, components: [], stories: [], helpers: [], pkg: await pkgPromise, hasTailwind, error: 'timeout' }
     }
 
     const [componentSources, storySources] = fetched
@@ -269,9 +271,9 @@ export async function scanComponents(
     // the component+story+helper fetches.
     const pkg = await pkgPromise
 
-    return { framework, components, stories, helpers, pkg, error: null }
+    return { framework, components, stories, helpers, pkg, hasTailwind, error: null }
   } catch {
-    return { framework: 'unknown', components: [], stories: [], helpers: [], pkg: null, error: 'network' }
+    return { framework: 'unknown', components: [], stories: [], helpers: [], pkg: null, hasTailwind: false, error: 'network' }
   }
 }
 
@@ -284,7 +286,7 @@ export function registerComponentsIPC(): void {
 
   ipcMain.handle(
     'components:compile',
-    async (_event, source: string, framework = 'react'): Promise<string | null> => {
+    async (_event, source: string, framework = 'react'): Promise<CompileResult> => {
       // Cache hit — skip esbuild entirely. Bump the entry to MRU position
       // (delete + re-set) so the LRU eviction below trims true stale entries.
       const key = compileCacheKey(source, framework)
@@ -292,7 +294,7 @@ export function registerComponentsIPC(): void {
       if (cached !== undefined) {
         compileCache.delete(key)
         compileCache.set(key, cached)
-        return cached
+        return { ok: true, code: cached }
       }
 
       try {
@@ -336,11 +338,36 @@ export function registerComponentsIPC(): void {
           if (oldestKey !== undefined) compileCache.delete(oldestKey)
         }
         compileCache.set(key, result.code)
-        return result.code
+        return { ok: true, code: result.code }
       } catch (err) {
         console.error('[components:compile] esbuild transform failed:', err)
-        return null
+        return { ok: false, error: formatCompileError(err) }
       }
     },
   )
+}
+
+// Result envelope so the renderer can show the actual esbuild error in the
+// card UI instead of a generic "Compile returned null". The `error` field is
+// human-readable — esbuild's first error location + message, or the thrown
+// exception's message.
+type CompileResult =
+  | { ok: true;  code: string }
+  | { ok: false; error: string }
+
+function formatCompileError(err: unknown): string {
+  // esbuild throws an object with `errors: BuildFailure['errors']` — we surface
+  // the first one (file:line:col + text). Other thrown values fall back to
+  // their message or string form.
+  if (err && typeof err === 'object' && 'errors' in err) {
+    const errors = (err as { errors?: Array<{ text?: string; location?: { line?: number; column?: number; lineText?: string } | null }> }).errors
+    if (Array.isArray(errors) && errors.length > 0) {
+      const e = errors[0]
+      const loc = e.location ? `${e.location.line}:${e.location.column}` : ''
+      const lineText = e.location?.lineText ? ` | ${e.location.lineText.trim()}` : ''
+      return `esbuild ${loc}: ${e.text ?? ''}${lineText}`
+    }
+  }
+  if (err instanceof Error) return err.message
+  return String(err)
 }

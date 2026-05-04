@@ -1,27 +1,45 @@
 // src/hooks/useRepoStats.ts
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { RepoStats } from '../types/repoStats'
 
 export function useRepoStats(
   owner: string | undefined,
   name: string | undefined,
+  // When false, the hook stays in 'loading' state without firing the IPC. This
+  // lets callers defer the fetch until the data is actually visible — e.g. the
+  // stats sidebar is only rendered on the Activities tab, so calling
+  // `useRepoStats(owner, name, activeTab === 'activities')` avoids a 9-call
+  // GitHub burst when the user lands on README/Files.
+  enabled: boolean = true,
 ): RepoStats | 'loading' | 'error' {
   const [stats, setStats] = useState<RepoStats | 'loading' | 'error'>('loading')
+  const fetchedRef = useRef<string | null>(null)
 
-  // Fires once per repo. The previous version had `lastReleaseDate` in its
-  // deps, which caused a second full stats fetch (9 GitHub calls) the moment
-  // releases resolved in RepoDetail. The renderer now recomputes the
-  // release-affected score components client-side using `computeHealthScore`
-  // and the `daysSinceCommit` field exposed in `RepoStats.health`.
+  // Reset when the target repo changes. Separate from the fetch effect so a
+  // pure enabled flip doesn't clobber state.
   useEffect(() => {
-    if (!owner || !name) { setStats('loading'); return }
-    let cancelled = false
+    fetchedRef.current = null
     setStats('loading')
+  }, [owner, name])
+
+  // Fires once per (owner, name) once enabled. The previous version had
+  // `lastReleaseDate` in its deps, which caused a second full stats fetch
+  // (9 GitHub calls) the moment releases resolved in RepoDetail. The renderer
+  // now recomputes the release-affected score components client-side using
+  // `computeHealthScore` and the `daysSinceCommit` field on `RepoStats.health`.
+  useEffect(() => {
+    if (!owner || !name) return
+    if (!enabled) return
+    const key = `${owner}/${name}`
+    if (fetchedRef.current === key) return
+    fetchedRef.current = key
+
+    let cancelled = false
     window.api.github.getRepoStats(owner, name)
       .then(s => { if (!cancelled) setStats(s) })
       .catch(() => { if (!cancelled) setStats('error') })
     return () => { cancelled = true }
-  }, [owner, name])
+  }, [owner, name, enabled])
 
   return stats
 }

@@ -13,6 +13,7 @@ interface Props {
   theme: 'light' | 'dark'
   source: string
   helpers?: HelperSources
+  hasTailwind?: boolean
   githubUrl?: string
   onBack: () => void
 }
@@ -20,7 +21,7 @@ interface Props {
 const VARIANT_VISIBLE_CAP = 6
 
 export function ComponentDetailView({
-  component, variants, tier, bundled, theme, source, helpers, githubUrl, onBack,
+  component, variants, tier, bundled, theme, source, helpers, hasTailwind, githubUrl, onBack,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [sourceOpen, setSourceOpen] = useState(false)
@@ -46,7 +47,7 @@ export function ComponentDetailView({
         <div className="cg-detail-hero">
           <ComponentCard
             component={component} variant={heroVariant} tier={tier}
-            bundled={bundled} theme={theme} source={source} helpers={helpers}
+            bundled={bundled} theme={theme} source={source} helpers={helpers} hasTailwind={hasTailwind}
             onClick={() => {/* hero click is a no-op in detail view */}}
           />
         </div>
@@ -60,7 +61,7 @@ export function ComponentDetailView({
               <div key={i} className="cg-variant-tile">
                 <ComponentCard
                   component={component} variant={v} tier={tier}
-                  bundled={bundled} theme={theme} source={source} helpers={helpers}
+                  bundled={bundled} theme={theme} source={source} helpers={helpers} hasTailwind={hasTailwind}
                   onClick={() => {}}
                 />
                 <div className="cg-variant-name">{v.name}</div>

@@ -36,7 +36,7 @@ export function ForkRepoCard({
 
       <div className="repo-card-info">
         <div className="repo-card-top">
-          <img className="repo-card-avatar" src={avatarUrl} alt="" />
+          <img className="repo-card-avatar" src={avatarUrl} alt="" loading="lazy" decoding="async" />
           <div className="repo-card-top-text">
             <div className="repo-card-name">{name}</div>
             {description && <p className="repo-card-desc">{description}</p>}

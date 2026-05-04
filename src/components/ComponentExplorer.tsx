@@ -1,12 +1,9 @@
 // src/components/ComponentExplorer.tsx
 import { useState, useEffect, useMemo } from 'react'
 import type { ComponentScanResult, Variant, RenderTier, BundledRender } from '../types/components'
-import { parseComponent, type ParsedComponent } from '../utils/componentParser'
-import { generateProps } from '../utils/propsGenerator'
-import { generateVariants } from '../utils/variantGenerator'
-import { parseStoryFile, resolveStoryComponent } from '../utils/storyParser'
-import { chooseRenderer } from '../utils/componentBundle'
+import type { ParsedComponent } from '../utils/componentParser'
 import type { HelperSources } from '../utils/iframeTemplate'
+import { getCachedScan, performComponentScan } from '../utils/componentScan'
 import { ComponentSidebar } from './ComponentSidebar'
 import { ComponentGallery } from './ComponentGallery'
 import { ComponentDetailView } from './ComponentDetailView'
@@ -29,12 +26,37 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
   const [tierByPath, setTierByPath] = useState<Record<string, RenderTier>>({})
   const [bundledByPath, setBundledByPath] = useState<Record<string, BundledRender>>({})
   const [helpers, setHelpers] = useState<HelperSources | null>(null)
+  const [hasTailwind, setHasTailwind] = useState(false)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>('dark')
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     let cancelled = false
+
+    function applyCached(cached: ReturnType<typeof getCachedScan>): void {
+      if (!cached) return
+      setComponents(cached.components)
+      setSourceByPath(cached.sourceByPath)
+      setVariantsByPath(cached.variantsByPath)
+      setTierByPath(cached.tierByPath)
+      setBundledByPath(cached.bundledByPath)
+      setHelpers(cached.helpers)
+      setHasTailwind(cached.hasTailwind)
+      setSelectedPath(null)
+      setScanError(null)
+      setScanState('done')
+    }
+
+    // Tab-switch / prefetch fast path: a prior mount or RepoDetail's idle
+    // prefetch may have populated the cache — apply it synchronously and
+    // skip the scanning UI entirely.
+    const cached = getCachedScan(owner, name, branch)
+    if (cached) {
+      applyCached(cached)
+      return
+    }
+
     setScanState('scanning')
     setScanError(null)
     setComponents([])
@@ -43,65 +65,24 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
     setTierByPath({})
     setBundledByPath({})
     setHelpers(null)
+    setHasTailwind(false)
     setSelectedPath(null)
     // Note: bundleCache is intentionally NOT reset here — it's keyed on
     // `${pkg}@${version}` which is invalidation-safe across navigations.
     // Resetting on every mount made navigating back to a previously-explored
     // repo re-probe esm.sh for every package.
 
-    void window.api.components.scan(owner, name, branch).then(async (scan: ComponentScanResult) => {
+    // performComponentScan dedupes if a prefetch is already in flight for
+    // this key, so clicking the tab while the prefetch is running awaits
+    // the same Promise instead of starting a second scan.
+    void performComponentScan(owner, name, branch).then(result => {
       if (cancelled) return
-      if (scan.error) {
+      if (!result.ok) {
         setScanState('error')
-        setScanError(scan.error)
+        setScanError(result.error)
         return
       }
-      const parsed = scan.components.map(c => parseComponent(c.path, c.source, scan.framework))
-      const sources = Object.fromEntries(scan.components.map(c => [c.path, c.source]))
-
-      const storyVariants = computeStoryVariants(scan, parsed)
-      const variants: Record<string, Variant[]> = {}
-      for (const c of parsed) {
-        const fromStories = storyVariants[c.path]
-        if (fromStories && fromStories.length > 0) {
-          variants[c.path] = fromStories
-        } else {
-          const auto = generateVariants(c)
-          variants[c.path] = auto.length > 0
-            ? auto
-            : [{ name: 'default', props: generateProps(c.props), source: 'default' }]
-        }
-      }
-
-      if (cancelled) return
-
-      const tiers: Record<string, RenderTier> = {}
-      const bundled: Record<string, BundledRender> = {}
-      await Promise.all(parsed.map(async c => {
-        const choice = await chooseRenderer(c, scan)
-        tiers[c.path] = choice.tier
-        if (choice.tier === 'bundled') bundled[c.path] = choice.render
-      }))
-
-      if (cancelled) return
-      // Build the helpers map (path → source) once per scan. ComponentCard
-      // will look up its component's relative imports against this map and
-      // inline anything that resolves, instead of stubbing it as null.
-      const helpersByPath: Record<string, string> = {}
-      for (const h of scan.helpers ?? []) helpersByPath[h.path] = h.source
-
-      setComponents(parsed)
-      setSourceByPath(sources)
-      setVariantsByPath(variants)
-      setTierByPath(tiers)
-      setBundledByPath(bundled)
-      setHelpers(Object.keys(helpersByPath).length > 0 ? { byPath: helpersByPath } : null)
-      setScanState('done')
-    }).catch(() => {
-      if (!cancelled) {
-        setScanState('error')
-        setScanError('network')
-      }
+      applyCached(result.cached)
     })
 
     return () => { cancelled = true }
@@ -148,6 +129,7 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
             theme={theme}
             source={sourceByPath[selectedComponent.path] ?? ''}
             helpers={helpers ?? undefined}
+            hasTailwind={hasTailwind}
             githubUrl={`https://github.com/${owner}/${name}/blob/${branch}/${selectedComponent.path}`}
             onBack={() => setSelectedPath(null)}
           />
@@ -159,6 +141,7 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
             bundledByPath={bundledByPath}
             sourceByPath={sourceByPath}
             helpers={helpers ?? undefined}
+            hasTailwind={hasTailwind}
             theme={theme}
             onSelect={setSelectedPath}
           />
@@ -172,24 +155,4 @@ function errorMessageFor(error: ComponentScanResult['error']): string {
   if (error === 'rate-limit') return 'GitHub rate limit hit. Try again in a few minutes.'
   if (error === 'timeout')    return 'Repo too large to scan.'
   return "Couldn't reach GitHub."
-}
-
-function computeStoryVariants(
-  scan: ComponentScanResult,
-  parsed: ParsedComponent[],
-): Record<string, Variant[]> {
-  const componentPaths = parsed.map(p => p.path)
-  const result: Record<string, Variant[]> = {}
-  for (const story of scan.stories) {
-    const file = parseStoryFile(story.path, story.source)
-    if (!file) continue
-    const targetPath = resolveStoryComponent(story.path, file.componentImportPath, componentPaths)
-    if (!targetPath) continue
-    result[targetPath] = file.stories.map(s => ({
-      name: s.name,
-      props: s.args,
-      source: 'story' as const,
-    }))
-  }
-  return result
 }

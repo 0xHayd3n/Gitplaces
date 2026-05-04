@@ -221,7 +221,10 @@ declare global {
       }
       components: {
         scan(owner: string, name: string, branch: string): Promise<ComponentScanResult>
-        compile(source: string, framework?: string): Promise<string | null>
+        compile(source: string, framework?: string): Promise<
+          | { ok: true; code: string }
+          | { ok: false; error: string }
+        >
       }
       verification: {
         prioritise(repoIds: string[]): Promise<void>

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import DitherBackground from './DitherBackground'
 import { relativeTime } from '../utils/relativeTime'
 import './BannerCard.css'
@@ -51,7 +52,7 @@ export interface BannerCardProps {
 
 const MAJOR_FALLBACK_GRADIENT: [string, string] = ['#2a1750', '#110a26']
 
-export function BannerCard({
+export const BannerCard = memo(function BannerCard({
   tag, tier, title, descriptionPreview, versionLabel,
   ownerAvatarUrl, repoFullName, occurredAt, onClick,
 }: BannerCardProps) {
@@ -74,7 +75,7 @@ export function BannerCard({
         <p className="banner-card__desc">{descriptionPreview}</p>
         <div className="banner-card__meta">
           <div className="banner-card__meta-repo">
-            <img src={ownerAvatarUrl} alt="" />
+            <img src={ownerAvatarUrl} alt="" loading="lazy" decoding="async" />
             <strong>{repoFullName.split('/')[1] ?? repoFullName}</strong>
           </div>
           <span>·</span>
@@ -83,4 +84,4 @@ export function BannerCard({
       </div>
     </div>
   )
-}
+})

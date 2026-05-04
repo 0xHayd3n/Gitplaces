@@ -43,7 +43,7 @@ import {
 } from '../utils/socialParser'
 import { extractCommands, type CommandBlock } from '../utils/commandParser'
 // websiteParser import removed — website links are now shown in the README's References section
-import { BannerCard } from '../components/BannerCard'
+import { BannerCard, type BannerCardProps } from '../components/BannerCard'
 import { releaseToBannerProps } from '../components/ActivityEvent'
 import { classifyRelease } from '../utils/classifyRelease'
 import { ActivityModal } from '../components/ActivityModal'
@@ -63,6 +63,7 @@ import { useRepoNav } from '../contexts/RepoNav'
 const StorybookExplorer = lazy(() => import('../components/StorybookExplorer'))
 const ComponentExplorer = lazy(() => import('../components/ComponentExplorer'))
 import { isComponentLibraryRepo } from '../utils/componentLibraryDetector'
+import { getCachedScan, performComponentScan } from '../utils/componentScan'
 import VerificationBadge from '../components/VerificationBadge'
 import { useVerification } from '../hooks/useVerification'
 import CloneOptionsPanel from '../components/CloneOptionsPanel'
@@ -551,7 +552,11 @@ export default function RepoDetail() {
   // Stats fetches once per repo (no `lastReleaseDate` dep). When releases
   // later resolve, we recompute the release-affected score components in
   // `enrichedRepoStats` below — no second network round-trip.
-  const rawRepoStats = useRepoStats(owner, name)
+  // Stats sidebar is only rendered on the Activities tab — defer the
+  // IPC until the user is actually there. Activities is the default tab so
+  // most users still trigger this on first load; users who deep-link to
+  // another tab don't pay for stats they never see.
+  const rawRepoStats = useRepoStats(owner, name, activeTab === 'activities')
   const repoStats = useMemo(() => {
     if (rawRepoStats === 'loading' || rawRepoStats === 'error') return rawRepoStats
     if (lastReleaseDate === null || rawRepoStats.health.daysSinceCommit === undefined) {
@@ -606,6 +611,39 @@ export default function RepoDetail() {
     }
     return null
   }, [repoActivityItems])
+
+  // Stable callback for opening a release modal — memoized once so memoized
+  // BannerCards don't re-render every time the parent does.
+  const handleOpenRelease = useCallback((event: GitHubFeedEvent) => {
+    setSelectedReleaseId(event.id)
+  }, [])
+
+  // Compute BannerCard props once per release.id. Two wins: stripMarkdownPreview
+  // only runs when the underlying items change (not on every parent render),
+  // and the prop object reference is stable so React.memo on BannerCard keeps
+  // unchanged cards from re-rendering.
+  const bannerPropsByEventId = useMemo(() => {
+    const map = new Map<string, BannerCardProps>()
+    for (const item of repoActivityItems) {
+      if (item.kind === 'release') {
+        map.set(item.event.id, releaseToBannerProps(item.event, handleOpenRelease))
+      }
+    }
+    return map
+  }, [repoActivityItems, handleOpenRelease])
+
+  // Pre-filter the featured release out of the timeline groups (was inline in
+  // render). Hides empty groups too.
+  const displayedActivityGroups = useMemo(() => {
+    const featuredId = featuredActivityItem?.event.id
+    if (!featuredId) return repoActivityGroups
+    return repoActivityGroups
+      .map(g => ({
+        ...g,
+        items: g.items.filter(item => !(item.kind === 'release' && item.event.id === featuredId)),
+      }))
+      .filter(g => g.items.length > 0)
+  }, [repoActivityGroups, featuredActivityItem])
   // First-resolve fallback: if BOTH releases and user events come back empty/error,
   // drop from the optimistic 'activities' default to README. The ref ensures we
   // only apply the fallback once — subsequent navigations to Activities by the
@@ -728,6 +766,20 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     setStorybookState('detecting')
     setStorybookReadmeScanned(false)
     setReleases('loading')
+    // Pre-mark the deferred-releases ref so the deferred effect (which runs
+    // on the same first render with activeTab='activities') sees that a fetch
+    // is already underway via the bundle and bails. Without this, both fired
+    // in parallel on every cold load.
+    //
+    // Ordering note: this effect must run BEFORE the deferred-releases effect
+    // for the pre-mark to be visible. React fires effects in declaration
+    // order within a component, and this main effect is declared before
+    // the deferred-releases effect (~line 944), so the ordering holds. If
+    // either effect is ever reordered, the deferred one will race.
+    //
+    // The null-bundle fallback below and the deferred effect itself both
+    // clear the ref on error so a tab switch back to Activities can retry.
+    releasesFetchedRef.current = cacheKey
     setRelated([])
     setRepoCols([])
     setLearnState('UNLEARNED')
@@ -775,6 +827,34 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                 writeSessionCache(_starredCache, cacheKey, s)
               })
               .catch(() => {})
+          }
+          // Fallback releases fetch — bundle didn't return them. Mirrors the
+          // deferred effect's logic. Session cache is checked first so a
+          // re-mount from cache stays free. On any error path we clear
+          // releasesFetchedRef so a tab switch back to Activities can retry
+          // (otherwise the pre-mark at the top of this effect would block
+          // forever within the session).
+          const cachedReleases = readSessionCache(_releasesCache, cacheKey)
+          if (cachedReleases !== undefined) {
+            setReleases(cachedReleases)
+          } else {
+            window.api.github.getReleases(owner, name)
+              .then(r => {
+                if (cancelled) return
+                if (r === null) {
+                  setReleases('error')
+                  releasesFetchedRef.current = null
+                } else {
+                  setReleases(r)
+                  writeSessionCache(_releasesCache, cacheKey, r)
+                }
+              })
+              .catch(() => {
+                if (!cancelled) {
+                  setReleases('error')
+                  releasesFetchedRef.current = null
+                }
+              })
           }
           return
         }
@@ -833,6 +913,42 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     return () => { cancelled = true }
   }, [owner, name])
 
+  // Idle prefetch of the component scan. Fires after the page has settled
+  // so the scan result is warm by the time the user clicks the Components
+  // tab. Gated on `isComponentLibrary` to avoid running for repos that
+  // don't have a Components tab. Uses requestIdleCallback so it competes
+  // only for spare CPU — never blocks rendering or interaction. The scan
+  // util dedupes if the user clicks the tab while the prefetch is in
+  // flight (both will await the same Promise).
+  useEffect(() => {
+    if (!owner || !name) return
+    if (!isComponentLibrary) return
+    // Defer until repo.default_branch resolves — otherwise we'd prefetch with
+    // the 'main' fallback first, then re-fire with the real branch when repo
+    // loads, paying for two scans on repos whose default branch isn't 'main'.
+    // In practice isComponentLibrary already gates on repo loading (it reads
+    // repo.topics/description), so this guard is defensive belt-and-suspenders.
+    const branch = repo?.default_branch
+    if (!branch) return
+    if (getCachedScan(owner, name, branch)) return
+
+    type IdleHandle = number
+    const requestIdle: (cb: () => void, opts?: { timeout: number }) => IdleHandle =
+      typeof window.requestIdleCallback === 'function'
+        ? (cb, opts) => window.requestIdleCallback(cb, opts) as unknown as IdleHandle
+        : (cb) => window.setTimeout(cb, 500) as unknown as IdleHandle
+    const cancelIdle: (h: IdleHandle) => void =
+      typeof window.cancelIdleCallback === 'function'
+        ? (h) => window.cancelIdleCallback(h)
+        : (h) => window.clearTimeout(h)
+
+    const handle = requestIdle(() => {
+      void performComponentScan(owner, name, branch).catch(() => { /* prefetch swallows errors; tab click will surface them */ })
+    }, { timeout: 3000 })
+
+    return () => cancelIdle(handle)
+  }, [owner, name, isComponentLibrary, repo?.default_branch])
+
   // Releases — deferred fetch. Fires only when the user is on (or navigates
   // to) the Activities tab, since `releases` is no longer used outside of
   // that tab. A session cache (5-min TTL) skips the IPC entirely on
@@ -858,15 +974,22 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
         if (cancelled) return
         // The IPC handler returns `null` instead of throwing on network error /
         // timeout (avoids spamming the main-process console). `.catch` is still
-        // wired up as a backstop in case the handler itself rejects.
+        // wired up as a backstop in case the handler itself rejects. Clearing
+        // the ref on error lets a tab switch back to Activities retry.
         if (r === null) {
           setReleases('error')
+          releasesFetchedRef.current = null
         } else {
           setReleases(r)
           writeSessionCache(_releasesCache, cacheKey, r)
         }
       })
-      .catch(() => { if (!cancelled) setReleases('error') })
+      .catch(() => {
+        if (!cancelled) {
+          setReleases('error')
+          releasesFetchedRef.current = null
+        }
+      })
     return () => { cancelled = true }
   }, [owner, name, activeTab])
 
@@ -1491,103 +1614,11 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
           <div style={{ padding: 20, fontSize: 11, color: 'var(--t2)', flex: 1 }}>
             Could not load repo — check your connection.
           </div>
-        ) : repo === null ? (
-          <div className="repo-detail-skeleton">
-            {/* Top section — mirrors .article-layout-top */}
-            <div className="repo-detail-sk-top">
-              <div className="repo-detail-sk-dither" />
-              <div className="repo-detail-sk-top-panel">
-                {/* 204px spacer — mirrors .article-layout-dither-spacer */}
-                <div className="repo-detail-sk-spacer" />
-                {/* Title row — mirrors .article-layout-title-row */}
-                <div className="repo-detail-sk-title-row">
-                  <div className="repo-detail-sk-bar" style={{ width: '46%', height: 26 }} />
-                  <div className="repo-detail-sk-pills">
-                    <div className="repo-detail-sk-pill" style={{ width: 78 }} />
-                    <div className="repo-detail-sk-pill" style={{ width: 96 }} />
-                  </div>
-                </div>
-                {/* Description — mirrors .article-layout-description */}
-                <div className="repo-detail-sk-description">
-                  <div className="repo-detail-sk-bar" style={{ width: '72%' }} />
-                </div>
-                {/* Byline — mirrors .article-layout-byline */}
-                <div className="repo-detail-sk-byline">
-                  <div className="repo-detail-sk-circle" />
-                  <div className="repo-detail-sk-bar" style={{ width: 80 }} />
-                  <div className="repo-detail-sk-bar" style={{ width: 60, opacity: 0.5 }} />
-                </div>
-                {/* Action buttons — mirrors .article-layout-actions */}
-                <div className="repo-detail-sk-actions">
-                  {[56, 64, 50, 50].map((w, i) => (
-                    <div key={i} className="repo-detail-sk-btn" style={{ width: w }} />
-                  ))}
-                </div>
-              </div>
-            </div>
-            {/* Tabs row — mirrors .article-layout-tabs-slot */}
-            <div className="repo-detail-sk-tabs-row">
-              {[68, 52, 62, 48, 66].map((w, i) => (
-                <div key={i} className="repo-detail-sk-tab" style={{ width: w }} />
-              ))}
-            </div>
-            {/* Body — Activities is the new default tab, so we mirror its
-                2-column layout (no TOC): activity feed (flex-1) | stats slot
-                (220px). Earlier this skeleton mirrored the README tab's
-                3-column layout, which caused a visible layout shift the moment
-                `repo` resolved and the actual ArticleLayout swapped in. */}
-            <div className="repo-detail-sk-split">
-              {/* Left: activity feed — mirrors .repo-activity-split-left */}
-              <div className="repo-detail-sk-body-main">
-                {/* Featured release banner placeholder */}
-                <div className="repo-detail-sk-featured" />
-                {/* Date divider + activity rows × 2 groups */}
-                {[0, 1].map(g => (
-                  <div key={g} style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
-                    <div className="repo-detail-sk-bar" style={{ width: 64, height: 8 }} />
-                    {[0, 1].map(r => <div key={r} className="repo-detail-sk-activity-row" />)}
-                  </div>
-                ))}
-              </div>
-              {/* Right: stats sidebar — mirrors .article-layout-stats-slot
-                  (220px). Tiles match the new sidebar shape: verdict block,
-                  vitals 2×2 grid, health donut row, then collapsed section
-                  headers. */}
-              <div className="repo-detail-sk-sidebar-col">
-                <div className="repo-detail-sk-verdict">
-                  <div className="repo-detail-sk-bar" style={{ width: '55%', height: 11 }} />
-                  <div className="repo-detail-sk-bar" style={{ width: '75%', height: 7, marginTop: 6 }} />
-                </div>
-                <div className="repo-detail-sk-section">
-                  <div className="repo-detail-sk-bar" style={{ width: 36, height: 7, marginBottom: 8 }} />
-                  <div className="repo-detail-sk-vitals-grid">
-                    {[0, 1, 2, 3].map(i => (
-                      <div key={i} className="repo-detail-sk-vitals-cell">
-                        <div className="repo-detail-sk-bar" style={{ width: 28, height: 12 }} />
-                        <div className="repo-detail-sk-bar" style={{ width: 44, height: 6, marginTop: 4 }} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="repo-detail-sk-section">
-                  <div className="repo-detail-sk-bar" style={{ width: 40, height: 7, marginBottom: 8 }} />
-                  <div className="repo-detail-sk-health-row">
-                    <div className="repo-detail-sk-circle" style={{ width: 40, height: 40 }} />
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <div className="repo-detail-sk-bar" style={{ width: '85%', height: 10 }} />
-                      <div className="repo-detail-sk-bar" style={{ width: 50, height: 6 }} />
-                    </div>
-                  </div>
-                </div>
-                {[60, 52, 84].map((w, i) => (
-                  <div key={i} className="repo-detail-sk-section-collapsed">
-                    <div className="repo-detail-sk-bar" style={{ width: w, height: 7 }} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
         ) : (
+          // Render the layout immediately — banner nodes (titleNode, bylineNode,
+          // titleExtrasNode, etc.) are null-safe and use URL-derived owner/name
+          // until `repo` resolves. Each tab manages its own loading placeholder
+          // so the user sees the page chrome from the first paint.
           <div className="repo-detail-content-fadein">
           <ArticleLayout
             navBar={inLibrary ? null : <NavBar />}
@@ -1742,7 +1773,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                             Couldn't load releases — showing local events only.
                           </p>
                         )}
-                        {featuredActivityItem && (
+                        {featuredActivityItem && bannerPropsByEventId.get(featuredActivityItem.event.id) && (
                           <div className="repo-activity-featured">
                             <div className="repo-activity-featured__header">
                               <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
@@ -1750,24 +1781,18 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                               </svg>
                               Featured
                             </div>
-                            <BannerCard
-                              {...releaseToBannerProps(featuredActivityItem.event, () => setSelectedReleaseId(featuredActivityItem.event.id))}
-                            />
+                            <BannerCard {...bannerPropsByEventId.get(featuredActivityItem.event.id)!} />
                           </div>
                         )}
-                        {repoActivityGroups.map(group => {
-                          const items = group.items.filter(item =>
-                            !(featuredActivityItem && item.kind === 'release' && item.event.id === featuredActivityItem.event.id)
-                          )
-                          if (items.length === 0) return null
+                        {displayedActivityGroups.map(group => {
                           return (
                             <div key={group.label} className="repo-activity-group">
                               <DateDivider label={group.label} />
-                              {items.map(item => (
+                              {group.items.map(item => (
                                 item.kind === 'release' ? (
                                   <BannerCard
                                     key={item.event.id}
-                                    {...releaseToBannerProps(item.event, () => setSelectedReleaseId(item.event.id))}
+                                    {...bannerPropsByEventId.get(item.event.id)!}
                                   />
                                 ) : (
                                   <RepoUserEventRow

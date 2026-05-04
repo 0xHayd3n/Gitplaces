@@ -12,6 +12,7 @@ interface Props {
   bundledByPath: Record<string, BundledRender | undefined>
   sourceByPath: Record<string, string>
   helpers?: HelperSources
+  hasTailwind?: boolean
   theme: 'light' | 'dark'
   onSelect: (path: string) => void
 }
@@ -25,7 +26,7 @@ const LRU_CAP = 24
 const FAILURE_BANNER_THRESHOLD = 2
 
 export function ComponentGallery({
-  components, variantsByPath, tierByPath, bundledByPath, sourceByPath, helpers, theme, onSelect,
+  components, variantsByPath, tierByPath, bundledByPath, sourceByPath, helpers, hasTailwind, theme, onSelect,
 }: Props) {
   // Component-scoped LRU registry. Currently unused for eviction in v1 — the
   // ComponentCard already lazy-mounts via IntersectionObserver, which keeps
@@ -71,6 +72,7 @@ export function ComponentGallery({
               theme={theme}
               source={sourceByPath[c.path] ?? ''}
               helpers={helpers}
+              hasTailwind={hasTailwind}
               onClick={() => onSelect(c.path)}
               onRenderFailed={() => handleCardFailed(c.path)}
             />

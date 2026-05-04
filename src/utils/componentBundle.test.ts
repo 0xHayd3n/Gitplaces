@@ -20,6 +20,8 @@ const baseScan = (overrides: Partial<ComponentScanResult> = {}): ComponentScanRe
   pkg: { name: '@radix-ui/react-dialog', version: '1.0.5' },
   components: [{ path: reactComp.path, source: '' }],
   stories: [],
+  helpers: [],
+  hasTailwind: false,
   error: null,
   ...overrides,
 })

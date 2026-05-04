@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { PiBrainFill } from 'react-icons/pi'
 import { relativeTime } from '../utils/relativeTime'
 import type { RepoUserEvent } from '../types/repoUserEvents'
@@ -11,20 +12,22 @@ interface Props {
   userAvatarUrl: string
 }
 
-export function RepoUserEventRow({ event, repoOwner, repoName, userLogin, userAvatarUrl }: Props) {
+export const RepoUserEventRow = memo(function RepoUserEventRow({
+  event, repoOwner, repoName, userLogin, userAvatarUrl,
+}: Props) {
   const { verb, chip, actor } = buildContent(event, repoOwner, repoName, userLogin)
   const displayLogin = actor?.login ?? userLogin
   const displayAvatar = actor?.avatarUrl ?? userAvatarUrl
   return (
     <div className="repo-user-event">
-      <img src={displayAvatar} alt={displayLogin} className="repo-user-event__avatar" />
+      <img src={displayAvatar} alt={displayLogin} className="repo-user-event__avatar" loading="lazy" decoding="async" />
       <span className="repo-user-event__user">{displayLogin}</span>
       <span className="repo-user-event__verb">{verb}</span>
       {chip}
       <span className="repo-user-event__time">{relativeTime(event.ts)}</span>
     </div>
   )
-}
+})
 
 function buildContent(
   event: RepoUserEvent,
@@ -59,7 +62,7 @@ function buildContent(
 function RepoChip({ avatar, text }: { avatar: string; text: string }) {
   return (
     <span className="repo-user-event__chip repo-user-event__chip--repo">
-      <img src={avatar} alt="" className="repo-user-event__chip-avatar" />
+      <img src={avatar} alt="" className="repo-user-event__chip-avatar" loading="lazy" decoding="async" />
       <span>{text}</span>
     </span>
   )

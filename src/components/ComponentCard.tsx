@@ -17,6 +17,7 @@ interface Props {
   theme: 'light' | 'dark'
   source: string
   helpers?: HelperSources
+  hasTailwind?: boolean
   onClick: () => void
   onRenderFailed?: () => void
 }
@@ -24,7 +25,7 @@ interface Props {
 type State = 'idle' | 'rendering' | 'rendered' | 'failed'
 
 export function ComponentCard({
-  component, variant, tier, bundled, theme, source, helpers, onClick, onRenderFailed,
+  component, variant, tier, bundled, theme, source, helpers, hasTailwind = false, onClick, onRenderFailed,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -93,7 +94,7 @@ export function ComponentCard({
 
     // Bundled tier: no compile step, just template the HTML directly.
     if (currentTier === 'bundled' && bundled) {
-      const html = buildBundledIframeHtml(bundled, JSON.stringify(themedProps), theme)
+      const html = buildBundledIframeHtml(bundled, JSON.stringify(themedProps), theme, hasTailwind)
       publishHtml(html)
       return cleanup
     }
@@ -108,7 +109,7 @@ export function ComponentCard({
       && cache.tier === currentTier
 
     if (cacheValid) {
-      const html = buildHtmlFromCompiled(component, cache.prepared, themedProps, theme)
+      const html = buildHtmlFromCompiled(component, cache.prepared, themedProps, theme, hasTailwind)
       if (html) {
         publishHtml(html)
       } else if (!cancelled) {
@@ -121,12 +122,20 @@ export function ComponentCard({
     void compileForIframe(component, source, helpers).then(prepared => {
       if (cancelled) return
       if (prepared === null) {
-        setErrorMessage(`Compile returned null (${currentTier} tier)`)
+        setErrorMessage(`Component is not renderable (${currentTier} tier)`)
+        handleTierFailure()
+        return
+      }
+      if (typeof prepared !== 'string') {
+        // compileForIframe returned `{ error }` from esbuild. Surface the
+        // actual diagnostic to the card so the user (and we) can see what's
+        // wrong instead of a generic "Compile returned null".
+        setErrorMessage(prepared.error)
         handleTierFailure()
         return
       }
       compileCacheRef.current = { source, helpers, tier: currentTier, prepared }
-      const html = buildHtmlFromCompiled(component, prepared, themedProps, theme)
+      const html = buildHtmlFromCompiled(component, prepared, themedProps, theme, hasTailwind)
       if (html) {
         publishHtml(html)
       } else {

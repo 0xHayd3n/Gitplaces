@@ -247,6 +247,71 @@ export function setDitherScrollHint(scrolling: boolean) {
   }
 }
 
+// ── Avatar source cache ──────────────────────────────────────────
+// The expensive per-pixel work in extractDominantHue + renderCamera depends on
+// (a) the decoded avatar's `ImageData` and (b) its dominant-hue derived tint
+// color. Both are pure functions of the avatar URL. The Activities feed shows
+// many BannerCards that all use the same owner avatar — caching the loaded +
+// processed source eliminates N redundant image fetches, N getImageData
+// allocations, and N extractDominantHue passes when N cards share a URL.
+// The cache lives at module scope and persists across mounts; entries are
+// trivial in size (a single avatar's pixel buffer + a 3-tuple).
+//
+// In-flight Promises are tracked separately so two cards mounting in the same
+// tick share a single image load instead of racing.
+interface AvatarSrcEntry {
+  imgWidth: number
+  imgHeight: number
+  srcData: ImageData
+  tintColor: [number, number, number]
+}
+const _avatarSrcCache = new Map<string, AvatarSrcEntry>()
+const _avatarSrcInflight = new Map<string, Promise<AvatarSrcEntry | null>>()
+
+// Static-frame output cache keyed by `${url}:${w}:${h}`. With staticFrame=true
+// the renderCamera call is deterministic (camera 0, t=0), so the resulting
+// ImageData is shared across every BannerCard with matching dimensions —
+// typically all of them. Avoids the per-pixel render entirely on cache hit.
+const _staticOutputCache = new Map<string, ImageData>()
+
+function loadAvatarSrc(url: string): Promise<AvatarSrcEntry | null> {
+  const cached = _avatarSrcCache.get(url)
+  if (cached) return Promise.resolve(cached)
+  const inflight = _avatarSrcInflight.get(url)
+  if (inflight) return inflight
+
+  const p = new Promise<AvatarSrcEntry | null>(resolve => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const srcCanvas = document.createElement('canvas')
+      srcCanvas.width = img.width
+      srcCanvas.height = img.height
+      const srcCtx = srcCanvas.getContext('2d')
+      if (!srcCtx) { resolve(null); return }
+      srcCtx.drawImage(img, 0, 0)
+      try {
+        const srcData = srcCtx.getImageData(0, 0, img.width, img.height)
+        const { tintColor } = extractDominantHue(srcData, img.width, img.height)
+        const entry: AvatarSrcEntry = {
+          imgWidth: img.width, imgHeight: img.height, srcData, tintColor,
+        }
+        _avatarSrcCache.set(url, entry)
+        resolve(entry)
+      } catch {
+        // Canvas tainted by CORS — bail
+        resolve(null)
+      }
+    }
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+
+  _avatarSrcInflight.set(url, p)
+  void p.finally(() => _avatarSrcInflight.delete(url))
+  return p
+}
+
 // ── Hook ─────────────────────────────────────────────────────────
 export function useBayerDither(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
@@ -282,57 +347,62 @@ export function useBayerDither(
     canvas.width = w
     canvas.height = h
 
-    // Pause animation when card is not visible (performance optimization)
     let cancelled = false
     renderFnRef.current = null
 
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        const wasHidden = !visibleRef.current
-        visibleRef.current = entry.isIntersecting
-        if (!entry.isIntersecting) {
-          if (animRef.current) { cancelAnimationFrame(animRef.current); animRef.current = 0 }
-        } else if (wasHidden && !cancelled && renderFnRef.current && !animRef.current) {
-          // Delay past any collapse/expand CSS transition (~260ms) before resuming
-          // expensive rendering, so the transition isn't competing with renderCamera.
-          setTimeout(() => {
-            if (!cancelled && renderFnRef.current && visibleRef.current && !animRef.current) {
-              animRef.current = requestAnimationFrame(renderFnRef.current)
-            }
-          }, 350)
-        }
-      },
-      { threshold: 0 },
-    )
-    io.observe(canvas)
-
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-
-    img.onload = () => {
-      if (cancelled) return
-
-      const srcCanvas = document.createElement('canvas')
-      srcCanvas.width = img.width
-      srcCanvas.height = img.height
-      const srcCtx = srcCanvas.getContext('2d')
-      if (!srcCtx) return
-      srcCtx.drawImage(img, 0, 0)
-
-      let srcData: ImageData
-      try {
-        srcData = srcCtx.getImageData(0, 0, img.width, img.height)
-      } catch {
-        // Canvas tainted by CORS — abort
-        return
+    // Static-frame super-fast path: if we've already rendered this avatar at
+    // the current size, just blit the cached ImageData. No image load, no
+    // extractDominantHue, no renderCamera, no IntersectionObserver. Common
+    // case across the activity feed (every BannerCard shares the same owner
+    // avatar).
+    if (staticFrame) {
+      const outKey = `${avatarUrl}:${w}:${h}`
+      const cachedOutput = _staticOutputCache.get(outKey)
+      if (cachedOutput) {
+        ctx.putImageData(cachedOutput, 0, 0)
+        return () => { cancelled = true }
       }
+    }
 
-      const { tintColor } = extractDominantHue(srcData, img.width, img.height)
+    // IntersectionObserver is only useful for animated mode (pause rAF when
+    // off-screen, resume on re-enter). Static-frame renders once and stops,
+    // so we skip the observer entirely on that path.
+    let io: IntersectionObserver | null = null
+    if (!staticFrame) {
+      io = new IntersectionObserver(
+        ([entry]) => {
+          const wasHidden = !visibleRef.current
+          visibleRef.current = entry.isIntersecting
+          if (!entry.isIntersecting) {
+            if (animRef.current) { cancelAnimationFrame(animRef.current); animRef.current = 0 }
+          } else if (wasHidden && !cancelled && renderFnRef.current && !animRef.current) {
+            // Delay past any collapse/expand CSS transition (~260ms) before resuming
+            // expensive rendering, so the transition isn't competing with renderCamera.
+            setTimeout(() => {
+              if (!cancelled && renderFnRef.current && visibleRef.current && !animRef.current) {
+                animRef.current = requestAnimationFrame(renderFnRef.current)
+              }
+            }, 350)
+          }
+        },
+        { threshold: 0 },
+      )
+      io.observe(canvas)
+    }
+
+    void loadAvatarSrc(avatarUrl).then(entry => {
+      if (cancelled || !entry) return
+      const { srcData, imgWidth: srcW, imgHeight: srcH, tintColor } = entry
 
       if (staticFrame) {
-        // Render a single frame at a fixed camera/time and stop — no animation loop.
-        const pixels = renderCamera(srcData, img.width, img.height, w, h, 0, 0, tintColor)
-        ctx.putImageData(new ImageData(pixels, w, h), 0, 0)
+        // Render once at fixed camera/time, cache the output for sibling cards.
+        // The cached ImageData's pixel buffer is shared by all consumers — do
+        // NOT mutate `imageData.data` after caching, or every card sharing the
+        // entry will see the mutation. `ctx.putImageData` only reads.
+        const pixels = renderCamera(srcData, srcW, srcH, w, h, 0, 0, tintColor)
+        const imageData = new ImageData(pixels, w, h)
+        _staticOutputCache.set(`${avatarUrl}:${w}:${h}`, imageData)
+        ctx.putImageData(imageData, 0, 0)
         return
       }
 
@@ -376,12 +446,12 @@ export function useBayerDither(
         const isFading = frameInHold >= fadeStart
 
         const currentPixels = renderCamera(
-          srcData, img.width, img.height, w, h, currentCam, t, tintColor,
+          srcData, srcW, srcH, w, h, currentCam, t, tintColor,
         )
 
         if (isFading) {
           const nextPixels = renderCamera(
-            srcData, img.width, img.height, w, h, nextCam, t, tintColor,
+            srcData, srcW, srcH, w, h, nextCam, t, tintColor,
           )
           const fadeProgress = easeOutCubic((frameInHold - fadeStart) / FADE_FRAMES)
 
@@ -404,21 +474,15 @@ export function useBayerDither(
       if (visibleRef.current) {
         animRef.current = requestAnimationFrame(render)
       }
-    }
-
-    img.onerror = () => {
-      // Failed to load avatar — leave canvas empty (black)
-    }
-
-    img.src = avatarUrl
+    })
 
     return () => {
       cancelled = true
       renderFnRef.current = null
-      io.disconnect()
+      io?.disconnect()
       cleanup()
     }
-  }, [avatarUrl, containerWidth, containerHeight, canvasRef, cleanup])
+  }, [avatarUrl, containerWidth, containerHeight, canvasRef, cleanup, staticFrame])
 
   useEffect(() => {
     if (staticFrame) return
