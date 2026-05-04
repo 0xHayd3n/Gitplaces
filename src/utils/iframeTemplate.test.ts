@@ -185,10 +185,8 @@ describe('buildIframeHtml — import map approach', () => {
   it('stubs local/relative imports as function placeholders', async () => {
     const source = "import Card from './Card'\nexport default function C() { return null }"
     const html = await buildIframeHtml(reactComp(), source, {})
-    // Local import stubbed — returns null. Used as JSX renders nothing harmful;
-    // destructuring throws, which is surfaced as "Preview failed" in the card UI.
-    // Not sent to esm.sh.
-    expect(html).toContain('const Card = () => null')
+    // Local import stubbed as _$stub. Not sent to esm.sh.
+    expect(html).toContain('const Card = _$stub')
     expect(html).not.toContain('esm.sh/./Card')
   })
 
@@ -210,10 +208,10 @@ describe('buildIframeHtml — import map approach', () => {
       { byPath: { 'src/spinners/helpers/parseLength.ts': helperSource } },
     )
     // Helper code is inlined — `parseLength` defined as a real function,
-    // not stubbed as `() => null`
+    // not stubbed as `_$stub`.
     expect(html).toContain('function parseLength')
     expect(html).toContain('inlined: src/spinners/helpers/parseLength.ts')
-    expect(html).not.toContain('const parseLength = () => null')
+    expect(html).not.toContain('const parseLength = _$stub')
   })
 
   it('falls back to null stub when helper file is not in the helpers map', async () => {
@@ -226,7 +224,7 @@ describe('buildIframeHtml — import map approach', () => {
       'dark',
       { byPath: {} },
     )
-    expect(html).toContain('const unknownHelper = () => null')
+    expect(html).toContain('const unknownHelper = _$stub')
   })
 
   it('inlines transitive helper deps in dependency order', async () => {
@@ -448,7 +446,7 @@ describe('buildIframeHtml — helper inlining: bare-import consolidation', () =>
   it("drops helper stubs that collide with the rendered component's own declaration", async () => {
     // Reproduces material-tailwind's SpeedDial pattern: a parent index.tsx
     // (a sibling helper) imports the component being rendered. The import
-    // gets stubbed as `const SpeedDialContent = () => null;`, which then
+    // gets stubbed as `const SpeedDialContent = _$stub;`, which then
     // collides with the component's `export const SpeedDialContent = …`.
     // Dedup must drop the helper stub, not the component's real declaration.
     const compSource = "import { useParent } from './parent'\n"
@@ -480,7 +478,7 @@ describe('buildIframeHtml — helper inlining: bare-import consolidation', () =>
     // Reproduces the bug where multiple theme files each have a multi-line
     // `import type { className, ... } from "../../../types/components/<X>"`.
     // Those imports survive stripInlinedImports (its regex excludes newlines)
-    // and get stubbed by prepareForCompile as `const className = () => null`.
+    // and get stubbed by prepareForCompile as `const className = _$stub;`.
     // Without trailing semicolons on the stubs, findDeclarationEnd runs past
     // them looking for a terminator and absorbs subsequent declarations into
     // the first one's range, which leaks duplicates through dedup.
@@ -685,7 +683,7 @@ describe('buildIframeHtml — barrel and multi-line import handling', () => {
     expect(html).not.toBeNull()
     // `stepper` must be stubbed (not undefined). Old bug: barrel → inlinedSet →
     // import stripped → name never declared → ReferenceError.
-    expect(html).toContain('const stepper = () => null')
+    expect(html).toContain('const stepper = _$stub')
     expect(html).toContain('const theme')
   })
 
@@ -741,8 +739,8 @@ describe('buildIframeHtml — barrel and multi-line import handling', () => {
     expect(html).not.toBeNull()
     // Names from multi-line import must be stubbed (not left as dangling
     // relative module references the browser can't resolve from a blob URL).
-    expect(html).toContain('const timeline = () => null')
-    expect(html).toContain('const timelineItem = () => null')
+    expect(html).toContain('const timeline = _$stub')
+    expect(html).toContain('const timelineItem = _$stub')
   })
 })
 

@@ -149,7 +149,7 @@ function prepareForCompileWithHelpers(
   helpers?: HelperSources,
 ): string {
   if (!helpers || Object.keys(helpers.byPath).length === 0) {
-    return prepareForCompile(source)
+    return prepareForCompile(source, '_$stub')
   }
 
   // First, identify which of the component's relative imports actually
@@ -174,7 +174,7 @@ function prepareForCompileWithHelpers(
   }
   walk(componentPath, source)
 
-  if (inlinedOrder.length === 0) return prepareForCompile(source)
+  if (inlinedOrder.length === 0) return prepareForCompile(source, '_$stub')
 
   // Remove pure barrel files from inlinedSet/inlinedOrder.
   //
@@ -192,7 +192,7 @@ function prepareForCompileWithHelpers(
   // in the merged code → ReferenceError at runtime.
   //
   // Fix: remove pure barrels from inlinedSet so the importing file keeps its
-  // import line, which prepareForCompile then stubs as `const x = () => null;`.
+  // import line, which prepareForCompile then stubs as `const x = _$stub;`.
   // If the barrel's sub-files ARE fetched and inlined, those real declarations
   // appear earlier in helperBlock; the stubs are seen as duplicates and dropped
   // by dedupTopLevelDeclarations — correct either way.
@@ -203,7 +203,7 @@ function prepareForCompileWithHelpers(
     }
   }
 
-  if (inlinedOrder.length === 0) return prepareForCompile(source)
+  if (inlinedOrder.length === 0) return prepareForCompile(source, '_$stub')
 
   // For each file (helpers + component), remove relative-import lines
   // whose target is in inlinedSet — they'll be in scope from the inline
@@ -212,12 +212,12 @@ function prepareForCompileWithHelpers(
   // strip exports so identifiers become bare consts at module scope.
   const helperBlock = inlinedOrder.map(path => {
     const stripped = stripInlinedImports(helpers.byPath[path], path, inlinedSet, helpers.byPath)
-    const prepared = prepareForCompile(stripped)
+    const prepared = prepareForCompile(stripped, '_$stub')
     return `// --- inlined: ${path} ---\n${stripHelperExports(prepared)}`
   }).join('\n\n')
 
   const componentStripped = stripInlinedImports(source, componentPath, inlinedSet, helpers.byPath)
-  const componentPrepared = prepareForCompile(componentStripped)
+  const componentPrepared = prepareForCompile(componentStripped, '_$stub')
 
   // Bare-specifier imports (`import React from "react"`) survive both
   // stripInlinedImports and prepareForCompile. When several helpers each
@@ -564,6 +564,14 @@ function prepareForCompile(source: string, stubReturn: string = 'null'): string 
   // 1. Side-effect imports: import 'anything'  (CSS, SCSS, JSON, bare strings)
   r = r.replace(/^import\s+['"][^'"]+['"]\s*;?$/gm, '')
 
+  // When stubReturn is '_$stub', assign the proxy directly so that both
+  // property access (`stub.x`) and calls (`stub()`) work without wrapping
+  // in an arrow function. Otherwise use `() => <value>` for backwards compat.
+  const mkStub = (name: string) =>
+    stubReturn === '_$stub' ? `const ${name} = _$stub;` : `const ${name} = () => ${stubReturn};`
+  const mkNsStub = (name: string) =>
+    stubReturn === '_$stub' ? `const ${name} = _$stub;` : `const ${name} = {};`
+
   // 2. Namespace: import * as X from './relative'
   // Stubs MUST end with `;` — `dedupTopLevelDeclarations` uses statement
   // terminators to find declaration boundaries, and a trailing-`;`-less stub
@@ -572,7 +580,7 @@ function prepareForCompile(source: string, stubReturn: string = 'null'): string 
   // them through the dedup pass.
   r = r.replace(
     /^import\s+\*\s+as\s+(\w+)\s+from\s+(['"])(\.[^'"]+)\2\s*;?$/gm,
-    (_m, name: string) => `const ${name} = {};`,
+    (_m, name: string) => mkNsStub(name),
   )
 
   // 3. Mixed: import X, { Y } from './relative'
@@ -583,11 +591,11 @@ function prepareForCompile(source: string, stubReturn: string = 'null'): string 
         .split(',')
         .map((n: string) => {
           const fin = (n.trim().split(/\s+as\s+/).pop() ?? '').trim()
-          return fin ? `const ${fin} = () => ${stubReturn};` : ''
+          return fin ? mkStub(fin) : ''
         })
         .filter(Boolean)
         .join('\n')
-      return `const ${def} = () => ${stubReturn};\n${stubs}`
+      return `${mkStub(def)}\n${stubs}`
     },
   )
 
@@ -601,7 +609,7 @@ function prepareForCompile(source: string, stubReturn: string = 'null'): string 
           const parts = n.trim().split(/\s+as\s+/)
           const fin = (parts[parts.length - 1] ?? '').trim()
           if (!fin || n.trim().startsWith('type ')) return ''
-          return `const ${fin} = () => ${stubReturn};`
+          return mkStub(fin)
         })
         .filter(Boolean)
         .join('\n'),
@@ -619,7 +627,7 @@ function prepareForCompile(source: string, stubReturn: string = 'null'): string 
           const parts = n.trim().split(/\s+as\s+/)
           const fin = (parts[parts.length - 1] ?? '').trim()
           if (!fin || n.trim().startsWith('type ')) return ''
-          return `const ${fin} = () => ${stubReturn};`
+          return mkStub(fin)
         })
         .filter(Boolean)
         .join('\n'),
@@ -628,7 +636,7 @@ function prepareForCompile(source: string, stubReturn: string = 'null'): string 
   // 5. Default: import X from './relative'
   r = r.replace(
     /^import\s+(\w+)\s+from\s+(['"])(\.[^'"]+)\2\s*;?$/gm,
-    (_m, name: string) => `const ${name} = () => ${stubReturn};`,
+    (_m, name: string) => mkStub(name),
   )
 
   // Third-party bare specifiers (not starting with '.') are left as-is.
@@ -849,6 +857,23 @@ function baseHead(theme: 'light' | 'dark', importMap = '', hasTailwind = false):
 }
 
 // ---------------------------------------------------------------------------
+// STUB_PROLOG — injected at the top of React/Solid iframe module scripts.
+//
+// Defines `_$stub`, a self-returning Proxy used by prepareForCompile to stub
+// unresolvable relative imports. Properties, calls, and nested access all
+// return `_$stub` itself, so patterns like:
+//   const { open } = useAccordion()   → open = _$stub (no throw)
+//   styles.base.padding               → _$stub (no throw)
+//   data.findIndex(...)               → _$stub (callable, no throw)
+// …all survive without "Cannot destructure" / "is not a function" crashes.
+//
+// The `then` guard prevents Promise detection (avoids infinite await loops).
+// ESM hoists all `import` statements before the module body runs, so any
+// `import` in the render tail is already bound by the time this const runs.
+// ---------------------------------------------------------------------------
+const STUB_PROLOG = `const _$stub=new Proxy(function _s(){return _$stub},{get:(_,p)=>p==='then'?undefined:_$stub,apply:()=>_$stub});`
+
+// ---------------------------------------------------------------------------
 // buildReactHtml
 //
 // Takes esbuild-compiled ESM code (bare specifiers intact) and wraps it in a
@@ -870,6 +895,7 @@ function buildReactHtml(name: string, compiledCode: string, propsJson: string, t
   return `<!DOCTYPE html><html><head>${baseHead(theme, importMap, hasTailwind)}
 </head><body ${themeBodyAttrs(theme)}><div id="root"></div>
 <script type="module">
+${STUB_PROLOG}
 ${escapeScriptContent(code + '\n' + renderTail)}
 </script></body></html>`
 }
@@ -922,7 +948,7 @@ function buildSolidHtml(name: string, compiledCode: string, propsJson: string, t
     `try{_$r(()=>_$cc(${name},${propsJson}),document.getElementById('root'));}` +
     `catch(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');}`,
   ].join('\n')
-  return `<!DOCTYPE html><html><head>${baseHead(theme, importMap, hasTailwind)}\n</head><body ${themeBodyAttrs(theme)}><div id="root"></div>\n<script type="module">\n${escapeScriptContent(code + '\n' + renderTail)}\n</script></body></html>`
+  return `<!DOCTYPE html><html><head>${baseHead(theme, importMap, hasTailwind)}\n</head><body ${themeBodyAttrs(theme)}><div id="root"></div>\n<script type="module">\n${STUB_PROLOG}\n${escapeScriptContent(code + '\n' + renderTail)}\n</script></body></html>`
 }
 
 function buildAngularHtml(name: string, compiledCode: string, theme: 'light' | 'dark'): string {
