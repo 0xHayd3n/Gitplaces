@@ -8,6 +8,10 @@ import { getToken, getGitHubUser, getApiKey } from '../store'
 import { githubHeaders, getReadme, getReleases } from '../github'
 import { route as pipelineRoute } from '../skill-gen/pipeline'
 import { prepareWrite } from '../skill-gen/regeneration'
+import { isAnatomyEngineEnabled } from '../anatomy/flag'
+import { generateViaAnatomy, persistAnatomySkill, readFileOrNull } from '../anatomy/index'
+import { ensureClone } from '../anatomy/clone'
+import { spawnAnatomy, resolveAnatomyRuntime } from '../anatomy/runtime'
 
 // ── Pure helpers (tested) ──────────────────────────────────────────────────────
 
@@ -107,6 +111,25 @@ export async function applySkillRegen(repoId: string): Promise<{ ok: boolean; er
     default_branch: string | null; type_bucket: string | null; type_sub: string | null; upstream_version: string | null
   } | undefined
   if (!row) return { ok: false, error: 'Repo not found' }
+
+  if (isAnatomyEngineEnabled(_db)) {
+    try {
+      const rt = resolveAnatomyRuntime({
+        packaged: app.isPackaged, platform: process.platform,
+        repoRoot: process.cwd(), resourcesPath: process.resourcesPath,
+      })
+      const a = await generateViaAnatomy(
+        { token, owner: row.owner, name: row.name, defaultBranch: row.default_branch ?? 'main', apiKey: apiKey ?? undefined },
+        { ensureClone, spawnAnatomy, readFile: readFileOrNull, runtime: rt },
+        path.join(app.getPath('userData'), 'anatomy-cache'),
+      )
+      await persistAnatomySkill(_db, app.getPath('userData'), repoId, row.owner, row.name, a, row.upstream_version ?? 'unknown')
+      clearUpdateFlag(repoId, row.upstream_version)
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: String(err) }
+    }
+  }
 
   try {
     const readme = await getReadme(token, row.owner, row.name)

@@ -26,6 +26,10 @@ import {
 import { route as pipelineRoute, generate as pipelineGenerate, generateComponents as pipelineGenerateComponents } from './skill-gen/pipeline'
 import { prepareWrite } from './skill-gen/regeneration'
 import { extractionCache } from './skill-gen/extraction-cache'
+import { isAnatomyEngineEnabled } from './anatomy/flag'
+import { generateViaAnatomy, persistAnatomySkill, readFileOrNull } from './anatomy/index'
+import { ensureClone } from './anatomy/clone'
+import { spawnAnatomy, resolveAnatomyRuntime } from './anatomy/runtime'
 import { needsTranslation, translate as translateText } from './translator'
 import { registerComponentsIPC, scanComponents } from './componentScanner'
 import { registerBadgeProtocol } from './badgeProtocol'
@@ -1368,6 +1372,18 @@ ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?
         }
         content = await generateSkill(skillInput, apiKey)
       }
+    } else if (isAnatomyEngineEnabled(db)) {
+      const rt = resolveAnatomyRuntime({
+        packaged: app.isPackaged, platform: process.platform,
+        repoRoot: process.cwd(), resourcesPath: process.resourcesPath,
+      })
+      const a = await generateViaAnatomy(
+        { token, owner, name, defaultBranch: repo.default_branch ?? 'main', apiKey: apiKey ?? undefined },
+        { ensureClone, spawnAnatomy, readFile: readFileOrNull, runtime: rt },
+        path.join(app.getPath('userData'), 'anatomy-cache'),
+      )
+      await persistAnatomySkill(db, app.getPath('userData'), repo.id, owner, name, a, version)
+      return { content: a.content, version, generated_at: new Date().toISOString(), warnings: a.warnings }
     } else {
       const routeResult = await pipelineRoute(flavour, {
         token,
