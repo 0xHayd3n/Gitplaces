@@ -9,7 +9,7 @@ import type { McpScanResult } from '../types/mcp'
 
 const mockRow: LibraryRow = {
   id: 'r1', owner: 'modelcontextprotocol', name: 'server-github', language: 'TypeScript',
-  description: 'GitHub MCP server', content: '# Core',
+  description: 'GitHub MCP server',
   topics: '[]', stars: null, forks: null, license: 'MIT',
   homepage: null, updated_at: null, pushed_at: null, saved_at: '2026-01-01',
   type: 'skill', banner_svg: null, discovered_at: null, discover_query: null,
@@ -20,7 +20,9 @@ const mockRow: LibraryRow = {
   verification_score: null, verification_tier: null, verification_signals: null, verification_checked_at: null,
   type_bucket: 'utilities', type_sub: 'mcp-server',
   active: 1, version: 'v1.0', generated_at: '2026-01-01T00:00:00.000Z',
-  filename: 'server-github.skill.md', enabled_components: null, enabled_tools: null, tier: 1, installed: 1,
+  enabled_components: null, enabled_tools: null, tier: 1, installed: 1,
+  unstarred_at: null, is_forked: null, update_available: null,
+  update_checked_at: null, upstream_version: null, stored_version: null,
 }
 
 const staticScan: McpScanResult = {

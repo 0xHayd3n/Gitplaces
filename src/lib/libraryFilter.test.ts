@@ -76,7 +76,7 @@ describe('unstarred', () => {
   it('returns only unstarred repo entries (no local entries)', () => {
     const repo = makeRepo('alice', 'tool')
     const local = makeLocal('MyApp')
-    const unstarredRow = { ...repo.row, unstarred_at: '2024-01-10' } as import('../types/repo').StarredRepoRow
+    const unstarredRow = { ...(repo as { row: RepoRow }).row, unstarred_at: '2024-01-10' } as import('../types/repo').StarredRepoRow
     const opts = { ...baseOpts, unstarredRows: [unstarredRow] }
     const result = filterLibraryEntries([repo, local], 'unstarred', opts)
     expect(result).toHaveLength(1)

@@ -8,7 +8,7 @@ import type { LibraryRow } from '../types/repo'
 
 const mockRow: LibraryRow = {
   id: 'r1', owner: 'facebook', name: 'react', language: 'TypeScript',
-  description: 'A JS library', content: '# Core\nline',
+  description: 'A JS library',
   topics: '[]', stars: null, forks: null, license: 'MIT',
   homepage: null, updated_at: null, pushed_at: null, saved_at: '2026-01-01',
   type: 'skill', banner_svg: null, discovered_at: null, discover_query: null,
@@ -19,7 +19,9 @@ const mockRow: LibraryRow = {
   verification_score: null, verification_tier: null, verification_signals: null, verification_checked_at: null,
   type_bucket: 'frameworks', type_sub: 'web-framework',
   active: 1, version: 'v18.0.0', generated_at: '2026-01-01T00:00:00.000Z',
-  filename: 'react.skill.md', enabled_components: null, enabled_tools: null, tier: 1, installed: 1,
+  enabled_components: null, enabled_tools: null, tier: 1, installed: 1,
+  unstarred_at: null, is_forked: null, update_available: null,
+  update_checked_at: null, upstream_version: null, stored_version: null,
 }
 
 function renderCard(props: Partial<React.ComponentProps<typeof LibraryCard>> = {}) {

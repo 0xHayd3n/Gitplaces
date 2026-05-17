@@ -15,7 +15,7 @@ Object.defineProperty(window, 'api', {
 })
 
 describe('Titlebar', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => { vi.clearAllMocks() })
 
   it('renders the Git Suite wordmark', () => {
     render(<MemoryRouter><Titlebar /></MemoryRouter>)

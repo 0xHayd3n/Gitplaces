@@ -10,7 +10,7 @@ beforeEach(() => {
   initSchema(db)
 })
 
-afterEach(() => db.close())
+afterEach(() => { db.close() })
 
 function insertRepo(overrides: Partial<Record<string, unknown>> = {}) {
   const defaults = {

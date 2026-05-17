@@ -7,7 +7,7 @@ import type { LibraryRow } from '../types/repo'
 import { DEFAULT_LAYOUT_PREFS } from './LayoutDropdown'
 
 const baseRow: LibraryRow = {
-  id: '', owner: '', name: '', language: 'TypeScript', description: null, content: '',
+  id: '', owner: '', name: '', language: 'TypeScript', description: null,
   topics: '[]', stars: null, forks: null, license: null, homepage: null,
   updated_at: null, pushed_at: null, saved_at: null, type: 'skill',
   banner_svg: null, discovered_at: null, discover_query: null, watchers: null, size: null,
@@ -17,7 +17,9 @@ const baseRow: LibraryRow = {
   detected_language: null, verification_score: null, verification_tier: null,
   verification_signals: null, verification_checked_at: null,
   type_bucket: null, type_sub: null,
-  active: 1, version: null, generated_at: null, filename: '', enabled_components: null, enabled_tools: null, tier: 1, installed: 1,
+  active: 1, version: null, generated_at: null, enabled_components: null, enabled_tools: null, tier: 1, installed: 1,
+  unstarred_at: null, is_forked: null, update_available: null,
+  update_checked_at: null, upstream_version: null, stored_version: null,
 }
 
 const rows: LibraryRow[] = [

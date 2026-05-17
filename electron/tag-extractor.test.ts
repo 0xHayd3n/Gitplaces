@@ -20,7 +20,7 @@ describe('extractTags', () => {
   })
 
   it('falls back to word split when response is invalid JSON', async () => {
-    const Anthropic = (await import('@anthropic-ai/sdk')).default as ReturnType<typeof vi.fn>
+    const Anthropic = (await import('@anthropic-ai/sdk')).default as unknown as ReturnType<typeof vi.fn>
     Anthropic.mockImplementationOnce(() => ({
       messages: {
         create: vi.fn().mockResolvedValue({

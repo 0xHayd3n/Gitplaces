@@ -45,33 +45,33 @@ const repos = [
 describe('DiscoverRow', () => {
   it('renders null when repos is empty', () => {
     const { container } = render(
-      <DiscoverRow repos={[]} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onHoverIndex={vi.fn()} />,
+      <DiscoverRow repos={[]} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />,
     )
     expect(container.firstChild).toBeNull()
   })
 
   it('renders a card for each repo', () => {
-    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onHoverIndex={vi.fn()} />)
+    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />)
     expect(screen.getByText('facebook / react')).toBeTruthy()
     expect(screen.getByText('microsoft / vscode')).toBeTruthy()
     expect(screen.getByText('golang / go')).toBeTruthy()
   })
 
   it('renders "Recommended for You" section heading', () => {
-    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onHoverIndex={vi.fn()} />)
+    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />)
     expect(screen.getByText('Recommended for You')).toBeTruthy()
   })
 
   it('calls onMore when More button is clicked', async () => {
     const onMore = vi.fn()
-    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={onMore} onHoverIndex={vi.fn()} />)
+    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={onMore} onAdvance={vi.fn()} columns={3} />)
     await userEvent.click(screen.getByRole('button', { name: /more/i }))
     expect(onMore).toHaveBeenCalledOnce()
   })
 
   it('calls onNavigate with correct path when a card is clicked', async () => {
     const onNavigate = vi.fn()
-    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={onNavigate} onMore={vi.fn()} onHoverIndex={vi.fn()} />)
+    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={onNavigate} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />)
     await userEvent.click(screen.getByText('facebook / react'))
     expect(onNavigate).toHaveBeenCalledWith('/repo/facebook/react')
   })

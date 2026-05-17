@@ -10,7 +10,7 @@ function makeImg(
   const img = { naturalWidth: width, naturalHeight: height } as HTMLImageElement
 
   const setupMock = () => {
-    vi.spyOn(document, 'createElement').mockImplementationOnce((tag) => {
+    vi.spyOn(document, 'createElement').mockImplementationOnce((tag: string) => {
       if (tag !== 'canvas') return document.createElement(tag)
 
       // Return a fully mocked canvas object

@@ -12,7 +12,7 @@ vi.mock('./FilesTab', () => ({
 
 const baseRow: LibraryRow = {
   id: 'r1', owner: 'acme', name: 'my-skill', language: 'TypeScript',
-  description: 'A skill', content: '# Core\nfoo', topics: '[]',
+  description: 'A skill', topics: '[]',
   stars: 1200, forks: null, license: 'MIT', homepage: null,
   updated_at: null, pushed_at: null, saved_at: '2026-01-01',
   type: 'skill', banner_svg: null, discovered_at: null, discover_query: null,
@@ -25,8 +25,10 @@ const baseRow: LibraryRow = {
   verification_signals: null, verification_checked_at: null,
   type_bucket: 'tools', type_sub: null,
   active: 1, version: 'v2.0', generated_at: '2026-01-01T00:00:00.000Z',
-  filename: 'my-skill.skill.md', enabled_components: null,
+  enabled_components: null,
   enabled_tools: null, tier: 1, installed: 1,
+  unstarred_at: null, is_forked: null, update_available: null,
+  update_checked_at: null, upstream_version: null, stored_version: null,
 }
 
 function renderDetail(overrides: Partial<LibraryRow> = {}, props = {}) {

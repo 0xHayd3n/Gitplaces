@@ -14,9 +14,9 @@ const mockGetFileContent = vi.mocked(getFileContent)
 describe('fetchFileTree', () => {
   it('returns file paths from tree', async () => {
     mockGetRepoTree.mockResolvedValue([
-      { path: 'src/index.ts', type: 'blob' },
-      { path: 'src', type: 'tree' },
-      { path: 'package.json', type: 'blob' },
+      { path: 'src/index.ts', type: 'blob', sha: 'sha-index' },
+      { path: 'src', type: 'tree', sha: 'sha-src' },
+      { path: 'package.json', type: 'blob', sha: 'sha-pkg' },
     ])
     const result = await fetchFileTree('tok', 'owner', 'repo', 'main')
     expect(result).toEqual(['src/index.ts', 'package.json'])
