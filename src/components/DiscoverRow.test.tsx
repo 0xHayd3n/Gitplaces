@@ -31,6 +31,8 @@ function makeRepo(owner: string, name: string): RepoRow {
     translated_readme: null, translated_readme_lang: null, detected_language: null,
     verification_score: null, verification_tier: null, verification_signals: null,
     verification_checked_at: null, type_bucket: null, type_sub: null,
+    is_forked: null, update_available: null, update_checked_at: null,
+    upstream_version: null, stored_version: null,
   }
 }
 

@@ -48,6 +48,8 @@ function apiRepoToRow(r: GithubApiRepo): RepoRow {
     verification_tier: null, verification_signals: null,
     verification_checked_at: null, type_bucket: null, type_sub: null,
     og_image_url: null,
+    is_forked: null, update_available: null, update_checked_at: null,
+    upstream_version: null, stored_version: null,
   }
 }
 
@@ -68,6 +70,8 @@ function makeStubRow(p: LocalProject): RepoRow {
     verification_tier: null, verification_signals: null,
     verification_checked_at: null, type_bucket: null, type_sub: null,
     og_image_url: null,
+    is_forked: null, update_available: null, update_checked_at: null,
+    upstream_version: null, stored_version: null,
   }
 }
 
