@@ -182,8 +182,8 @@ async function convertToDocx(html: string, defaultName: string): Promise<void> {
   if (result.canceled || !result.filePath) return
 
   const fs = await import('fs/promises')
-  const arrayBuffer = await blob.arrayBuffer()
-  await fs.writeFile(result.filePath, Buffer.from(arrayBuffer))
+  const out = Buffer.isBuffer(blob) ? blob : Buffer.from(await blob.arrayBuffer())
+  await fs.writeFile(result.filePath, out)
 }
 
 // ── ePub via epub-gen-memory ──
@@ -365,7 +365,7 @@ export async function exportBookmarks(owner: string, name: string): Promise<void
     const tokens = marked.lexer(blob.content)
     walkTokens(tokens, (token) => {
       if (token.type === 'heading') {
-        currentHeading = token.text
+        currentHeading = token.text ?? ''
       }
       if (token.type === 'link') {
         let url = token.href

@@ -20,7 +20,17 @@ export function BrowseIcon({ size = 14 }: { size?: number }) {
   )
 }
 
+export function LastVisitedIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" className="view-mode-icon">
+      <circle cx="8" cy="8" r="6"/>
+      <path d="M8 4.5 V8 L10.5 9.5"/>
+    </svg>
+  )
+}
+
 export const VIEW_MODE_ICONS: Record<ViewModeKey, (props: { size?: number }) => JSX.Element> = {
   recommended: RecommendedIcon,
   all: BrowseIcon,
+  'last-visited': LastVisitedIcon,
 }

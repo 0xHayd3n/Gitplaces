@@ -3,7 +3,7 @@
  * Used across Discover chips, RepoCard language dot, and Library language labels.
  */
 
-import { createElement, type ComponentType, type SVGProps } from 'react'
+import { createElement, type ComponentType, type CSSProperties, type SVGProps } from 'react'
 import {
   SiJavascript,
   SiTypescript,
@@ -187,7 +187,7 @@ export interface LangDef {
   /** GitHub language filter value (exact case, as GitHub expects) */
   key: string
   category: EcosystemCategory
-  icon: ComponentType<{ size?: number; color?: string }> | null
+  icon: ComponentType<{ size?: number; color?: string; style?: CSSProperties }> | null
   color: string
   scale?: number
   doubleLayer?: boolean

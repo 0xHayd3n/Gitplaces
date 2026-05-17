@@ -38,7 +38,8 @@ export function getDownloadOptions(typeBucket: string, typeSub: string | null): 
     options.push({ id: 'pdf', label: 'Download as PDF', icon: 'file-text', isDefault: defaultId === 'pdf' })
   }
   if (HAS_DOCX.has(typeSub)) {
-    options.push({ id: 'docx', label: 'Download as Word', icon: 'file-type', isDefault: defaultId === 'docx' })
+    // docx is offered but never the computed default (no DOCX_DEFAULT set), so isDefault is always false.
+    options.push({ id: 'docx', label: 'Download as Word', icon: 'file-type', isDefault: false })
   }
   if (BOOKMARKS_DEFAULT.has(typeSub)) {
     options.push({ id: 'bookmarks', label: 'Export as Bookmarks', icon: 'bookmark', isDefault: defaultId === 'bookmarks' })
