@@ -76,17 +76,17 @@ describe('rawSearch', () => {
 
   it('passes page parameter to searchRepos', async () => {
     await rawSearch('tok', 'react', undefined, undefined, 3)
-    expect(mockFn).toHaveBeenCalledWith('tok', 'react', 20, undefined, undefined, 3)
+    expect(mockFn).toHaveBeenCalledWith('tok', 'react', 100, undefined, undefined, 3)
   })
 
   it('defaults page to 1 when omitted', async () => {
     await rawSearch('tok', 'react')
-    expect(mockFn).toHaveBeenCalledWith('tok', 'react', 20, undefined, undefined, 1)
+    expect(mockFn).toHaveBeenCalledWith('tok', 'react', 100, undefined, undefined, 1)
   })
 
-  it('uses perPage of 20', async () => {
+  it('uses perPage of 100', async () => {
     await rawSearch('tok', 'react')
-    expect(mockFn.mock.calls[0][2]).toBe(20)
+    expect(mockFn.mock.calls[0][2]).toBe(100)
   })
 })
 
