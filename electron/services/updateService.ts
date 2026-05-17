@@ -12,6 +12,7 @@ import { isAnatomyEngineEnabled } from '../anatomy/flag'
 import { generateViaAnatomy, persistAnatomySkill, readFileOrNull } from '../anatomy/index'
 import { ensureClone } from '../anatomy/clone'
 import { spawnAnatomy, resolveAnatomyRuntime } from '../anatomy/runtime'
+import { isAnatomyStale, type StalenessResult } from '../anatomy/staleness'
 
 // ── Pure helpers (tested) ──────────────────────────────────────────────────────
 
@@ -25,6 +26,20 @@ export function isNewerRelease(upstream: string, stored: string | null): boolean
 export function isNewerPushedAt(upstream: string, stored: string | null): boolean {
   if (!stored) return true
   return new Date(upstream).getTime() > new Date(stored).getTime()
+}
+
+type AnatomyProbe = (o: string, n: string, b: string, sc: string | null, t: string | null) => Promise<StalenessResult>
+
+/** Anatomy-row staleness: pins to the .anatomy commit instead of releases. */
+export async function isAnatomyRepoStale(
+  owner: string, name: string, branch: string, storedCommit: string | null,
+  token: string | null, probe: AnatomyProbe = isAnatomyStale,
+): Promise<{ updateAvailable: boolean; upstreamVersion: string }> {
+  const r = await probe(owner, name, branch, storedCommit, token)
+  return {
+    updateAvailable: r.stale && r.latestSha != null,
+    upstreamVersion: r.latestSha ?? storedCommit ?? 'unknown',
+  }
 }
 
 // ── Service state ─────────────────────────────────────────────────────────────
@@ -218,7 +233,13 @@ export async function checkAll(): Promise<void> {
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH)
     await Promise.all(batch.map(async (row) => {
-      const result = await checkRepo(row.owner, row.name, row.stored_version)
+      const anat = _db!.prepare(
+        `SELECT s.anatomy_source, s.anatomy_commit, r.default_branch
+         FROM skills s JOIN repos r ON r.id = s.repo_id WHERE s.repo_id = ?`
+      ).get(row.id) as { anatomy_source: string | null; anatomy_commit: string | null; default_branch: string | null } | undefined
+      const result = anat?.anatomy_source
+        ? await isAnatomyRepoStale(row.owner, row.name, anat.default_branch ?? 'main', anat.anatomy_commit, getToken() ?? null)
+        : await checkRepo(row.owner, row.name, row.stored_version)
       if (!result) return
       const prev = (_db!.prepare('SELECT update_available FROM repos WHERE id = ?')
         .get(row.id) as { update_available: number } | undefined)
