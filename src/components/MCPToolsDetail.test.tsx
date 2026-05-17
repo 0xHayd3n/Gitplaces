@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
 import MCPToolsDetail from './MCPToolsDetail'
 import type { LibraryRow } from '../types/repo'
@@ -62,6 +62,14 @@ function renderDetail(props: Partial<React.ComponentProps<typeof MCPToolsDetail>
     </MemoryRouter>
   )
 }
+
+beforeEach(() => {
+  vi.stubGlobal('api', {
+    skill: {
+      getContent: vi.fn().mockResolvedValue({ content: '# server-github\nskill body' }),
+    },
+  })
+})
 
 describe('MCPToolsDetail', () => {
   it('renders tool names and descriptions on tools tab', () => {

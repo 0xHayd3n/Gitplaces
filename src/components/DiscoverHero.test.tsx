@@ -44,9 +44,10 @@ describe('DiscoverHero', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('renders owner/name as title', () => {
+  it('renders name and owner', () => {
     render(<DiscoverHero repo={repo} onNavigate={vi.fn()} />)
-    expect(screen.getByText('vercel / next.js')).toBeTruthy()
+    expect(screen.getByText('next.js')).toBeTruthy()
+    expect(screen.getByText('vercel')).toBeTruthy()
   })
 
   it('renders description', () => {
@@ -66,9 +67,8 @@ describe('DiscoverHero', () => {
     expect(screen.getByTestId('dither-bg')).toBeTruthy()
   })
 
-  it('renders language and star count in meta', () => {
+  it('renders language in meta', () => {
     render(<DiscoverHero repo={repo} onNavigate={vi.fn()} />)
     expect(screen.getByText('JavaScript')).toBeTruthy()
-    expect(screen.getByText(/128/)).toBeTruthy()
   })
 })

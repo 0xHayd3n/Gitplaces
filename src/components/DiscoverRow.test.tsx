@@ -52,9 +52,9 @@ describe('DiscoverRow', () => {
 
   it('renders a card for each repo', () => {
     render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />)
-    expect(screen.getByText('facebook / react')).toBeTruthy()
-    expect(screen.getByText('microsoft / vscode')).toBeTruthy()
-    expect(screen.getByText('golang / go')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'facebook/react' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'microsoft/vscode' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'golang/go' })).toBeTruthy()
   })
 
   it('renders "Recommended for You" section heading', () => {
@@ -65,14 +65,14 @@ describe('DiscoverRow', () => {
   it('calls onMore when More button is clicked', async () => {
     const onMore = vi.fn()
     render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={onMore} onAdvance={vi.fn()} columns={3} />)
-    await userEvent.click(screen.getByRole('button', { name: /more/i }))
+    await userEvent.click(screen.getByRole('button', { name: /see all/i }))
     expect(onMore).toHaveBeenCalledOnce()
   })
 
   it('calls onNavigate with correct path when a card is clicked', async () => {
     const onNavigate = vi.fn()
     render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={onNavigate} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />)
-    await userEvent.click(screen.getByText('facebook / react'))
+    await userEvent.click(screen.getByRole('button', { name: 'facebook/react' }))
     expect(onNavigate).toHaveBeenCalledWith('/repo/facebook/react')
   })
 })
