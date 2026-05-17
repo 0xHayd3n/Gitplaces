@@ -43,7 +43,10 @@ export async function ensureClone(
     fs, http, dir: tmp,
     url: `https://github.com/${owner}/${name}.git`,
     ref: branch, singleBranch: true, depth: 1,
-    onAuth: () => (token ? { username: token } : {}),
+    // Only supply credentials when we have a token; returning {} makes
+    // isomorphic-git send empty Basic auth, which GitHub rejects with 401
+    // even for public repos. Omitting onAuth keeps the request anonymous.
+    ...(token ? { onAuth: () => ({ username: token, password: 'x-oauth-basic' }) } : {}),
   })
   const sha = await git.resolveRef({ fs, dir: tmp, ref: 'HEAD' })
   const finalDir = cacheDirFor(cacheRoot, owner, name, sha)
