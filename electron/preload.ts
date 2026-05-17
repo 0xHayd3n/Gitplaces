@@ -125,6 +125,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('skill:get-versioned-installs', owner, name),
     getContent: (owner: string, name: string) =>
       ipcRenderer.invoke('skill:getContent', owner, name),
+    getAnatomy: (owner: string, name: string) =>
+      ipcRenderer.invoke('skill:getAnatomy', owner, name),
   },
 
   library: {

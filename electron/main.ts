@@ -30,6 +30,7 @@ import { isAnatomyEngineEnabled } from './anatomy/flag'
 import { generateViaAnatomy, persistAnatomySkill, readFileOrNull } from './anatomy/index'
 import { ensureClone } from './anatomy/clone'
 import { spawnAnatomy, resolveAnatomyRuntime } from './anatomy/runtime'
+import { parseAnatomy, parseMemory } from './anatomy/parse'
 import { needsTranslation, translate as translateText } from './translator'
 import { registerComponentsIPC, scanComponents } from './componentScanner'
 import { registerBadgeProtocol } from './badgeProtocol'
@@ -1582,6 +1583,33 @@ ipcMain.handle('skill:get', async (_, owner: string, name: string) => {
   return db.prepare(
     'SELECT s.* FROM skills s JOIN repos r ON s.repo_id = r.id WHERE r.owner = ? AND r.name = ?'
   ).get(owner, name) ?? null
+})
+
+ipcMain.handle('skill:getAnatomy', async (_, owner: string, name: string) => {
+  const db = getDb(app.getPath('userData'))
+  const row = db.prepare(
+    `SELECT s.content, s.anatomy_memory, s.anatomy_source, s.anatomy_commit,
+            s.anatomy_fingerprint, s.anatomy_verify
+     FROM skills s JOIN repos r ON s.repo_id = r.id WHERE r.owner = ? AND r.name = ?`
+  ).get(owner, name) as {
+    content: string; anatomy_memory: string | null; anatomy_source: string | null
+    anatomy_commit: string | null; anatomy_fingerprint: string | null; anatomy_verify: string | null
+  } | undefined
+  if (!row || !row.anatomy_source) return null
+  let model = null
+  let memory: unknown[] = []
+  let verify = null
+  try { model = parseAnatomy(row.content) } catch { /* malformed — surface raw only */ }
+  try { memory = parseMemory(row.anatomy_memory) } catch { memory = [] }
+  try { verify = row.anatomy_verify ? JSON.parse(row.anatomy_verify) : null } catch { verify = null }
+  return {
+    source: row.anatomy_source,
+    commit: row.anatomy_commit,
+    fingerprint: row.anatomy_fingerprint,
+    rawContent: row.content,
+    rawMemory: row.anatomy_memory,
+    model, memory, verify,
+  }
 })
 
 ipcMain.handle('skill:delete', async (_, owner: string, name: string) => {

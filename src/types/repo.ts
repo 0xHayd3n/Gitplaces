@@ -87,6 +87,13 @@ export interface SkillRow {
   enabled_components: string | null
   enabled_tools: string | null
   tier?: number
+  // Phase 1/2 — anatomy engine (present only for anatomy-sourced skills)
+  anatomy_source?: string | null      // 'committed' | 'generated' | null
+  anatomy_commit?: string | null
+  anatomy_fingerprint?: string | null
+  anatomy_memory?: string | null
+  anatomy_brief?: string | null
+  anatomy_verify?: string | null      // JSON AnatomyVerifyResult
 }
 
 export interface SubSkillRow {
@@ -137,4 +144,30 @@ export interface CollectionRepoRow {
 /** Returned by starred:getAll — repos WHERE starred_at IS NOT NULL, LEFT JOIN skills. */
 export interface StarredRepoRow extends RepoRow {
   installed: number  // 0 or 1 — 1 if a skill exists for this repo
+}
+
+// ── Anatomy engine (renderer-facing; parsed in main via skill:getAnatomy) ──
+export interface AnatomyModelView {
+  identity: Record<string, unknown>
+  generated: Record<string, unknown>
+  operation?: Record<string, unknown>
+  substance?: Record<string, unknown>
+  rules: Array<{ statement: string; verify?: { kind: string } }>
+  decisions: Array<{ decision: string; rationale?: string }>
+}
+export interface AnatomyMemoryEntryView {
+  text: string; kind?: string; at?: string; superseded?: boolean
+  last_verified_at?: string; verified_by?: string
+}
+export interface AnatomyVerifyView {
+  ok: boolean; errors: string[]; warnings: string[]
+  rules: Array<{ statement: string; kind: string; status: 'pass' | 'fail' | 'unverified'; detail?: string }>
+  skipped: string[]
+}
+export interface AnatomyPayload {
+  source: string; commit: string | null; fingerprint: string | null
+  rawContent: string; rawMemory: string | null
+  model: AnatomyModelView | null
+  memory: AnatomyMemoryEntryView[]
+  verify: AnatomyVerifyView | null
 }
