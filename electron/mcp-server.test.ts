@@ -95,6 +95,31 @@ describe('handleGetSkill', () => {
     expect(result.content[0].text).toContain('## [CORE]')
     expect(result.content[0].text).toContain('Hello')
   })
+
+  it('returns raw .anatomy + memory for anatomy-source rows', () => {
+    const db = makeDb()
+    const repoId = seedRepo(db, 'o', 'n')
+    db.prepare(
+      `INSERT INTO skills (repo_id, filename, content, version, generated_at, active, anatomy_source, anatomy_memory)
+       VALUES (?, '.anatomy', ?, 'v', 't', 1, 'generated', ?)`
+    ).run(repoId, '[identity]\nform="lib"', '[[entries]]\ntext="gotcha"')
+    const res = handleGetSkill(tmpDir, 'o', 'n', db)
+    expect(res.content[0].text).toMatch(/\[identity\]/)
+    expect(res.content[0].text).toMatch(/Lived experience/)
+    expect(res.content[0].text).toMatch(/gotcha/)
+    db.close()
+  })
+
+  it('still reads the .skill.md file for legacy rows (no anatomy_source)', () => {
+    const db = makeDb()
+    const repoId = seedRepo(db, 'o2', 'n2')
+    seedSkill(db, repoId, 'n2.skill.md')
+    const skillDir = path.join(tmpDir, 'skills', 'o2')
+    fs.mkdirSync(skillDir, { recursive: true })
+    fs.writeFileSync(path.join(skillDir, 'n2.skill.md'), '## [CORE]\nlegacy', 'utf8')
+    expect(handleGetSkill(tmpDir, 'o2', 'n2', db).content[0].text).toMatch(/legacy/)
+    db.close()
+  })
 })
 
 // ── handleSearchSkills ────────────────────────────────────────────────────────

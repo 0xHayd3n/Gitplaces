@@ -72,7 +72,21 @@ export function handleListSkills(db: Database.Database): ToolResult {
   return text(lines.join('\n'))
 }
 
-export function handleGetSkill(dataDir: string, owner: string, repo: string): ToolResult {
+export function handleGetSkill(
+  dataDir: string, owner: string, repo: string, db?: Database.Database | null,
+): ToolResult {
+  if (db) {
+    const row = db.prepare(`
+      SELECT s.content, s.anatomy_memory, s.anatomy_source
+      FROM skills s JOIN repos r ON r.id = s.repo_id
+      WHERE r.owner = ? AND r.name = ? AND s.active = 1
+    `).get(owner, repo) as { content: string; anatomy_memory: string | null; anatomy_source: string | null } | undefined
+    if (row?.anatomy_source) {
+      const mem = row.anatomy_memory
+        ? `\n\n# Lived experience (.anatomy-memory)\n\n${row.anatomy_memory}` : ''
+      return text(row.content + mem)
+    }
+  }
   const skillPath = path.join(dataDir, 'skills', owner, `${repo}.skill.md`)
   const resolved = path.resolve(skillPath)
   const base = path.resolve(path.join(dataDir, 'skills'))
@@ -279,7 +293,7 @@ async function main(): Promise<void> {
         return handleListSkills(db!)
       case 'get_skill':
         if (!input.owner || !input.repo) return text('Missing required parameters: owner, repo')
-        return handleGetSkill(dataDir, input.owner, input.repo)
+        return handleGetSkill(dataDir, input.owner, input.repo, db)
       case 'get_components_skill':
         if (!input.owner || !input.repo) return text('Missing required parameters: owner, repo')
         return handleGetComponentsSkill(db!, dataDir, input.owner, input.repo)
