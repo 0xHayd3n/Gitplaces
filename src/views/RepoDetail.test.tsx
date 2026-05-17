@@ -247,7 +247,8 @@ describe('RepoDetail skill tab', () => {
 describe('RepoDetail related tab', () => {
   it('does not show Related tab when related repos is empty', async () => {
     setupDetail(null)
-    await waitFor(() => screen.getAllByText('next.js'))
+    // Related's absence is the assertion — gate on the always-present Activities tab to prove the tab strip mounted.
+    await screen.findByRole('button', { name: 'Activities' })
     expect(screen.queryByRole('button', { name: 'Related' })).not.toBeInTheDocument()
   })
 
@@ -269,7 +270,6 @@ describe('RepoDetail related tab', () => {
 describe('RepoDetail activities tab', () => {
   it('shows the Activities tab and selects it by default when releases is non-empty', async () => {
     const { container } = setupDetail(null, null, vi.fn(), [], [sampleRelease])
-    await waitFor(() => screen.getAllByText('next.js'))
     const activitiesTab = await waitFor(() =>
       screen.getByRole('button', { name: 'Activities' })
     )
@@ -287,7 +287,7 @@ describe('RepoDetail activities tab', () => {
 
   it('shows the Activities tab even when releases is empty, but falls back to README as the default', async () => {
     const { container } = setupDetail(null, null, vi.fn(), [], [])
-    await waitFor(() => screen.getAllByText('next.js'))
+    await screen.findByRole('button', { name: 'Activities' })
     // Tab is always visible
     expect(screen.getByRole('button', { name: 'Activities' })).toBeInTheDocument()
     // README is the active default — Activities body is not mounted, no BannerCards
@@ -296,14 +296,13 @@ describe('RepoDetail activities tab', () => {
 
   it('shows the Activities tab even when getReleases rejects, but falls back to README as the default', async () => {
     const { container } = setupDetail(null, null, vi.fn(), [], 'reject')
-    await waitFor(() => screen.getAllByText('next.js'))
+    await screen.findByRole('button', { name: 'Activities' })
     expect(screen.getByRole('button', { name: 'Activities' })).toBeInTheDocument()
     expect(container.querySelector('.banner-card')).toBeNull()
   })
 
   it('opens the ActivityModal when a release card is clicked', async () => {
     const { container } = setupDetail(null, null, vi.fn(), [], [sampleRelease])
-    await waitFor(() => screen.getAllByText('next.js'))
     const card = await waitFor(
       () => {
         const el = container.querySelector('.banner-card')
@@ -323,7 +322,6 @@ describe('RepoDetail activities tab — merged feed', () => {
 
   it('renders both BannerCards and RepoUserEventRows when both sources have data', async () => {
     const { container } = setupDetail(null, null, vi.fn(), [], [sampleRelease], [sampleStarEvent])
-    await waitFor(() => screen.getAllByText('next.js'))
     await waitFor(
       () => {
         if (!container.querySelector('.banner-card')) throw new Error('banner-card not yet')
@@ -336,7 +334,6 @@ describe('RepoDetail activities tab — merged feed', () => {
 
   it('renders only user events when releases is empty', async () => {
     const { container } = setupDetail(null, null, vi.fn(), [], [], [sampleStarEvent])
-    await waitFor(() => screen.getAllByText('next.js'))
     await waitFor(
       () => {
         if (!container.querySelector('.repo-user-event')) throw new Error('user-event not yet')
@@ -349,7 +346,6 @@ describe('RepoDetail activities tab — merged feed', () => {
 
   it('renders only releases when user events is empty', async () => {
     const { container } = setupDetail(null, null, vi.fn(), [], [sampleRelease], [])
-    await waitFor(() => screen.getAllByText('next.js'))
     await waitFor(
       () => {
         if (!container.querySelector('.banner-card')) throw new Error('banner-card not yet')
@@ -362,7 +358,6 @@ describe('RepoDetail activities tab — merged feed', () => {
 
   it('default tab is Activities when user events is non-empty even with no releases', async () => {
     const { container } = setupDetail(null, null, vi.fn(), [], [], [sampleStarEvent])
-    await waitFor(() => screen.getAllByText('next.js'))
     await waitFor(
       () => {
         if (!container.querySelector('.repo-user-event')) throw new Error('not yet')
@@ -374,14 +369,13 @@ describe('RepoDetail activities tab — merged feed', () => {
 
   it('default tab falls back to Readme when both releases and user events are empty', async () => {
     const { container } = setupDetail(null, null, vi.fn(), [], [], [])
-    await waitFor(() => screen.getAllByText('next.js'))
+    await screen.findByRole('button', { name: 'Activities' })
     expect(container.querySelector('.banner-card')).toBeNull()
     expect(container.querySelector('.repo-user-event')).toBeNull()
   })
 
   it('renders the resolved source when one errors and the other resolves', async () => {
     const { container } = setupDetail(null, null, vi.fn(), [], [sampleRelease], 'reject')
-    await waitFor(() => screen.getAllByText('next.js'))
     await waitFor(
       () => {
         if (!container.querySelector('.banner-card')) throw new Error('banner-card not yet')
