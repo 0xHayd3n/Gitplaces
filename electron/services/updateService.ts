@@ -6,9 +6,6 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { getToken, getGitHubUser, getApiKey } from '../store'
 import { githubHeaders, getReadme, getReleases } from '../github'
-import { route as pipelineRoute } from '../skill-gen/pipeline'
-import { prepareWrite } from '../skill-gen/regeneration'
-import { isAnatomyEngineEnabled } from '../anatomy/flag'
 import { generateViaAnatomy, persistAnatomySkill, readFileOrNull } from '../anatomy/index'
 import { ensureClone } from '../anatomy/clone'
 import { spawnAnatomy, resolveAnatomyRuntime } from '../anatomy/runtime'
@@ -127,74 +124,17 @@ export async function applySkillRegen(repoId: string): Promise<{ ok: boolean; er
   } | undefined
   if (!row) return { ok: false, error: 'Repo not found' }
 
-  if (isAnatomyEngineEnabled(_db)) {
-    try {
-      const rt = resolveAnatomyRuntime({
-        packaged: app.isPackaged, platform: process.platform,
-        repoRoot: process.cwd(), resourcesPath: process.resourcesPath,
-      })
-      const a = await generateViaAnatomy(
-        { token, owner: row.owner, name: row.name, defaultBranch: row.default_branch ?? 'main', apiKey: apiKey ?? undefined },
-        { ensureClone, spawnAnatomy, readFile: readFileOrNull, runtime: rt },
-        path.join(app.getPath('userData'), 'anatomy-cache'),
-      )
-      await persistAnatomySkill(_db, app.getPath('userData'), repoId, row.owner, row.name, a, row.upstream_version ?? 'unknown')
-      clearUpdateFlag(repoId, row.upstream_version)
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, error: String(err) }
-    }
-  }
-
   try {
-    const readme = await getReadme(token, row.owner, row.name)
-    const releases = await getReleases(token, row.owner, row.name)
-    const version = releases[0]?.tag_name ?? 'unknown'
-    const topics = JSON.parse(row.topics ?? '[]') as string[]
-
-    // pipelineRoute signature: (flavour: SkillFlavour, input: GenerateInput)
-    // GenerateInput: { token, owner, name, language, topics, readme, version, defaultBranch, apiKey?, typeBucket?, typeSub? }
-    // SkillFlavour is 'library' | 'codebase' | 'domain' — use 'library' for update regen
-    const routeResult = await pipelineRoute('library', {
-      token,
-      owner: row.owner,
-      name: row.name,
-      language: row.language ?? '',
-      topics,
-      readme: readme ?? '',
-      version,
-      defaultBranch: row.default_branch ?? 'main',
-      apiKey: apiKey ?? undefined,
-      typeBucket: row.type_bucket ?? undefined,
-      typeSub: row.type_sub ?? undefined,
+    const rt = resolveAnatomyRuntime({
+      packaged: app.isPackaged, platform: process.platform,
+      repoRoot: process.cwd(), resourcesPath: process.resourcesPath,
     })
-
-    // RouteResult is a discriminated union; 'codebase' has no .content — narrow first
-    if (routeResult.flavour !== 'library' || !routeResult.content) return { ok: false, error: 'No content generated' }
-
-    // Write skill file + update DB — library-flavour path (mirrors main.ts:1184-1229)
-    const dir = path.join(app.getPath('userData'), 'skills', row.owner)
-    await fs.mkdir(dir, { recursive: true })
-    const skillPath = path.join(dir, `${row.name}.skill.md`)
-    const storedSkill = (_db!.prepare('SELECT content FROM skills WHERE repo_id = ?')
-      .get(repoId) as { content: string } | undefined)?.content ?? null
-    const currentSkill = await fs.readFile(skillPath, 'utf8').catch(() => null)
-    const generated_at = new Date().toISOString()
-    const check = prepareWrite(routeResult.content, storedSkill, currentSkill)
-    if (check.conflict) return { ok: false, error: 'Skill file has local edits in the generated block — regenerate manually' }
-
-    await fs.writeFile(skillPath, check.merged!, 'utf8')
-    _db!.prepare(`
-      INSERT INTO skills (repo_id, filename, content, version, generated_at, active, enabled_components, tier)
-      VALUES (?, ?, ?, ?, ?, 1, NULL, 1)
-      ON CONFLICT(repo_id) DO UPDATE SET
-        filename     = excluded.filename,
-        content      = excluded.content,
-        version      = excluded.version,
-        generated_at = excluded.generated_at,
-        tier         = excluded.tier
-    `).run(repoId, `${row.name}.skill.md`, check.merged!, version, generated_at)
-
+    const a = await generateViaAnatomy(
+      { token, owner: row.owner, name: row.name, defaultBranch: row.default_branch ?? 'main', apiKey: apiKey ?? undefined },
+      { ensureClone, spawnAnatomy, readFile: readFileOrNull, runtime: rt },
+      path.join(app.getPath('userData'), 'anatomy-cache'),
+    )
+    await persistAnatomySkill(_db, app.getPath('userData'), repoId, row.owner, row.name, a, row.upstream_version ?? 'unknown')
     clearUpdateFlag(repoId, row.upstream_version)
     return { ok: true }
   } catch (err) {
