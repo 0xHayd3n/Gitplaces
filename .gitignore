@@ -15,3 +15,7 @@ dist-electron/
 
 # Superpowers brainstorm scratch (visual companion mockups, .events, .server-info)
 .superpowers/
+
+# Anatomy engine: downloaded Node 22 runtime + clone cache (not committed)
+vendor/node22/
+**/anatomy-cache/

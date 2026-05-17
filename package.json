@@ -11,7 +11,10 @@
     "test": "npm rebuild better-sqlite3 && vitest run",
     "test:watch": "npm rebuild better-sqlite3 && vitest",
     "posttest": "npx @electron/rebuild -f -o better-sqlite3",
-    "postinstall": "npx @electron/rebuild -f -o better-sqlite3"
+    "postinstall": "npx @electron/rebuild -f -o better-sqlite3",
+    "vendor:node22": "node scripts/fetch-node22.mjs",
+    "vendor:anatomy": "git submodule update --init --recursive && node scripts/build-anatomy.mjs",
+    "vendor": "npm run vendor:node22 && npm run vendor:anatomy"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.87",
