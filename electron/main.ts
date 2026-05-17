@@ -42,7 +42,8 @@ import { registerTtsHandlers } from './ipc/ttsHandlers'
 import { registerRecommendHandlers } from './ipc/recommendHandlers'
 import { registerEngagementHandlers } from './ipc/engagementHandlers'
 import { registerUpdateHandlers } from './ipc/updateHandlers'
-import { startUpdateService, checkIsFork } from './services/updateService'
+import { startUpdateService, checkIsFork, applySkillRegen } from './services/updateService'
+import { runAnatomyBackfill } from './anatomy/backfill'
 import { registerCreateHandlers, closeAllOnQuit } from './ipc/createHandlers'
 import { startVerificationService, enqueueRepo } from './services/verificationService'
 import { startSkillSyncService, push as skillSyncPush, pushAll as skillSyncPushAll, setupRepo as skillSyncSetupRepo } from './services/skillSyncService'
@@ -2615,6 +2616,9 @@ app.whenReady().then(() => {
     startNotesSyncService(db)
     if (getSyncEnabled()) void pushAllPendingNotes()
     startUpdateService(db, mainWindow)
+    // One-time, non-blocking: migrate any legacy (non-anatomy) installed
+    // skills to the anatomy engine. Replace-on-success-only.
+    void runAnatomyBackfill(db, (repoId) => applySkillRegen(repoId))
   }
   const existingToken = getToken()
   if (existingToken) initTopicCache(existingToken).catch(() => {}) // Non-blocking
