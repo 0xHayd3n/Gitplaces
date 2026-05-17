@@ -202,11 +202,12 @@ describe('getRepoStats', () => {
   })
 
   it('exposes daysSinceCommit and leaves lastReleaseDate null (renderer enriches)', async () => {
+    // commit_activity is no longer fetched by getRepoStats (lazy momentum):
+    // 3 main (repo, contributors, commits) + 5 security.
     mockFetch
       .mockResolvedValueOnce(okJson(repoPayload))
       .mockResolvedValueOnce(okJson([]))
       .mockResolvedValueOnce(okJson(commitsPayload))
-      .mockResolvedValueOnce(okJson(activityPayload))
       .mockResolvedValueOnce(okJson([]))
       .mockResolvedValueOnce(okJson([]))
       .mockResolvedValueOnce(okJson(profilePayload))
@@ -233,7 +234,6 @@ describe('getRepoStats', () => {
       .mockResolvedValueOnce(okJson(repoPayload))
       .mockResolvedValueOnce(contribRes)
       .mockResolvedValueOnce(okJson(commitsPayload))
-      .mockResolvedValueOnce(okJson(activityPayload))
       .mockResolvedValueOnce(okJson([]))                             // open dependabot
       .mockResolvedValueOnce(okJson([]))                             // dismissed dependabot
       .mockResolvedValueOnce(okJson(profilePayload))
@@ -260,6 +260,7 @@ describe('getRepoStats', () => {
       .mockResolvedValueOnce(okJson(profilePayload))
       .mockResolvedValueOnce(new Response('[]', { status: 200 }))   // code scanning
       .mockResolvedValueOnce(new Response('', { status: 404 }))     // secret scanning
+      .mockResolvedValueOnce(okJson(repoPayload))                   // 2nd call: lone /repos refetch (intermediates+security cached)
 
     const db = createTestDb()
     const first = await getRepoStats(db, 'owner', 'repo', 'token')
@@ -306,8 +307,9 @@ describe('getRepoStats', () => {
     expect(result.vitals.stars).toBe(100)
     expect(result.vitals.contributors).toBe(42)
     expect(result.health.daysSinceCommit).toBe(5)
-    // Momentum is now lazy (separate IPC), not part of the stats bundle.
-    expect(result.momentum).toBeNull()
+    // Momentum is now lazy (separate IPC), not part of the stats bundle —
+    // the field is absent from the result, so it reads as undefined.
+    expect(result.momentum).toBeUndefined()
     expect(result.security.available).toBe(true)
   })
 
