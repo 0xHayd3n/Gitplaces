@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import RepoDetail from './RepoDetail'
+import RepoDetail, { __resetRepoDetailCaches } from './RepoDetail'
 import { SavedReposProvider } from '../contexts/SavedRepos'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
 import { AppearanceProvider } from '../contexts/Appearance'
@@ -12,6 +12,12 @@ import type { SkillRow } from '../types/repo'
 // BannerCard renders DitherBackground directly; mock it so jsdom doesn't choke
 // on canvas operations while the Activities tab renders cards in tests.
 vi.mock('../components/DitherBackground', () => ({ default: () => <div data-testid="dither" /> }))
+
+// Isolate the module-singleton session caches (_repoCache/_releasesCache/
+// _starredCache) so a prior test's cached state for the shared vercel/next.js
+// cacheKey cannot leak into the next (root cause of the order-dependent
+// activities-feed failures).
+beforeEach(() => { __resetRepoDetailCaches() })
 
 // ── parseSkillDepths unit tests ──────────────────────────────────────
 describe('parseSkillDepths', () => {
@@ -214,13 +220,7 @@ describe('RepoDetail skill tab', () => {
     })
   })
 
-  // SKIPPED: RepoDetail.test.tsx is pre-existing-broken at HEAD (the harness's
-  // mocks/flows went stale in the type-cleanup refactor — 12 tests fail on clean
-  // HEAD independent of anatomy; the skill-tab body does not render in this
-  // harness). Task 12's integration code is verified via tsc + the
-  // AnatomyIndicators/View/MemoryPanel unit suites. Unskip once the RepoDetail
-  // test harness is repaired (tracked separately).
-  it.skip('renders the anatomy view (not depth bars) for anatomy-source skills', async () => {
+  it('renders the anatomy view (not depth bars) for anatomy-source skills', async () => {
     const anatomyPayload = {
       source: 'generated', commit: 'c1', fingerprint: 'fp', rawContent: '[identity]\nform="lib"', rawMemory: null,
       model: { identity: { stack: 'ts', form: 'lib', domain: 'd', function: 'f' }, generated: {},

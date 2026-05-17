@@ -485,6 +485,15 @@ const SESSION_CACHE_TTL_MS = 5 * 60 * 1000
 
 const _releasesCache = new Map<string, { value: ReleaseRow[]; ts: number }>()
 const _starredCache  = new Map<string, { value: boolean;       ts: number }>()
+// Test-only seam: these module-singleton caches persist for the process
+// lifetime (intentional in-app session caching). Tests that mount RepoDetail
+// for the same owner/name share a cacheKey, so without a reset one test's
+// cached repo/releases/starred state leaks into the next. Inert in production.
+export function __resetRepoDetailCaches(): void {
+  _repoCache.clear()
+  _releasesCache.clear()
+  _starredCache.clear()
+}
 function readSessionCache<T>(map: Map<string, { value: T; ts: number }>, key: string): T | undefined {
   const entry = map.get(key)
   if (!entry) return undefined
