@@ -180,17 +180,28 @@ export function handleGetCollection(
   // INNER JOIN so we only get repos that have an active skill.
   // Filter in the JOIN condition (not WHERE) keeps intent explicit.
   const repos = db.prepare(`
-    SELECT repos.owner, repos.name, skills.filename
+    SELECT repos.owner, repos.name, skills.filename,
+           skills.content AS db_content, skills.anatomy_source, skills.anatomy_brief, skills.anatomy_memory
     FROM collection_repos
     JOIN repos ON repos.id = collection_repos.repo_id
     JOIN skills ON skills.repo_id = repos.id AND skills.active = 1
     WHERE collection_repos.collection_id = ?
-  `).all(collection.id) as Array<{ owner: string; name: string; filename: string }>
+  `).all(collection.id) as Array<{
+    owner: string; name: string; filename: string
+    db_content: string; anatomy_source: string | null; anatomy_brief: string | null; anatomy_memory: string | null
+  }>
 
   if (repos.length === 0) return text(`Collection "${name}" has no active skills installed.`)
 
   const parts: string[] = []
   for (const repo of repos) {
+    if (repo.anatomy_source) {
+      const body = depth === 'core'
+        ? (repo.anatomy_brief && repo.anatomy_brief.trim() ? repo.anatomy_brief : repo.db_content)
+        : repo.db_content + (repo.anatomy_memory ? `\n\n# Lived experience (.anatomy-memory)\n\n${repo.anatomy_memory}` : '')
+      parts.push(`# ${repo.owner}/${repo.name}\n\n${body}`)
+      continue
+    }
     if (!repo.filename) continue
     const skillPath = path.join(dataDir, 'skills', repo.owner, repo.filename)
     if (!fs.existsSync(skillPath)) continue

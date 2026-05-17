@@ -220,6 +220,25 @@ describe('handleSearchSkills', () => {
 // ── handleGetCollection ───────────────────────────────────────────────────────
 
 describe('handleGetCollection', () => {
+  it('uses anatomy_brief for depth=core and raw .anatomy for depth=full (anatomy rows)', () => {
+    const db = makeDb()
+    db.prepare(`INSERT INTO collections (id, name, owner, active, created_at) VALUES ('c1','Stack','user',1,'t')`).run()
+    const repoId = seedRepo(db, 'o', 'n')
+    db.prepare(
+      `INSERT INTO skills (repo_id, filename, content, version, generated_at, active, anatomy_source, anatomy_brief)
+       VALUES (?, '.anatomy', ?, 'v', 't', 1, 'generated', ?)`
+    ).run(repoId, '[identity]\nform="full-raw"', 'BRIEF: form=lib')
+    db.prepare(`INSERT INTO collection_repos (collection_id, repo_id) VALUES ('c1', ?)`).run(repoId)
+
+    const core = handleGetCollection(db, tmpDir, 'Stack', 'core')
+    expect(core.content[0].text).toContain('BRIEF: form=lib')
+    expect(core.content[0].text).not.toContain('full-raw')
+
+    const full = handleGetCollection(db, tmpDir, 'Stack', 'full')
+    expect(full.content[0].text).toContain('full-raw')
+    db.close()
+  })
+
   it('returns not-found when collection does not exist', () => {
     const db = makeDb()
     const result = handleGetCollection(db, tmpDir, 'nonexistent')
