@@ -1,4 +1,4 @@
-import type { RepoRow, ReleaseRow, SkillRow, SubSkillRow, LibraryRow, CollectionRow, CollectionRepoRow, StarredRepoRow } from './types/repo'
+import type { RepoRow, ReleaseRow, SkillRow, SubSkillRow, LibraryRow, CollectionRow, CollectionRepoRow, StarredRepoRow, AnatomyPayload } from './types/repo'
 import type { ComponentScanResult } from './types/components'
 import type { AiChatMessage } from './components/AiChatOverlay.types'
 import type { RecommendationResponse } from './types/recommendation'
@@ -160,6 +160,7 @@ declare global {
         getSubSkill(owner: string, name: string, skillType: string): Promise<SubSkillRow | null>
         getVersionedInstalls(owner: string, name: string): Promise<string[]>
         getContent(owner: string, name: string): Promise<{ filename: string; content: string } | undefined>
+        getAnatomy(owner: string, name: string): Promise<AnatomyPayload | null>
       }
       library: {
         getAll(): Promise<LibraryRow[]>

@@ -19,7 +19,10 @@ import LanguageIcon from '../components/LanguageIcon'
 import logoTransparent from '../assets/logo-transparent.png'
 import { useSavedRepos } from '../contexts/SavedRepos'
 import { useArchivedRepos } from '../hooks/useArchivedRepos'
-import { parseTopics, formatStars, type RepoRow, type ReleaseRow, type SkillRow, type SubSkillRow } from '../types/repo'
+import { parseTopics, formatStars, type RepoRow, type ReleaseRow, type SkillRow, type SubSkillRow, type AnatomyPayload } from '../types/repo'
+import AnatomyIndicators from '../components/AnatomyIndicators'
+import AnatomyView from '../components/AnatomyView'
+import AnatomyMemoryPanel from '../components/AnatomyMemoryPanel'
 import { parseSkillDepths } from '../utils/skillParse'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
 import { useAppearance } from '../contexts/Appearance'
@@ -662,6 +665,7 @@ export default function RepoDetail() {
   const [learnState, setLearnState] = useState<LearnState>('UNLEARNED')
   const [learnError, setLearnError] = useState<'no-key' | 'failed' | null>(null)
 const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
+  const [anatomyPayload, setAnatomyPayload] = useState<AnatomyPayload | null>(null)
   const [componentsSkillRow, setComponentsSkillRow] = useState<SubSkillRow | null>(null)
   const [selectedSkillFile, setSelectedSkillFile] = useState<string>('master')
   const [relearningTarget, setRelearningTarget] = useState<'master' | 'components' | null>(null)
@@ -896,6 +900,10 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
         const compRow = await window.api.skill.getSubSkill(owner, name, 'components').catch(() => null)
         if (!cancelled) setComponentsSkillRow(compRow)
       })
+      .catch(() => {})
+
+    window.api.skill.getAnatomy(owner, name)
+      .then((p: AnatomyPayload | null) => { if (!cancelled) setAnatomyPayload(p) })
       .catch(() => {})
 
     // Live star check is now folded into the bundle (see fetchRepoBundle
@@ -1675,6 +1683,13 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
 
                 {activeTab === 'skill' && (
                   skillRow ? (
+                    skillRow.anatomy_source && anatomyPayload ? (
+                      <div className="anatomy-skill-tab">
+                        <AnatomyIndicators payload={anatomyPayload} updateAvailable={(repo?.update_available ?? 0) as number} />
+                        <AnatomyView payload={anatomyPayload} />
+                        <AnatomyMemoryPanel entries={anatomyPayload.memory} />
+                      </div>
+                    ) : (
                     <>
                       {(() => {
                         const skillFiles = [
@@ -1739,6 +1754,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                         )
                       })()}
                     </>
+                    )
                   ) : (
                     <p className="repo-detail-placeholder">Learn this repo to generate a Skills Folder for Claude.</p>
                   )

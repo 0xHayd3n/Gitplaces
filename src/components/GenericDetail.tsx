@@ -4,10 +4,11 @@ import { ExternalLink } from 'lucide-react'
 import Toggle from './Toggle'
 import DetailRow from './DetailRow'
 import SkillDepthBars from './SkillDepthBars'
+import AnatomyIndicators from './AnatomyIndicators'
 import { getLangConfig } from './BannerSVG'
 import { formatDate, daysSince } from '../utils/dateHelpers'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
-import type { LibraryRow, SubSkillRow } from '../types/repo'
+import type { LibraryRow, SubSkillRow, AnatomyPayload } from '../types/repo'
 
 export default function GenericDetail({
   row, collections, onToggle, onRegenerate, onEnhance, onRemove, regenerating, componentsSubSkill, versionedInstalls,
@@ -23,12 +24,21 @@ export default function GenericDetail({
   versionedInstalls: string[]
 }) {
   const [skillContent, setSkillContent] = useState<string | null>(null)
+  const [anatomy, setAnatomy] = useState<AnatomyPayload | null>(null)
 
   useEffect(() => {
     let cancelled = false
     window.api.skill.getContent(row.owner, row.name).then(result => {
       if (!cancelled && result) setSkillContent(result.content)
     })
+    return () => { cancelled = true }
+  }, [row.owner, row.name])
+
+  useEffect(() => {
+    let cancelled = false
+    window.api.skill.getAnatomy(row.owner, row.name)
+      .then(p => { if (!cancelled) setAnatomy(p) })
+      .catch(() => {})
     return () => { cancelled = true }
   }, [row.owner, row.name])
 
@@ -80,7 +90,9 @@ export default function GenericDetail({
             <span className="lib-skill-panel-status-ok">{'\u2713'} current</span>
           </div>
           <div className="lib-skill-panel-body">
-            <SkillDepthBars content={skillContent ?? ''} />
+            {anatomy
+              ? <AnatomyIndicators payload={anatomy} updateAvailable={(row.update_available ?? 0) as number} />
+              : <SkillDepthBars content={skillContent ?? ''} />}
             <p className="lib-skill-note">
               Generated from v{row.version ?? '\u2014'} {'\u00B7'} {row.generated_at ? daysSince(row.generated_at) : '\u2014'}
             </p>
