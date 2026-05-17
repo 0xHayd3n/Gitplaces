@@ -267,10 +267,15 @@ describe('getRecommendedHandler', () => {
     const { getRecommendedHandler } = await import('./recommendHandlers')
 
     await getRecommendedHandler()
+    const afterFirst = vi.mocked(fetchCandidates).mock.calls.length
     await getRecommendedHandler()
 
-    // fetchCandidates should have been called only ONCE (L1 cache hit on second call)
-    expect(vi.mocked(fetchCandidates)).toHaveBeenCalledTimes(1)
+    // L1 cache hit: the second same-profile call must add ZERO fetchCandidates
+    // calls (count unchanged). The first call's count varies with the
+    // cold-start fallback (post-37007fd); the invariant is that the repeat
+    // call is fully served from the L1 cache.
+    expect(afterFirst).toBeGreaterThan(0)
+    expect(vi.mocked(fetchCandidates)).toHaveBeenCalledTimes(afterFirst)
   })
 
   it('profile hash change invalidates L1 cache and calls fetchCandidates twice', async () => {
@@ -323,9 +328,13 @@ describe('getRecommendedHandler', () => {
     const { getRecommendedHandler } = await import('./recommendHandlers')
 
     await getRecommendedHandler()
+    const afterFirst = vi.mocked(fetchCandidates).mock.calls.length
     await getRecommendedHandler()
 
-    expect(vi.mocked(fetchCandidates)).toHaveBeenCalledTimes(2)
+    // Profile hash changed (extra starred repo on the 2nd call) → L1 cache
+    // miss → the second call must fetch again (count strictly increases).
+    expect(afterFirst).toBeGreaterThan(0)
+    expect(vi.mocked(fetchCandidates).mock.calls.length).toBeGreaterThan(afterFirst)
   })
 
   it('fetch failure propagates as error (Option B — no stale fallback)', async () => {
