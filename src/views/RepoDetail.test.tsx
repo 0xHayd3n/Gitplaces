@@ -151,19 +151,19 @@ function setupDetail(
 }
 
 describe('RepoDetail install button', () => {
-  it('shows "+ Learn" when skill not installed', async () => {
+  it('shows "Learn" when skill not installed', async () => {
     setupDetail(null)
     await waitFor(() => screen.getAllByText('next.js'))
-    expect(screen.getByText('+ Learn')).toBeInTheDocument()
+    expect(screen.getByText('Learn')).toBeInTheDocument()
   })
 
-  it('shows "✓ Learned" when skill row exists on mount', async () => {
+  it('shows "Learned" when skill row exists on mount', async () => {
     setupDetail({
       repo_id: '12345', filename: 'next.js.skill.md',
       content: '## [CORE]\nfoo\n## [EXTENDED]\nbar\n## [DEEP]\nbaz',
       version: 'v14.0', generated_at: '2024-01-01', active: 1, enabled_components: null, enabled_tools: null,
     })
-    await waitFor(() => screen.getByText('✓ Learned'))
+    await waitFor(() => screen.getByText('Learned'))
   })
 
   it('transitions to generating on click', async () => {
@@ -171,7 +171,7 @@ describe('RepoDetail install button', () => {
     const neverResolves = vi.fn().mockReturnValue(new Promise(() => {}))
     setupDetail(null, 'sk-ant-test', neverResolves)
     await waitFor(() => screen.getAllByText('next.js'))
-    fireEvent.click(screen.getByText('+ Learn'))
+    fireEvent.click(screen.getByText('Learn'))
     await waitFor(() => screen.getByText('Learning…'))
   })
 })
@@ -183,7 +183,7 @@ describe('RepoDetail skill tab', () => {
       repo_id: '12345', filename: 'next.js.skill.md',
       content, version: 'v14.0', generated_at: '2024-01-01', active: 1, enabled_components: null, enabled_tools: null,
     })
-    await waitFor(() => screen.getByText('✓ Learned'))
+    await waitFor(() => screen.getByText('Learned'))
     fireEvent.click(screen.getByRole('button', { name: 'Skills Folder' }))
     await waitFor(() => screen.getByText(/install: npm i next/))
   })
@@ -194,7 +194,7 @@ describe('RepoDetail skill tab', () => {
       repo_id: '12345', filename: 'next.js.skill.md',
       content, version: 'v14.0', generated_at: '2024-01-01', active: 1, enabled_components: null, enabled_tools: null,
     })
-    await waitFor(() => screen.getByText('✓ Learned'))
+    await waitFor(() => screen.getByText('Learned'))
     fireEvent.click(screen.getByRole('button', { name: 'Skills Folder' }))
     await waitFor(() => {
       expect(screen.getAllByText('Core').length).toBeGreaterThan(0)
@@ -206,7 +206,7 @@ describe('RepoDetail skill tab', () => {
 
   it('does not show skill tab header when skill is not installed', async () => {
     setupDetail(null)
-    await waitFor(() => screen.getByText('+ Learn'))
+    await waitFor(() => screen.getByText('Learn'))
     fireEvent.click(screen.getByRole('button', { name: 'Skills Folder' }))
     await waitFor(() => {
       expect(screen.queryAllByText('Core').length).toBe(0)
@@ -234,7 +234,7 @@ describe('RepoDetail skill tab', () => {
       null, vi.fn(), [], [], [], anatomyPayload,
     )
     // Readiness gate: repo name (robust — matches the passing tests' pattern;
-    // the '✓ Learned' button flow is pre-existing-broken in this suite).
+    // the 'Learned' button flow is pre-existing-broken in this suite).
     await waitFor(() => screen.getAllByText('next.js'))
     fireEvent.click(screen.getByRole('button', { name: 'Skills Folder' }))
     await waitFor(() => {
