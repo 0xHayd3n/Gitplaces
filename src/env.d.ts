@@ -4,10 +4,9 @@ import type { AiChatMessage } from './components/AiChatOverlay.types'
 import type { RecommendationResponse } from './types/recommendation'
 import type { RepoUserEvent } from './types/repoUserEvents'
 
-declare module '*.png' {
-  const src: string
-  export default src
-}
+// NOTE: `declare module '*.png'` lives in src/assets.d.ts, not here. This file
+// is a module (top-level imports below), so a wildcard module declaration here
+// would be dead under `moduleResolution: "bundler"`.
 
 export {}
 
@@ -310,10 +309,10 @@ declare global {
         applyForkSync: (id: string) => Promise<{ ok: boolean; error?: string }>
         applySkillRegen: (id: string) => Promise<{ ok: boolean; error?: string }>
         restartService: () => Promise<void>
-        onStatusChanged: (cb: (data: unknown) => void) => void
-        offStatusChanged: (cb: (data: unknown) => void) => void
-        onToast: (cb: (data: unknown) => void) => void
-        offToast: (cb: (data: unknown) => void) => void
+        onStatusChanged: (cb: (data: { ids: string[] }) => void) => void
+        offStatusChanged: (cb: (data: { ids: string[] }) => void) => void
+        onToast: (cb: (data: { message: string }) => void) => void
+        offToast: (cb: (data: { message: string }) => void) => void
       }
       skillSync: {
         setup(): Promise<{ ok: true; repoUrl: string } | { ok: false; error: string }>
