@@ -23,10 +23,9 @@ import {
   triggerClaudeAuth, invalidateClaudePathCache, loginClaude,
   type SkillGenInput
 } from './skill-gen/legacy'
-import { route as pipelineRoute, generate as pipelineGenerate, generateComponents as pipelineGenerateComponents } from './skill-gen/pipeline'
+import { generateComponents as generateComponentsSlim } from './skill-gen/components'
 import { prepareWrite } from './skill-gen/regeneration'
 import { extractionCache } from './skill-gen/extraction-cache'
-import { isAnatomyEngineEnabled } from './anatomy/flag'
 import { generateViaAnatomy, persistAnatomySkill, readFileOrNull } from './anatomy/index'
 import { ensureClone } from './anatomy/clone'
 import { spawnAnatomy, resolveAnatomyRuntime } from './anatomy/runtime'
@@ -1373,7 +1372,7 @@ ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?
         }
         content = await generateSkill(skillInput, apiKey)
       }
-    } else if (isAnatomyEngineEnabled(db)) {
+    } else {
       const rt = resolveAnatomyRuntime({
         packaged: app.isPackaged, platform: process.platform,
         repoRoot: process.cwd(), resourcesPath: process.resourcesPath,
@@ -1385,38 +1384,6 @@ ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?
       )
       await persistAnatomySkill(db, app.getPath('userData'), repo.id, owner, name, a, version)
       return { content: a.content, version, generated_at: new Date().toISOString(), warnings: a.warnings }
-    } else {
-      const routeResult = await pipelineRoute(flavour, {
-        token,
-        owner,
-        name,
-        language,
-        topics,
-        readme: readmeContent,
-        version,
-        defaultBranch: repo.default_branch ?? 'main',
-        apiKey: apiKey ?? undefined,
-        typeBucket: repo.type_bucket ?? undefined,
-        typeSub: repo.type_sub ?? undefined,
-      })
-
-      if (routeResult.flavour === 'codebase') {
-        systemContent = routeResult.system
-        practiceContent = routeResult.practice
-        const allWarnings: string[] = []
-        for (const v of [routeResult.systemValidation, routeResult.practiceValidation]) {
-          allWarnings.push(...v.warnings.map(w => w.message))
-          if (v.autoFixes > 0) allWarnings.push(`Auto-fixed ${v.autoFixes} issue(s)`)
-        }
-        pipelineWarnings = allWarnings
-      } else {
-        content = routeResult.content
-        const v = routeResult.validation
-        const warnings: string[] = []
-        if (v.warnings.length > 0) warnings.push(...v.warnings.map(w => w.message))
-        if (v.autoFixes > 0) warnings.push(`Auto-fixed ${v.autoFixes} issue(s) (hallucinated URLs, invalid references)`)
-        pipelineWarnings = warnings
-      }
     }
   }
 
@@ -1424,7 +1391,7 @@ ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?
   let componentsContent: string | null = null
   if (isComponents && (target === 'all' || target === 'components')) {
     try {
-      const compResult = await pipelineGenerateComponents({
+      const compResult = await generateComponentsSlim({
         token,
         owner,
         name,
