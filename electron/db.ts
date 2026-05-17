@@ -269,6 +269,14 @@ export function initSchema(db: Database.Database): void {
   try { db.exec(`ALTER TABLE sub_skills ADD COLUMN synced_at INTEGER`) } catch {}
   try { db.exec(`ALTER TABLE sub_skills ADD COLUMN sync_status TEXT`) } catch {}
 
+  // Anatomy engine columns (Phase 1) — raw .anatomy is stored in skills.content;
+  // github_sha (added above) doubles as the anatomy commit pin.
+  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_memory      TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_commit      TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_fingerprint TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_source      TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_brief       TEXT`) } catch {}
+
   // Phase 23 migration — update notifications
   try { db.exec(`ALTER TABLE repos ADD COLUMN is_forked         INTEGER DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE repos ADD COLUMN update_available  INTEGER DEFAULT 0`) } catch {}
