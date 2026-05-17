@@ -1,6 +1,7 @@
 // Slim, barrel-free components-sub-skill generator (D12 retained path).
-// Replaces pipeline.generateComponents WITHOUT importing extractors/index,
-// templates/index, classifier, pipeline, or prompts.
+// Replaces the deleted legacy component generation. Imports only the
+// component-library extractor + the lifted prompt + minimal shared leaves —
+// never the deleted extractor/template barrels or master pipeline.
 import { fetchFileTree, fetchRepoFiles, fetchManifest } from './github-files'
 import { parseManifest } from './manifest-parser'
 import { componentLibraryExtractor } from './extractors/component-library'
