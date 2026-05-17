@@ -17,7 +17,7 @@ export function resolveAnatomyRuntime(o: RuntimeOpts): ResolvedRuntime {
   const nodeBin = o.platform === 'win32'
     ? join(node22Root, 'node.exe')
     : join(node22Root, 'bin', 'node')
-  const cliEntry = join(base, 'anatomy', 'anatomy-cli', 'dist', 'index.js')
+  const cliEntry = join(base, 'anatomy', 'anatomy-cli', 'dist', 'bin.js')
   return { nodeBin, cliEntry }
 }
 

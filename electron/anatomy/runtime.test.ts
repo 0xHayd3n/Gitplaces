@@ -7,7 +7,7 @@ describe('resolveAnatomyRuntime', () => {
   it('resolves dev paths from a given repo root', () => {
     const r = resolveAnatomyRuntime({ packaged: false, repoRoot: '/repo', platform: 'linux' })
     expect(r.nodeBin).toBe(join('/repo', 'vendor', 'node22', 'bin', 'node'))
-    expect(r.cliEntry).toBe(join('/repo', 'vendor', 'anatomy', 'anatomy-cli', 'dist', 'index.js'))
+    expect(r.cliEntry).toBe(join('/repo', 'vendor', 'anatomy', 'anatomy-cli', 'dist', 'bin.js'))
   })
 
   it('uses node.exe on win32', () => {
@@ -17,7 +17,7 @@ describe('resolveAnatomyRuntime', () => {
 
   it('resolves packaged paths under resourcesPath', () => {
     const r = resolveAnatomyRuntime({ packaged: true, resourcesPath: '/app/resources', platform: 'linux' })
-    expect(r.cliEntry).toBe(join('/app/resources', 'anatomy', 'anatomy-cli', 'dist', 'index.js'))
+    expect(r.cliEntry).toBe(join('/app/resources', 'anatomy', 'anatomy-cli', 'dist', 'bin.js'))
   })
 })
 
@@ -27,7 +27,7 @@ describe('buildSpawnArgs', () => {
   })
 })
 
-const cli = join(process.cwd(), 'vendor', 'anatomy', 'anatomy-cli', 'dist', 'index.js')
+const cli = join(process.cwd(), 'vendor', 'anatomy', 'anatomy-cli', 'dist', 'bin.js')
 const node = process.platform === 'win32'
   ? join(process.cwd(), 'vendor', 'node22', 'node.exe')
   : join(process.cwd(), 'vendor', 'node22', 'bin', 'node')

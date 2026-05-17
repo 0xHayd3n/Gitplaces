@@ -1,0 +1,3 @@
+[submodule "vendor/anatomy"]
+	path = vendor/anatomy
+	url = https://github.com/0xHayd3n/anatomy
