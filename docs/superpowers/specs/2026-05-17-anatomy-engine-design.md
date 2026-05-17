@@ -53,6 +53,7 @@ These were resolved during brainstorming and are binding for the plan:
 | D9 | Runtime: **bundle a pinned Node ≥22 + vendored `@anatomy/cli`** in the app (Approach A). `--ai --provider claude-cli` default. | Electron 31 ships Node 20; anatomy needs Node ≥22. Desktop app cannot assume a dev toolchain. |
 | D10 | Cloning: **`isomorphic-git`** (pure JS, uses existing GitHub token), no system `git` / no bundled git binary. | Anatomy needs a real `.git`; isomorphic-git produces one with no new system prerequisite. |
 | D11 | **Phased** delivery (P1 engine+serve, P2 verify+staleness+UI, P3 rip-out+backfill). | De-risks the clone/CLI/runtime integration before deleting the legacy path. |
+| D12 | **(Resolves the §13 P3 gate.)** Phase 3 rip-out keeps the **component-library extractor path + the `get_components_skill` sub-skill** as the single retained legacy exception. Anatomy is the spine (the master skill is raw `.anatomy`); the components sub-skill rides alongside it, regenerated independently. D1's "fully ripped out" is hereby qualified to **"rip out `electron/skill-gen/` *except* the component-library extractor + the components sub-skill generation path."** | Anatomy's pillars (`stack/form/domain/function` + rules/decisions) do not model per-component prop/variant detail; that fidelity is high-value and was heavily invested in across Phase-1-era work. One scoped, well-bounded exception beats regressing every component-library skill. |
 
 ---
 
@@ -330,21 +331,23 @@ legacy rows.
 - `search_skills` raw-text search; `get_collection` budget mapping.
 
 **Phase 3 — Rip-out + backfill:**
-- Delete `electron/skill-gen/` (classify, extractors, templates, legacy Haiku
-  path) and legacy-envelope consumers (`parseSkillDepths`, the `[CORE]`
-  regexes).
-- Regenerate all installed skills through the anatomy engine (migration job).
+- Delete `electron/skill-gen/` **except the component-library extractor + the
+  components sub-skill generation path** (kept per D12), plus legacy-envelope
+  consumers that only served the master skill (`parseSkillDepths`, the `[CORE]`
+  regexes). The retained component path keeps whatever `skill-gen` modules it
+  transitively needs; everything else (classify/templates/legacy Haiku/the
+  non-component extractors) goes.
+- Regenerate all installed skills through the anatomy engine (migration job);
+  for component libraries, also regenerate the components sub-skill via the
+  retained extractor so `get_components_skill` keeps working.
 - Flip `anatomyEngineEnabled` default on; remove the flag and the branch
-  seam.
-- Define final hard-fail states (no legacy fallback).
-- **Resolve the deferred components question (open):** component libraries
-  currently get rich per-component props via the typed extractor + the
-  `get_components_skill` sub-skill (`sub_skills` table). Anatomy's pillars do
-  not capture per-prop detail. P3 decides one of: (a) anatomy `[substance]` is
-  sufficient and the components sub-skill is removed; or (b) component
-  extraction is retained as the single "build atop it" exception, fed as an
-  anatomy-adjacent sub-skill. This is the one explicitly unresolved design
-  question and must be answered before P3 implementation.
+  seam (the component sub-skill path runs unconditionally, alongside anatomy).
+- Define final hard-fail states (no legacy master-skill fallback).
+- **Components question — RESOLVED (D12):** the component-library extractor +
+  `get_components_skill` sub-skill (`sub_skills` table) are the single retained
+  "build atop anatomy" exception. The master skill is raw `.anatomy`; the
+  components sub-skill is generated independently and rides alongside it. No
+  longer a gate — Phase 3 may be planned.
 
 **Out of scope:** running `anatomy mcp` (D6); authoring/committing `.anatomy`
 back to repos (Git Suite is a consumer); Electron major upgrade (a separate
@@ -378,5 +381,5 @@ future cleanup; deliberately not coupled — D9/C rejected).
 | `isomorphic-git` slow/memory-heavy on large repos | Shallow `depth:1`; size ceiling; ephemeral-temp fallback; measured at P1 exit. |
 | anatomy CLI is young (v1.0.0) — schema churn | Pinned CLI version; parser tolerates unknown tables; `validate` errors surfaced not swallowed. |
 | `claude-cli` provider unavailable in packaged app context | Provider fallback chain ends at deterministic Pass-1 — always produces a valid `.anatomy`. |
-| Components fidelity regression at P3 rip-out | Explicit P3 gate (§13) — not auto-resolved; blocks P3 until decided. |
+| Components fidelity regression at P3 rip-out | Resolved (D12): the component extractor + `get_components_skill` sub-skill are retained as the single exception; component libraries keep per-prop fidelity. |
 | Two big changes coupled | Phasing (D11); Electron upgrade explicitly out of scope. |
