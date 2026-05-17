@@ -1,0 +1,108 @@
+// electron/anatomy/index.ts
+import { join } from 'node:path'
+import { readFile as fsReadFile, writeFile, mkdir } from 'node:fs/promises'
+import type Database from 'better-sqlite3'
+import { parseAnatomy, parseMemory } from './parse'
+import type { ResolvedRuntime, SpawnResult } from './runtime'
+import type { AnatomyGenerateInput, AnatomyGenerateOutput } from './types'
+
+export interface AnatomyEngineDeps {
+  ensureClone: (root: string, owner: string, name: string, branch: string, token: string | null) => Promise<{ dir: string; sha: string }>
+  spawnAnatomy: (rt: ResolvedRuntime, args: string[], cwd: string, env?: NodeJS.ProcessEnv) => Promise<SpawnResult>
+  readFile: (p: string) => Promise<string | null>
+  runtime: ResolvedRuntime
+}
+
+const BRIEF_BUDGET = 1500
+
+async function tryGenerate(
+  d: AnatomyEngineDeps, dir: string, apiKey?: string,
+): Promise<{ warnings: string[] }> {
+  const warnings: string[] = []
+  const env = { ...process.env, ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}) }
+  // 1. claude-cli (no key)
+  let r = await d.spawnAnatomy(d.runtime, ['generate', '--ai', '--provider', 'claude-cli', '--repo', dir], dir, env)
+  if (r.code === 0) return { warnings }
+  // 2. anthropic-http (needs key)
+  if (apiKey) {
+    r = await d.spawnAnatomy(d.runtime, ['generate', '--ai', '--provider', 'anthropic-http', '--repo', dir], dir, env)
+    if (r.code === 0) { warnings.push('anatomy: generated via Anthropic API (Claude Code unavailable)'); return { warnings } }
+  }
+  // 3. Pass-1 deterministic (no --ai) — always produces a valid .anatomy
+  r = await d.spawnAnatomy(d.runtime, ['generate', '--repo', dir], dir, env)
+  if (r.code !== 0) throw new Error(`anatomy generate failed (all providers): ${r.stderr.slice(0, 500)}`)
+  warnings.push('anatomy: AI enrichment unavailable — used deterministic Pass-1 (lower richness)')
+  return { warnings }
+}
+
+export async function generateViaAnatomy(
+  input: AnatomyGenerateInput,
+  d: AnatomyEngineDeps,
+  cacheRoot = join(process.cwd(), '.anatomy-cache'),
+): Promise<AnatomyGenerateOutput> {
+  const { token, owner, name, defaultBranch, apiKey } = input
+  let clone: { dir: string; sha: string }
+  try {
+    clone = await d.ensureClone(cacheRoot, owner, name, defaultBranch, token)
+  } catch (err) {
+    throw new Error(`anatomy clone failed for ${owner}/${name}: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  const warnings: string[] = []
+  let source: 'committed' | 'generated'
+
+  const v = await d.spawnAnatomy(d.runtime, ['validate', '--require'], clone.dir)
+  if (v.code === 0) {
+    source = 'committed'
+  } else {
+    source = 'generated'
+    const g = await tryGenerate(d, clone.dir, apiKey)
+    warnings.push(...g.warnings)
+  }
+
+  const content = await d.readFile(join(clone.dir, '.anatomy'))
+  if (content === null) throw new Error(`anatomy: no .anatomy produced for ${owner}/${name}`)
+  const memory = await d.readFile(join(clone.dir, '.anatomy-memory'))
+
+  const model = parseAnatomy(content)
+  parseMemory(memory) // validate memory parses; surfaced in Phase 2 UI
+
+  const briefRes = await d.spawnAnatomy(d.runtime, ['render', '--budget', String(BRIEF_BUDGET)], clone.dir)
+  const brief = briefRes.code === 0 && briefRes.stdout.trim() ? briefRes.stdout : content
+
+  return {
+    content,
+    memory,
+    brief,
+    commit: (model.generated.commit as string | undefined) ?? clone.sha ?? null,
+    fingerprint: (model.generated.fingerprint as string | undefined) ?? null,
+    source,
+    warnings,
+  }
+}
+
+/** Persist verbatim — mirrors the legacy library path in main.ts:1506-1530. */
+export async function persistAnatomySkill(
+  db: Database.Database, userDataDir: string, repoId: string, owner: string, name: string,
+  out: AnatomyGenerateOutput, version: string,
+): Promise<void> {
+  const dir = join(userDataDir, 'anatomy', owner, name)
+  await mkdir(dir, { recursive: true })
+  await writeFile(join(dir, '.anatomy'), out.content, 'utf8')
+  if (out.memory) await writeFile(join(dir, '.anatomy-memory'), out.memory, 'utf8')
+  const generated_at = new Date().toISOString()
+  db.prepare(`
+    INSERT INTO skills (repo_id, filename, content, version, generated_at, active, enabled_components, tier,
+                        anatomy_memory, anatomy_commit, anatomy_fingerprint, anatomy_source, anatomy_brief, github_sha)
+    VALUES (?, '.anatomy', ?, ?, ?, 1, NULL, 1, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(repo_id) DO UPDATE SET
+      filename=excluded.filename, content=excluded.content, version=excluded.version,
+      generated_at=excluded.generated_at, anatomy_memory=excluded.anatomy_memory,
+      anatomy_commit=excluded.anatomy_commit, anatomy_fingerprint=excluded.anatomy_fingerprint,
+      anatomy_source=excluded.anatomy_source, anatomy_brief=excluded.anatomy_brief,
+      github_sha=excluded.github_sha
+  `).run(repoId, out.content, version, generated_at, out.memory, out.commit, out.fingerprint, out.source, out.brief, out.commit)
+}
+
+export const readFileOrNull = async (p: string): Promise<string | null> =>
+  fsReadFile(p, 'utf8').catch(() => null)
