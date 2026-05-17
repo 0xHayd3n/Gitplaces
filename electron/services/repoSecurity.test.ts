@@ -167,11 +167,14 @@ describe('getRepoSecurity', () => {
     expect(result.permissionDenied).toBe(false)
   })
 
-  it('accumulates open dependabot alerts across paginated responses', async () => {
+  it('returns first page of open dependabot alerts; pagination intentionally skipped (rate-limit tradeoff)', async () => {
     const db = createDb()
     const page1 = [makeAlert('high', 1), makeAlert('high', 2)]
-    const page2 = [makeAlert('moderate', 3)]
 
+    // page1 carries a `rel="next"` Link, but getRepoSecurity uses
+    // parseConditional (single read, no Link follow) by design — see the
+    // documented tradeoff in repoSecurity.ts. So only page1 is counted and
+    // there are exactly 5 etag fetches (the page-2 follow never happens).
     mockFetch
       .mockResolvedValueOnce(
         new Response(JSON.stringify(page1), {
@@ -186,14 +189,13 @@ describe('getRepoSecurity', () => {
       .mockResolvedValueOnce(okJson({ files: { security: null } }))
       .mockResolvedValueOnce(new Response('', { status: 404 }))
       .mockResolvedValueOnce(new Response('', { status: 404 }))
-      .mockResolvedValueOnce(okJson(page2))
 
     const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
 
-    expect(result.alerts).toHaveLength(3)
+    expect(result.alerts).toHaveLength(2)
     expect(result.vulnerabilities?.high).toBe(2)
-    expect(result.vulnerabilities?.moderate).toBe(1)
-    expect(mockFetch).toHaveBeenCalledTimes(6)
+    expect(result.vulnerabilities?.moderate).toBe(0)
+    expect(mockFetch).toHaveBeenCalledTimes(5)
   })
 
   // ── New test cases ──────────────────────────────────────────────────────────
@@ -293,10 +295,9 @@ describe('getRepoSecurity', () => {
     expect(result.secretScanning).toBeNull()
   })
 
-  it('paginates dismissed dependabot alerts', async () => {
+  it('counts first page of dismissed dependabot alerts (no pagination by design)', async () => {
     const db = createDb()
     const dismissedP1 = [makeAlert('high', 101), makeAlert('high', 102)]
-    const dismissedP2 = [makeAlert('critical', 103)]
 
     mockFetch
       .mockResolvedValueOnce(okJson([]))
@@ -310,18 +311,16 @@ describe('getRepoSecurity', () => {
       .mockResolvedValueOnce(okJson({ files: {} }))
       .mockResolvedValueOnce(new Response('', { status: 404 }))
       .mockResolvedValueOnce(new Response('', { status: 404 }))
-      .mockResolvedValueOnce(okJson(dismissedP2))
 
     const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
 
-    expect(result.dismissedVulnerabilities).toEqual({ critical: 1, high: 2, moderate: 0, low: 0 })
-    expect(mockFetch).toHaveBeenCalledTimes(6)
+    expect(result.dismissedVulnerabilities).toEqual({ critical: 0, high: 2, moderate: 0, low: 0 })
+    expect(mockFetch).toHaveBeenCalledTimes(5)
   })
 
-  it('paginates code scanning alerts', async () => {
+  it('counts first page of code scanning alerts (no pagination by design)', async () => {
     const db = createDb()
     const scanP1 = [makeCodeScanAlert('high'), makeCodeScanAlert('medium')]
-    const scanP2 = [makeCodeScanAlert('critical')]
 
     mockFetch
       .mockResolvedValueOnce(okJson([]))
@@ -335,18 +334,16 @@ describe('getRepoSecurity', () => {
         },
       }))
       .mockResolvedValueOnce(new Response('', { status: 404 }))
-      .mockResolvedValueOnce(okJson(scanP2))
 
     const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
 
-    expect(result.codeScanning).toEqual({ critical: 1, high: 1, medium: 1, low: 0, note: 0, warning: 0 })
-    expect(mockFetch).toHaveBeenCalledTimes(6)
+    expect(result.codeScanning).toEqual({ critical: 0, high: 1, medium: 1, low: 0, note: 0, warning: 0 })
+    expect(mockFetch).toHaveBeenCalledTimes(5)
   })
 
-  it('paginates secret scanning alerts', async () => {
+  it('counts first page of secret scanning alerts (no pagination by design)', async () => {
     const db = createDb()
     const secretP1 = [makeSecretAlert('active'), makeSecretAlert('active')]
-    const secretP2 = [makeSecretAlert('inactive')]
 
     mockFetch
       .mockResolvedValueOnce(okJson([]))
@@ -360,11 +357,10 @@ describe('getRepoSecurity', () => {
           Link: '<https://api.github.com/repos/owner/repo/secret-scanning/alerts?page=2>; rel="next"',
         },
       }))
-      .mockResolvedValueOnce(okJson(secretP2))
 
     const result = await getRepoSecurity(db, 'owner', 'repo', 'token')
 
-    expect(result.secretScanning).toEqual({ active: 2, inactive: 1, unknown: 0 })
-    expect(mockFetch).toHaveBeenCalledTimes(6)
+    expect(result.secretScanning).toEqual({ active: 2, inactive: 0, unknown: 0 })
+    expect(mockFetch).toHaveBeenCalledTimes(5)
   })
 })
