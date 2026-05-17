@@ -1,0 +1,13 @@
+anatomy_memory_version = "0.2"
+repo_fingerprint = "fp_abc123"
+
+[[entries]]
+text = "isomorphic-git shallow clone needs depth:1 or it OOMs on big repos"
+kind = "gotcha"
+at = "2026-05-16T12:00:00Z"
+
+[[entries]]
+text = "Old approach using tarball extract — superseded, anatomy needs real .git"
+kind = "attempt"
+at = "2026-05-10T09:00:00Z"
+superseded = true

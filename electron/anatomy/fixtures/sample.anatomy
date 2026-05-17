@@ -1,0 +1,19 @@
+[identity]
+stack = "TypeScript / Node"
+form = "library"
+domain = "git tooling"
+function = "turns repos into agent knowledge"
+
+[generated]
+fingerprint = "fp_abc123"
+commit = "deadbeefcafe"
+at = "2026-05-17T00:00:00Z"
+by = "anatomy@1.0.0 claude-cli"
+
+[[rules]]
+statement = "All DB writes go through electron/db.ts"
+verify = { kind = "glob", pattern = "electron/db.ts" }
+
+[[decisions]]
+decision = "Serve anatomy verbatim"
+rationale = "Reprojection loses citation fidelity"
