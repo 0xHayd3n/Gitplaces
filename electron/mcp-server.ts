@@ -22,7 +22,12 @@ export function getDataDir(): string {
 }
 
 // ── Tool result shape ────────────────────────────────────────────────────────
-export interface ToolResult {
+// Declared as a `type` (not `interface`) deliberately: the MCP SDK's request
+// handlers expect `ServerResult | Result`, whose schemas carry an implicit
+// string index signature (Zod `$loose`). An interface is not assignable to an
+// index-signatured type (interfaces are open to declaration merging); a closed
+// type alias of identical shape is. Runtime behavior is unchanged.
+export type ToolResult = {
   content: Array<{ type: 'text'; text: string }>
 }
 
