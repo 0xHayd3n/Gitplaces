@@ -40,3 +40,18 @@ export interface AnatomyGenerateOutput {
   /** Non-fatal notices surfaced to the existing skill-gen warning UI. */
   warnings: string[]
 }
+
+export interface AnatomyRuleResult {
+  statement: string
+  kind: string            // 'glob' | 'ast-grep' | 'semgrep' | string
+  status: 'pass' | 'fail' | 'unverified'
+  detail?: string
+}
+
+export interface AnatomyVerifyResult {
+  ok: boolean             // overall: no hard validation errors
+  errors: string[]
+  warnings: string[]
+  rules: AnatomyRuleResult[]
+  skipped: string[]       // e.g. ['semgrep not installed']
+}
