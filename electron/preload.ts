@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-const callbackWrappers = new Map<Function, (...args: unknown[]) => void>()
+// Opaque registry of ipcRenderer listener wrappers (keyed by the caller's cb)
+// so off* can removeListener the exact wrapper. Wrapper signatures are
+// heterogeneous per channel; `any[]` params keep them bivariantly assignable.
+const callbackWrappers = new Map<Function, (...args: any[]) => void>()
 
 contextBridge.exposeInMainWorld('api', {
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),

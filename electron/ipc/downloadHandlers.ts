@@ -23,7 +23,7 @@ export function registerDownloadHandlers(): void {
       | undefined
     const downloadFolder = row?.value ?? require('path').join(app.getPath('userData'), 'downloads')
     const token = getToken()
-    return downloadRepoZip(owner, name, downloadFolder, token)
+    return downloadRepoZip(owner, name, downloadFolder, token ?? null)
   })
 
   ipcMain.handle('download:pickFolder', async () => {
