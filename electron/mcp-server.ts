@@ -134,27 +134,30 @@ export function handleSearchSkills(
   query: string
 ): ToolResult {
   const activeSkills = db.prepare(`
-    SELECT repos.owner, repos.name, skills.filename
+    SELECT repos.owner, repos.name, skills.filename, skills.content AS db_content, skills.anatomy_source
     FROM skills
     INNER JOIN repos ON repos.id = skills.repo_id
     WHERE skills.active = 1
-  `).all() as Array<{ owner: string; name: string; filename: string }>
+  `).all() as Array<{ owner: string; name: string; filename: string; db_content: string; anatomy_source: string | null }>
 
   const results: string[] = []
   const tokens = query.toLowerCase().split(/\s+/).filter(t => t.length > 0)
   if (tokens.length === 0) return text('Empty search query')
 
   for (const skill of activeSkills) {
-    const skillPath = path.join(dataDir, 'skills', skill.owner, skill.filename)
-    if (!fs.existsSync(skillPath)) continue
-    const content = fs.readFileSync(skillPath, 'utf8')
-    // Search only the CORE section for relevance
-    const coreMatch = content.match(/## \[CORE\]([\s\S]*?)(?=## \[EXTENDED\]|$)/)
-    const core = coreMatch ? coreMatch[1] : content
-    const coreLower = core.toLowerCase()
-    // All tokens must appear in the CORE section (AND semantics)
-    if (tokens.every(t => coreLower.includes(t))) {
-      results.push(`${skill.owner}/${skill.name}:\n${core.slice(0, 300).trim()}...`)
+    let haystack: string
+    if (skill.anatomy_source) {
+      haystack = skill.db_content // raw .anatomy — search the whole document
+    } else {
+      const skillPath = path.join(dataDir, 'skills', skill.owner, skill.filename)
+      if (!fs.existsSync(skillPath)) continue
+      const content = fs.readFileSync(skillPath, 'utf8')
+      const coreMatch = content.match(/## \[CORE\]([\s\S]*?)(?=## \[EXTENDED\]|$)/)
+      haystack = coreMatch ? coreMatch[1] : content
+    }
+    const lower = haystack.toLowerCase()
+    if (tokens.every(t => lower.includes(t))) {
+      results.push(`${skill.owner}/${skill.name}:\n${haystack.slice(0, 300).trim()}...`)
     }
   }
 

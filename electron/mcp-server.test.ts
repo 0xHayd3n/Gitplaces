@@ -125,6 +125,19 @@ describe('handleGetSkill', () => {
 // ── handleSearchSkills ────────────────────────────────────────────────────────
 
 describe('handleSearchSkills', () => {
+  it('searches raw .anatomy content for anatomy rows (no [CORE] needed)', () => {
+    const db = makeDb()
+    const repoId = seedRepo(db, 'o', 'n')
+    db.prepare(
+      `INSERT INTO skills (repo_id, filename, content, version, generated_at, active, anatomy_source)
+       VALUES (?, '.anatomy', ?, 'v', 't', 1, 'generated')`
+    ).run(repoId, '[identity]\nform="lib"\n\n[[rules]]\nstatement = "all DB writes go through db.ts"\n')
+    const result = handleSearchSkills(db, tmpDir, 'db writes')
+    expect(result.content[0].text).toContain('o/n')
+    expect(result.content[0].text).toContain('Found in 1 skill(s)')
+    db.close()
+  })
+
   it('returns not-found message when query matches nothing', () => {
     const db = makeDb()
     const repoId = seedRepo(db, 'tiangolo', 'fastapi')
