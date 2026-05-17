@@ -812,7 +812,7 @@ export default function Discover() {
     if (loadingMoreRef.current || loadingRef.current || !snap.hasMore) return
     setLoadingMore(true)
     const gen = fetchGeneration.current
-    const { page, searchPath, viewMode, selectedLanguages, appliedFilters, activeTags, repos, selectedSubtypes } = snap
+    const { page, searchPath, viewMode, selectedLanguages, appliedFilters, activeTags, repos, selectedSubtypes = [] } = snap
     const discoverQuery = snap.query
     const nextPage = page + 1
 

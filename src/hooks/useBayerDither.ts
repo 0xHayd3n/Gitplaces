@@ -154,7 +154,7 @@ function renderCamera(
   w: number, h: number,
   camIdx: number, t: number,
   tintColor: [number, number, number],
-): Uint8ClampedArray {
+): Uint8ClampedArray<ArrayBuffer> {
   const out = new Uint8ClampedArray(w * h * 4)
   const data = srcData.data
   const camera = CAMERAS[camIdx]
@@ -411,6 +411,7 @@ export function useBayerDither(
 
       function render(now: number) {
         if (cancelled) return
+        if (!ctx) return
         if (!visibleRef.current) {
           // Stop the loop — IntersectionObserver will restart it when the card is visible again
           animRef.current = 0

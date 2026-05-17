@@ -122,7 +122,7 @@ export function useFeed(): FeedState & { refresh: () => void } {
         RELEASE_FETCH_CONCURRENCY,
         ({ owner, name }) =>
           window.api.github.getReleases(owner, name).then(releases =>
-            releases
+            (releases ?? [])
               .filter(r => r.tag_name && new Date(r.published_at).getTime() > cutoff)
               .map((r): GitHubFeedEvent => ({
                 id: `release-${owner}-${name}-${r.tag_name}`,
