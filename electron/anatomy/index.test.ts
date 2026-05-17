@@ -59,4 +59,20 @@ describe('generateViaAnatomy', () => {
     await expect(generateViaAnatomy({ token: null, owner: 'o', name: 'n', defaultBranch: 'main' }, d))
       .rejects.toThrow(/anatomy clone failed/i)
   })
+
+  it('runs verification and attaches + surfaces the parsed result', async () => {
+    const d = deps({
+      spawnAnatomy: vi.fn(async (_rt, args) => {
+        if (args[0] === 'validate' && args.includes('--json')) {
+          return { stdout: JSON.stringify({ ok: true, errors: [], warnings: ['w1'] }), stderr: '', code: 0 }
+        }
+        if (args[0] === 'validate') return { stdout: '', stderr: '', code: 0 } // committed-path probe
+        return { stdout: '', stderr: '', code: 0 }
+      }),
+    })
+    const out = await generateViaAnatomy({ token: null, owner: 'o', name: 'n', defaultBranch: 'main' }, d)
+    expect(out.verify).not.toBeNull()
+    expect(out.verify!.ok).toBe(true)
+    expect(out.warnings.join(' ')).toMatch(/w1/)
+  })
 })

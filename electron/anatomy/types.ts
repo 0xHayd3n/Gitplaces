@@ -39,6 +39,8 @@ export interface AnatomyGenerateOutput {
   source: 'committed' | 'generated'
   /** Non-fatal notices surfaced to the existing skill-gen warning UI. */
   warnings: string[]
+  /** Rule-verification summary (Phase 2); null if verification could not run. */
+  verify: AnatomyVerifyResult | null
 }
 
 export interface AnatomyRuleResult {

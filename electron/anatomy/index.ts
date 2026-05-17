@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { readFile as fsReadFile, writeFile, mkdir } from 'node:fs/promises'
 import type Database from 'better-sqlite3'
 import { parseAnatomy, parseMemory } from './parse'
+import { runAnatomyVerify } from './verify'
 import type { ResolvedRuntime, SpawnResult } from './runtime'
 import type { AnatomyGenerateInput, AnatomyGenerateOutput } from './types'
 
@@ -70,6 +71,13 @@ export async function generateViaAnatomy(
   const briefRes = await d.spawnAnatomy(d.runtime, ['render', '--budget', String(BRIEF_BUDGET)], clone.dir)
   const brief = briefRes.code === 0 && briefRes.stdout.trim() ? briefRes.stdout : content
 
+  // Rule verification (spec D5): surface errors + warnings + skipped into the
+  // existing skill-gen warnings array. Never blocks generation.
+  const verify = await runAnatomyVerify({ runtime: d.runtime, spawnAnatomy: d.spawnAnatomy }, clone.dir)
+  for (const e of verify.errors) warnings.push(`anatomy verify error: ${e}`)
+  for (const w of verify.warnings) warnings.push(`anatomy verify: ${w}`)
+  for (const s of verify.skipped) warnings.push(`anatomy verify: ${s} (rule unverified)`)
+
   return {
     content,
     memory,
@@ -78,6 +86,7 @@ export async function generateViaAnatomy(
     fingerprint: (model.generated.fingerprint as string | undefined) ?? null,
     source,
     warnings,
+    verify,
   }
 }
 
@@ -93,15 +102,16 @@ export async function persistAnatomySkill(
   const generated_at = new Date().toISOString()
   db.prepare(`
     INSERT INTO skills (repo_id, filename, content, version, generated_at, active, enabled_components, tier,
-                        anatomy_memory, anatomy_commit, anatomy_fingerprint, anatomy_source, anatomy_brief, github_sha)
-    VALUES (?, '.anatomy', ?, ?, ?, 1, NULL, 1, ?, ?, ?, ?, ?, ?)
+                        anatomy_memory, anatomy_commit, anatomy_fingerprint, anatomy_source, anatomy_brief, anatomy_verify, github_sha)
+    VALUES (?, '.anatomy', ?, ?, ?, 1, NULL, 1, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(repo_id) DO UPDATE SET
       filename=excluded.filename, content=excluded.content, version=excluded.version,
       generated_at=excluded.generated_at, anatomy_memory=excluded.anatomy_memory,
       anatomy_commit=excluded.anatomy_commit, anatomy_fingerprint=excluded.anatomy_fingerprint,
       anatomy_source=excluded.anatomy_source, anatomy_brief=excluded.anatomy_brief,
-      github_sha=excluded.github_sha
-  `).run(repoId, out.content, version, generated_at, out.memory, out.commit, out.fingerprint, out.source, out.brief, out.commit)
+      anatomy_verify=excluded.anatomy_verify, github_sha=excluded.github_sha
+  `).run(repoId, out.content, version, generated_at, out.memory, out.commit, out.fingerprint,
+         out.source, out.brief, out.verify ? JSON.stringify(out.verify) : null, out.commit)
 }
 
 export const readFileOrNull = async (p: string): Promise<string | null> =>
