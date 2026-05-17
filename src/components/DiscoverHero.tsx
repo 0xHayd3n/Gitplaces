@@ -106,7 +106,7 @@ function HeroLayer({ repo, animClass }: LayerProps) {
   )
 }
 
-export default function DiscoverHero({ repo }: DiscoverHeroProps) {
+export default function DiscoverHero({ repo, onNavigate }: DiscoverHeroProps) {
   const [shownRepo, setShownRepo] = useState<RepoRow | null>(repo)
   const [outgoingRepo, setOutgoingRepo] = useState<RepoRow | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -129,7 +129,10 @@ export default function DiscoverHero({ repo }: DiscoverHeroProps) {
   if (!shownRepo && !outgoingRepo) return null
 
   return (
-    <div className="discover-hero">
+    <div
+      className="discover-hero"
+      onClick={() => { if (shownRepo) onNavigate?.(`/repo/${shownRepo.owner}/${shownRepo.name}`) }}
+    >
       {outgoingRepo && (
         <HeroLayer key={outgoingRepo.id + '-out'} repo={outgoingRepo} animClass="discover-hero-layer--out" />
       )}
