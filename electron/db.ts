@@ -277,6 +277,9 @@ export function initSchema(db: Database.Database): void {
   try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_source      TEXT`) } catch {}
   try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_brief       TEXT`) } catch {}
 
+  // Phase 2 — rule-verification summary (JSON: { ok, errors[], warnings[], rules[] })
+  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_verify TEXT`) } catch {}
+
   // Phase 23 migration — update notifications
   try { db.exec(`ALTER TABLE repos ADD COLUMN is_forked         INTEGER DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE repos ADD COLUMN update_available  INTEGER DEFAULT 0`) } catch {}

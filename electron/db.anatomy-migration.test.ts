@@ -9,7 +9,7 @@ describe('db migration — anatomy columns', () => {
     const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
     const db = getDb(dir)
     const cols = (db.prepare("PRAGMA table_info('skills')").all() as { name: string }[]).map(c => c.name)
-    for (const c of ['anatomy_memory', 'anatomy_commit', 'anatomy_fingerprint', 'anatomy_source', 'anatomy_brief']) {
+    for (const c of ['anatomy_memory', 'anatomy_commit', 'anatomy_fingerprint', 'anatomy_source', 'anatomy_brief', 'anatomy_verify']) {
       expect(cols).toContain(c)
     }
   })
