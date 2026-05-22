@@ -1,9 +1,10 @@
 // electron/anatomy/clone.ts
-import { join } from 'node:path'
-import { mkdir, readdir, stat, rm } from 'node:fs/promises'
-import http from 'isomorphic-git/http/node'
-import git from 'isomorphic-git'
-import * as fs from 'node:fs'
+import { join, dirname } from 'node:path'
+import { mkdir, readdir, stat, rm, rename } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFile)
 
 const safe = (s: string) => s.replace(/[^\w.-]/g, '_')
 
@@ -31,29 +32,54 @@ export function selectEvictions(
   return entries.filter(e => evict.has(e.dir)).map(e => e.dir)
 }
 
+/** Runs `git <args>` in `cwd`; returns stdout. Throws on non-zero exit. */
+export type GitRunner = (args: string[], cwd: string) => Promise<string>
+
+const defaultGitRunner: GitRunner = async (args, cwd) => {
+  const { stdout } = await execFileAsync('git', args, {
+    cwd,
+    maxBuffer: 16 * 1024 * 1024,
+    timeout: 10 * 60_000,
+  })
+  return stdout
+}
+
 export interface CloneResult { dir: string; sha: string }
 
-/** Shallow (depth:1) clone via isomorphic-git — produces a real .git anatomy can read. */
+/**
+ * Shallow (depth:1) clone via native git. Previously used isomorphic-git, which
+ * fans out parallel file writes via Promise.allSettled and reliably hits
+ * EMFILE on large monorepos (mui/material-ui, kubernetes, etc. — ~40k+ files
+ * on Windows). Native git serialises checkout properly.
+ */
 export async function ensureClone(
   cacheRoot: string, owner: string, name: string, branch: string, token: string | null,
+  gitRunner: GitRunner = defaultGitRunner,
 ): Promise<CloneResult> {
   const tmp = join(cacheRoot, safe(owner), `${safe(name)}@pending-${Date.now()}`)
-  await mkdir(tmp, { recursive: true })
-  await git.clone({
-    fs, http, dir: tmp,
-    url: `https://github.com/${owner}/${name}.git`,
-    ref: branch, singleBranch: true, depth: 1,
-    // Only supply credentials when we have a token; returning {} makes
-    // isomorphic-git send empty Basic auth, which GitHub rejects with 401
-    // even for public repos. Omitting onAuth keeps the request anonymous.
-    ...(token ? { onAuth: () => ({ username: token, password: 'x-oauth-basic' }) } : {}),
-  })
-  const sha = await git.resolveRef({ fs, dir: tmp, ref: 'HEAD' })
-  const finalDir = cacheDirFor(cacheRoot, owner, name, sha)
-  await rm(finalDir, { recursive: true, force: true })
-  await mkdir(join(finalDir, '..'), { recursive: true })
-  await (await import('node:fs/promises')).rename(tmp, finalDir)
-  return { dir: finalDir, sha }
+  await mkdir(dirname(tmp), { recursive: true })
+
+  let promoted = false
+  try {
+    const url = token
+      ? `https://x-access-token:${token}@github.com/${owner}/${name}.git`
+      : `https://github.com/${owner}/${name}.git`
+    await gitRunner(
+      ['clone', '--depth=1', '--single-branch', '--branch', branch, url, tmp],
+      dirname(tmp),
+    )
+    const sha = (await gitRunner(['rev-parse', 'HEAD'], tmp)).trim()
+    const finalDir = cacheDirFor(cacheRoot, owner, name, sha)
+    await rm(finalDir, { recursive: true, force: true })
+    await rename(tmp, finalDir)
+    promoted = true
+    return { dir: finalDir, sha }
+  } finally {
+    if (!promoted) {
+      await rm(tmp, { recursive: true, force: true })
+        .catch(err => console.warn(`[anatomy clone] cleanup failed for ${tmp}:`, (err as Error).message))
+    }
+  }
 }
 
 export async function dirBytes(dir: string): Promise<number> {

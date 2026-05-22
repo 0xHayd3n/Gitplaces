@@ -19,3 +19,6 @@ dist-electron/
 # Anatomy engine: downloaded Node 22 runtime + clone cache (not committed)
 vendor/node22/
 **/anatomy-cache/
+
+# Pre-launch migration snapshot copies of the live DB (45 MB; never commit)
+.preflight/
