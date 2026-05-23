@@ -11,5 +11,3 @@ export interface LocalProject {
 export type LibraryEntry =
   | { kind: 'repo'; row: RepoRow; isInstalled: boolean; isStarred: boolean }
   | { kind: 'local'; project: LocalProject }
-
-export type ActiveSegment = 'all' | 'active' | 'unstarred' | 'own' | 'recent' | 'archive'
