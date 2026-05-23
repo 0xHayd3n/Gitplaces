@@ -5,6 +5,7 @@ import type { ListDensity, ListFields } from './LayoutDropdown'
 import { formatCount } from './RepoCard'
 import { Star, GitFork, Clock } from 'lucide-react'
 import VerificationBadge from './VerificationBadge'
+import { useLearningProgress } from '../hooks/useLearningProgress'
 
 interface RepoListRowProps {
   repo: RepoRow
@@ -42,6 +43,8 @@ export default function RepoListRow({
   const visibleTopics = tagsExpanded ? allTopics : allTopics.slice(0, 3)
   const moreCount = allTopics.length - 3
   const typeConfig = getSubTypeConfig(typeSub)
+  const { state: learnState } = useLearningProgress(repo.owner, repo.name)
+  const isLearning = !!learnState && learnState.state === 'running'
 
   useEffect(() => {
     if (focused && rowRef.current) {
@@ -52,7 +55,7 @@ export default function RepoListRow({
   return (
     <div
       ref={rowRef}
-      className={`repo-list-row repo-list-row--${density}${focused ? ' kb-focused' : ''}`}
+      className={`repo-list-row repo-list-row--${density}${focused ? ' kb-focused' : ''}${isLearning ? ' learning' : ''}`}
       onClick={() => onNavigate(`/repo/${repo.owner}/${repo.name}`)}
       style={{ cursor: 'pointer', '--row-accent': typeConfig?.accentColor ?? 'rgba(255,255,255,0.15)' } as React.CSSProperties}
     >

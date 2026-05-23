@@ -6,6 +6,7 @@ import type { RepoRow } from '../types/repo'
 import { DEFAULT_LAYOUT_PREFS } from './LayoutDropdown'
 import type { ListDensity, ListFields } from './LayoutDropdown'
 import { SavedReposProvider } from '../contexts/SavedRepos'
+import { MockLearningProgressProvider } from '../contexts/LearningProgressContext'
 
 function makeApi() {
   Object.defineProperty(window, 'api', {
@@ -110,16 +111,18 @@ async function renderRow(
   await act(async () => {
     result = render(
       <SavedReposProvider>
-        <MemoryRouter>
-          <RepoListRow
-            repo={{ ...baseRepo, ...overrides }}
-            onNavigate={vi.fn()}
-            onTagClick={vi.fn()}
-            density={density}
-            fields={fields}
-            verificationTier={verificationTier}
-          />
-        </MemoryRouter>
+        <MockLearningProgressProvider>
+          <MemoryRouter>
+            <RepoListRow
+              repo={{ ...baseRepo, ...overrides }}
+              onNavigate={vi.fn()}
+              onTagClick={vi.fn()}
+              density={density}
+              fields={fields}
+              verificationTier={verificationTier}
+            />
+          </MemoryRouter>
+        </MockLearningProgressProvider>
       </SavedReposProvider>
     )
   })
