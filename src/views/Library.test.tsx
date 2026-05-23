@@ -15,6 +15,7 @@ vi.mock('../components/CollectionsSidebar', () => ({
 
 vi.mock('./RepoDetail', () => ({
   default: () => <div data-testid="repo-detail" />,
+  primeRepoCacheFromRows: () => {},
 }))
 
 vi.mock('./CollectionDetail', () => ({

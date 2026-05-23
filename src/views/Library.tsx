@@ -12,6 +12,7 @@ import type { RecentEntry } from '../lib/recentVisits'
 import LibraryDetailRoutes from '../components/LibraryDetailRoutes'
 import LibrarySidebar from '../components/LibrarySidebar'
 import ActivityFeed from '../components/ActivityFeed'
+import { primeRepoCacheFromRows } from './RepoDetail'
 
 export default function Library() {
   const { toast } = useToast()
@@ -84,6 +85,13 @@ export default function Library() {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
     }
   }, [])
+
+  // Prime RepoDetail's per-repo cache from rows we already have in memory,
+  // so first-time navigation to a sidebar repo shows its header/description/
+  // stats immediately instead of waiting for fetchRepoBundle.
+  useEffect(() => {
+    primeRepoCacheFromRows([...rows, ...starredRows, ...unstarredRows])
+  }, [rows, starredRows, unstarredRows])
 
   const repoSelectedId = useMemo(() => {
     if (!repoMatch) return null

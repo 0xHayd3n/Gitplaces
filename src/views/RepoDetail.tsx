@@ -480,6 +480,18 @@ function patchRepoCache(key: string, patch: Partial<CachedRepoEntry>) {
   _repoCache.set(key, { ..._repoCache.get(key), ...patch })
 }
 
+// Seed the cache from rows already in memory (e.g. the Library sidebar's
+// installedRows + starredRows). Lets RepoDetail render the header band,
+// description, and stats sidebar immediately on first navigation instead of
+// waiting for fetchRepoBundle to resolve. The live fetch still runs and
+// overwrites, so any drift between the cached row and the live response is
+// resolved within one round-trip.
+export function primeRepoCacheFromRows(rows: ReadonlyArray<RepoRow>) {
+  for (const row of rows) {
+    patchRepoCache(`${row.owner}/${row.name}`, { repo: row })
+  }
+}
+
 // ── Module-level session caches for endpoints that don't merit their own
 // SQLite-backed cache but ARE worth skipping on a same-session revisit. Each
 // entry is invalidated by writes (e.g., `_starredCache.delete()` on (un)star).
