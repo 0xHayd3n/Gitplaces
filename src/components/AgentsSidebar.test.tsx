@@ -78,4 +78,11 @@ describe('AgentsSidebar', () => {
     fireEvent.click(screen.getByRole('button', { name: /\+ New agent/ }))
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
+
+  it('hides named folders that have no matching agents during search', async () => {
+    renderSidebar('lit')
+    await waitFor(() => screen.getByText(/Research/))
+    // Writing folder contains only "Copy editor" which doesn't match "lit"
+    expect(screen.queryByText(/Writing/)).toBeNull()
+  })
 })

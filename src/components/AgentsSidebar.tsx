@@ -69,6 +69,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
         name: f.name,
         agents: byFolder.get(f.id) ?? [],
       }))
+      .filter(g => q === '' || g.agents.length > 0)
       .sort((a, b) => a.name.localeCompare(b.name))
     const out: FolderGroup[] = []
     if (unfiled.length > 0) out.push({ id: null, name: 'Unfiled', agents: unfiled })
