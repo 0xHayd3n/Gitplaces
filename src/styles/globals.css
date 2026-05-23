@@ -6215,6 +6215,54 @@ a {
   color: var(--accent-text);
 }
 
+/* ── Split button (Learn / Cancel / Learned + dropdown) ───────────── */
+.split-button { display: inline-flex; position: relative; }
+.split-button-action,
+.split-button-caret {
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  transition: background 0.1s, color 0.1s;
+}
+.split-button-action { border-radius: 6px 0 0 6px; }
+.split-button-caret  { border-radius: 0 6px 6px 0; padding: 8px 8px; border-left: 1px solid rgba(0,0,0,0.15); }
+.split-button--primary .split-button-action,
+.split-button--primary .split-button-caret { background: var(--accent); color: var(--t1); }
+.split-button--primary .split-button-action:hover:not(:disabled),
+.split-button--primary .split-button-caret:hover { background: #7c3aed; }
+.split-button--idle .split-button-action,
+.split-button--idle .split-button-caret { background: var(--accent); color: var(--t1); }
+.split-button--idle .split-button-action:hover:not(:disabled),
+.split-button--idle .split-button-caret:hover { background: #7c3aed; }
+.split-button--learned .split-button-action,
+.split-button--learned .split-button-caret {
+  background: transparent; color: var(--accent-text);
+  border: 1px solid var(--accent-text);
+}
+.split-button--learned .split-button-caret { border-left: 1px solid var(--accent-text); }
+.split-button-action:disabled { opacity: 0.85; cursor: default; }
+.split-button-menu {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 50;
+  background: #15151a; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;
+  min-width: 140px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.split-button-menu button {
+  background: transparent; border: none; color: var(--t1); padding: 8px 14px;
+  width: 100%; display: flex; align-items: center; gap: 10px; font-size: 12px;
+  text-align: left; cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.split-button-menu button:last-child { border-bottom: none; }
+.split-button-menu button:hover { background: rgba(255,255,255,0.05); }
+.split-button-cancel-icon { display: inline-flex; gap: 2px; }
+.split-button-cancel-icon span { width: 3px; height: 11px; background: currentColor; }
+
 /* ── Inline clone options panel ────────────────────────────── */
 .clone-panel {
   display: flex;
