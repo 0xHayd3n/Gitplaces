@@ -1,5 +1,4 @@
 import { memo } from 'react'
-import { PiBrainFill } from 'react-icons/pi'
 import { relativeTime } from '../utils/relativeTime'
 import type { RepoUserEvent } from '../types/repoUserEvents'
 import './RepoUserEventRow.css'
@@ -48,7 +47,7 @@ function buildContent(
     case 'learn':
       return {
         verb: event.skillType === 'components' ? 'learned components for' : 'learned',
-        chip: <SkillChip filename={event.skillFilename} />,
+        chip: <RepoChip avatar={repoAvatar} text={`${repoOwner}/${repoName}`} />,
       }
     case 'created':
       return {
@@ -64,15 +63,6 @@ function RepoChip({ avatar, text }: { avatar: string; text: string }) {
     <span className="repo-user-event__chip repo-user-event__chip--repo">
       <img src={avatar} alt="" className="repo-user-event__chip-avatar" loading="lazy" decoding="async" />
       <span>{text}</span>
-    </span>
-  )
-}
-
-function SkillChip({ filename }: { filename: string }) {
-  return (
-    <span className="repo-user-event__chip repo-user-event__chip--skill">
-      <PiBrainFill size={12} />
-      <span>{filename}</span>
     </span>
   )
 }

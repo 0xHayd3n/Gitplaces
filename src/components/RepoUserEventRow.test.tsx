@@ -34,25 +34,28 @@ describe('RepoUserEventRow', () => {
     expect(screen.getByText('hayden/next.js')).toBeInTheDocument()
   })
 
-  it('renders a learn (master) event with "learned" verb and skill chip', () => {
+  it('renders a learn (master) event with "learned" verb and repo chip', () => {
     const event: RepoUserEvent = {
       type: 'learn', ts: '2026-04-04T00:00:00Z',
-      skillFilename: 'next.js.skill.md', skillType: 'master',
+      skillFilename: '.anatomy', skillType: 'master',
     }
     const { container } = render(<RepoUserEventRow event={event} {...baseProps} />)
     expect(screen.getByText('learned')).toBeInTheDocument()
-    expect(screen.getByText('next.js.skill.md')).toBeInTheDocument()
-    expect(container.querySelector('.repo-user-event__chip--skill')).not.toBeNull()
+    // Activity now shows the repo, not the implementation-detail filename
+    expect(screen.getByText('vercel/next.js')).toBeInTheDocument()
+    expect(screen.queryByText('.anatomy')).toBeNull()
+    expect(container.querySelector('.repo-user-event__chip--repo')).not.toBeNull()
   })
 
-  it('renders a learn (components) event with "learned components for" verb', () => {
+  it('renders a learn (components) event with "learned components for" verb and repo chip', () => {
     const event: RepoUserEvent = {
       type: 'learn', ts: '2026-04-05T00:00:00Z',
       skillFilename: 'next.js.components.skill.md', skillType: 'components',
     }
     render(<RepoUserEventRow event={event} {...baseProps} />)
     expect(screen.getByText('learned components for')).toBeInTheDocument()
-    expect(screen.getByText('next.js.components.skill.md')).toBeInTheDocument()
+    expect(screen.getByText('vercel/next.js')).toBeInTheDocument()
+    expect(screen.queryByText('next.js.components.skill.md')).toBeNull()
   })
 
   it('renders a created event with repo owner as actor and "created" verb', () => {
