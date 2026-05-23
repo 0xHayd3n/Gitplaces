@@ -116,10 +116,6 @@ export default function ActivityFeed() {
 
   return (
     <div className="activity-feed">
-      <div className="activity-feed-header">
-        <span className="activity-feed-title">Activity</span>
-      </div>
-
       <div ref={bodyRef} className="activity-feed-body">
         <div
           className={[

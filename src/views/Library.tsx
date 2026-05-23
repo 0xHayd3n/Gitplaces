@@ -111,38 +111,51 @@ export default function Library() {
     navigate(`/library/collection/${id}`, { state: { coll, collectionName: coll.name } })
   }, [navigate])
 
+  const pageTitle = (() => {
+    if (repoMatch) return `${repoMatch.params.owner} / ${repoMatch.params.name}`
+    if (collMatch) {
+      const st = location.state as { collectionName?: string } | null
+      return st?.collectionName ?? 'Collection'
+    }
+    return 'Activity'
+  })()
+
   return (
     <div className="library-root-v2">
-      <div className="discover-drag-strip" aria-hidden="true" />
+      <header className="library-page-header" aria-label={pageTitle}>
+        <span className="library-page-title">{pageTitle}</span>
+      </header>
 
-      <div className={`library-panel${isMiniTab ? ' mini' : ''}`}>
-        <LibrarySidebar
-          installedRows={rows}
-          starredRows={starredRows}
-          unstarredRows={unstarredRows}
-          localProjects={localProjects}
-          archivedSet={archivedSet}
-          selectedId={repoSelectedId}
-          selectedLocalPath={selectedLocalPath}
-          collSelectedId={collSelectedId}
-          onSelect={handleRepoSelect}
-          onSelectLocal={handleLocalSelect}
-          onSelectColl={handleCollSelect}
-        />
-      </div>
-
-      <main className="library-main">
-        <div className="library-detail-area">
-          {hasDetail ? (
-            <Routes>
-              <Route path="repo/:owner/:name" element={<RepoDetail />} />
-              <Route path="collection/:id" element={<CollectionDetail />} />
-            </Routes>
-          ) : (
-            <ActivityFeed />
-          )}
+      <div className="library-body">
+        <div className={`library-panel${isMiniTab ? ' mini' : ''}`}>
+          <LibrarySidebar
+            installedRows={rows}
+            starredRows={starredRows}
+            unstarredRows={unstarredRows}
+            localProjects={localProjects}
+            archivedSet={archivedSet}
+            selectedId={repoSelectedId}
+            selectedLocalPath={selectedLocalPath}
+            collSelectedId={collSelectedId}
+            onSelect={handleRepoSelect}
+            onSelectLocal={handleLocalSelect}
+            onSelectColl={handleCollSelect}
+          />
         </div>
-      </main>
+
+        <main className="library-main">
+          <div className="library-detail-area">
+            {hasDetail ? (
+              <Routes>
+                <Route path="repo/:owner/:name" element={<RepoDetail />} />
+                <Route path="collection/:id" element={<CollectionDetail />} />
+              </Routes>
+            ) : (
+              <ActivityFeed />
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
