@@ -134,22 +134,8 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
   const toggle = (key: string) =>
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }))
 
-  const handleNewAgent = async () => {
-    // Pick the next "Agent N" not already used.
-    let max = 0
-    for (const a of agents) {
-      const m = a.name.match(/^Agent (\d+)$/)
-      if (m) {
-        const n = parseInt(m[1], 10)
-        if (n > max) max = n
-      }
-    }
-    const row = await window.api.agents.create({
-      name: `Agent ${max + 1}`,
-      body: '',
-      folderId: null,
-    })
-    navigate(`/library/agent/${row.id}`)
+  const handleNewAgent = () => {
+    navigate('/library/agent/new')
   }
 
   return (
