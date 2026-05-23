@@ -139,6 +139,9 @@ interface RepoCardProps {
   onLearn?: () => void
 }
 
+// useLearningProgress reads from LearningProgressContext (mounted in App.tsx).
+// Tests that render RepoCard in isolation must wrap with MockLearningProgressProvider
+// from `../contexts/LearningProgressContext`.
 const RepoCard = memo(function RepoCard({ repo, onNavigate, onTagClick, onOwnerClick, typeSub, typeBucket, verificationTier, verificationSignals, verificationResolving, activeTags, focused, viewMode, anchors, onStar, onLanguageClick, onSubtypeClick, learnState, onLearn }: RepoCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const learningProgress = useLearningProgress(repo.owner, repo.name)

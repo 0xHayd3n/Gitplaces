@@ -1244,7 +1244,10 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     setRelearningTarget(target)
     setLearnError(null)
     try {
-      await window.api.skill.generate(owner ?? '', name ?? '', { flavour, target })
+      const result = await startLearn(owner ?? '', name ?? '', () =>
+        window.api.skill.generate(owner ?? '', name ?? '', { flavour, target }),
+      )
+      if (result && 'cancelled' in result) return false
       if (target === 'master') {
         const freshRow = await window.api.skill.get(owner ?? '', name ?? '')
         setSkillRow(freshRow)
