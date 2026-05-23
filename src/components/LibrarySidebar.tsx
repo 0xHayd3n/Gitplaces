@@ -8,6 +8,7 @@ import type { LibraryEntry, LocalProject } from '../types/library'
 import { useLearningProgress } from '../hooks/useLearningProgress'
 import RepoContextMenu, { type RepoContextMenuTarget } from './RepoContextMenu'
 import CollectionsSidebar from './CollectionsSidebar'
+import AgentsSidebar from './AgentsSidebar'
 
 interface Props {
   installedRows: LibraryRow[]
@@ -39,6 +40,15 @@ function CollectionsIcon({ size = 13 }: { size?: number }) {
   )
 }
 
+function AgentsIcon({ size = 13 }: { size?: number }) {
+  // Small markdown-doc glyph: page with a fold + an "M" mark.
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 2.5L18.5 9H14V4.5zM7 13h2v5H7v-5zm4-2h2v7h-2v-7zm4 3h2v4h-2v-4z" />
+    </svg>
+  )
+}
+
 function GitHubIcon({ size = 11 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -63,7 +73,7 @@ function FolderIcon() {
   )
 }
 
-type Mode = 'repos' | 'collections'
+type Mode = 'repos' | 'collections' | 'agents'
 
 export default function LibrarySidebar({
   installedRows, starredRows, unstarredRows, localProjects,
@@ -74,7 +84,10 @@ export default function LibrarySidebar({
   const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
   const collMatch = useMatch('/library/collection/:id')
   const repoMatch = useMatch('/library/repo/:owner/:name')
-  const [mode, setMode] = useState<Mode>(collMatch ? 'collections' : 'repos')
+  const agentMatch = useMatch('/library/agent/:id')
+  const [mode, setMode] = useState<Mode>(
+    agentMatch ? 'agents' : collMatch ? 'collections' : 'repos'
+  )
   const [searchTerm, setSearchTerm] = useState('')
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [unstarredOpen, setUnstarredOpen] = useState(false)
@@ -89,6 +102,10 @@ export default function LibrarySidebar({
   useEffect(() => {
     if (repoMatch) setMode('repos')
   }, [repoMatch?.params.owner, repoMatch?.params.name])
+
+  useEffect(() => {
+    if (agentMatch) setMode('agents')
+  }, [agentMatch?.params.id])
 
   const allEntries = useMemo<LibraryEntry[]>(() => {
     const map = new Map<string, LibraryEntry>()
@@ -180,6 +197,15 @@ export default function LibrarySidebar({
             >
               <CollectionsIcon />
             </button>
+            <button
+              type="button"
+              className={`library-sidebar-toggle-btn${mode === 'agents' ? ' active' : ''}`}
+              onClick={() => { setMode('agents'); setSearchTerm('') }}
+              aria-label="Agents"
+              title="Agents"
+            >
+              <AgentsIcon />
+            </button>
           </div>
         </div>
         <div className="library-sidebar-topbar-row2">
@@ -189,13 +215,13 @@ export default function LibrarySidebar({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={mode === 'repos' ? 'Search repositories' : 'Search collections'}
+              placeholder={mode === 'repos' ? 'Search repositories' : mode === 'collections' ? 'Search collections' : 'Search agents'}
               className="library-sidebar-search-input"
             />
           </div>
         </div>
       </div>
-      {mode === 'repos' ? (
+      {mode === 'repos' && (
       <div className="library-sidebar-list">
         {visible.length === 0 && (
           <div className="library-sidebar-empty">No repos or projects</div>
@@ -290,13 +316,19 @@ export default function LibrarySidebar({
           </div>
         )}
       </div>
-      ) : (
+      )}
+      {mode === 'collections' && (
         <div className="library-sidebar-list">
           <CollectionsSidebar
             selectedId={collSelectedId}
             onSelect={onSelectColl ?? (() => {})}
             searchTerm={searchTerm}
           />
+        </div>
+      )}
+      {mode === 'agents' && (
+        <div className="library-sidebar-list">
+          <AgentsSidebar searchTerm={searchTerm} />
         </div>
       )}
 
