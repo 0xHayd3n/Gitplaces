@@ -14,6 +14,11 @@ function normaliseName(input: string): string {
   return trimmed.length === 0 ? 'Untitled agent' : trimmed
 }
 
+function normaliseFolderName(input: string): string {
+  const trimmed = input.trim()
+  return trimmed.length === 0 ? 'Untitled folder' : trimmed
+}
+
 function assertNameLen(name: string): void {
   if (name.length > AGENT_NAME_MAX) {
     throw new Error(`Agent name length ${name.length} exceeds ${AGENT_NAME_MAX}`)
@@ -34,18 +39,24 @@ function assertFolderExists(db: Database.Database, folderId: string): void {
 // ── Folders ─────────────────────────────────────────────────────────
 
 export function createFolder(db: Database.Database, name: string): AgentFolderRow {
+  const normalised = normaliseFolderName(name)
+  assertNameLen(normalised)
   const id = randomUUID()
   const created_at = nowIso()
   db.prepare(`
     INSERT INTO agent_folders (id, name, color_start, color_end, description, created_at)
     VALUES (?, ?, NULL, NULL, NULL, ?)
-  `).run(id, name, created_at)
+  `).run(id, normalised, created_at)
   return db.prepare('SELECT * FROM agent_folders WHERE id = ?').get(id) as AgentFolderRow
 }
 
 export function renameFolder(db: Database.Database, id: string, name: string): AgentFolderRow {
-  db.prepare('UPDATE agent_folders SET name = ? WHERE id = ?').run(name, id)
-  return db.prepare('SELECT * FROM agent_folders WHERE id = ?').get(id) as AgentFolderRow
+  const normalised = normaliseFolderName(name)
+  assertNameLen(normalised)
+  db.prepare('UPDATE agent_folders SET name = ? WHERE id = ?').run(normalised, id)
+  const row = db.prepare('SELECT * FROM agent_folders WHERE id = ?').get(id) as AgentFolderRow | undefined
+  if (!row) throw new Error(`Unknown folder id: ${id}`)
+  return row
 }
 
 export function deleteFolder(db: Database.Database, id: string): void {
@@ -113,7 +124,9 @@ export function updateAgent(
     db.prepare(`UPDATE agents SET ${sets.join(', ')} WHERE id = ?`).run(...params)
   }
 
-  return db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow
+  const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow | undefined
+  if (!row) throw new Error(`Unknown agent id: ${id}`)
+  return row
 }
 
 export function deleteAgent(db: Database.Database, id: string): void {
@@ -123,8 +136,12 @@ export function deleteAgent(db: Database.Database, id: string): void {
 export function duplicateAgent(db: Database.Database, id: string): AgentRow {
   const src = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow | undefined
   if (!src) throw new Error(`Unknown agent id: ${id}`)
+  const suffix = ' (copy)'
+  const baseName = src.name.length + suffix.length > AGENT_NAME_MAX
+    ? src.name.slice(0, AGENT_NAME_MAX - suffix.length)
+    : src.name
   return createAgent(db, {
-    name: `${src.name} (copy)`,
+    name: `${baseName}${suffix}`,
     body: src.body,
     folderId: src.folder_id,
   })

@@ -32,6 +32,24 @@ describe('agentsService — folders', () => {
     expect(updated.name).toBe('Research')
   })
 
+  it('renameFolder throws when folder does not exist', () => {
+    expect(() => renameFolder(db, 'nope', 'X')).toThrow(/folder/i)
+  })
+
+  it('createFolder falls back to "Untitled folder" when name is empty after trim', () => {
+    const f = createFolder(db, '   ')
+    expect(f.name).toBe('Untitled folder')
+  })
+
+  it('createFolder rejects when name exceeds AGENT_NAME_MAX', () => {
+    const name = 'x'.repeat(AGENT_NAME_MAX + 1)
+    expect(() => createFolder(db, name)).toThrow(/name.*length/i)
+  })
+
+  it('deleteFolder on unknown id is a no-op', () => {
+    expect(() => deleteFolder(db, 'does-not-exist')).not.toThrow()
+  })
+
   it('deleteFolder removes the row and nulls agents.folder_id', () => {
     const f = createFolder(db, 'Writing')
     const a = createAgent(db, { name: 'A', body: '# A', folderId: f.id })
@@ -103,6 +121,30 @@ describe('agentsService — agents', () => {
     deleteAgent(db, a.id)
     const all = getAllAgents(db)
     expect(all.agents.find(x => x.id === a.id)).toBeUndefined()
+  })
+
+  it('updateAgent with empty patch returns unchanged row', () => {
+    const a = createAgent(db, { name: 'A', body: 'b', folderId: null })
+    const u = updateAgent(db, a.id, {})
+    expect(u.name).toBe('A')
+    expect(u.body).toBe('b')
+    expect(u.updated_at).toBe(a.updated_at)
+  })
+
+  it('updateAgent throws when agent does not exist', () => {
+    expect(() => updateAgent(db, 'nope', { body: 'x' })).toThrow(/agent/i)
+  })
+
+  it('deleteAgent on unknown id is a no-op', () => {
+    expect(() => deleteAgent(db, 'does-not-exist')).not.toThrow()
+  })
+
+  it('duplicateAgent truncates name when src.name is at AGENT_NAME_MAX', () => {
+    const longName = 'x'.repeat(AGENT_NAME_MAX)
+    const a = createAgent(db, { name: longName, body: 'b', folderId: null })
+    const d = duplicateAgent(db, a.id)
+    expect(d.name.length).toBeLessThanOrEqual(AGENT_NAME_MAX)
+    expect(d.name.endsWith(' (copy)')).toBe(true)
   })
 
   it('duplicateAgent copies body+folder, names "X (copy)", assigns new id+timestamps', async () => {
