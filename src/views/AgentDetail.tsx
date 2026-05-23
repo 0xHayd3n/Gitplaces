@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
 import { useToast } from '../contexts/Toast'
+import { buildPersonaPayload, deriveDescription } from '../utils/copyPayload'
 import './AgentDetail.css'
 
 type SaveStatus = 'idle' | 'saving' | 'saved'
@@ -19,14 +20,12 @@ export default function AgentDetail() {
   const [bodyDraft, setBodyDraft] = useState('')
   const [nameDraft, setNameDraft] = useState('')
   const [nameEditing, setNameEditing] = useState(false)
-  const [folderMenuOpen, setFolderMenuOpen] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
 
   const bodyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nameTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bodyRef = useRef<HTMLTextAreaElement>(null)
 
-  // Load agent + folders
   useEffect(() => {
     if (!id) return
     let cancelled = false
@@ -41,7 +40,6 @@ export default function AgentDetail() {
       setAgent(a)
       setBodyDraft(a?.body ?? '')
       setNameDraft(a?.name ?? '')
-      // Auto-enter edit mode when opening an empty agent (just-created)
       setEditing(a !== null && a.body === '')
     })()
     return () => { cancelled = true }
@@ -52,12 +50,8 @@ export default function AgentDetail() {
   useEffect(() => { editingRef.current = editing }, [editing])
   useEffect(() => { nameEditingRef.current = nameEditing }, [nameEditing])
 
-  // Autofocus textarea whenever edit mode becomes active
-  useEffect(() => {
-    if (editing) bodyRef.current?.focus()
-  }, [editing])
+  useEffect(() => { if (editing) bodyRef.current?.focus() }, [editing])
 
-  // Listen for external changes
   useEffect(() => {
     if (!id) return
     const cb = async () => {
@@ -104,18 +98,15 @@ export default function AgentDetail() {
     return folders.find(f => f.id === agent.folder_id)?.name ?? 'Unfiled'
   }, [agent, folders])
 
+  const liveBody = editing ? bodyDraft : (agent?.body ?? '')
+  const description = useMemo(() => deriveDescription(liveBody), [liveBody])
+  const bodyChars = liveBody.length
+
   const handleCopy = async () => {
     if (!agent) return
-    const content = editing ? bodyDraft : agent.body
-    await navigator.clipboard.writeText(content)
-    toast('Copied to clipboard', 'success')
-  }
-
-  const handleFolderPick = async (folderId: string | null) => {
-    if (!id) return
-    setFolderMenuOpen(false)
-    const updated = await window.api.agents.update(id, { folderId })
-    setAgent(updated)
+    const payload = buildPersonaPayload({ handle: agent.handle, description, body: liveBody })
+    await navigator.clipboard.writeText(payload)
+    toast(`Copied @${agent.handle}`, 'success')
   }
 
   const handleDelete = async () => {
@@ -131,102 +122,88 @@ export default function AgentDetail() {
     navigate(`/library/agent/${dup.id}`)
   }
 
-  if (!agent) {
-    return <div className="agent-detail-loading">Loading…</div>
-  }
+  if (!agent) return <div className="agent-detail-loading">Loading…</div>
 
-  const bodyChars = (editing ? bodyDraft : agent.body).length
+  const swatchStyle: React.CSSProperties = {
+    background: agent.color_end
+      ? `linear-gradient(135deg, ${agent.color_start ?? '#888'}, ${agent.color_end})`
+      : (agent.color_start ?? '#888'),
+  }
 
   return (
     <div className="agent-detail">
-      <header className="agent-detail-header">
-        <button
-          type="button"
-          className="agent-detail-back"
-          onClick={() => navigate('/library')}
-          aria-label="Back"
-          title="Back to Library"
+      <header className="agent-detail-hero">
+        <div
+          className="agent-detail-swatch"
+          data-testid="agent-hero-swatch"
+          style={swatchStyle}
         >
-          ←
-        </button>
-        {nameEditing ? (
-          <input
-            className="agent-detail-title-input"
-            aria-label="Name"
-            value={nameDraft}
-            onChange={e => { setNameDraft(e.target.value); scheduleSaveName(e.target.value) }}
-            onBlur={() => setNameEditing(false)}
-            onKeyDown={e => { if (e.key === 'Enter') setNameEditing(false) }}
-            maxLength={200}
-            autoFocus
-          />
-        ) : (
-          <h2
-            className="agent-detail-title"
-            onClick={() => setNameEditing(true)}
-            title="Click to rename"
-          >
-            {nameDraft || agent.name}
-          </h2>
-        )}
-        <button
-          type="button"
-          className="agent-detail-action"
-          onClick={handleDuplicate}
-          aria-label="Duplicate"
-        >
-          Duplicate
-        </button>
-        <button
-          type="button"
-          className="agent-detail-action agent-detail-action--danger"
-          onClick={handleDelete}
-          aria-label="Delete"
-        >
-          Delete
-        </button>
-        <button
-          type="button"
-          className="agent-detail-action agent-detail-action--primary"
-          onClick={() => setEditing(e => !e)}
-          aria-label={editing ? 'Preview' : 'Edit'}
-        >
-          {editing ? 'Preview' : 'Edit'}
-        </button>
-      </header>
-
-      <div className="agent-detail-meta">
-        <div className="agent-detail-folder-wrap">
+          {agent.emoji ?? ''}
+        </div>
+        <div className="agent-detail-id-block">
+          <div className="agent-detail-handle">@{agent.handle}</div>
+          {nameEditing ? (
+            <input
+              className="agent-detail-title-input"
+              aria-label="Name"
+              value={nameDraft}
+              onChange={e => { setNameDraft(e.target.value); scheduleSaveName(e.target.value) }}
+              onBlur={() => setNameEditing(false)}
+              onKeyDown={e => { if (e.key === 'Enter') setNameEditing(false) }}
+              maxLength={200}
+              autoFocus
+            />
+          ) : (
+            <h2
+              className="agent-detail-title"
+              onClick={() => setNameEditing(true)}
+              title="Click to rename"
+            >
+              {nameDraft || agent.name}
+            </h2>
+          )}
+          {description && <p className="agent-detail-description">{description}</p>}
+          <div className="agent-detail-meta">
+            <span className="agent-detail-chip">{currentFolderName}</span>
+            <span className="agent-detail-chip">{(bodyChars / 1024).toFixed(1)} kb</span>
+            <span className="agent-detail-chip">Updated {new Date(agent.updated_at).toLocaleString()}</span>
+          </div>
+        </div>
+        <div className="agent-detail-actions">
           <button
             type="button"
-            className="agent-detail-folder-button"
-            onClick={() => setFolderMenuOpen(o => !o)}
-            aria-label="Folder"
-            aria-haspopup="true"
-            aria-expanded={folderMenuOpen}
+            className="agent-detail-copy"
+            onClick={handleCopy}
+            aria-label="Copy"
           >
-            Folder: {currentFolderName} ▾
+            📋 Copy
           </button>
-          {folderMenuOpen && (
-            <ul role="menu" className="agent-detail-folder-menu">
-              <li>
-                <button role="menuitem" type="button" onClick={() => handleFolderPick(null)}>
-                  Unfiled
-                </button>
-              </li>
-              {folders.map(f => (
-                <li key={f.id}>
-                  <button role="menuitem" type="button" onClick={() => handleFolderPick(f.id)}>
-                    {f.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <button
+            type="button"
+            className="agent-detail-action"
+            onClick={() => setEditing(e => !e)}
+            aria-label={editing ? 'Preview' : 'Edit'}
+          >
+            {editing ? 'Preview' : 'Edit'}
+          </button>
+          <button
+            type="button"
+            className="agent-detail-action"
+            onClick={handleDuplicate}
+            aria-label="Duplicate"
+          >
+            Duplicate
+          </button>
+          <button
+            type="button"
+            className="agent-detail-action agent-detail-action--danger"
+            onClick={handleDelete}
+            aria-label="Delete"
+          >
+            Delete
+          </button>
         </div>
-        <span>Updated {new Date(agent.updated_at).toLocaleString()}</span>
-        <span>· {bodyChars} chars</span>
-      </div>
+      </header>
 
       <div className="agent-detail-body">
         {editing ? (
@@ -246,9 +223,6 @@ export default function AgentDetail() {
       </div>
 
       <footer className="agent-detail-footer">
-        <button type="button" className="agent-detail-action" onClick={handleCopy}>
-          Copy markdown
-        </button>
         <span
           className={
             'agent-detail-save-status' +
