@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { CollectionRow } from '../types/repo'
 import NewCollectionModal from './NewCollectionModal'
 import { useToast } from '../contexts/Toast'
@@ -6,9 +6,10 @@ import { useToast } from '../contexts/Toast'
 interface CollectionsSidebarProps {
   selectedId: string | null
   onSelect: (id: string, coll: CollectionRow) => void
+  searchTerm?: string
 }
 
-export default function CollectionsSidebar({ selectedId, onSelect }: CollectionsSidebarProps) {
+export default function CollectionsSidebar({ selectedId, onSelect, searchTerm = '' }: CollectionsSidebarProps) {
   const [collections, setCollections] = useState<CollectionRow[]>([])
   const [showModal, setShowModal] = useState(false)
   const { toast } = useToast()
@@ -19,6 +20,12 @@ export default function CollectionsSidebar({ selectedId, onSelect }: Collections
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const visibleCollections = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) return collections
+    return collections.filter(c => c.name.toLowerCase().includes(q))
+  }, [collections, searchTerm])
 
   async function handleCreate(newId: string) {
     setShowModal(false)
@@ -31,12 +38,11 @@ export default function CollectionsSidebar({ selectedId, onSelect }: Collections
 
   return (
     <aside className="library-sidebar">
-      <div className="library-sidebar-header">COLLECTIONS</div>
       <div className="library-sidebar-list">
-        {collections.length === 0 && (
+        {visibleCollections.length === 0 && (
           <div className="library-sidebar-empty">No collections</div>
         )}
-        {collections.map(coll => (
+        {visibleCollections.map(coll => (
           <button
             key={coll.id}
             type="button"

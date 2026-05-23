@@ -66,4 +66,23 @@ describe('CollectionsSidebar', () => {
     await screen.findByText('My Stack')
     expect(screen.getByText(/new collection/i)).toBeInTheDocument()
   })
+
+  it('filters collections by name when searchTerm is set', async () => {
+    const onSelect = vi.fn()
+    wrap(<CollectionsSidebar selectedId={null} onSelect={onSelect} searchTerm="python" />)
+    expect(await screen.findByText('Python API')).toBeInTheDocument()
+    expect(screen.queryByText('My Stack')).not.toBeInTheDocument()
+  })
+
+  it('is case-insensitive', async () => {
+    const onSelect = vi.fn()
+    wrap(<CollectionsSidebar selectedId={null} onSelect={onSelect} searchTerm="STACK" />)
+    expect(await screen.findByText('My Stack')).toBeInTheDocument()
+  })
+
+  it('no longer renders a COLLECTIONS header', async () => {
+    wrap(<CollectionsSidebar selectedId={null} onSelect={vi.fn()} />)
+    await screen.findByText('My Stack')
+    expect(screen.queryByText(/^COLLECTIONS$/i)).not.toBeInTheDocument()
+  })
 })
