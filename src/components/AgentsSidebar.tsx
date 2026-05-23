@@ -79,7 +79,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
       await window.api.agents.update(id, { folderId: null })
       return
     }
-    const f = folders.find(x => x.name === choice.trim())
+    const f = folders.find(x => x.name.toLowerCase() === choice.trim().toLowerCase())
     if (f) {
       await window.api.agents.update(id, { folderId: f.id })
     } else {

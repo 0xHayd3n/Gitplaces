@@ -29,16 +29,19 @@ export default function AgentContextMenu({
       if (ref.current && !ref.current.contains(e.target as Node)) onClose()
     }
     function key(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    function scroll() { onClose() }
     window.addEventListener('mousedown', handle)
     window.addEventListener('keydown', key)
+    window.addEventListener('scroll', scroll, true)
     return () => {
       window.removeEventListener('mousedown', handle)
       window.removeEventListener('keydown', key)
+      window.removeEventListener('scroll', scroll, true)
     }
   }, [onClose])
 
   const style: React.CSSProperties = {
-    position: 'fixed', top: y, left: x, zIndex: 1000,
+    position: 'fixed', top: y, left: x, zIndex: 9999,
     background: 'var(--bg2)', border: '1px solid var(--border)',
     padding: 4, minWidth: 160,
   }
