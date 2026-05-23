@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useNavigate, useMatch, useLocation, Routes, Route } from 'react-router-dom'
+import { useNavigate, useMatch, useLocation } from 'react-router-dom'
 import { type LibraryRow, type StarredRepoRow, type RepoRow } from '../types/repo'
 import type { CollectionRow } from '../types/repo'
 import type { LocalProject } from '../types/library'
@@ -9,9 +9,8 @@ import { useArchivedRepos } from '../hooks/useArchivedRepos'
 import { useLocalProjects } from '../hooks/useLocalProjects'
 import { getRecentVisits, recordRecentVisit } from '../lib/recentVisits'
 import type { RecentEntry } from '../lib/recentVisits'
+import LibraryDetailRoutes from '../components/LibraryDetailRoutes'
 import LibrarySidebar from '../components/LibrarySidebar'
-import RepoDetail from './RepoDetail'
-import CollectionDetail from './CollectionDetail'
 import ActivityFeed from '../components/ActivityFeed'
 
 export default function Library() {
@@ -156,10 +155,7 @@ export default function Library() {
         <main className="library-main">
           <div className="library-detail-area">
             {hasDetail ? (
-              <Routes>
-                <Route path="repo/:owner/:name" element={<RepoDetail />} />
-                <Route path="collection/:id" element={<CollectionDetail />} />
-              </Routes>
+              <LibraryDetailRoutes />
             ) : (
               <ActivityFeed />
             )}
