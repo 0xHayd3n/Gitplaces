@@ -10,9 +10,21 @@ const folders: AgentFolderRow[] = [
   { id: 'f2', name: 'Research', color_start: null, color_end: null, description: null, created_at: '2026-05-23T00:00:00Z' },
 ]
 const agents: AgentRow[] = [
-  { id: 'a1', name: 'Copy editor',   body: '# Copy editor\nbody',   folder_id: 'f1', created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z' },
-  { id: 'a2', name: 'Lit reviewer',  body: '# Lit reviewer\nbody',  folder_id: 'f2', created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z' },
-  { id: 'a3', name: 'Untagged note', body: '# Untagged\nbody',      folder_id: null, created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z' },
+  { id: 'a1', name: 'Copy editor',   handle: 'copy-editor',   body: '# Copy editor\nbody',
+    folder_id: 'f1',
+    color_start: '#10b981', color_end: '#34d399', emoji: '✏️',
+    pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
+    created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z' },
+  { id: 'a2', name: 'Lit reviewer',  handle: 'lit-reviewer',  body: '# Lit reviewer\nbody',
+    folder_id: 'f2',
+    color_start: '#6366f1', color_end: null, emoji: null,
+    pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
+    created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z' },
+  { id: 'a3', name: 'Untagged note', handle: 'untagged-note', body: '# Untagged\nbody',
+    folder_id: null,
+    color_start: '#ec4899', color_end: null, emoji: null,
+    pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
+    created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z' },
 ]
 
 beforeEach(() => {
@@ -85,37 +97,40 @@ describe('AgentsSidebar', () => {
     expect(screen.queryByText('Copy editor')).toBeNull()
   })
 
-  it('auto-creates "Agent N" and navigates to it when "+ New agent" is clicked', async () => {
+  it('"+ New agent" navigates to /library/agent/new', async () => {
     renderSidebar()
     await waitFor(() => screen.getByRole('button', { name: /\+ New agent/ }))
     fireEvent.click(screen.getByRole('button', { name: /\+ New agent/ }))
     await waitFor(() =>
-      expect(window.api.agents.create).toHaveBeenCalledWith({
-        name: 'Agent 1', body: '', folderId: null,
-      }),
-    )
-    await waitFor(() =>
-      expect(screen.getByTestId('location').textContent).toBe('/library/agent/new-id'),
+      expect(screen.getByTestId('location').textContent).toBe('/library/agent/new'),
     )
   })
 
-  it('picks the next available "Agent N" when some already exist', async () => {
-    ;(window as any).api.agents.getAll.mockResolvedValueOnce({
-      folders,
-      agents: [
-        { ...agents[0], name: 'Agent 1' },
-        { ...agents[1], name: 'Agent 3' },
-        { ...agents[2], name: 'Untagged note' },
-      ],
-    })
+  it('renders a color swatch per agent row', async () => {
     renderSidebar()
-    await waitFor(() => screen.getByRole('button', { name: /\+ New agent/ }))
-    fireEvent.click(screen.getByRole('button', { name: /\+ New agent/ }))
-    await waitFor(() =>
-      expect(window.api.agents.create).toHaveBeenCalledWith({
-        name: 'Agent 4', body: '', folderId: null,
-      }),
-    )
+    await waitFor(() => screen.getByText(/Writing/))
+    fireEvent.click(screen.getByRole('button', { name: /Writing/ }))
+    const swatch = await screen.findByTestId('sidebar-swatch-a1')
+    expect(swatch).toBeTruthy()
+    // a1 has both colors set → gradient background
+    expect(swatch.style.background).toMatch(/linear-gradient/)
+  })
+
+  it('renders @handle suffix per agent row', async () => {
+    renderSidebar()
+    await waitFor(() => screen.getByText(/Writing/))
+    fireEvent.click(screen.getByRole('button', { name: /Writing/ }))
+    expect(await screen.findByText('@copy-editor')).toBeTruthy()
+  })
+
+  it('renders a solid swatch (no gradient) when color_end is null', async () => {
+    renderSidebar()
+    await waitFor(() => screen.getByText(/Research/))
+    fireEvent.click(screen.getByRole('button', { name: /Research/ }))
+    const swatch = await screen.findByTestId('sidebar-swatch-a2')
+    // a2 has color_end: null → solid background
+    expect(swatch.style.background).not.toMatch(/linear-gradient/)
+    expect(swatch.textContent?.trim()).toBe('')  // a2 emoji is null
   })
 
   it('hides named folders that have no matching agents during search', async () => {

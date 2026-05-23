@@ -13,14 +13,6 @@ interface FolderGroup {
   agents: AgentRow[]
 }
 
-function MarkdownDocIcon({ size = 13 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm0 2.5L18.5 9H14V4.5zM7 13h2v5H7v-5zm4-2h2v7h-2v-7zm4 3h2v4h-2v-4z" />
-    </svg>
-  )
-}
-
 export default function AgentsSidebar({ searchTerm = '' }: Props) {
   const navigate = useNavigate()
   const agentMatch = useMatch('/library/agent/:id')
@@ -177,12 +169,21 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
                 className={`library-sidebar-item installed${selectedId === a.id ? ' selected' : ''}`}
                 onClick={() => navigate(`/library/agent/${a.id}`)}
                 onContextMenu={(e) => onAgentRightClick(e, a.id)}
-                title={a.name}
+                title={`${a.name} @${a.handle}`}
               >
-                <span className="library-sidebar-avatar library-sidebar-local-avatar">
-                  <MarkdownDocIcon />
+                <span
+                  className="library-sidebar-avatar agents-sidebar-swatch"
+                  data-testid={`sidebar-swatch-${a.id}`}
+                  style={{
+                    background: a.color_end
+                      ? `linear-gradient(135deg, ${a.color_start ?? '#888'}, ${a.color_end})`
+                      : (a.color_start ?? '#888'),
+                  }}
+                >
+                  {a.emoji ?? ''}
                 </span>
                 <span className="library-sidebar-name">{a.name}</span>
+                <span className="agents-sidebar-handle">@{a.handle}</span>
               </button>
             ))}
           </div>

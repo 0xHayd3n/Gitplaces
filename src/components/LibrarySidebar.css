@@ -421,3 +421,24 @@
   border-color: var(--glass-border);
   color: var(--t1);
 }
+
+.agents-sidebar-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agents-sidebar-handle {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--t3);
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+}
