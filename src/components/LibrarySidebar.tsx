@@ -1,6 +1,6 @@
 // src/components/LibrarySidebar.tsx
-import { useState, useMemo } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useState, useMemo, useEffect } from 'react'
+import { useLocation, useNavigate, useMatch } from 'react-router-dom'
 import { Home, Search } from 'lucide-react'
 import './LibrarySidebar.css'
 import type { LibraryRow, StarredRepoRow, RepoRow } from '../types/repo'
@@ -68,13 +68,23 @@ export default function LibrarySidebar({
   selectedId, selectedLocalPath, onSelect, onSelectLocal,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
-  const [mode, setMode] = useState<Mode>('repos')
+  const collMatch = useMatch('/library/collection/:id')
+  const repoMatch = useMatch('/library/repo/:owner/:name')
+  const [mode, setMode] = useState<Mode>(collMatch ? 'collections' : 'repos')
   const [searchTerm, setSearchTerm] = useState('')
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [unstarredOpen, setUnstarredOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const isSummaryActive = location.pathname === '/library'
+
+  useEffect(() => {
+    if (collMatch) setMode('collections')
+  }, [collMatch?.params.id])
+
+  useEffect(() => {
+    if (repoMatch) setMode('repos')
+  }, [repoMatch?.params.owner, repoMatch?.params.name])
 
   const allEntries = useMemo<LibraryEntry[]>(() => {
     const map = new Map<string, LibraryEntry>()

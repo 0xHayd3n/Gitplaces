@@ -180,3 +180,15 @@ describe('LibrarySidebar — recently unstarred section', () => {
     expect(screen.queryByRole('button', { name: /recently unstarred/i })).not.toBeInTheDocument()
   })
 })
+
+describe('LibrarySidebar — URL-driven mode', () => {
+  it('starts in collections mode when URL is /library/collection/:id', () => {
+    wrap(<LibrarySidebar {...defaultProps} />, '/library/collection/abc')
+    expect(screen.getByRole('button', { name: 'Collections' })).toHaveClass('active')
+  })
+
+  it('starts in repos mode when URL is /library/repo/:owner/:name', () => {
+    wrap(<LibrarySidebar {...defaultProps} />, '/library/repo/foo/bar')
+    expect(screen.getByRole('button', { name: 'Repositories' })).toHaveClass('active')
+  })
+})
