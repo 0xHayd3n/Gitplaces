@@ -1,7 +1,7 @@
 // src/components/LibrarySidebar.tsx
 import { useState, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Home } from 'lucide-react'
+import { Home, Search } from 'lucide-react'
 import './LibrarySidebar.css'
 import type { LibraryRow, StarredRepoRow, RepoRow } from '../types/repo'
 import type { LibraryEntry, LocalProject } from '../types/library'
@@ -69,6 +69,7 @@ export default function LibrarySidebar({
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
   const [mode, setMode] = useState<Mode>('repos')
+  const [searchTerm, setSearchTerm] = useState('')
   const location = useLocation()
   const navigate = useNavigate()
   const isSummaryActive = location.pathname === '/library'
@@ -90,13 +91,19 @@ export default function LibrarySidebar({
   }, [installedRows, starredRows, localProjects])
 
   const visible = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
     return allEntries.filter(e => {
       const key = e.kind === 'repo'
         ? `${e.row.owner}/${e.row.name}`
         : `${e.project.owner ?? ''}/${e.project.repoName ?? e.project.name}`
-      return !archivedSet.has(key)
+      if (archivedSet.has(key)) return false
+      if (!q) return true
+      if (e.kind === 'repo') {
+        return e.row.name.toLowerCase().includes(q) || e.row.owner.toLowerCase().includes(q)
+      }
+      return e.project.name.toLowerCase().includes(q)
     })
-  }, [allEntries, archivedSet])
+  }, [allEntries, archivedSet, searchTerm])
 
   const handleRepoContextMenu = (e: React.MouseEvent, entry: LibraryEntry & { kind: 'repo' }) => {
     e.preventDefault()
@@ -124,7 +131,7 @@ export default function LibrarySidebar({
             <button
               type="button"
               className={`library-sidebar-toggle-btn${mode === 'repos' ? ' active' : ''}`}
-              onClick={() => setMode('repos')}
+              onClick={() => { setMode('repos'); setSearchTerm('') }}
               aria-label="Repositories"
               title="Repositories"
             >
@@ -133,12 +140,24 @@ export default function LibrarySidebar({
             <button
               type="button"
               className={`library-sidebar-toggle-btn${mode === 'collections' ? ' active' : ''}`}
-              onClick={() => setMode('collections')}
+              onClick={() => { setMode('collections'); setSearchTerm('') }}
               aria-label="Collections"
               title="Collections"
             >
               <CollectionsIcon />
             </button>
+          </div>
+        </div>
+        <div className="library-sidebar-topbar-row2">
+          <div className="library-sidebar-search">
+            <Search size={11} className="library-sidebar-search-icon" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder={mode === 'repos' ? 'Search repositories' : 'Search collections'}
+              className="library-sidebar-search-input"
+            />
           </div>
         </div>
       </div>
