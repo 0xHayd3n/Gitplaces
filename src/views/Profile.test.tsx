@@ -3,6 +3,7 @@ import { vi, describe, it, expect, beforeEach, beforeAll, afterAll } from 'vites
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
 import { GitHubAuthProvider } from '../contexts/GitHubAuth'
+import { MockLearningProgressProvider } from '../contexts/LearningProgressContext'
 import Profile from './Profile'
 
 // jsdom does not provide ResizeObserver — needed by DitherBackground inside RepoCard
@@ -86,11 +87,13 @@ function renderProfile() {
   return render(
     <GitHubAuthProvider>
       <ProfileOverlayProvider>
+        <MockLearningProgressProvider>
         <MemoryRouter initialEntries={['/profile']}>
           <Routes>
             <Route path="/profile" element={<Profile />} />
           </Routes>
         </MemoryRouter>
+        </MockLearningProgressProvider>
       </ProfileOverlayProvider>
     </GitHubAuthProvider>
   )

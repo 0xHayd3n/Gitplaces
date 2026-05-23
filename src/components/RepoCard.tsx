@@ -3,6 +3,7 @@ import { justifyContent, unjustifyContent } from 'tex-linebreak'
 import { Plus, Brain } from 'lucide-react'
 import { parseTopics, type RepoRow } from '../types/repo'
 import type { Anchor } from '../types/recommendation'
+import { useLearningProgress } from '../hooks/useLearningProgress'
 import DitherBackground from './DitherBackground'
 import VerifiedBadge from './VerifiedBadge'
 import { getSubTypeConfig, getBucketGradient, getBucketColor } from '../config/repoTypeConfig'
@@ -140,6 +141,9 @@ interface RepoCardProps {
 
 const RepoCard = memo(function RepoCard({ repo, onNavigate, onTagClick, onOwnerClick, typeSub, typeBucket, verificationTier, verificationSignals, verificationResolving, activeTags, focused, viewMode, anchors, onStar, onLanguageClick, onSubtypeClick, learnState, onLearn }: RepoCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
+  const learningProgress = useLearningProgress(repo.owner, repo.name)
+  const isLearning = !!learningProgress.state && learningProgress.state.state === 'running'
+  const learnPercent = learningProgress.state?.percent ?? 0
 
   useEffect(() => {
     if (focused && cardRef.current) {
@@ -280,13 +284,13 @@ const RepoCard = memo(function RepoCard({ repo, onNavigate, onTagClick, onOwnerC
             <span>{formatCount(repo.stars)}</span>
           </button>
           <button
-            className={`repo-card-badge-learn${learnState === 'LEARNED' ? ' learned' : ''}`}
+            className={`repo-card-badge-learn${learnState === 'LEARNED' ? ' learned' : ''}${isLearning ? ' learning' : ''}`}
             onClick={e => { e.stopPropagation(); onLearn?.() }}
-            disabled={learnState === 'LEARNING'}
-            title={learnState === 'LEARNED' ? 'Learned' : learnState === 'LEARNING' ? 'Learning…' : 'Learn'}
+            disabled={learnState === 'LEARNING' || isLearning}
+            title={learnState === 'LEARNED' ? 'Learned' : isLearning ? `Learning… ${learnPercent}%` : learnState === 'LEARNING' ? 'Learning…' : 'Learn'}
             aria-label={learnState === 'LEARNED' ? 'Learned' : 'Learn'}
           >
-            {learnState === 'LEARNING' ? (
+            {(isLearning || learnState === 'LEARNING') ? (
               <span className="spin-ring" style={{ width: 12, height: 12 }} />
             ) : learnState === 'LEARNED' ? (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -295,7 +299,12 @@ const RepoCard = memo(function RepoCard({ repo, onNavigate, onTagClick, onOwnerC
             ) : (
               <Brain size={14} />
             )}
-            <span>{learnState === 'LEARNED' ? 'Learned' : learnState === 'LEARNING' ? 'Learning…' : 'Learn'}</span>
+            <span>
+              {learnState === 'LEARNED' ? 'Learned'
+                : isLearning ? `Learning… ${learnPercent}%`
+                : learnState === 'LEARNING' ? 'Learning…'
+                : 'Learn'}
+            </span>
           </button>
         </div>
       </div>

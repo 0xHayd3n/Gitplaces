@@ -2041,6 +2041,12 @@ a {
 }
 .repo-card-badge-learn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.15); color: rgba(255,255,255,0.9); }
 .repo-card-badge-learn.learned { color: var(--accent-light); border-color: rgba(139,92,246,0.5); box-shadow: 0 0 8px rgba(139,92,246,0.4), 0 0 3px rgba(139,92,246,0.2); }
+.repo-card-badge-learn.learning {
+  color: var(--accent-light);
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4), 0 0 3px rgba(139, 92, 246, 0.2);
+}
+.repo-card-badge-learn.learning span:last-child { font-variant-numeric: tabular-nums; }
 .repo-card-badge-learn:disabled { cursor: default; opacity: 0.6; }
 .repo-card-badge-br.starred { color: #f59e0b; }
 .repo-card-badge-br:disabled { cursor: default; opacity: 0.6; }

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { useRef, useEffect } from 'react'
 import Discover from './Discover'
 import { SavedReposProvider } from '../contexts/SavedRepos'
+import { MockLearningProgressProvider } from '../contexts/LearningProgressContext'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
 import { SearchProvider, useSearch } from '../contexts/Search'
 import { DEFAULT_LAYOUT_PREFS } from '../components/LayoutDropdown'
@@ -137,7 +138,9 @@ function renderDiscover(initialEntry = '/discover?view=recommended') {
         <SearchInputShim />
         <ProfileOverlayProvider>
           <SavedReposProvider>
-            <Discover />
+            <MockLearningProgressProvider>
+              <Discover />
+            </MockLearningProgressProvider>
           </SavedReposProvider>
         </ProfileOverlayProvider>
       </SearchProvider>
