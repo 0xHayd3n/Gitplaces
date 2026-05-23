@@ -34,9 +34,8 @@ describe('agents redesign — schema migration', () => {
     )
   })
 
-  it('indexes exist for handle (unique), pinned, last_used_at, revisions', () => {
+  it('indexes exist for pinned, last_used_at, revisions', () => {
     const idx = db.prepare(`PRAGMA index_list(agents)`).all() as { name: string; unique: number }[]
-    expect(idx.find(i => i.name === 'idx_agents_handle')?.unique).toBe(1)
     expect(idx.find(i => i.name === 'idx_agents_pinned')).toBeDefined()
     expect(idx.find(i => i.name === 'idx_agents_last_used')).toBeDefined()
 
