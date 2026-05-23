@@ -6234,8 +6234,10 @@ a {
 .split-button-action,
 .split-button-caret {
   border: none;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -6270,8 +6272,9 @@ a {
   display: flex; flex-direction: column;
 }
 .split-button-menu button {
-  background: transparent; border: none; color: var(--t1); padding: 8px 14px;
-  width: 100%; display: flex; align-items: center; gap: 10px; font-size: 12px;
+  background: transparent; border: none; color: var(--t1); padding: 10px 16px;
+  width: 100%; display: flex; align-items: center; gap: 12px; font-size: 12px;
+  font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em;
   text-align: left; cursor: pointer;
   border-bottom: 1px solid rgba(255,255,255,0.04);
 }
