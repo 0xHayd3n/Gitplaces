@@ -6263,6 +6263,17 @@ a {
 .split-button-cancel-icon { display: inline-flex; gap: 2px; }
 .split-button-cancel-icon span { width: 3px; height: 11px; background: currentColor; }
 
+/* ── Learn status inline (RepoDetail action row) ─────────────────── */
+.learn-status-inline { display: flex; flex-direction: column; justify-content: center; min-width: 180px; }
+.learn-status-label { color: var(--accent-text); font-size: 10px; letter-spacing: 0.1em; line-height: 1.3; }
+.learn-status-meta { color: var(--t2); font-size: 11px; margin-top: 3px; margin-bottom: 5px; }
+.learn-status-meta-sep { color: var(--t4); margin-left: 4px; margin-right: 4px; }
+.learn-status-meta-elapsed { color: var(--t4); }
+.learn-status-bar { height: 3px; background: rgba(139,92,246,0.15); border-radius: 2px; overflow: hidden; }
+.learn-status-bar-fill { height: 100%; background: linear-gradient(90deg, #8b5cf6, #a78bfa); transition: width 0.3s ease; }
+.learn-status-inline--failed .learn-status-label { color: #f87171; }
+.learn-status-inline--failed .learn-status-bar-fill { background: #f87171; }
+
 /* ── Inline clone options panel ────────────────────────────── */
 .clone-panel {
   display: flex;
