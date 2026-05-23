@@ -155,3 +155,28 @@ describe('LibrarySidebar — archived section', () => {
     expect(screen.queryByRole('button', { name: /archived/i })).not.toBeInTheDocument()
   })
 })
+
+describe('LibrarySidebar — recently unstarred section', () => {
+  const unstarredRow = {
+    ...makeRow('zed', 'unstarred-repo'),
+    starred_at: null,
+    unstarred_at: '2026-05-22T00:00:00Z',
+  } as unknown as import('../types/repo').StarredRepoRow
+
+  it('shows a collapsed Recently unstarred (N) section when there are items', () => {
+    wrap(<LibrarySidebar {...defaultProps} unstarredRows={[unstarredRow]} />)
+    expect(screen.getByRole('button', { name: /recently unstarred \(1\)/i })).toBeInTheDocument()
+    expect(screen.queryByText('unstarred-repo')).not.toBeInTheDocument()
+  })
+
+  it('expands to reveal items on click', () => {
+    wrap(<LibrarySidebar {...defaultProps} unstarredRows={[unstarredRow]} />)
+    fireEvent.click(screen.getByRole('button', { name: /recently unstarred \(1\)/i }))
+    expect(screen.getByText('unstarred-repo')).toBeInTheDocument()
+  })
+
+  it('hides Recently unstarred section entirely when empty', () => {
+    wrap(<LibrarySidebar {...defaultProps} unstarredRows={[]} />)
+    expect(screen.queryByRole('button', { name: /recently unstarred/i })).not.toBeInTheDocument()
+  })
+})

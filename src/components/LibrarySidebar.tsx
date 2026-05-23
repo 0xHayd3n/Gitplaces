@@ -71,6 +71,7 @@ export default function LibrarySidebar({
   const [mode, setMode] = useState<Mode>('repos')
   const [searchTerm, setSearchTerm] = useState('')
   const [archivedOpen, setArchivedOpen] = useState(false)
+  const [unstarredOpen, setUnstarredOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const isSummaryActive = location.pathname === '/library'
@@ -116,6 +117,14 @@ export default function LibrarySidebar({
       return e.row.name.toLowerCase().includes(q) || e.row.owner.toLowerCase().includes(q)
     })
   }, [allEntries, archivedSet, searchTerm])
+
+  const visibleUnstarred = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) return unstarredRows
+    return unstarredRows.filter(r =>
+      r.name.toLowerCase().includes(q) || r.owner.toLowerCase().includes(q)
+    )
+  }, [unstarredRows, searchTerm])
 
   const handleRepoContextMenu = (e: React.MouseEvent, entry: LibraryEntry & { kind: 'repo' }) => {
     e.preventDefault()
@@ -237,6 +246,30 @@ export default function LibrarySidebar({
                 />
               )
             })}
+          </div>
+        )}
+
+        {visibleUnstarred.length > 0 && (
+          <div className="library-sidebar-section">
+            <button
+              type="button"
+              className="library-sidebar-section-header"
+              onClick={() => setUnstarredOpen(o => !o)}
+              aria-expanded={unstarredOpen}
+            >
+              <span className="library-sidebar-section-caret">{unstarredOpen ? '▾' : '▸'}</span>
+              Recently unstarred ({visibleUnstarred.length})
+            </button>
+            {unstarredOpen && visibleUnstarred.map(row => (
+              <SidebarRepoRow
+                key={`unstarred-${row.id}`}
+                row={row}
+                isInstalled={false}
+                selected={selectedId === row.id}
+                onSelect={() => onSelect(row, false)}
+                onContextMenu={(e) => handleRepoContextMenu(e, { kind: 'repo', row, isInstalled: false, isStarred: false })}
+              />
+            ))}
           </div>
         )}
       </div>
