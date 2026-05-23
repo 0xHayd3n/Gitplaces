@@ -169,9 +169,26 @@ contextBridge.exposeInMainWorld('api', {
         folders: import('../src/types/agent').AgentFolderRow[]
         agents:  import('../src/types/agent').AgentRow[]
       }>,
-    create: (input: { name: string; body: string; folderId: string | null }) =>
+    create: (input: {
+      name: string
+      body: string
+      folderId: string | null
+      handle: string
+      colorStart: string
+      colorEnd: string | null
+      emoji: string | null
+    }) =>
       ipcRenderer.invoke('agents:create', input) as Promise<import('../src/types/agent').AgentRow>,
-    update: (id: string, patch: { name?: string; body?: string; folderId?: string | null }) =>
+    update: (id: string, patch: {
+      name?: string
+      body?: string
+      folderId?: string | null
+      handle?: string
+      colorStart?: string
+      colorEnd?: string | null
+      emoji?: string | null
+      pinned?: boolean
+    }) =>
       ipcRenderer.invoke('agents:update', id, patch) as Promise<import('../src/types/agent').AgentRow>,
     delete: (id: string) => ipcRenderer.invoke('agents:delete', id) as Promise<void>,
     duplicate: (id: string) =>
