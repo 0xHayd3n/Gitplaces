@@ -164,4 +164,23 @@ describe('AgentDetail', () => {
     // After blur, header should reflect the new name (nameDraft), not stale agent.name
     expect(screen.getByRole('heading', { level: 2, name: 'Renamed agent' })).toBeTruthy()
   })
+
+  it('auto-enters edit mode and focuses the textarea when body is empty', async () => {
+    const emptyAgent: AgentRow = {
+      id: 'a1', name: 'Agent 1', body: '',
+      folder_id: null, created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z',
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [emptyAgent] })
+    setup()
+    await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Agent 1' }))
+    const ta = screen.getByRole('textbox', { name: /Body/ }) as HTMLTextAreaElement
+    expect(ta).toBeTruthy()
+    expect(document.activeElement).toBe(ta)
+  })
+
+  it('stays in preview mode when body is non-empty', async () => {
+    setup()
+    await waitForLoaded()
+    expect(screen.queryByRole('textbox', { name: /Body/ })).toBeNull()
+  })
 })

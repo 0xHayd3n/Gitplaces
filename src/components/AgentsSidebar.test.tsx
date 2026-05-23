@@ -22,7 +22,14 @@ beforeEach(() => {
       onChanged: vi.fn(),
       offChanged: vi.fn(),
       createFolder: vi.fn(),
-      create: vi.fn(),
+      create: vi.fn().mockImplementation(async (input: any) => ({
+        id: 'new-id',
+        name: input.name,
+        body: input.body,
+        folder_id: input.folderId,
+        created_at: '2026-05-23T00:00:00Z',
+        updated_at: '2026-05-23T00:00:00Z',
+      })),
     },
   }
 })
@@ -78,11 +85,37 @@ describe('AgentsSidebar', () => {
     expect(screen.queryByText('Copy editor')).toBeNull()
   })
 
-  it('navigates to /library/agent/new when "+ New agent" is clicked', async () => {
+  it('auto-creates "Agent N" and navigates to it when "+ New agent" is clicked', async () => {
     renderSidebar()
     await waitFor(() => screen.getByRole('button', { name: /\+ New agent/ }))
     fireEvent.click(screen.getByRole('button', { name: /\+ New agent/ }))
-    expect(screen.getByTestId('location').textContent).toBe('/library/agent/new')
+    await waitFor(() =>
+      expect(window.api.agents.create).toHaveBeenCalledWith({
+        name: 'Agent 1', body: '', folderId: null,
+      }),
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('location').textContent).toBe('/library/agent/new-id'),
+    )
+  })
+
+  it('picks the next available "Agent N" when some already exist', async () => {
+    ;(window as any).api.agents.getAll.mockResolvedValueOnce({
+      folders,
+      agents: [
+        { ...agents[0], name: 'Agent 1' },
+        { ...agents[1], name: 'Agent 3' },
+        { ...agents[2], name: 'Untagged note' },
+      ],
+    })
+    renderSidebar()
+    await waitFor(() => screen.getByRole('button', { name: /\+ New agent/ }))
+    fireEvent.click(screen.getByRole('button', { name: /\+ New agent/ }))
+    await waitFor(() =>
+      expect(window.api.agents.create).toHaveBeenCalledWith({
+        name: 'Agent 4', body: '', folderId: null,
+      }),
+    )
   })
 
   it('hides named folders that have no matching agents during search', async () => {

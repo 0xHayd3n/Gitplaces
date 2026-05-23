@@ -3,7 +3,6 @@ import { Routes, Route, useLocation, type Location } from 'react-router-dom'
 import RepoDetail from '../views/RepoDetail'
 import CollectionDetail from '../views/CollectionDetail'
 import AgentDetail from '../views/AgentDetail'
-import NewAgentPanel from './NewAgentPanel'
 import './LibraryDetailRoutes.css'
 
 const TRANSITION_HOLD_MS = 220
@@ -31,7 +30,6 @@ export default function LibraryDetailRoutes() {
           <Routes location={leaving}>
             <Route path="repo/:owner/:name" element={<RepoDetail />} />
             <Route path="collection/:id" element={<CollectionDetail />} />
-            <Route path="agent/new" element={<NewAgentPanel />} />
             <Route path="agent/:id" element={<AgentDetail />} />
           </Routes>
         </div>
@@ -40,7 +38,6 @@ export default function LibraryDetailRoutes() {
         <Routes location={current}>
           <Route path="repo/:owner/:name" element={<RepoDetail />} />
           <Route path="collection/:id" element={<CollectionDetail />} />
-          <Route path="agent/new" element={<NewAgentPanel />} />
           <Route path="agent/:id" element={<AgentDetail />} />
         </Routes>
       </div>
