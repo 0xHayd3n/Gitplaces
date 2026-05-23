@@ -163,6 +163,40 @@ contextBridge.exposeInMainWorld('api', {
     toggle:    (id: string, active: number) => ipcRenderer.invoke('collection:toggle', id, active),
   },
 
+  agents: {
+    getAll: () =>
+      ipcRenderer.invoke('agents:getAll') as Promise<{
+        folders: import('../src/types/agent').AgentFolderRow[]
+        agents:  import('../src/types/agent').AgentRow[]
+      }>,
+    create: (input: { name: string; body: string; folderId: string | null }) =>
+      ipcRenderer.invoke('agents:create', input) as Promise<import('../src/types/agent').AgentRow>,
+    update: (id: string, patch: { name?: string; body?: string; folderId?: string | null }) =>
+      ipcRenderer.invoke('agents:update', id, patch) as Promise<import('../src/types/agent').AgentRow>,
+    delete: (id: string) => ipcRenderer.invoke('agents:delete', id) as Promise<void>,
+    duplicate: (id: string) =>
+      ipcRenderer.invoke('agents:duplicate', id) as Promise<import('../src/types/agent').AgentRow>,
+
+    createFolder: (name: string) =>
+      ipcRenderer.invoke('agents:createFolder', name) as Promise<import('../src/types/agent').AgentFolderRow>,
+    renameFolder: (id: string, name: string) =>
+      ipcRenderer.invoke('agents:renameFolder', id, name) as Promise<import('../src/types/agent').AgentFolderRow>,
+    deleteFolder: (id: string) => ipcRenderer.invoke('agents:deleteFolder', id) as Promise<void>,
+
+    onChanged: (cb: () => void) => {
+      const wrapper = () => cb()
+      callbackWrappers.set(cb, wrapper)
+      ipcRenderer.on('agents:changed', wrapper)
+    },
+    offChanged: (cb: () => void) => {
+      const wrapper = callbackWrappers.get(cb)
+      if (wrapper) {
+        ipcRenderer.removeListener('agents:changed', wrapper)
+        callbackWrappers.delete(cb)
+      }
+    },
+  },
+
   starred: {
     getAll:                () => ipcRenderer.invoke('starred:getAll'),
     getRecentlyUnstarred:  () => ipcRenderer.invoke('starred:getRecentlyUnstarred'),

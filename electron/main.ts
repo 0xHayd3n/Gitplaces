@@ -40,6 +40,7 @@ import { registerVerificationHandlers } from './ipc/verificationHandlers'
 import { registerDownloadHandlers } from './ipc/downloadHandlers'
 import { registerAiChatHandlers } from './ipc/aiChatHandlers'
 import { registerTtsHandlers } from './ipc/ttsHandlers'
+import { registerAgentHandlers } from './ipc/agentHandlers'
 import { registerRecommendHandlers } from './ipc/recommendHandlers'
 import { registerEngagementHandlers } from './ipc/engagementHandlers'
 import { registerUpdateHandlers } from './ipc/updateHandlers'
@@ -2202,6 +2203,7 @@ registerVerificationHandlers()
 registerDownloadHandlers()
 registerAiChatHandlers()
 registerTtsHandlers()
+registerAgentHandlers()
 registerRecommendHandlers()
 registerEngagementHandlers()
 registerUpdateHandlers()
