@@ -32,6 +32,7 @@ export default function NewAgentModal({ folders, onClose, onCreated }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+  const folderCreatingRef = useRef(false)
 
   useEffect(() => { taRef.current?.focus() }, [])
 
@@ -65,16 +66,22 @@ export default function NewAgentModal({ folders, onClose, onCreated }: Props) {
   }, [body, name, folderId, onCreated])
 
   const handleFolderCreate = useCallback(async () => {
+    if (folderCreatingRef.current) return
     const trimmed = newFolderName.trim()
     if (!trimmed) {
       setCreatingFolder(false)
       return
     }
-    const f = await window.api.agents.createFolder(trimmed)
-    setLocalFolders(prev => [...prev, f].sort((a, b) => a.name.localeCompare(b.name)))
-    setFolderId(f.id)
-    setCreatingFolder(false)
-    setNewFolderName('')
+    folderCreatingRef.current = true
+    try {
+      const f = await window.api.agents.createFolder(trimmed)
+      setLocalFolders(prev => [...prev, f].sort((a, b) => a.name.localeCompare(b.name)))
+      setFolderId(f.id)
+      setCreatingFolder(false)
+      setNewFolderName('')
+    } finally {
+      folderCreatingRef.current = false
+    }
   }, [newFolderName])
 
   return (
@@ -132,7 +139,7 @@ export default function NewAgentModal({ folders, onClose, onCreated }: Props) {
           aria-label="Name"
           maxLength={200}
           value={name}
-          onChange={e => { setName(e.target.value); setNameTouched(true) }}
+          onChange={e => { setName(e.target.value); setNameTouched(e.target.value !== '') }}
         />
 
         <div className="coll-modal-label">Body</div>

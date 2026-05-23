@@ -70,6 +70,19 @@ describe('NewAgentModal', () => {
     expect(nameInput.value).toBe('My override')
   })
 
+  it('clearing the name field restores auto-derivation from body', () => {
+    setup()
+    const ta = screen.getByPlaceholderText(/Paste your markdown/i) as HTMLTextAreaElement
+    fireEvent.change(ta, { target: { value: '# First' } })
+    const nameInput = screen.getByLabelText(/Name/i) as HTMLInputElement
+    expect(nameInput.value).toBe('First')
+    fireEvent.change(nameInput, { target: { value: 'Override' } })
+    expect(nameInput.value).toBe('Override')
+    fireEvent.change(nameInput, { target: { value: '' } })
+    fireEvent.change(ta, { target: { value: '# Restored' } })
+    expect(nameInput.value).toBe('Restored')
+  })
+
   it('disables Create until body is non-empty', () => {
     setup()
     const create = screen.getByRole('button', { name: /Create/ }) as HTMLButtonElement
