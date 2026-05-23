@@ -1,16 +1,12 @@
 // src/components/LibrarySidebar.tsx
 import { useState, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Layers, Brain, User, History, Archive, Activity } from 'lucide-react'
+import { Activity } from 'lucide-react'
 import './LibrarySidebar.css'
 import type { LibraryRow, StarredRepoRow, RepoRow } from '../types/repo'
-import type { LibraryEntry, LocalProject, ActiveSegment } from '../types/library'
-import type { RecentEntry } from '../lib/recentVisits'
-import { filterLibraryEntries } from '../lib/libraryFilter'
+import type { LibraryEntry, LocalProject } from '../types/library'
 import { useLearningProgress } from '../hooks/useLearningProgress'
 import RepoContextMenu, { type RepoContextMenuTarget } from './RepoContextMenu'
-
-export type { ActiveSegment }
 
 interface Props {
   installedRows: LibraryRow[]
@@ -18,33 +14,10 @@ interface Props {
   unstarredRows: StarredRepoRow[]
   localProjects: LocalProject[]
   archivedSet: Set<string>
-  recentVisits: RecentEntry[]
-  githubUsername: string | null
   selectedId: string | null
   selectedLocalPath: string | null
-  activeSegment: ActiveSegment
-  onSegmentChange: (s: ActiveSegment) => void
   onSelect: (row: RepoRow, isInstalled: boolean) => void
   onSelectLocal: (project: LocalProject) => void
-}
-
-function DashedStar({ size = 11 }: { size?: number }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeDasharray="2 1.4"
-      strokeLinejoin="round"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M8 1.5l1.85 3.75 4.15.6-3 2.93.7 4.1L8 10.77l-3.7 1.96.7-4.1-3-2.93 4.15-.6z" />
-    </svg>
-  )
 }
 
 function GitHubIcon({ size = 11 }: { size?: number }) {
@@ -71,28 +44,10 @@ function FolderIcon() {
   )
 }
 
-const EMPTY_STATES: Record<ActiveSegment, string> = {
-  all: 'No repos or projects',
-  active: 'No active skills',
-  unstarred: 'Nothing unstarred in the last 30 days',
-  own: 'No repos or projects owned by you',
-  recent: 'Nothing viewed recently',
-  archive: 'Nothing archived',
-}
-
-const SEGMENTS: { id: ActiveSegment; icon: React.ReactNode; label: string }[] = [
-  { id: 'all',       icon: <Layers size={12} />,   label: 'All' },
-  { id: 'active',    icon: <Brain size={12} />,    label: 'Learned' },
-  { id: 'unstarred', icon: <DashedStar size={11} />, label: 'Unstarred' },
-  { id: 'own',       icon: <User size={12} />,     label: 'Own' },
-  { id: 'recent',    icon: <History size={12} />,  label: 'Recent' },
-  { id: 'archive',   icon: <Archive size={12} />,  label: 'Archive' },
-]
-
 export default function LibrarySidebar({
   installedRows, starredRows, unstarredRows, localProjects,
-  archivedSet, recentVisits, githubUsername,
-  selectedId, selectedLocalPath, activeSegment, onSegmentChange, onSelect, onSelectLocal,
+  archivedSet,
+  selectedId, selectedLocalPath, onSelect, onSelectLocal,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
   const location = useLocation()
@@ -115,10 +70,14 @@ export default function LibrarySidebar({
     return Array.from(map.values())
   }, [installedRows, starredRows, localProjects])
 
-  const visible = useMemo(
-    () => filterLibraryEntries(allEntries, activeSegment, { archivedSet, recentVisits, githubUsername, unstarredRows }),
-    [allEntries, activeSegment, archivedSet, recentVisits, githubUsername, unstarredRows],
-  )
+  const visible = useMemo(() => {
+    return allEntries.filter(e => {
+      const key = e.kind === 'repo'
+        ? `${e.row.owner}/${e.row.name}`
+        : `${e.project.owner ?? ''}/${e.project.repoName ?? e.project.name}`
+      return !archivedSet.has(key)
+    })
+  }, [allEntries, archivedSet])
 
   const handleRepoContextMenu = (e: React.MouseEvent, entry: LibraryEntry & { kind: 'repo' }) => {
     e.preventDefault()
@@ -141,22 +100,9 @@ export default function LibrarySidebar({
           Activity
         </button>
       </div>
-      <div className="library-sidebar-filter">
-        {SEGMENTS.map(({ id, icon, label }) => (
-          <button
-            key={id}
-            className={`library-sidebar-seg${activeSegment === id ? ' active' : ''}`}
-            onClick={() => onSegmentChange(id)}
-            title={label}
-          >
-            {icon}
-          </button>
-        ))}
-      </div>
-
       <div className="library-sidebar-list">
         {visible.length === 0 && (
-          <div className="library-sidebar-empty">{EMPTY_STATES[activeSegment]}</div>
+          <div className="library-sidebar-empty">No repos or projects</div>
         )}
         {visible.map(entry => {
           if (entry.kind === 'repo') {

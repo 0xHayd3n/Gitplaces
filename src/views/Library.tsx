@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useMatch, useLocation, Routes, Route } from 'react-router-dom'
 import { type LibraryRow, type StarredRepoRow, type RepoRow } from '../types/repo'
 import type { CollectionRow } from '../types/repo'
-import type { LocalProject, ActiveSegment } from '../types/library'
+import type { LocalProject } from '../types/library'
 import { useToast } from '../contexts/Toast'
 import { useRepoNav } from '../contexts/RepoNav'
-import { useGitHubAuth } from '../contexts/GitHubAuth'
 import { useArchivedRepos } from '../hooks/useArchivedRepos'
 import { getRecentVisits, recordRecentVisit } from '../lib/recentVisits'
 import type { RecentEntry } from '../lib/recentVisits'
@@ -22,7 +21,6 @@ export default function Library() {
   const { toast } = useToast()
   const navigate = useNavigate()
   const { state: repoNav } = useRepoNav()
-  const { user } = useGitHubAuth()
   const { archivedSet } = useArchivedRepos()
   const location = useLocation()
   const isMiniTab = repoNav.activeTab === 'files' || repoNav.activeTab === 'components'
@@ -35,7 +33,6 @@ export default function Library() {
   const [rows, setRows] = useState<LibraryRow[]>([])
   const [starredRows, setStarredRows] = useState<StarredRepoRow[]>([])
   const [unstarredRows, setUnstarredRows] = useState<StarredRepoRow[]>([])
-  const [activeSegment, setActiveSegment] = useState<ActiveSegment>('all')
   const [localProjects, setLocalProjects] = useState<LocalProject[]>([])
   const [recentVisits, setRecentVisits] = useState<RecentEntry[]>(() => getRecentVisits())
 
@@ -143,12 +140,8 @@ export default function Library() {
           unstarredRows={unstarredRows}
           localProjects={localProjects}
           archivedSet={archivedSet}
-          recentVisits={recentVisits}
-          githubUsername={user?.login ?? null}
           selectedId={repoSelectedId}
           selectedLocalPath={selectedLocalPath}
-          activeSegment={activeSegment}
-          onSegmentChange={setActiveSegment}
           onSelect={handleRepoSelect}
           onSelectLocal={handleLocalSelect}
         />
