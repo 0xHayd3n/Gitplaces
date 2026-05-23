@@ -7,11 +7,15 @@ import { runAnatomyVerify } from './verify'
 import type { ResolvedRuntime, SpawnResult } from './runtime'
 import type { AnatomyGenerateInput, AnatomyGenerateOutput } from './types'
 
+export type AnatomyPhase = 'cloning' | 'validating' | 'generating' | 'verifying' | 'persisting'
+
 export interface AnatomyEngineDeps {
   ensureClone: (root: string, owner: string, name: string, branch: string, token: string | null) => Promise<{ dir: string; sha: string }>
   spawnAnatomy: (rt: ResolvedRuntime, args: string[], cwd: string, env?: NodeJS.ProcessEnv) => Promise<SpawnResult>
   readFile: (p: string) => Promise<string | null>
   runtime: ResolvedRuntime
+  /** Optional progress callback invoked at the start of each phase. */
+  onProgress?: (phase: AnatomyPhase) => void
 }
 
 const BRIEF_BUDGET = 1500
@@ -50,6 +54,9 @@ export async function generateViaAnatomy(
   cacheRoot = join(process.cwd(), '.anatomy-cache'),
 ): Promise<AnatomyGenerateOutput> {
   const { token, owner, name, defaultBranch, apiKey } = input
+  const emit = (phase: AnatomyPhase) => { try { d.onProgress?.(phase) } catch {} }
+
+  emit('cloning')
   let clone: { dir: string; sha: string }
   try {
     clone = await d.ensureClone(cacheRoot, owner, name, defaultBranch, token)
@@ -60,11 +67,13 @@ export async function generateViaAnatomy(
   const warnings: string[] = []
   let source: 'committed' | 'generated'
 
+  emit('validating')
   const v = await d.spawnAnatomy(d.runtime, ['validate', '--require'], clone.dir)
   if (v.code === 0) {
     source = 'committed'
   } else {
     source = 'generated'
+    emit('generating')
     const g = await tryGenerate(d, clone.dir, apiKey)
     warnings.push(...g.warnings)
   }
@@ -79,6 +88,7 @@ export async function generateViaAnatomy(
   const briefRes = await d.spawnAnatomy(d.runtime, ['render', '--budget', String(BRIEF_BUDGET)], clone.dir)
   const brief = briefRes.code === 0 && briefRes.stdout.trim() ? briefRes.stdout : content
 
+  emit('verifying')
   // Rule verification (spec D5): surface errors + warnings + skipped into the
   // existing skill-gen warnings array. Never blocks generation.
   const verify = await runAnatomyVerify({ runtime: d.runtime, spawnAnatomy: d.spawnAnatomy }, clone.dir)

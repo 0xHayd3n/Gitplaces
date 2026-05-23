@@ -60,6 +60,33 @@ describe('generateViaAnatomy', () => {
       .rejects.toThrow(/anatomy clone failed/i)
   })
 
+  it('emits onProgress at each phase boundary in order', async () => {
+    const calls: string[] = []
+    const d = deps({
+      spawnAnatomy: vi.fn(async (_rt, args) => ({
+        stdout: '', stderr: '',
+        code: args[0] === 'validate' ? 1 : 0, // force generate path
+      })),
+    })
+    await generateViaAnatomy(
+      { token: null, owner: 'o', name: 'n', defaultBranch: 'main', apiKey: 'k' },
+      { ...d, onProgress: (phase) => calls.push(phase) },
+    )
+    expect(calls).toEqual(['cloning', 'validating', 'generating', 'verifying'])
+  })
+
+  it('skips generating phase when validate succeeds (cached path)', async () => {
+    const calls: string[] = []
+    const d = deps({
+      spawnAnatomy: vi.fn(async () => ({ stdout: '', stderr: '', code: 0 })),
+    })
+    await generateViaAnatomy(
+      { token: null, owner: 'o', name: 'n', defaultBranch: 'main' },
+      { ...d, onProgress: (phase) => calls.push(phase) },
+    )
+    expect(calls).toEqual(['cloning', 'validating', 'verifying'])
+  })
+
   it('runs verification and attaches + surfaces the parsed result', async () => {
     const d = deps({
       spawnAnatomy: vi.fn(async (_rt, args) => {
