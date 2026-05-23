@@ -142,7 +142,7 @@ declare global {
         translate(text: string, targetLang: string): Promise<{ translatedText: string; detectedLanguage: string } | null>
       }
       skill: {
-        generate(owner: string, name: string, options?: { flavour?: 'library' | 'codebase' | 'domain'; enabledComponents?: string[]; enabledTools?: string[]; target?: 'master' | 'components' | 'all'; ref?: string }): Promise<{ content?: string; system?: string; practice?: string; conflict?: boolean; version: string; generated_at: string; warnings?: string[] }>
+        generate(owner: string, name: string, options?: { flavour?: 'library' | 'codebase' | 'domain'; enabledComponents?: string[]; enabledTools?: string[]; target?: 'master' | 'components' | 'all'; ref?: string }): Promise<{ content?: string; system?: string; practice?: string; conflict?: boolean; version: string; generated_at: string; warnings?: string[] } | { cancelled: true }>
         get(owner: string, name: string): Promise<SkillRow | null>
         delete(owner: string, name: string): Promise<void>
         toggle(owner: string, name: string, active: number): Promise<void>
@@ -157,6 +157,15 @@ declare global {
         logoutClaude(): Promise<void>
         onLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
         offLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
+        cancelLearn(owner: string, name: string): Promise<{ cancelled: boolean }>
+        onLearnProgress(cb: (event: {
+          owner: string; name: string; phase: string; percent: number; elapsedMs: number
+          state: 'running' | 'completed' | 'cancelled' | 'failed'; error?: string
+        }) => void): void
+        offLearnProgress(cb: (event: {
+          owner: string; name: string; phase: string; percent: number; elapsedMs: number
+          state: 'running' | 'completed' | 'cancelled' | 'failed'; error?: string
+        }) => void): void
         getSubSkill(owner: string, name: string, skillType: string): Promise<SubSkillRow | null>
         getVersionedInstalls(owner: string, name: string): Promise<string[]>
         getContent(owner: string, name: string): Promise<{ filename: string; content: string } | undefined>

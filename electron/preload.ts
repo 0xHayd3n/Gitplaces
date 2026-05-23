@@ -119,6 +119,26 @@ contextBridge.exposeInMainWorld('api', {
         callbackWrappers.delete(cb)
       }
     },
+    cancelLearn: (owner: string, name: string) =>
+      ipcRenderer.invoke('skill:cancelLearn', owner, name) as Promise<{ cancelled: boolean }>,
+    onLearnProgress: (cb: (event: {
+      owner: string; name: string; phase: string; percent: number; elapsedMs: number;
+      state: 'running' | 'completed' | 'cancelled' | 'failed'; error?: string
+    }) => void) => {
+      const wrapper = (_: unknown, data: Parameters<typeof cb>[0]) => cb(data)
+      callbackWrappers.set(cb, wrapper)
+      ipcRenderer.on('skill:learn-progress', wrapper)
+    },
+    offLearnProgress: (cb: (event: {
+      owner: string; name: string; phase: string; percent: number; elapsedMs: number;
+      state: 'running' | 'completed' | 'cancelled' | 'failed'; error?: string
+    }) => void) => {
+      const wrapper = callbackWrappers.get(cb)
+      if (wrapper) {
+        ipcRenderer.removeListener('skill:learn-progress', wrapper)
+        callbackWrappers.delete(cb)
+      }
+    },
     getSubSkill: (owner: string, name: string, skillType: string) =>
       ipcRenderer.invoke('skill:getSubSkill', owner, name, skillType),
     getVersionedInstalls: (owner: string, name: string): Promise<string[]> =>

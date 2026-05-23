@@ -24,6 +24,9 @@ export default function LibraryFilesDetail({ row, onToggleActive, onInstalled }:
     setInstallError(null)
     try {
       const result = await window.api.skill.generate(row.owner, row.name, { flavour: 'library' })
+      if ('cancelled' in result) {
+        return
+      }
       onInstalled({ content: result.content ?? '', version: result.version, generated_at: result.generated_at })
     } catch {
       setInstallError('Install failed')
