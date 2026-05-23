@@ -1,9 +1,27 @@
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import type { AgentRow, AgentFolderRow } from '../../src/types/agent'
+import { isValidHandle, dedupeHandle } from '../../src/utils/agentSlug'
 
 export const AGENT_NAME_MAX = 200
 export const AGENT_BODY_MAX = 1_048_576 // 1 MiB
+
+const HEX_RE = /^#[0-9a-f]{6}$/i
+
+function assertValidHandle(handle: string): void {
+  if (!isValidHandle(handle)) throw new Error(`Invalid handle: ${JSON.stringify(handle)}`)
+}
+
+function assertValidHex(label: string, hex: string): void {
+  if (!HEX_RE.test(hex)) throw new Error(`${label} must be a hex color, got ${JSON.stringify(hex)}`)
+}
+
+function assertHandleUnique(db: Database.Database, handle: string, exceptId?: string): void {
+  const row = exceptId
+    ? db.prepare(`SELECT id FROM agents WHERE handle = ? AND id <> ?`).get(handle, exceptId)
+    : db.prepare(`SELECT id FROM agents WHERE handle = ?`).get(handle)
+  if (row) throw new Error(`Handle already in use: ${handle}`)
+}
 
 function nowIso(): string {
   return new Date().toISOString()
@@ -69,6 +87,10 @@ export interface CreateAgentInput {
   name: string
   body: string
   folderId: string | null
+  handle: string
+  colorStart: string
+  colorEnd: string | null
+  emoji: string | null
 }
 
 export function createAgent(db: Database.Database, input: CreateAgentInput): AgentRow {
@@ -77,12 +99,17 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
   assertBodyLen(input.body)
   if (input.folderId !== null) assertFolderExists(db, input.folderId)
 
+  assertValidHandle(input.handle)
+  assertHandleUnique(db, input.handle)
+  assertValidHex('colorStart', input.colorStart)
+  if (input.colorEnd !== null) assertValidHex('colorEnd', input.colorEnd)
+
   const id = randomUUID()
   const ts = nowIso()
   db.prepare(`
-    INSERT INTO agents (id, name, body, folder_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, name, input.body, input.folderId, ts, ts)
+    INSERT INTO agents (id, name, handle, body, folder_id, color_start, color_end, emoji, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, name, input.handle, input.body, input.folderId, input.colorStart, input.colorEnd, input.emoji, ts, ts)
   return db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow
 }
 
@@ -90,6 +117,11 @@ export interface UpdateAgentPatch {
   name?: string
   body?: string
   folderId?: string | null
+  handle?: string
+  colorStart?: string
+  colorEnd?: string | null
+  emoji?: string | null
+  pinned?: boolean
 }
 
 export function updateAgent(
@@ -103,23 +135,42 @@ export function updateAgent(
   if (patch.name !== undefined) {
     const name = normaliseName(patch.name)
     assertNameLen(name)
-    sets.push('name = ?')
-    params.push(name)
+    sets.push('name = ?'); params.push(name)
   }
   if (patch.body !== undefined) {
     assertBodyLen(patch.body)
-    sets.push('body = ?')
-    params.push(patch.body)
+    sets.push('body = ?'); params.push(patch.body)
   }
   if (patch.folderId !== undefined) {
     if (patch.folderId !== null) assertFolderExists(db, patch.folderId)
-    sets.push('folder_id = ?')
-    params.push(patch.folderId)
+    sets.push('folder_id = ?'); params.push(patch.folderId)
+  }
+  if (patch.handle !== undefined) {
+    assertValidHandle(patch.handle)
+    assertHandleUnique(db, patch.handle, id)
+    sets.push('handle = ?'); params.push(patch.handle)
+  }
+  if (patch.colorStart !== undefined) {
+    assertValidHex('colorStart', patch.colorStart)
+    sets.push('color_start = ?'); params.push(patch.colorStart)
+  }
+  if (patch.colorEnd !== undefined) {
+    if (patch.colorEnd !== null) assertValidHex('colorEnd', patch.colorEnd)
+    sets.push('color_end = ?'); params.push(patch.colorEnd)
+  }
+  if (patch.emoji !== undefined) {
+    sets.push('emoji = ?'); params.push(patch.emoji)
+  }
+  if (patch.pinned !== undefined) {
+    sets.push('pinned = ?'); params.push(patch.pinned ? 1 : 0)
+    if (patch.pinned) {
+      sets.push('pinned_at = ?'); params.push(nowIso())
+    }
+    // when unpinning, leave pinned_at alone (preserved for re-pin UX)
   }
 
   if (sets.length > 0) {
-    sets.push('updated_at = ?')
-    params.push(nowIso())
+    sets.push('updated_at = ?'); params.push(nowIso())
     params.push(id)
     db.prepare(`UPDATE agents SET ${sets.join(', ')} WHERE id = ?`).run(...params)
   }
@@ -140,10 +191,18 @@ export function duplicateAgent(db: Database.Database, id: string): AgentRow {
   const baseName = src.name.length + suffix.length > AGENT_NAME_MAX
     ? src.name.slice(0, AGENT_NAME_MAX - suffix.length)
     : src.name
+
+  const taken = (db.prepare(`SELECT handle FROM agents`).all() as { handle: string }[]).map(r => r.handle)
+  const dupHandle = dedupeHandle(src.handle, taken)
+
   return createAgent(db, {
     name: `${baseName}${suffix}`,
     body: src.body,
     folderId: src.folder_id,
+    handle: dupHandle,
+    colorStart: src.color_start ?? '#888888',
+    colorEnd: src.color_end,
+    emoji: src.emoji,
   })
 }
 
