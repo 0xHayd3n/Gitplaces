@@ -187,8 +187,25 @@ declare global {
           folders: import('./types/agent').AgentFolderRow[]
           agents: import('./types/agent').AgentRow[]
         }>
-        create(input: { name: string; body: string; folderId: string | null }): Promise<import('./types/agent').AgentRow>
-        update(id: string, patch: { name?: string; body?: string; folderId?: string | null }): Promise<import('./types/agent').AgentRow>
+        create(input: {
+          name: string
+          body: string
+          folderId: string | null
+          handle: string
+          colorStart: string
+          colorEnd: string | null
+          emoji: string | null
+        }): Promise<import('./types/agent').AgentRow>
+        update(id: string, patch: {
+          name?: string
+          body?: string
+          folderId?: string | null
+          handle?: string
+          colorStart?: string
+          colorEnd?: string | null
+          emoji?: string | null
+          pinned?: boolean
+        }): Promise<import('./types/agent').AgentRow>
         delete(id: string): Promise<void>
         duplicate(id: string): Promise<import('./types/agent').AgentRow>
         createFolder(name: string): Promise<import('./types/agent').AgentFolderRow>
