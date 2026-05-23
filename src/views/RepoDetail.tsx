@@ -1658,7 +1658,13 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
             dither={<DitherBackground avatarUrl={repo?.avatar_url} fallbackGradient={ditherGradient} staticFrame />}
             title={titleNode}
             titleExtras={titleExtrasNode}
-            description={repo?.description ? <>{repo.description}</> : undefined}
+            description={
+              repo?.description
+                ? <>{repo.description}</>
+                : repo === null && !repoError
+                  ? <span className="skeleton-shimmer repo-detail-skeleton-description" aria-hidden="true" />
+                  : undefined
+            }
             tabs={tabsNode}
             scrollRef={articleBodyRef}
             tocSlot={
@@ -1675,7 +1681,14 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
               <>
                 {activeTab === 'readme' && (
                   readme === 'loading' || (deferredReadmeContent === '' && rawReadmeContent !== '') ? (
-                    <p className="repo-detail-placeholder">Loading README…</p>
+                    <div className="repo-detail-skeleton-readme" aria-hidden="true">
+                      <span className="skeleton-shimmer" style={{ width: '92%', height: 14 }} />
+                      <span className="skeleton-shimmer" style={{ width: '88%', height: 14 }} />
+                      <span className="skeleton-shimmer" style={{ width: '76%', height: 14 }} />
+                      <span className="skeleton-shimmer" style={{ width: '94%', height: 14 }} />
+                      <span className="skeleton-shimmer" style={{ width: '70%', height: 14 }} />
+                      <span className="skeleton-shimmer" style={{ width: '82%', height: 14 }} />
+                    </div>
                   ) : readme === 'error' ? (
                     <p className="repo-detail-placeholder">Failed to load README.</p>
                   ) : readme === null ? (

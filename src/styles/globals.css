@@ -2619,6 +2619,24 @@ a {
   color: var(--t2);
 }
 
+.repo-detail-skeleton-description {
+  display: inline-block;
+  width: 72%;
+  height: 14px;
+  vertical-align: middle;
+}
+
+.repo-detail-skeleton-readme {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.repo-detail-skeleton-readme .skeleton-shimmer {
+  display: block;
+}
+
 .page-transition {
   flex: 1;
   display: flex;
