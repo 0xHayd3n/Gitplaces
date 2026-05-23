@@ -26,7 +26,8 @@ export default function Library() {
 
   const repoMatch  = useMatch('/library/repo/:owner/:name')
   const collMatch  = useMatch('/library/collection/:id')
-  const hasDetail  = repoMatch !== null || collMatch !== null
+  const agentMatch = useMatch('/library/agent/:id')
+  const hasDetail  = repoMatch !== null || collMatch !== null || agentMatch !== null
 
   const [rows, setRows] = useState<LibraryRow[]>([])
   const [starredRows, setStarredRows] = useState<StarredRepoRow[]>([])
@@ -64,6 +65,12 @@ export default function Library() {
   useEffect(() => {
     window.addEventListener('library:changed', scheduleRefresh)
     return () => window.removeEventListener('library:changed', scheduleRefresh)
+  }, [scheduleRefresh])
+
+  useEffect(() => {
+    const cb = () => scheduleRefresh()
+    window.api.agents.onChanged(cb)
+    return () => window.api.agents.offChanged(cb)
   }, [scheduleRefresh])
 
   useEffect(() => {

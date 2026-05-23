@@ -182,6 +182,21 @@ declare global {
         delete(id: string): Promise<void>
         toggle(id: string, active: number): Promise<void>
       }
+      agents: {
+        getAll(): Promise<{
+          folders: import('./types/agent').AgentFolderRow[]
+          agents: import('./types/agent').AgentRow[]
+        }>
+        create(input: { name: string; body: string; folderId: string | null }): Promise<import('./types/agent').AgentRow>
+        update(id: string, patch: { name?: string; body?: string; folderId?: string | null }): Promise<import('./types/agent').AgentRow>
+        delete(id: string): Promise<void>
+        duplicate(id: string): Promise<import('./types/agent').AgentRow>
+        createFolder(name: string): Promise<import('./types/agent').AgentFolderRow>
+        renameFolder(id: string, name: string): Promise<import('./types/agent').AgentFolderRow>
+        deleteFolder(id: string): Promise<void>
+        onChanged(cb: () => void): void
+        offChanged(cb: () => void): void
+      }
       starred: {
         getAll(): Promise<StarredRepoRow[]>
         getRecentlyUnstarred(): Promise<StarredRepoRow[]>

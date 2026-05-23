@@ -64,6 +64,10 @@ beforeEach(() => {
       getRecentlyUnstarred: vi.fn().mockResolvedValue([]),
     },
     collection: { getAll: vi.fn().mockResolvedValue([]) },
+    agents: {
+      onChanged: vi.fn(),
+      offChanged: vi.fn(),
+    },
     settings: {
       get: vi.fn().mockResolvedValue(null),
       set: vi.fn().mockResolvedValue(undefined),
