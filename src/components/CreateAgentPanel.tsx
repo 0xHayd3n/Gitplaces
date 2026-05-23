@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { slugifyName, dedupeHandle } from '../utils/agentSlug'
+import { slugifyName, dedupeHandle, isValidHandle } from '../utils/agentSlug'
 import { hashHandleToColor, type HarmonyMode } from '../utils/colorHarmony'
+import { useToast } from '../contexts/Toast'
 import AgentEmojiPicker from './AgentEmojiPicker'
 import AgentColorPicker from './AgentColorPicker'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
 
 export default function CreateAgentPanel() {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [folders, setFolders] = useState<AgentFolderRow[]>([])
   const [takenHandles, setTakenHandles] = useState<string[]>([])
 
@@ -59,7 +61,7 @@ export default function CreateAgentPanel() {
   }, [defaultColorStart, colorTouched])
 
   const cleanHandle = handle.replace(/^@/, '')
-  const handleIsValid = /^[a-z0-9][a-z0-9-]{0,63}$/.test(cleanHandle) && !takenHandles.includes(cleanHandle)
+  const handleIsValid = isValidHandle(cleanHandle) && !takenHandles.includes(cleanHandle)
   const canSubmit = !submitting && name.trim().length > 0 && handleIsValid
 
   async function handleSubmit() {
@@ -78,8 +80,12 @@ export default function CreateAgentPanel() {
       navigate(`/library/agent/${row.id}`)
     } catch (e) {
       setSubmitting(false)
-      // eslint-disable-next-line no-console
-      console.error('Failed to create agent', e)
+      toast(
+        e instanceof Error && e.message.includes('Handle')
+          ? `Handle already in use: @${cleanHandle}`
+          : 'Failed to create agent',
+        'error',
+      )
     }
   }
 
