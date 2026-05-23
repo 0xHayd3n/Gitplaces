@@ -2145,9 +2145,9 @@ function RepoArticleActionRow({
     learnState === 'LEARNING'  ? () => { void learnProgress.cancel() } :
                                  onUnlearn
   const actionIcon =
-    learnState === 'UNLEARNED' ? <PiBrainFill size={14} /> :
+    learnState === 'UNLEARNED' ? <PiBrainFill size={20} /> :
     learnState === 'LEARNING'  ? <span className="split-button-cancel-icon"><span /><span /></span> :
-                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 12 9 17 20 6" /></svg>
+                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 12 9 17 20 6" /></svg>
 
   return (
     <div className="article-action-row">

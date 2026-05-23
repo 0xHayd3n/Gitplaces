@@ -6229,22 +6229,22 @@ a {
 /* Width: action grows to fill (flex:1), caret stays compact. Combined with
    the menu's JS-synced width, the trigger and the open menu read as the
    same pill — same width, edges aligned. */
-.split-button { display: inline-flex; position: relative; min-width: 180px; }
+.split-button { display: inline-flex; position: relative; min-width: 240px; }
 .split-button-action { flex: 1; justify-content: center; }
 .split-button-action,
 .split-button-caret {
   border: none;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 20px;
+  gap: 12px;
+  padding: 13px 24px;
   transition: background 0.1s, color 0.1s;
 }
 .split-button-action { border-radius: 6px 0 0 6px; }
-.split-button-caret  { border-radius: 0 6px 6px 0; padding: 11px 10px; border-left: 1px solid rgba(0,0,0,0.2); }
+.split-button-caret  { border-radius: 0 6px 6px 0; padding: 13px 12px; border-left: 1px solid rgba(0,0,0,0.2); }
 .split-button--primary .split-button-action,
 .split-button--primary .split-button-caret { background: var(--accent); color: var(--t1); }
 .split-button--primary .split-button-action:hover:not(:disabled),
@@ -6277,8 +6277,8 @@ a {
 }
 .split-button-menu button:last-child { border-bottom: none; }
 .split-button-menu button:hover { background: rgba(255,255,255,0.05); }
-.split-button-cancel-icon { display: inline-flex; gap: 2px; }
-.split-button-cancel-icon span { width: 3px; height: 11px; background: currentColor; }
+.split-button-cancel-icon { display: inline-flex; gap: 3px; }
+.split-button-cancel-icon span { width: 4px; height: 14px; background: currentColor; }
 
 /* ── Learn status inline (RepoDetail action row) ─────────────────── */
 .learn-status-inline { display: flex; flex-direction: column; justify-content: center; min-width: 180px; }
