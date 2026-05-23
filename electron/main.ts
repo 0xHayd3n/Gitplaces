@@ -29,6 +29,7 @@ import { extractionCache } from './skill-gen/extraction-cache'
 import { generateViaAnatomy, persistAnatomySkill, readFileOrNull } from './anatomy/index'
 import { ensureClone } from './anatomy/clone'
 import { spawnAnatomy, resolveAnatomyRuntime } from './anatomy/runtime'
+import { learnProcessRegistry } from './services/learnProcessRegistry'
 import { parseAnatomy, parseMemory } from './anatomy/parse'
 import { needsTranslation, translate as translateText } from './translator'
 import { registerComponentsIPC, scanComponents } from './componentScanner'
@@ -1378,9 +1379,17 @@ ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?
         packaged: app.isPackaged, platform: process.platform,
         repoRoot: process.cwd(), resourcesPath: process.resourcesPath,
       })
+      const learnKey = `${owner}/${name}` as const
+      const trackedSpawn: typeof spawnAnatomy = (r, args, cwd, env) =>
+        spawnAnatomy(r, args, cwd, env, {
+          onProcess: (proc) => {
+            learnProcessRegistry.register(learnKey, proc)
+            proc.on('close', () => learnProcessRegistry.unregister(learnKey))
+          },
+        })
       const a = await generateViaAnatomy(
         { token, owner, name, defaultBranch: repo.default_branch ?? 'main', apiKey: apiKey ?? undefined },
-        { ensureClone, spawnAnatomy, readFile: readFileOrNull, runtime: rt },
+        { ensureClone, spawnAnatomy: trackedSpawn, readFile: readFileOrNull, runtime: rt },
         path.join(app.getPath('userData'), 'anatomy-cache'),
       )
       await persistAnatomySkill(db, app.getPath('userData'), repo.id, owner, name, a, version)
