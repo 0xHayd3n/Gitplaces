@@ -6280,6 +6280,8 @@ a {
 }
 .split-button-menu button:last-child { border-bottom: none; }
 .split-button-menu button:hover { background: rgba(255,255,255,0.05); }
+.split-button-menu button.split-button-menu-item--danger { color: #f87171; }
+.split-button-menu button.split-button-menu-item--danger:hover { background: rgba(248,113,113,0.10); }
 .split-button-cancel-icon { display: inline-flex; gap: 3px; }
 .split-button-cancel-icon span { width: 4px; height: 14px; background: currentColor; }
 
