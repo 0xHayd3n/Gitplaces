@@ -35,10 +35,15 @@ export function spawnAnatomy(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<SpawnResult> {
   return new Promise((resolve, reject) => {
+    // 15-minute ceiling. Must exceed the anatomy CLI's internal claude-cli
+    // per-attempt timeout (ANATOMY_CLAUDE_CLI_TIMEOUT_MS, set to 10min by
+    // index.ts:23) with headroom for pass-1 scan + render + I/O on large
+    // monorepos. Validate/render calls exit fast either way; this only
+    // increases the safety net.
     execFile(
       rt.nodeBin,
       buildSpawnArgs(rt.cliEntry, anatomyArgs),
-      { cwd, env, maxBuffer: 32 * 1024 * 1024, timeout: 5 * 60_000 },
+      { cwd, env, maxBuffer: 32 * 1024 * 1024, timeout: 15 * 60_000 },
       (err, stdout, stderr) => {
         const code = err && typeof (err as { code?: unknown }).code === 'number'
           ? (err as unknown as { code: number }).code : err ? 1 : 0

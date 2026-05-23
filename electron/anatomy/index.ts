@@ -20,7 +20,15 @@ async function tryGenerate(
   d: AnatomyEngineDeps, dir: string, apiKey?: string,
 ): Promise<{ warnings: string[] }> {
   const warnings: string[] = []
-  const env = { ...process.env, ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}) }
+  // 10-minute ceiling for the claude-cli provider's per-attempt timeout.
+  // Default in the anatomy CLI is 120s, which routinely tips over on
+  // medium-large monorepos (e.g. mui/material-ui's pass-1 context).
+  // Env-var override is honoured by anatomy CLI 1.0.1+ (ANATOMY_CLAUDE_CLI_TIMEOUT_MS).
+  const env = {
+    ...process.env,
+    ANATOMY_CLAUDE_CLI_TIMEOUT_MS: '600000',
+    ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
+  }
   // 1. claude-cli (no key)
   let r = await d.spawnAnatomy(d.runtime, ['generate', '--ai', '--provider', 'claude-cli', '--repo', dir], dir, env)
   if (r.code === 0) return { warnings }
