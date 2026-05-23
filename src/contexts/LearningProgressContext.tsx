@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
+import React, { createContext, useContext, useEffect, useRef, useCallback, useMemo } from 'react'
 
 export type LearningPhase = 'cloning' | 'validating' | 'generating' | 'verifying' | 'persisting'
 export type LearningTerminalState = 'completed' | 'cancelled' | 'failed'
@@ -13,11 +13,22 @@ export interface LearningState {
 }
 
 type LearningMap = Map<string, LearningState>
+type Listener = () => void
+
+interface LearningStore {
+  states: LearningMap
+  get: (key: string) => LearningState | null
+  set: (key: string, value: LearningState) => void
+  delete: (key: string) => void
+  subscribe: (key: string, listener: Listener) => () => void
+}
 
 interface ContextValue {
   states: LearningMap
   startLearn: <T>(owner: string, name: string, fn: () => Promise<T>) => Promise<T>
   cancelLearn: (owner: string, name: string) => Promise<void>
+  subscribe: LearningStore['subscribe']
+  getSnapshot: LearningStore['get']
 }
 
 const LearningProgressContext = createContext<ContextValue | null>(null)
@@ -26,8 +37,37 @@ const TERMINAL_DROP_DELAY_MS = 5000
 
 const key = (owner: string, name: string) => `${owner}/${name}`
 
+// Per-key subscribable store. Mutated in place; subscribers are notified only
+// when their specific key changes, so a row's render is independent of other
+// rows' learning progress.
+function createLearningStore(initial?: LearningMap): LearningStore {
+  const statesMap: LearningMap = new Map(initial)
+  const keyListeners = new Map<string, Set<Listener>>()
+  const notify = (k: string) => keyListeners.get(k)?.forEach(l => l())
+
+  return {
+    states: statesMap,
+    get: (k) => statesMap.get(k) ?? null,
+    set: (k, value) => { statesMap.set(k, value); notify(k) },
+    delete: (k) => { statesMap.delete(k); notify(k) },
+    subscribe: (k, listener) => {
+      let set = keyListeners.get(k)
+      if (!set) { set = new Set(); keyListeners.set(k, set) }
+      set.add(listener)
+      return () => {
+        const s = keyListeners.get(k)
+        if (!s) return
+        s.delete(listener)
+        if (s.size === 0) keyListeners.delete(k)
+      }
+    },
+  }
+}
+
 export function LearningProgressProvider({ children }: { children: React.ReactNode }) {
-  const [states, setStates] = useState<LearningMap>(() => new Map())
+  const storeRef = useRef<LearningStore | null>(null)
+  if (!storeRef.current) storeRef.current = createLearningStore()
+  const store = storeRef.current
 
   useEffect(() => {
     const cb = (event: {
@@ -35,53 +75,45 @@ export function LearningProgressProvider({ children }: { children: React.ReactNo
       elapsedMs: number; state: 'running' | LearningTerminalState; error?: string
     }) => {
       const k = key(event.owner, event.name)
-      setStates(prev => {
-        const next = new Map(prev)
-        const existing = next.get(k)
-        const startedAt = existing?.startedAt ?? Date.now() - event.elapsedMs
-        next.set(k, {
-          phase: event.phase as LearningPhase | LearningTerminalState,
-          percent: event.percent,
-          startedAt,
-          elapsedMs: event.elapsedMs,
-          state: event.state,
-          error: event.error,
-        })
-        return next
+      const existing = store.get(k)
+      const startedAt = existing?.startedAt ?? Date.now() - event.elapsedMs
+      store.set(k, {
+        phase: event.phase as LearningPhase | LearningTerminalState,
+        percent: event.percent,
+        startedAt,
+        elapsedMs: event.elapsedMs,
+        state: event.state,
+        error: event.error,
       })
       if (event.state !== 'running') {
         setTimeout(() => {
-          setStates(prev => {
-            const cur = prev.get(k)
-            if (!cur || cur.state === 'running') return prev
-            const next = new Map(prev)
-            next.delete(k)
-            return next
-          })
+          const cur = store.get(k)
+          if (!cur || cur.state === 'running') return
+          store.delete(k)
         }, TERMINAL_DROP_DELAY_MS)
       }
     }
     window.api.skill.onLearnProgress(cb)
     return () => window.api.skill.offLearnProgress(cb)
-  }, [])
+  }, [store])
 
   const startLearn = useCallback(<T,>(owner: string, name: string, fn: () => Promise<T>): Promise<T> => {
     const k = key(owner, name)
-    setStates(prev => {
-      const next = new Map(prev)
-      next.set(k, {
-        phase: 'cloning', percent: 0, startedAt: Date.now(), elapsedMs: 0, state: 'running',
-      })
-      return next
-    })
+    store.set(k, { phase: 'cloning', percent: 0, startedAt: Date.now(), elapsedMs: 0, state: 'running' })
     return fn()
-  }, [])
+  }, [store])
 
   const cancelLearn = useCallback(async (owner: string, name: string) => {
     await window.api.skill.cancelLearn(owner, name)
   }, [])
 
-  const value = useMemo(() => ({ states, startLearn, cancelLearn }), [states, startLearn, cancelLearn])
+  const value = useMemo<ContextValue>(() => ({
+    states: store.states,
+    startLearn,
+    cancelLearn,
+    subscribe: store.subscribe,
+    getSnapshot: store.get,
+  }), [store, startLearn, cancelLearn])
 
   return (
     <LearningProgressContext.Provider value={value}>
@@ -104,19 +136,23 @@ export function MockLearningProgressProvider({
   initialStates?: LearningMap
   children: React.ReactNode
 }) {
-  const [states, setStates] = useState<LearningMap>(initialStates)
-  const value: ContextValue = {
-    states,
-    startLearn: <T,>(owner: string, name: string, fn: () => Promise<T>) => {
-      const k = key(owner, name)
-      setStates(prev => {
-        const next = new Map(prev)
-        next.set(k, { phase: 'cloning', percent: 0, startedAt: Date.now(), elapsedMs: 0, state: 'running' })
-        return next
-      })
-      return fn()
-    },
+  const storeRef = useRef<LearningStore | null>(null)
+  if (!storeRef.current) storeRef.current = createLearningStore(initialStates)
+  const store = storeRef.current
+
+  const startLearn = useCallback(<T,>(owner: string, name: string, fn: () => Promise<T>): Promise<T> => {
+    const k = key(owner, name)
+    store.set(k, { phase: 'cloning', percent: 0, startedAt: Date.now(), elapsedMs: 0, state: 'running' })
+    return fn()
+  }, [store])
+
+  const value = useMemo<ContextValue>(() => ({
+    states: store.states,
+    startLearn,
     cancelLearn: async () => {},
-  }
+    subscribe: store.subscribe,
+    getSnapshot: store.get,
+  }), [store, startLearn])
+
   return <LearningProgressContext.Provider value={value}>{children}</LearningProgressContext.Provider>
 }

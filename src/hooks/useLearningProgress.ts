@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useSyncExternalStore } from 'react'
 import { useLearningProgressContext, type LearningState } from '../contexts/LearningProgressContext'
 
 interface UseLearningProgressResult {
@@ -10,8 +10,12 @@ interface UseLearningProgressResult {
 const key = (owner: string, name: string) => `${owner}/${name}`
 
 export function useLearningProgress(owner: string, name: string): UseLearningProgressResult {
-  const { states, cancelLearn } = useLearningProgressContext()
-  const state = states.get(key(owner, name)) ?? null
+  const { subscribe, getSnapshot, cancelLearn } = useLearningProgressContext()
+  const k = key(owner, name)
+
+  const subscribeKey = useCallback((cb: () => void) => subscribe(k, cb), [subscribe, k])
+  const getSnapshotKey = useCallback(() => getSnapshot(k), [getSnapshot, k])
+  const state = useSyncExternalStore(subscribeKey, getSnapshotKey)
 
   const [, setTick] = useState(0)
   useEffect(() => {
