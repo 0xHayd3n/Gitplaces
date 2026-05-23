@@ -9,7 +9,7 @@ import {
 
 function broadcastChanged(): void {
   for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send('agents:changed')
+    if (!win.isDestroyed()) win.webContents.send('agents:changed')
   }
 }
 
