@@ -1,7 +1,7 @@
 // src/components/LibrarySidebar.tsx
 import { useState, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Activity } from 'lucide-react'
+import { Home } from 'lucide-react'
 import './LibrarySidebar.css'
 import type { LibraryRow, StarredRepoRow, RepoRow } from '../types/repo'
 import type { LibraryEntry, LocalProject } from '../types/library'
@@ -90,15 +90,18 @@ export default function LibrarySidebar({
 
   return (
     <aside className="library-sidebar">
-      <div className="library-sidebar-header">REPOSITORIES</div>
-      <div className="library-activity-row">
-        <button
-          className={`library-activity-btn${isSummaryActive ? ' active' : ''}`}
-          onClick={() => navigate('/library')}
-        >
-          <Activity size={11} />
-          Activity
-        </button>
+      <div className="library-sidebar-topbar">
+        <div className="library-sidebar-topbar-row1">
+          <button
+            type="button"
+            className={`library-sidebar-home${isSummaryActive ? ' active' : ''}`}
+            onClick={() => navigate('/library')}
+            aria-label="Home"
+            title="Home"
+          >
+            <Home size={14} />
+          </button>
+        </div>
       </div>
       <div className="library-sidebar-list">
         {visible.length === 0 && (
