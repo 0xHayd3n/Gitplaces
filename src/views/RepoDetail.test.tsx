@@ -6,6 +6,7 @@ import { SavedReposProvider } from '../contexts/SavedRepos'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
 import { AppearanceProvider } from '../contexts/Appearance'
 import { GitHubAuthProvider } from '../contexts/GitHubAuth'
+import { MockLearningProgressProvider } from '../contexts/LearningProgressContext'
 import { parseSkillDepths } from '../utils/skillParse'
 import type { SkillRow } from '../types/repo'
 
@@ -145,9 +146,11 @@ function setupDetail(
         <GitHubAuthProvider>
           <ProfileOverlayProvider>
             <SavedReposProvider>
-              <Routes>
-                <Route path="/repo/:owner/:name" element={<RepoDetail />} />
-              </Routes>
+              <MockLearningProgressProvider>
+                <Routes>
+                  <Route path="/repo/:owner/:name" element={<RepoDetail />} />
+                </Routes>
+              </MockLearningProgressProvider>
             </SavedReposProvider>
           </ProfileOverlayProvider>
         </GitHubAuthProvider>
@@ -173,12 +176,13 @@ describe('RepoDetail install button', () => {
   })
 
   it('transitions to generating on click', async () => {
-    // Pass a never-resolving generate fn so the button stays in GENERATING state
+    // Pass a never-resolving generate fn so the button stays in LEARNING state
     const neverResolves = vi.fn().mockReturnValue(new Promise(() => {}))
     setupDetail(null, 'sk-ant-test', neverResolves)
     await waitFor(() => screen.getAllByText('next.js'))
     fireEvent.click(screen.getByText('Learn'))
-    await waitFor(() => screen.getByText('Learning…'))
+    // New split-button surfaces "Cancel" as the primary action label during LEARNING
+    await waitFor(() => screen.getByText('Cancel'))
   })
 })
 

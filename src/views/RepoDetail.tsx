@@ -26,6 +26,10 @@ import AnatomyMemoryPanel from '../components/AnatomyMemoryPanel'
 import { parseSkillDepths } from '../utils/skillParse'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
 import { useAppearance } from '../contexts/Appearance'
+import { useLearningProgressContext } from '../contexts/LearningProgressContext'
+import { useLearningProgress } from '../hooks/useLearningProgress'
+import { PrimaryActionSplitButton } from '../components/PrimaryActionSplitButton'
+import { LearnStatusInline } from '../components/LearnStatusInline'
 import { formatCount } from '../components/RepoCard'
 import {
   extractBadges,
@@ -673,6 +677,8 @@ export default function RepoDetail() {
   // Learn state
   const [learnState, setLearnState] = useState<LearnState>('UNLEARNED')
   const [learnError, setLearnError] = useState<'no-key' | 'failed' | null>(null)
+  const { startLearn } = useLearningProgressContext()
+  const learnProgress = useLearningProgress(owner ?? '', name ?? '')
 const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   const [anatomyPayload, setAnatomyPayload] = useState<AnatomyPayload | null>(null)
   const [componentsSkillRow, setComponentsSkillRow] = useState<SubSkillRow | null>(null)
@@ -1213,7 +1219,13 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     setLearnError(null)
     try {
       await saveRepo(owner ?? '', name ?? '')
-      await window.api.skill.generate(owner ?? '', name ?? '', { flavour })
+      const result = await startLearn(owner ?? '', name ?? '', () =>
+        window.api.skill.generate(owner ?? '', name ?? '', { flavour }),
+      )
+      if (result && 'cancelled' in result) {
+        setLearnState('UNLEARNED')
+        return
+      }
       const freshRow = await window.api.skill.get(owner ?? '', name ?? '')
       setSkillRow(freshRow)
       const freshComp = await window.api.skill.getSubSkill(owner ?? '', name ?? '', 'components').catch(() => null)
@@ -2030,6 +2042,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
             actionRow={
               <RepoArticleActionRow
                 learnState={learnState}
+                learnProgress={learnProgress}
                 starred={starred}
                 starWorking={starWorking}
                 starCount={repo?.stars ?? 0}
@@ -2087,6 +2100,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
 // -- Article action row --
 type RepoArticleActionRowProps = {
   learnState: 'UNLEARNED' | 'LEARNING' | 'LEARNED'
+  learnProgress: ReturnType<typeof useLearningProgress>
   starred: boolean
   starWorking: boolean
   starCount: number
@@ -2109,82 +2123,60 @@ type RepoArticleActionRowProps = {
 }
 
 function RepoArticleActionRow({
-  learnState, starred, starWorking, starCount,
+  learnState, learnProgress, starred, starWorking,
   cloneOpen, onToggleClone,
   onLearn, onUnlearn, onStar, onFork,
   archived, onArchive,
   translationStatus,
 }: RepoArticleActionRowProps) {
-  const learnBusy = learnState === 'LEARNING'
-  const learnLabel =
-    learnState === 'LEARNING' ? 'Learning…' :
-    learnState === 'LEARNED'  ? 'Learned'   :
-                                'Learn'
+  const variant: 'primary' | 'idle' | 'learned' =
+    learnState === 'UNLEARNED' ? 'idle' :
+    learnState === 'LEARNED'   ? 'learned' :
+                                 'primary'
+  const actionLabel =
+    learnState === 'UNLEARNED' ? 'Learn' :
+    learnState === 'LEARNING'  ? 'Cancel' :
+                                 'Learned'
+  const onAction =
+    learnState === 'UNLEARNED' ? onLearn :
+    learnState === 'LEARNING'  ? () => { void learnProgress.cancel() } :
+                                 onUnlearn
+  const actionIcon =
+    learnState === 'UNLEARNED' ? <PiBrainFill size={14} /> :
+    learnState === 'LEARNING'  ? <span className="split-button-cancel-icon"><span /><span /></span> :
+                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 12 9 17 20 6" /></svg>
 
   return (
     <div className="article-action-row">
-      <button
-        className={`article-action-btn article-action-btn--primary${learnBusy ? ' generating' : ''}${learnState === 'LEARNED' ? ' learned' : ''}`}
-        onClick={learnState === 'LEARNED' ? onUnlearn : onLearn}
-        disabled={learnBusy}
-        title={
-          learnState === 'UNLEARNED' ? 'Learn this repo'
-          : learnState === 'LEARNING'  ? 'Learning…'
-          : 'Learned — click to unlearn'
-        }
+      <PrimaryActionSplitButton
+        actionLabel={actionLabel}
+        onAction={onAction}
+        actionIcon={actionIcon}
+        variant={variant}
       >
-        {learnBusy ? (
-          <span className="spin-ring" style={{ width: 12, height: 12 }} />
-        ) : learnState === 'LEARNED' ? (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="4 12 9 17 20 6" />
+        <button onClick={onToggleClone}><PiGitBranchFill size={14} />Clone</button>
+        <button onClick={onStar} disabled={starWorking}>
+          {starred ? <PiStarFill size={14} /> : <PiStar size={14} />}
+          {starred ? 'Unstar' : 'Star'}
+        </button>
+        <button onClick={onFork}><PiGitForkFill size={14} />Fork</button>
+        <button onClick={onArchive}>
+          <svg viewBox="0 0 24 24" width={14} height={14} fill="currentColor">
+            <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5z"/>
           </svg>
-        ) : (
-          <PiBrainFill size={14} />
-        )}
-        <span>{learnLabel}</span>
-      </button>
+          {archived ? 'Unarchive' : 'Archive'}
+        </button>
+      </PrimaryActionSplitButton>
 
-      <button
-        className={`article-action-btn${cloneOpen ? ' article-action-btn--clone-active' : ''}`}
-        onClick={onToggleClone}
-        aria-expanded={cloneOpen}
-        aria-controls="repo-detail-clone-panel"
-        title="Clone options"
-      >
-        <PiGitBranchFill size={14} />
-        <span>Clone</span>
-      </button>
-
-      <button
-        className={`article-action-btn${starred ? ' article-action-btn--star-on' : ''}`}
-        onClick={onStar}
-        disabled={starWorking}
-        title={starred ? 'Unstar on GitHub' : 'Star on GitHub'}
-      >
-        {starred ? <PiStarFill size={14} /> : <PiStar size={14} />}
-        <span>Star</span>
-      </button>
-
-      <button
-        className="article-action-btn"
-        onClick={onFork}
-        title="Fork on GitHub"
-      >
-        <PiGitForkFill size={14} />
-        <span>Fork</span>
-      </button>
-
-      <button
-        className="article-action-btn"
-        onClick={onArchive}
-        title={archived ? 'Remove from archive' : 'Archive repo'}
-      >
-        <svg viewBox="0 0 24 24" width={14} height={14} fill="currentColor">
-          <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5z"/>
-        </svg>
-        <span>{archived ? 'Unarchive' : 'Archive'}</span>
-      </button>
+      {learnState === 'LEARNING' && learnProgress.state && (
+        <LearnStatusInline
+          phase={learnProgress.state.phase}
+          percent={learnProgress.state.percent}
+          elapsedMs={learnProgress.elapsedMs}
+          state={learnProgress.state.state}
+          error={learnProgress.state.error}
+        />
+      )}
 
       {translationStatus && (translationStatus.translating || translationStatus.translated) && (
         <div className="article-action-translation">
