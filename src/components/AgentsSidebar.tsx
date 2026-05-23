@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMatch, useNavigate } from 'react-router-dom'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
-import NewAgentModal from './NewAgentModal'
 import AgentContextMenu, { type AgentMenuKind } from './AgentContextMenu'
 
 interface Props {
@@ -30,7 +29,6 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
   const [folders, setFolders] = useState<AgentFolderRow[]>([])
   const [agents, setAgents] = useState<AgentRow[]>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const [showModal, setShowModal] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; target: AgentMenuKind } | null>(null)
 
   const onAgentRightClick = (e: React.MouseEvent, agentId: string) => {
@@ -136,11 +134,6 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
   const toggle = (key: string) =>
     setExpanded(prev => ({ ...prev, [key]: !prev[key] }))
 
-  const handleCreated = (newId: string) => {
-    setShowModal(false)
-    navigate(`/library/agent/${newId}`)
-  }
-
   return (
     <>
       <div style={{ padding: '8px', flexShrink: 0 }}>
@@ -148,7 +141,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
           type="button"
           className="library-sidebar-seg"
           style={{ width: '100%' }}
-          onClick={() => setShowModal(true)}
+          onClick={() => navigate('/library/agent/new')}
         >
           + New agent
         </button>
@@ -192,13 +185,6 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
         )
       })}
 
-      {showModal && (
-        <NewAgentModal
-          folders={folders}
-          onClose={() => setShowModal(false)}
-          onCreated={handleCreated}
-        />
-      )}
       {menu && (
         <AgentContextMenu
           x={menu.x}

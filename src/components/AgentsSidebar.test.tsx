@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import AgentsSidebar from './AgentsSidebar'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
 
@@ -27,10 +27,16 @@ beforeEach(() => {
   }
 })
 
+function LocationDisplay() {
+  const location = useLocation()
+  return <div data-testid="location">{location.pathname}</div>
+}
+
 function renderSidebar(searchTerm = '') {
   return render(
     <MemoryRouter>
       <AgentsSidebar searchTerm={searchTerm} />
+      <LocationDisplay />
     </MemoryRouter>,
   )
 }
@@ -72,11 +78,11 @@ describe('AgentsSidebar', () => {
     expect(screen.queryByText('Copy editor')).toBeNull()
   })
 
-  it('opens the create modal when "+ New agent" is clicked', async () => {
+  it('navigates to /library/agent/new when "+ New agent" is clicked', async () => {
     renderSidebar()
     await waitFor(() => screen.getByRole('button', { name: /\+ New agent/ }))
     fireEvent.click(screen.getByRole('button', { name: /\+ New agent/ }))
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByTestId('location').textContent).toBe('/library/agent/new')
   })
 
   it('hides named folders that have no matching agents during search', async () => {
