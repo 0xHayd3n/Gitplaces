@@ -125,3 +125,33 @@ describe('LibrarySidebar — search', () => {
     expect(screen.getByText('material-ui')).toBeInTheDocument()
   })
 })
+
+describe('LibrarySidebar — archived section', () => {
+  const liveRow = makeRow('foo', 'live-repo')
+  const archivedRow = makeRow('bar', 'archived-repo')
+  const archivedSet = new Set(['bar/archived-repo'])
+
+  it('hides archived repos from main list', () => {
+    wrap(<LibrarySidebar {...defaultProps} installedRows={[liveRow, archivedRow]} archivedSet={archivedSet} />)
+    expect(screen.getByText('live-repo')).toBeInTheDocument()
+    expect(screen.queryByText('archived-repo')).not.toBeInTheDocument()
+  })
+
+  it('shows a collapsed Archived (N) section when there are archived items', () => {
+    wrap(<LibrarySidebar {...defaultProps} installedRows={[liveRow, archivedRow]} archivedSet={archivedSet} />)
+    const header = screen.getByRole('button', { name: /archived \(1\)/i })
+    expect(header).toBeInTheDocument()
+    expect(screen.queryByText('archived-repo')).not.toBeInTheDocument()
+  })
+
+  it('expands Archived section on click to reveal items', () => {
+    wrap(<LibrarySidebar {...defaultProps} installedRows={[liveRow, archivedRow]} archivedSet={archivedSet} />)
+    fireEvent.click(screen.getByRole('button', { name: /archived \(1\)/i }))
+    expect(screen.getByText('archived-repo')).toBeInTheDocument()
+  })
+
+  it('hides Archived section entirely when no archived items', () => {
+    wrap(<LibrarySidebar {...defaultProps} installedRows={[liveRow]} archivedSet={new Set()} />)
+    expect(screen.queryByRole('button', { name: /archived/i })).not.toBeInTheDocument()
+  })
+})

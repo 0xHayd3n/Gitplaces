@@ -70,6 +70,7 @@ export default function LibrarySidebar({
   const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
   const [mode, setMode] = useState<Mode>('repos')
   const [searchTerm, setSearchTerm] = useState('')
+  const [archivedOpen, setArchivedOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const isSummaryActive = location.pathname === '/library'
@@ -102,6 +103,17 @@ export default function LibrarySidebar({
         return e.row.name.toLowerCase().includes(q) || e.row.owner.toLowerCase().includes(q)
       }
       return e.project.name.toLowerCase().includes(q)
+    })
+  }, [allEntries, archivedSet, searchTerm])
+
+  const archivedEntries = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
+    return allEntries.filter(e => {
+      if (e.kind !== 'repo') return false
+      const key = `${e.row.owner}/${e.row.name}`
+      if (!archivedSet.has(key)) return false
+      if (!q) return true
+      return e.row.name.toLowerCase().includes(q) || e.row.owner.toLowerCase().includes(q)
     })
   }, [allEntries, archivedSet, searchTerm])
 
@@ -199,6 +211,34 @@ export default function LibrarySidebar({
             </button>
           )
         })}
+
+        {archivedEntries.length > 0 && (
+          <div className="library-sidebar-section">
+            <button
+              type="button"
+              className="library-sidebar-section-header"
+              onClick={() => setArchivedOpen(o => !o)}
+              aria-expanded={archivedOpen}
+            >
+              <span className="library-sidebar-section-caret">{archivedOpen ? '▾' : '▸'}</span>
+              Archived ({archivedEntries.length})
+            </button>
+            {archivedOpen && archivedEntries.map(entry => {
+              if (entry.kind !== 'repo') return null
+              const { row } = entry
+              return (
+                <SidebarRepoRow
+                  key={`archived-${row.id}`}
+                  row={row}
+                  isInstalled={entry.isInstalled}
+                  selected={selectedId === row.id}
+                  onSelect={() => onSelect(row, entry.isInstalled)}
+                  onContextMenu={(e) => handleRepoContextMenu(e, entry)}
+                />
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {menu && (
