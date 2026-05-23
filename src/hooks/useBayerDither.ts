@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 
 // ── Bayer 8x8 ordered dither matrix ──────────────────────────────
 export const BAYER8 = [
@@ -362,7 +362,11 @@ export function useBayerDither(
     }
   }, [])
 
-  useEffect(() => {
+  // useLayoutEffect so the static-frame cache-hit path paints the canvas
+  // before the first browser paint. Avoids a one-frame blank/gradient flash
+  // on fresh mounts (notably the leaving and entering crossfade layers in
+  // LibraryDetailRoutes, which the user sees as "snapping" otherwise).
+  useLayoutEffect(() => {
     cleanup()
     if (!avatarUrl || !canvasRef.current || containerWidth <= 0 || containerHeight <= 0) return
 

@@ -1,4 +1,4 @@
-import { memo, useRef, useState, useEffect } from 'react'
+import { memo, useRef, useState, useEffect, useLayoutEffect } from 'react'
 import { useBayerDither } from '../hooks/useBayerDither'
 
 interface DitherBackgroundProps {
@@ -19,6 +19,22 @@ const DitherBackground = memo(function DitherBackground({
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
+
+  // Synchronous initial measurement so the canvas can paint from the static
+  // cache before the first browser paint. Without this, both crossfade layers
+  // mount with size {0,0}, wait one frame for ResizeObserver, and the canvas
+  // visibly snaps from blank/gradient → dither while the layer is already at
+  // most of its opacity. Critical for the leaving layer (full opacity at t=0).
+  useLayoutEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const w = Math.floor(rect.width)
+    const h = Math.floor(rect.height)
+    if (w > 0 && h > 0) {
+      setSize(prev => (prev.width === w && prev.height === h) ? prev : { width: w, height: h })
+    }
+  }, [])
 
   useEffect(() => {
     const el = containerRef.current
