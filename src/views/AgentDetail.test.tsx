@@ -142,6 +142,18 @@ describe('AgentDetail', () => {
     expect(screen.queryByRole('textbox', { name: /Body/ })).toBeNull()
   })
 
+  it('Copy markdown uses bodyDraft (live edits) when in edit mode', async () => {
+    setup()
+    await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Copy editor' }))
+    fireEvent.click(screen.getByRole('button', { name: /Edit/ }))
+    const ta = screen.getByRole('textbox', { name: /Body/ })
+    fireEvent.change(ta, { target: { value: 'live unsaved content' } })
+    fireEvent.click(screen.getByRole('button', { name: /Copy markdown/ }))
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('live unsaved content'),
+    )
+  })
+
   it('shows nameDraft in header after inline name edit even before save resolves', async () => {
     setup()
     await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Copy editor' }))

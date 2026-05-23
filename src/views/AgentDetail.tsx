@@ -68,9 +68,13 @@ export default function AgentDetail() {
     setSaveStatus('saving')
     if (bodyTimer.current) clearTimeout(bodyTimer.current)
     bodyTimer.current = setTimeout(async () => {
-      await window.api.agents.update(id, { body: value })
-      setSaveStatus('saved')
-      setTimeout(() => setSaveStatus('idle'), 2000)
+      try {
+        await window.api.agents.update(id, { body: value })
+        setSaveStatus('saved')
+        setTimeout(() => setSaveStatus('idle'), 2000)
+      } catch {
+        setSaveStatus('idle')
+      }
     }, 1500)
   }, [id])
 
@@ -94,7 +98,8 @@ export default function AgentDetail() {
 
   const handleCopy = async () => {
     if (!agent) return
-    await navigator.clipboard.writeText(agent.body)
+    const content = editing ? bodyDraft : agent.body
+    await navigator.clipboard.writeText(content)
     toast('Copied to clipboard', 'success')
   }
 
@@ -170,7 +175,7 @@ export default function AgentDetail() {
           )}
         </div>
         <span>Updated {new Date(agent.updated_at).toLocaleString()}</span>
-        <span>· {agent.body.length} chars</span>
+        <span>· {(editing ? bodyDraft : agent.body).length} chars</span>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
