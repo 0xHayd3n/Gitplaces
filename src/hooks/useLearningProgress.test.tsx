@@ -10,8 +10,9 @@ beforeEach(() => {
 
 describe('useLearningProgress', () => {
   it('returns null when no entry exists', () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(MockLearningProgressProvider, null, children)
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <MockLearningProgressProvider>{children}</MockLearningProgressProvider>
+    )
     const { result } = renderHook(() => useLearningProgress('o', 'n'), { wrapper })
     expect(result.current.state).toBeNull()
   })
@@ -21,8 +22,9 @@ describe('useLearningProgress', () => {
       phase: 'generating' as const, percent: 60, startedAt: Date.now() - 5000,
       elapsedMs: 5000, state: 'running' as const,
     }]])
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(MockLearningProgressProvider, { initialStates: initial }, children)
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <MockLearningProgressProvider initialStates={initial}>{children}</MockLearningProgressProvider>
+    )
     const { result } = renderHook(() => useLearningProgress('o', 'n'), { wrapper })
     expect(result.current.state).toEqual(expect.objectContaining({ phase: 'generating', percent: 60 }))
   })
@@ -33,8 +35,9 @@ describe('useLearningProgress', () => {
       phase: 'generating' as const, percent: 60, startedAt: Date.now() - 1000,
       elapsedMs: 1000, state: 'running' as const,
     }]])
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(MockLearningProgressProvider, { initialStates: initial }, children)
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <MockLearningProgressProvider initialStates={initial}>{children}</MockLearningProgressProvider>
+    )
     const { result } = renderHook(() => useLearningProgress('o', 'n'), { wrapper })
     const first = result.current.elapsedMs
     act(() => { vi.advanceTimersByTime(1000) })

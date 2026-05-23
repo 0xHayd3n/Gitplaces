@@ -9,6 +9,7 @@ import { ToastProvider } from './contexts/Toast'
 import { RepoNavProvider } from './contexts/RepoNav'
 import { AppearanceProvider, useAppearance } from './contexts/Appearance'
 import { GitHubAuthProvider } from './contexts/GitHubAuth'
+import { LearningProgressProvider } from './contexts/LearningProgressContext'
 import ProfileOverlay from './components/ProfileOverlay'
 import Titlebar from './components/Titlebar'
 import Dock from './components/Dock'
@@ -135,7 +136,9 @@ export default function App() {
               <SearchProvider>
                 <ToastProvider>
                   <RepoNavProvider>
-                    <AppContent />
+                    <LearningProgressProvider>
+                      <AppContent />
+                    </LearningProgressProvider>
                   </RepoNavProvider>
                 </ToastProvider>
               </SearchProvider>
