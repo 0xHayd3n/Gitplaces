@@ -1,5 +1,8 @@
 import Database from 'better-sqlite3'
 import path from 'path'
+import { randomUUID } from 'node:crypto'
+import { slugifyName, dedupeHandle } from '../src/utils/agentSlug'
+import { hashHandleToColor } from '../src/utils/colorHarmony'
 
 export function initSchema(db: Database.Database): void {
   db.pragma('journal_mode = WAL')
@@ -333,6 +336,49 @@ export function initSchema(db: Database.Database): void {
     created_at   TEXT NOT NULL,
     FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
   )`)
+
+  // Agents redesign — backfill pass for rows that pre-existed the redesign.
+  // Idempotent: only touches rows where handle = ''.
+  {
+    const needsBackfill = db
+      .prepare(`SELECT id, name, body FROM agents WHERE handle = ''`)
+      .all() as { id: string; name: string; body: string }[]
+
+    if (needsBackfill.length > 0) {
+      // Existing taken handles (across the whole table — not just the needs-backfill subset)
+      const taken = new Set<string>(
+        (db.prepare(`SELECT handle FROM agents WHERE handle <> ''`).all() as { handle: string }[])
+          .map(r => r.handle),
+      )
+
+      const updateHandle = db.prepare(
+        `UPDATE agents SET handle = ?, color_start = ?, color_end = NULL WHERE id = ?`,
+      )
+      const insertRevision = db.prepare(
+        `INSERT INTO agent_revisions (id, agent_id, body, presets_json, summary, kind, created_at)
+         VALUES (?, ?, ?, '[]', ?, 'create', ?)`,
+      )
+
+      const txn = db.transaction(() => {
+        const nowIso = new Date().toISOString()
+        for (const row of needsBackfill) {
+          const slug = slugifyName(row.name)
+          const handle = dedupeHandle(slug, Array.from(taken))
+          taken.add(handle)
+          const colorStart = hashHandleToColor(handle)
+          updateHandle.run(handle, colorStart, row.id)
+          insertRevision.run(randomUUID(), row.id, row.body, 'Initial agent', nowIso)
+        }
+      })
+      txn()
+    }
+  }
+
+  // UNIQUE index added AFTER backfill so duplicates can't violate it mid-migration.
+  // Partial index excludes empty-string handles so transient pre-backfill rows
+  // (and test fixtures simulating pre-redesign state) can coexist without
+  // tripping the constraint before backfill runs.
+  try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_handle ON agents(handle) WHERE handle <> ''`) } catch {}
 
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`
