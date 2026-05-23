@@ -39,4 +39,18 @@ describe.runIf(vendored)('spawnAnatomy (vendored)', () => {
     expect(r.code).toBe(0)
     expect(r.stdout + r.stderr).toMatch(/generate|validate|render/)
   }, 30_000)
+
+  it('returns a ChildProcess handle via the onProcess hook', async () => {
+    let captured: import('node:child_process').ChildProcess | null = null
+    const r = await spawnAnatomy(
+      { nodeBin: node, cliEntry: cli },
+      ['--help'],
+      process.cwd(),
+      process.env,
+      { onProcess: (p) => { captured = p } },
+    )
+    expect(r.code).toBe(0)
+    expect(captured).not.toBeNull()
+    expect(captured!.pid).toBeGreaterThan(0)
+  }, 30_000)
 })
