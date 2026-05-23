@@ -88,9 +88,21 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
     return () => { cancelled = true }
   }, [owner, name, branch])
 
+  // Drop files whose only PascalCase exports are React Context objects (e.g.
+  // material-tailwind's `*Context.tsx` files). They aren't renderable
+  // components — rendering a raw Context throws "r is not a function" — and
+  // showing them in the gallery / sidebar is just noise.
+  const visibleComponents = useMemo(
+    () => components.filter(c => c.renderable),
+    [components],
+  )
+
+  // Selection paths only ever come from `visibleComponents`, so resolving
+  // against the same list keeps the invariant "selected is renderable"
+  // explicit — a non-renderable component can never reach the detail view.
   const selectedComponent = useMemo(
-    () => components.find(c => c.path === selectedPath) ?? null,
-    [components, selectedPath],
+    () => visibleComponents.find(c => c.path === selectedPath) ?? null,
+    [visibleComponents, selectedPath],
   )
 
   if (scanState === 'scanning') {
@@ -103,14 +115,14 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
       </div>
     )
   }
-  if (components.length === 0) {
+  if (visibleComponents.length === 0) {
     return <div className="cg-empty"><span>No components found.</span></div>
   }
 
   return (
     <div className="cg-explorer" data-theme={theme}>
       <ComponentSidebar
-        components={components.map(c => ({ path: c.path, name: c.name }))}
+        components={visibleComponents.map(c => ({ path: c.path, name: c.name }))}
         selectedPath={selectedPath}
         searchQuery={searchQuery}
         theme={theme}
@@ -135,7 +147,7 @@ export default function ComponentExplorer({ owner, name, branch }: Props) {
           />
         ) : (
           <ComponentGallery
-            components={components}
+            components={visibleComponents}
             variantsByPath={variantsByPath}
             tierByPath={tierByPath}
             bundledByPath={bundledByPath}

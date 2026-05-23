@@ -34,10 +34,11 @@ export function parseComponent(
   // `ColorPicker` (matches), but `Code.tsx` might export `InstallCode`, or
   // a class component named `CPicker` aliased through `export default`.
   // Reading the source removes that guesswork.
-  const name = (framework === 'react' || framework === 'solid')
-    ? extractExportName(source, filenameBased)
-    : filenameBased
-  const renderable = true
+  const exportInfo = (framework === 'react' || framework === 'solid')
+    ? extractExportInfo(source, filenameBased)
+    : { name: filenameBased, renderable: true }
+  const name = exportInfo.name
+  const renderable = exportInfo.renderable
 
   let props: ParsedProp[] = []
   try {
@@ -87,30 +88,68 @@ function toPascalCase(s: string): string {
 // patterns in priority order; returns `fallback` (typically the PascalCase'd
 // filename) when nothing parseable is found. Only PascalCase identifiers
 // are accepted — lowercase exports are usually utilities, not components.
-function extractExportName(source: string, fallback: string): string {
+//
+// Also detects `createContext` declarations: their exports are React Context
+// objects, not components. Rendering a Context directly via createElement
+// drops it into React 18's ContextConsumer code path, which calls the
+// (missing) render-prop child as a function and crashes with the cryptic
+// `r is not a function` (where `r` is the minified `props.children`). When
+// the source has both a Context and a sibling component (e.g.
+// `*Context` + `*ContextProvider`), this returns the component instead.
+// When the source has ONLY Context exports, returns renderable: false so
+// the gallery can filter the file out — there's no real component to show.
+function extractExportInfo(source: string, fallback: string): { name: string; renderable: boolean } {
+  const contextNames = findContextDeclarations(source)
+
   // 1. `export default function ComponentName` / `export default class ComponentName`
   let m = source.match(/^export\s+default\s+(?:function|class)\s+([A-Z]\w*)/m)
-  if (m) return m[1]
+  if (m) return { name: m[1], renderable: !contextNames.has(m[1]) }
 
   // 2. `export default ComponentName` (separate declaration)
   m = source.match(/^export\s+default\s+([A-Z]\w*)\s*;?\s*$/m)
-  if (m) return m[1]
+  if (m) return { name: m[1], renderable: !contextNames.has(m[1]) }
 
-  // 3. Single named PascalCase export (`export const Foo = ...`,
-  //    `export function Foo`, `export class Foo`). When the file has
-  //    exactly one such export, it's almost always the component.
+  // 3. Named PascalCase exports (`export const Foo = ...`,
+  //    `export function Foo`, `export class Foo`).
   const namedExports: string[] = []
   const re = /^export\s+(?:const|function|class)\s+([A-Z]\w*)/gm
   let m2: RegExpExecArray | null
   while ((m2 = re.exec(source)) !== null) {
     namedExports.push(m2[1])
   }
-  if (namedExports.length === 1) return namedExports[0]
-  // If there are multiple named exports and one of them matches the
-  // filename-derived name, prefer that one.
-  if (namedExports.length > 1 && namedExports.includes(fallback)) return fallback
 
-  return fallback
+  // Component candidates exclude Context objects so we prefer the real
+  // component when both `*Context` and `*ContextProvider` are exported.
+  const components = namedExports.filter(n => !contextNames.has(n))
+
+  if (components.length === 1) return { name: components[0], renderable: true }
+  if (components.length > 1 && components.includes(fallback)) return { name: fallback, renderable: true }
+
+  // No component candidates remain. If the file's only PascalCase exports
+  // are Context objects, mark non-renderable so the gallery filters it out.
+  if (namedExports.length > 0 && components.length === 0) {
+    return { name: fallback, renderable: false }
+  }
+
+  // No PascalCase exports at all (or multi-component fallback miss) —
+  // preserve the prior behavior: return the filename-based name.
+  return { name: fallback, renderable: true }
+}
+
+// Detects `(export )? const NAME (: TYPE)? = (React.)?createContext(...)`
+// declarations and returns the set of names. Catches both single-line and
+// multi-line type-annotated forms.
+//
+// The character class between the name and the assignment is `[^;{(]*`, not
+// `[^=]*`: the latter mis-stops on generic defaults like `Context<T = U>`,
+// silently letting a Context object fall through as renderable. Stopping
+// instead on statement / call-site boundaries is accurate for the assignment.
+function findContextDeclarations(source: string): Set<string> {
+  const set = new Set<string>()
+  const re = /(?:^|\n)\s*(?:export\s+)?const\s+(\w+)[^;{(]*=\s*(?:React\.)?createContext\s*[<(]/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(source)) !== null) set.add(m[1])
+  return set
 }
 
 function parsePropBlock(block: string): ParsedProp[] {

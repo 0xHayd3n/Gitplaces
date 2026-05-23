@@ -76,6 +76,56 @@ describe('parseComponent — React', () => {
     expect(result.renderable).toBe(true)
   })
 
+  it('marks a file with only createContext exports as non-renderable', () => {
+    // Pattern from material-tailwind's `*Context.tsx` files. Rendering the
+    // raw Context object as a component triggers React 18's ContextConsumer
+    // path, which crashes with "r is not a function" when no render-prop
+    // child is provided.
+    const ctxOnly = [
+      'import React from "react"',
+      'export const AccordionContext = React.createContext(null)',
+      'export function useAccordion() { return null }',
+    ].join('\n')
+    const result = parseComponent('src/Accordion/AccordionContext.tsx', ctxOnly, 'react')
+    expect(result.renderable).toBe(false)
+  })
+
+  it('prefers a sibling Provider component over a Context object', () => {
+    // material-tailwind exports both `AccordionContext` (createContext result)
+    // and `AccordionContextProvider` (the actual component). The parser should
+    // pick the Provider so the gallery renders something benign instead of
+    // crashing on the raw Context.
+    const ctxAndProvider = [
+      'import React from "react"',
+      'export const AccordionContext = React.createContext(null)',
+      'export function useAccordion() { return null }',
+      'export const AccordionContextProvider = ({ value, children }) => null',
+    ].join('\n')
+    const result = parseComponent(
+      'src/Accordion/AccordionContext.tsx', ctxAndProvider, 'react',
+    )
+    expect(result.name).toBe('AccordionContextProvider')
+    expect(result.renderable).toBe(true)
+  })
+
+  it('detects createContext without the React. namespace prefix', () => {
+    const ctxOnly = [
+      'import { createContext } from "react"',
+      'export const ThemeContext = createContext(null)',
+    ].join('\n')
+    const result = parseComponent('src/ThemeContext.tsx', ctxOnly, 'react')
+    expect(result.renderable).toBe(false)
+  })
+
+  it('detects createContext with a TypeScript type annotation', () => {
+    const ctxOnly = [
+      'import React from "react"',
+      'export const MenuContext: React.Context<MenuValue | null> = React.createContext<MenuValue | null>(null)',
+    ].join('\n')
+    const result = parseComponent('src/MenuContext.tsx', ctxOnly, 'react')
+    expect(result.renderable).toBe(false)
+  })
+
   it('extracts required string prop', () => {
     const result = parseComponent('src/components/Button.tsx', source, 'react')
     const label = result.props.find(p => p.name === 'label')

@@ -885,18 +885,33 @@ const STUB_PROLOG = `const _$stub=new Proxy(function _s(){return _$stub},{get:(_
 function buildReactHtml(name: string, compiledCode: string, propsJson: string, theme: 'light' | 'dark', hasTailwind = false): string {
   let code = stripExports(compiledCode, name)
   const importMap = buildImportMap(code)
+  // The render tail:
+  //   1. Calls createRoot.render(...) inside a try/catch.
+  //   2. After 150ms, emits the dash placeholder if the root is still empty
+  //      (so empty-render components show "—" instead of nothing).
+  //   3. After 250ms, posts `render-settled` to the parent so the gallery
+  //      can release this iframe's render slot.
+  //
+  // Iframe `onLoad` fires when HTML parsing + sync scripts complete, but
+  // `<script type="module">` is deferred — module imports (esm.sh fetches),
+  // React render, and Tailwind JIT all run AFTER load. Releasing the gallery
+  // slot on `onLoad` releases too early; the next iframe starts while this
+  // one is still doing CPU-heavy work, and 30 iframes' work cumulatively
+  // freezes the renderer's main thread. `render-settled` fires inside the
+  // module script after React has had a beat to commit — that's the right
+  // point to let the next iframe start.
+  //
+  // The 100ms gap between dash check (150ms) and settle (250ms) gives heavy
+  // components (framer-motion, Tailwind JIT) extra time to finish their
+  // initial work before the next iframe starts competing for the main thread.
   const renderTail = [
     `import{createElement as _$cc}from'react'`,
     `import{createRoot as _$cr}from'react-dom/client'`,
     `try{_$cr(document.getElementById('root')).render(_$cc(${name},${propsJson}));}` +
       `catch(e){window.parent.postMessage({type:'render-error',tier:'source',message:String(e)},'*');}`,
-    // React 18 concurrent mode renders asynchronously — the try/catch above only catches
-    // synchronous errors. Components that return null (e.g. context sub-components without
-    // a provider) or whose render errors React swallows both leave the root empty with no
-    // error posted. Detect this after a short delay and show a placeholder so the card
-    // isn't just a silent black rectangle.
     `setTimeout(function(){var _$d=document.getElementById('root');` +
       `if(_$d&&!_$d.firstChild)_$d.innerHTML='<div style="opacity:.3;font-size:13px;text-align:center;padding-top:24px;color:currentColor">&#8212;</div>';},150);`,
+    `setTimeout(function(){window.parent.postMessage({type:'render-settled'},'*');},250);`,
   ].join('\n')
 
   return `<!DOCTYPE html><html><head>${baseHead(theme, importMap, hasTailwind)}
@@ -1044,8 +1059,11 @@ export function buildBundledIframeHtml(
     `} catch (e) {`,
     `  window.parent.postMessage({type:'render-error',tier:'bundled',message:String(e)},'*')`,
     `}`,
+    // Mirrors buildReactHtml — see comment there. Dash placeholder at 150ms,
+    // `render-settled` slot release at 250ms.
     `setTimeout(function(){var _$d=document.getElementById('root');` +
       `if(_$d&&!_$d.firstChild)_$d.innerHTML='<div style="opacity:.3;font-size:13px;text-align:center;padding-top:24px;color:currentColor">&#8212;</div>';},150);`,
+    `setTimeout(function(){window.parent.postMessage({type:'render-settled'},'*');},250);`,
   ].join('\n')
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">${ERROR_BRIDGE_BUNDLED}${importMap}${cssLinks}${tailwind}
