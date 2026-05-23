@@ -12,6 +12,7 @@ import { getLangColor } from '../lib/languages'
 import { classifyRepoBucket } from '../lib/classifyRepoType'
 import { getSubTypeConfig, getBucketGradient, getBucketColor } from '../config/repoTypeConfig'
 import DitherBackground from '../components/DitherBackground'
+import { cameraIdxForRepo } from '../utils/repoCameraSeed'
 const ReadmeRenderer = lazy(() => import('../components/ReadmeRenderer'))
 import TocNav, { type TocItem } from '../components/TocNav'
 import NavBar from '../components/NavBar'
@@ -1667,7 +1668,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
           <ArticleLayout
             navBar={inLibrary ? null : <NavBar />}
             byline={bylineNode}
-            dither={<DitherBackground avatarUrl={repo?.avatar_url} fallbackGradient={ditherGradient} staticFrame />}
+            dither={<DitherBackground avatarUrl={repo?.avatar_url} fallbackGradient={ditherGradient} staticFrame staticCameraIdx={cameraIdxForRepo(owner ?? '', name ?? '')} />}
             title={titleNode}
             titleExtras={titleExtrasNode}
             description={

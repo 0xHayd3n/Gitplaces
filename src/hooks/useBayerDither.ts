@@ -268,11 +268,39 @@ interface AvatarSrcEntry {
 const _avatarSrcCache = new Map<string, AvatarSrcEntry>()
 const _avatarSrcInflight = new Map<string, Promise<AvatarSrcEntry | null>>()
 
-// Static-frame output cache keyed by `${url}:${w}:${h}`. With staticFrame=true
-// the renderCamera call is deterministic (camera 0, t=0), so the resulting
-// ImageData is shared across every BannerCard with matching dimensions —
-// typically all of them. Avoids the per-pixel render entirely on cache hit.
+// Static-frame output cache keyed by `${url}:${w}:${h}:${camIdx}`. With
+// staticFrame=true the renderCamera call is deterministic (fixed camera, t=0),
+// so the resulting ImageData is shared across every consumer that matches all
+// four dimensions. Avoids the per-pixel render entirely on cache hit.
 const _staticOutputCache = new Map<string, ImageData>()
+
+// Most recently rendered banner dimensions (CSS pixels of the CONTAINER, not
+// the scaled canvas). `prewarmStaticDither` reads this so it can pre-render at
+// the same effective size useBayerDither will use when it mounts a moment
+// later — keeping the prewarm and the mount on the same cache key.
+let _lastBannerSize: { width: number; height: number } | null = null
+
+// Pre-render and cache a static-frame dither for a given avatar + camera
+// before any DitherBackground for it mounts. Used by the Library sidebar's
+// click handler so the next route's banner paints in its first frame after
+// mount instead of blinking in mid-crossfade.
+export function prewarmStaticDither(avatarUrl: string | null | undefined, camIdx: number = 0): void {
+  if (!avatarUrl || !_lastBannerSize) {
+    if (avatarUrl) void loadAvatarSrc(avatarUrl)
+    return
+  }
+  const scale = 0.25
+  const w = Math.floor(_lastBannerSize.width * scale)
+  const h = Math.floor(_lastBannerSize.height * scale)
+  if (w <= 0 || h <= 0) return
+  const outKey = `${avatarUrl}:${w}:${h}:${camIdx}`
+  if (_staticOutputCache.has(outKey)) return
+  void loadAvatarSrc(avatarUrl).then(entry => {
+    if (!entry || _staticOutputCache.has(outKey)) return
+    const pixels = renderCamera(entry.srcData, entry.imgWidth, entry.imgHeight, w, h, camIdx, 0, entry.tintColor)
+    _staticOutputCache.set(outKey, new ImageData(pixels, w, h))
+  })
+}
 
 function loadAvatarSrc(url: string): Promise<AvatarSrcEntry | null> {
   const cached = _avatarSrcCache.get(url)
@@ -319,6 +347,7 @@ export function useBayerDither(
   containerWidth: number,
   containerHeight: number,
   staticFrame = false,
+  staticCameraIdx = 0,
 ) {
   const animRef = useRef<number>(0)
   const frameRef = useRef(0)
@@ -347,16 +376,18 @@ export function useBayerDither(
     canvas.width = w
     canvas.height = h
 
+    _lastBannerSize = { width: containerWidth, height: containerHeight }
+
     let cancelled = false
     renderFnRef.current = null
 
     // Static-frame super-fast path: if we've already rendered this avatar at
-    // the current size, just blit the cached ImageData. No image load, no
-    // extractDominantHue, no renderCamera, no IntersectionObserver. Common
-    // case across the activity feed (every BannerCard shares the same owner
-    // avatar).
+    // the current size + camera, just blit the cached ImageData. No image
+    // load, no extractDominantHue, no renderCamera, no IntersectionObserver.
+    // Common case across the activity feed (every BannerCard shares the same
+    // owner avatar + default camera).
     if (staticFrame) {
-      const outKey = `${avatarUrl}:${w}:${h}`
+      const outKey = `${avatarUrl}:${w}:${h}:${staticCameraIdx}`
       const cachedOutput = _staticOutputCache.get(outKey)
       if (cachedOutput) {
         ctx.putImageData(cachedOutput, 0, 0)
@@ -399,9 +430,9 @@ export function useBayerDither(
         // The cached ImageData's pixel buffer is shared by all consumers — do
         // NOT mutate `imageData.data` after caching, or every card sharing the
         // entry will see the mutation. `ctx.putImageData` only reads.
-        const pixels = renderCamera(srcData, srcW, srcH, w, h, 0, 0, tintColor)
+        const pixels = renderCamera(srcData, srcW, srcH, w, h, staticCameraIdx, 0, tintColor)
         const imageData = new ImageData(pixels, w, h)
-        _staticOutputCache.set(`${avatarUrl}:${w}:${h}`, imageData)
+        _staticOutputCache.set(`${avatarUrl}:${w}:${h}:${staticCameraIdx}`, imageData)
         ctx.putImageData(imageData, 0, 0)
         return
       }
@@ -483,7 +514,7 @@ export function useBayerDither(
       io?.disconnect()
       cleanup()
     }
-  }, [avatarUrl, containerWidth, containerHeight, canvasRef, cleanup, staticFrame])
+  }, [avatarUrl, containerWidth, containerHeight, canvasRef, cleanup, staticFrame, staticCameraIdx])
 
   useEffect(() => {
     if (staticFrame) return

@@ -13,6 +13,8 @@ import LibraryDetailRoutes from '../components/LibraryDetailRoutes'
 import LibrarySidebar from '../components/LibrarySidebar'
 import ActivityFeed from '../components/ActivityFeed'
 import { primeRepoCacheFromRows } from './RepoDetail'
+import { prewarmStaticDither } from '../hooks/useBayerDither'
+import { cameraIdxForRepo } from '../utils/repoCameraSeed'
 
 export default function Library() {
   const { toast } = useToast()
@@ -110,6 +112,7 @@ export default function Library() {
     : null
 
   const handleRepoSelect = useCallback((row: RepoRow, _isInstalled: boolean) => {
+    prewarmStaticDither(row.avatar_url, cameraIdxForRepo(row.owner, row.name))
     recordRecentVisit({ owner: row.owner, name: row.name, avatar_url: row.avatar_url, navigatePath: `/library/repo/${row.owner}/${row.name}` })
     refreshRecentVisits()
     navigate(`/library/repo/${row.owner}/${row.name}`)

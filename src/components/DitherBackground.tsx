@@ -5,12 +5,16 @@ interface DitherBackgroundProps {
   avatarUrl?: string | null
   fallbackGradient?: [string, string]
   staticFrame?: boolean
+  /** When staticFrame is true, picks which of the 4 cameras to render. Lets
+      same-avatar repos show visibly different crops. Ignored when animating. */
+  staticCameraIdx?: number
 }
 
 const DitherBackground = memo(function DitherBackground({
   avatarUrl,
   fallbackGradient,
   staticFrame = false,
+  staticCameraIdx = 0,
 }: DitherBackgroundProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -36,7 +40,7 @@ const DitherBackground = memo(function DitherBackground({
     return () => { cancelAnimationFrame(rafId); ro.disconnect() }
   }, [])
 
-  useBayerDither(canvasRef, avatarUrl ?? null, size.width, size.height, staticFrame)
+  useBayerDither(canvasRef, avatarUrl ?? null, size.width, size.height, staticFrame, staticCameraIdx)
 
   const fallbackBg = fallbackGradient
     ? `linear-gradient(135deg, ${fallbackGradient[0]} 0%, ${fallbackGradient[1]} 100%)`
