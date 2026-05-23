@@ -21,14 +21,20 @@ export function PrimaryActionSplitButton({
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number; width: number } | null>(null)
 
   // Position the portaled menu under the right edge of the wrapper.
+  // Width matches the trigger exactly so the open menu reads as the
+  // expanded form of the button.
   useLayoutEffect(() => {
     if (!open || !wrapRef.current) return
     const update = () => {
       const rect = wrapRef.current!.getBoundingClientRect()
-      setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+      setMenuPos({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+        width: rect.width,
+      })
     }
     update()
     window.addEventListener('resize', update)
@@ -81,7 +87,12 @@ export function PrimaryActionSplitButton({
           ref={menuRef}
           className="split-button-menu"
           role="menu"
-          style={{ position: 'fixed', top: menuPos.top, right: menuPos.right }}
+          style={{
+            position: 'fixed',
+            top: menuPos.top,
+            right: menuPos.right,
+            width: menuPos.width,
+          }}
           onClick={() => setOpen(false)}
         >
           {children}

@@ -6226,7 +6226,11 @@ a {
 }
 
 /* ── Split button (Learn / Cancel / Learned + dropdown) ───────────── */
-.split-button { display: inline-flex; position: relative; }
+/* Width: action grows to fill (flex:1), caret stays compact. Combined with
+   the menu's JS-synced width, the trigger and the open menu read as the
+   same pill — same width, edges aligned. */
+.split-button { display: inline-flex; position: relative; min-width: 180px; }
+.split-button-action { flex: 1; justify-content: center; }
 .split-button-action,
 .split-button-caret {
   border: none;
@@ -6256,13 +6260,13 @@ a {
 .split-button--learned .split-button-action:hover:not(:disabled),
 .split-button--learned .split-button-caret:hover { background: #7c3aed; }
 .split-button-action:disabled { opacity: 0.85; cursor: default; }
-/* Position is set inline by the component (portal + getBoundingClientRect).
+/* Position + width are set inline by the component (portal + getBoundingClientRect).
    Stays in the global stacking context (document.body) so it can never be
    trapped under .article-layout-tabs-slot or any other sticky layer. */
 .split-button-menu {
   z-index: 2000;
   background: #15151a; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;
-  min-width: 160px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6); overflow: hidden;
   display: flex; flex-direction: column;
 }
 .split-button-menu button {
