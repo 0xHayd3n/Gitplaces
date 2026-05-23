@@ -53,8 +53,10 @@ const defaultProps = {
   archivedSet: new Set<string>(),
   selectedId: null,
   selectedLocalPath: null,
+  collSelectedId: null,
   onSelect: vi.fn(),
   onSelectLocal: vi.fn(),
+  onSelectColl: vi.fn(),
 }
 
 beforeEach(() => {
@@ -190,5 +192,28 @@ describe('LibrarySidebar — URL-driven mode', () => {
   it('starts in repos mode when URL is /library/repo/:owner/:name', () => {
     wrap(<LibrarySidebar {...defaultProps} />, '/library/repo/foo/bar')
     expect(screen.getByRole('button', { name: 'Repositories' })).toHaveClass('active')
+  })
+})
+
+describe('LibrarySidebar — collections mode rendering', () => {
+  it('renders the collections list when mode=collections', async () => {
+    vi.stubGlobal('api', {
+      collection: {
+        getAll: vi.fn().mockResolvedValue([
+          { id: 'c1', name: 'My Collection', description: null, owner: 'me',
+            active: 1, created_at: '2026-01-01', color_start: '#000', color_end: '#fff',
+            repo_count: 0, saved_count: 0 },
+        ]),
+      },
+    })
+    wrap(<LibrarySidebar {...defaultProps} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Collections' }))
+    expect(await screen.findByText('My Collection')).toBeInTheDocument()
+  })
+
+  it('changes search placeholder when in collections mode', () => {
+    wrap(<LibrarySidebar {...defaultProps} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Collections' }))
+    expect(screen.getByPlaceholderText('Search collections')).toBeInTheDocument()
   })
 })

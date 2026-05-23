@@ -3,10 +3,11 @@ import { useState, useMemo, useEffect } from 'react'
 import { useLocation, useNavigate, useMatch } from 'react-router-dom'
 import { Home, Search } from 'lucide-react'
 import './LibrarySidebar.css'
-import type { LibraryRow, StarredRepoRow, RepoRow } from '../types/repo'
+import type { LibraryRow, StarredRepoRow, RepoRow, CollectionRow } from '../types/repo'
 import type { LibraryEntry, LocalProject } from '../types/library'
 import { useLearningProgress } from '../hooks/useLearningProgress'
 import RepoContextMenu, { type RepoContextMenuTarget } from './RepoContextMenu'
+import CollectionsSidebar from './CollectionsSidebar'
 
 interface Props {
   installedRows: LibraryRow[]
@@ -16,8 +17,10 @@ interface Props {
   archivedSet: Set<string>
   selectedId: string | null
   selectedLocalPath: string | null
+  collSelectedId?: string | null
   onSelect: (row: RepoRow, isInstalled: boolean) => void
   onSelectLocal: (project: LocalProject) => void
+  onSelectColl?: (id: string, coll: CollectionRow) => void
 }
 
 function ReposIcon({ size = 13 }: { size?: number }) {
@@ -65,7 +68,8 @@ type Mode = 'repos' | 'collections'
 export default function LibrarySidebar({
   installedRows, starredRows, unstarredRows, localProjects,
   archivedSet,
-  selectedId, selectedLocalPath, onSelect, onSelectLocal,
+  selectedId, selectedLocalPath, collSelectedId = null,
+  onSelect, onSelectLocal, onSelectColl,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
   const collMatch = useMatch('/library/collection/:id')
@@ -192,6 +196,7 @@ export default function LibrarySidebar({
           </div>
         </div>
       </div>
+      {mode === 'repos' ? (
       <div className="library-sidebar-list">
         {visible.length === 0 && (
           <div className="library-sidebar-empty">No repos or projects</div>
@@ -283,6 +288,15 @@ export default function LibrarySidebar({
           </div>
         )}
       </div>
+      ) : (
+        <div className="library-sidebar-list">
+          <CollectionsSidebar
+            selectedId={collSelectedId}
+            onSelect={onSelectColl ?? (() => {})}
+            searchTerm={searchTerm}
+          />
+        </div>
+      )}
 
       {menu && (
         <RepoContextMenu
