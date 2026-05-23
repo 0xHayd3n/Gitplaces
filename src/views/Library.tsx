@@ -144,6 +144,7 @@ export default function Library() {
       const st = location.state as { collectionName?: string } | null
       return st?.collectionName ?? 'Collection'
     }
+    if (agentMatch) return 'Agent'
     return 'Activity'
   })()
 
