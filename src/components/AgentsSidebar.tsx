@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMatch, useNavigate } from 'react-router-dom'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
 import NewAgentModal from './NewAgentModal'
+import AgentContextMenu, { type AgentMenuKind } from './AgentContextMenu'
 
 interface Props {
   searchTerm?: string
@@ -30,6 +31,62 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
   const [agents, setAgents] = useState<AgentRow[]>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [showModal, setShowModal] = useState(false)
+  const [menu, setMenu] = useState<{ x: number; y: number; target: AgentMenuKind } | null>(null)
+
+  const onAgentRightClick = (e: React.MouseEvent, agentId: string) => {
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY, target: { kind: 'agent', agentId } })
+  }
+
+  const onFolderRightClick = (e: React.MouseEvent, folderId: string) => {
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY, target: { kind: 'folder', folderId } })
+  }
+
+  const handleRenameAgent = async (id: string) => {
+    const current = agents.find(a => a.id === id)
+    const next = prompt('Rename agent', current?.name ?? '')
+    if (next != null) await window.api.agents.update(id, { name: next })
+  }
+
+  const handleDeleteAgent = async (id: string) => {
+    if (!confirm('Delete this agent? This cannot be undone.')) return
+    await window.api.agents.delete(id)
+  }
+
+  const handleDuplicate = async (id: string) => {
+    await window.api.agents.duplicate(id)
+  }
+
+  const handleRenameFolder = async (id: string) => {
+    const current = folders.find(f => f.id === id)
+    const next = prompt('Rename folder', current?.name ?? '')
+    if (next != null) await window.api.agents.renameFolder(id, next)
+  }
+
+  const handleDeleteFolder = async (id: string) => {
+    if (!confirm('Delete this folder? Agents inside it will move to Unfiled.')) return
+    await window.api.agents.deleteFolder(id)
+  }
+
+  const handleMoveAgent = async (id: string) => {
+    const choice = prompt(
+      'Move to folder. Type folder name (blank for Unfiled):',
+      '',
+    )
+    if (choice === null) return
+    if (choice.trim() === '') {
+      await window.api.agents.update(id, { folderId: null })
+      return
+    }
+    const f = folders.find(x => x.name === choice.trim())
+    if (f) {
+      await window.api.agents.update(id, { folderId: f.id })
+    } else {
+      const created = await window.api.agents.createFolder(choice.trim())
+      await window.api.agents.update(id, { folderId: created.id })
+    }
+  }
 
   const load = useCallback(async () => {
     const data = await window.api.agents.getAll()
@@ -110,6 +167,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
               type="button"
               className="library-sidebar-section-header"
               onClick={() => toggle(key)}
+              onContextMenu={g.id ? (e) => onFolderRightClick(e, g.id!) : undefined}
               aria-expanded={isOpen}
             >
               <span className="library-sidebar-section-caret">{isOpen ? '▾' : '▸'}</span>
@@ -121,6 +179,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
                 type="button"
                 className={`library-sidebar-item installed${selectedId === a.id ? ' selected' : ''}`}
                 onClick={() => navigate(`/library/agent/${a.id}`)}
+                onContextMenu={(e) => onAgentRightClick(e, a.id)}
                 title={a.name}
               >
                 <span className="library-sidebar-avatar library-sidebar-local-avatar">
@@ -138,6 +197,20 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
           folders={folders}
           onClose={() => setShowModal(false)}
           onCreated={handleCreated}
+        />
+      )}
+      {menu && (
+        <AgentContextMenu
+          x={menu.x}
+          y={menu.y}
+          target={menu.target}
+          onClose={() => setMenu(null)}
+          onRenameAgent={handleRenameAgent}
+          onMoveAgent={handleMoveAgent}
+          onDuplicate={handleDuplicate}
+          onDeleteAgent={handleDeleteAgent}
+          onRenameFolder={handleRenameFolder}
+          onDeleteFolder={handleDeleteFolder}
         />
       )}
     </>
