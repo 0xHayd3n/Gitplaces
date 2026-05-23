@@ -20,6 +20,22 @@ interface Props {
   onSelectLocal: (project: LocalProject) => void
 }
 
+function ReposIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h18v2H3v-2z" />
+    </svg>
+  )
+}
+
+function CollectionsIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" />
+    </svg>
+  )
+}
+
 function GitHubIcon({ size = 11 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -44,12 +60,15 @@ function FolderIcon() {
   )
 }
 
+type Mode = 'repos' | 'collections'
+
 export default function LibrarySidebar({
   installedRows, starredRows, unstarredRows, localProjects,
   archivedSet,
   selectedId, selectedLocalPath, onSelect, onSelectLocal,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
+  const [mode, setMode] = useState<Mode>('repos')
   const location = useLocation()
   const navigate = useNavigate()
   const isSummaryActive = location.pathname === '/library'
@@ -101,6 +120,26 @@ export default function LibrarySidebar({
           >
             <Home size={14} />
           </button>
+          <div className="library-sidebar-toggle">
+            <button
+              type="button"
+              className={`library-sidebar-toggle-btn${mode === 'repos' ? ' active' : ''}`}
+              onClick={() => setMode('repos')}
+              aria-label="Repositories"
+              title="Repositories"
+            >
+              <ReposIcon />
+            </button>
+            <button
+              type="button"
+              className={`library-sidebar-toggle-btn${mode === 'collections' ? ' active' : ''}`}
+              onClick={() => setMode('collections')}
+              aria-label="Collections"
+              title="Collections"
+            >
+              <CollectionsIcon />
+            </button>
+          </div>
         </div>
       </div>
       <div className="library-sidebar-list">

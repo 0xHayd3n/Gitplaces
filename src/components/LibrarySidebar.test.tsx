@@ -50,4 +50,19 @@ describe('LibrarySidebar — top bar', () => {
     fireEvent.click(homeBtn)
     expect(screen.getByTestId('loc').textContent).toBe('/library')
   })
+
+  it('renders a Repos/Collections toggle with Repos active by default', () => {
+    wrap(<LibrarySidebar {...defaultProps} />)
+    const reposBtn = screen.getByRole('button', { name: 'Repositories' })
+    const collsBtn = screen.getByRole('button', { name: 'Collections' })
+    expect(reposBtn).toHaveClass('active')
+    expect(collsBtn).not.toHaveClass('active')
+  })
+
+  it('clicking Collections toggle activates it', () => {
+    wrap(<LibrarySidebar {...defaultProps} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Collections' }))
+    expect(screen.getByRole('button', { name: 'Collections' })).toHaveClass('active')
+    expect(screen.getByRole('button', { name: 'Repositories' })).not.toHaveClass('active')
+  })
 })
