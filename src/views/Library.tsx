@@ -8,14 +8,10 @@ import { useRepoNav } from '../contexts/RepoNav'
 import { useArchivedRepos } from '../hooks/useArchivedRepos'
 import { getRecentVisits, recordRecentVisit } from '../lib/recentVisits'
 import type { RecentEntry } from '../lib/recentVisits'
-import NavRail from '../components/NavRail'
 import LibrarySidebar from '../components/LibrarySidebar'
-import CollectionsSidebar from '../components/CollectionsSidebar'
 import RepoDetail from './RepoDetail'
 import CollectionDetail from './CollectionDetail'
 import ActivityFeed from '../components/ActivityFeed'
-
-type ActivePanel = 'repos' | 'collections'
 
 export default function Library() {
   const { toast } = useToast()
@@ -29,7 +25,6 @@ export default function Library() {
   const collMatch  = useMatch('/library/collection/:id')
   const hasDetail  = repoMatch !== null || collMatch !== null
 
-  const [activePanel, setActivePanel] = useState<ActivePanel>('repos')
   const [rows, setRows] = useState<LibraryRow[]>([])
   const [starredRows, setStarredRows] = useState<StarredRepoRow[]>([])
   const [unstarredRows, setUnstarredRows] = useState<StarredRepoRow[]>([])
@@ -74,11 +69,6 @@ export default function Library() {
   }, [refreshAll, toast])
 
   useEffect(() => {
-    if (collMatch) setActivePanel('collections')
-    else if (repoMatch) setActivePanel('repos')
-  }, [collMatch, repoMatch])
-
-  useEffect(() => {
     window.api.settings.get('projectsFolder').then(folder => {
       if (folder) {
         window.api.projects?.scanFolder(folder).then(setLocalProjects).catch(() => {})
@@ -102,10 +92,6 @@ export default function Library() {
     ? new URLSearchParams(location.search).get('path')
     : null
 
-  const handlePanelToggle = useCallback((panel: 'repos' | 'collections') => {
-    setActivePanel(panel)
-  }, [])
-
   const handleRepoSelect = useCallback((row: RepoRow, _isInstalled: boolean) => {
     recordRecentVisit({ owner: row.owner, name: row.name, avatar_url: row.avatar_url, navigatePath: `/library/repo/${row.owner}/${row.name}` })
     refreshRecentVisits()
@@ -128,12 +114,8 @@ export default function Library() {
   return (
     <div className="library-root-v2">
       <div className="discover-drag-strip" aria-hidden="true" />
-      <NavRail activePanel={activePanel} onPanelToggle={handlePanelToggle} />
 
-      <div
-        className={`library-panel${activePanel === 'repos' ? '' : ' collapsed'}${isMiniTab ? ' mini' : ''}`}
-        aria-hidden={activePanel !== 'repos'}
-      >
+      <div className={`library-panel${isMiniTab ? ' mini' : ''}`}>
         <LibrarySidebar
           installedRows={rows}
           starredRows={starredRows}
@@ -142,18 +124,10 @@ export default function Library() {
           archivedSet={archivedSet}
           selectedId={repoSelectedId}
           selectedLocalPath={selectedLocalPath}
+          collSelectedId={collSelectedId}
           onSelect={handleRepoSelect}
           onSelectLocal={handleLocalSelect}
-        />
-      </div>
-
-      <div
-        className={`library-panel${activePanel === 'collections' ? '' : ' collapsed'}`}
-        aria-hidden={activePanel !== 'collections'}
-      >
-        <CollectionsSidebar
-          selectedId={collSelectedId}
-          onSelect={handleCollSelect}
+          onSelectColl={handleCollSelect}
         />
       </div>
 

@@ -6,6 +6,8 @@ import Library from './Library'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
 import { SearchProvider } from '../contexts/Search'
 import { ToastProvider } from '../contexts/Toast'
+import { GitHubAuthProvider } from '../contexts/GitHubAuth'
+import { MockLearningProgressProvider } from '../contexts/LearningProgressContext'
 
 vi.mock('../components/CollectionsSidebar', () => ({
   default: () => <div data-testid="collections-sidebar" />,
@@ -38,13 +40,17 @@ const mockRows = [
 function renderLibrary(initialPath = '/library') {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
-      <ProfileOverlayProvider>
-        <SearchProvider>
-          <ToastProvider>
-            <Library />
-          </ToastProvider>
-        </SearchProvider>
-      </ProfileOverlayProvider>
+      <GitHubAuthProvider>
+        <MockLearningProgressProvider>
+          <ProfileOverlayProvider>
+            <SearchProvider>
+              <ToastProvider>
+                <Library />
+              </ToastProvider>
+            </SearchProvider>
+          </ProfileOverlayProvider>
+        </MockLearningProgressProvider>
+      </GitHubAuthProvider>
     </MemoryRouter>
   )
 }
@@ -52,52 +58,46 @@ function renderLibrary(initialPath = '/library') {
 beforeEach(() => {
   vi.stubGlobal('api', {
     library: { getAll: vi.fn().mockResolvedValue(mockRows) },
-    starred: { getAll: vi.fn().mockResolvedValue([]) },
+    starred: {
+      getAll: vi.fn().mockResolvedValue([]),
+      getRecentlyUnstarred: vi.fn().mockResolvedValue([]),
+    },
     collection: { getAll: vi.fn().mockResolvedValue([]) },
+    settings: {
+      get: vi.fn().mockResolvedValue(null),
+      set: vi.fn().mockResolvedValue(undefined),
+    },
+    updates: {
+      onStatusChanged: vi.fn(),
+      offStatusChanged: vi.fn(),
+      onToast: vi.fn(),
+      offToast: vi.fn(),
+    },
+    projects: {
+      scanFolder: vi.fn().mockResolvedValue([]),
+    },
+    github: {
+      setArchivedAt: vi.fn().mockResolvedValue(undefined),
+    },
   })
 })
 
 describe('Library', () => {
-  it('renders the nav rail with Repositories and Collections buttons', async () => {
+  it('renders the new sidebar with home button + mode toggle', async () => {
     renderLibrary()
     await screen.findByText('react')
+    expect(screen.getByRole('button', { name: 'Home' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Repositories' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Collections' })).toBeInTheDocument()
   })
 
-  it('Repositories panel is open by default', async () => {
+  it('starts on the repos list by default', async () => {
     renderLibrary()
     await screen.findByText('react')
-    const panel = document.querySelector('.library-panel:not(.collapsed)')
-    expect(panel).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Repositories' })).toHaveClass('active')
   })
 
-  it('clicking Repos button again collapses the panel', async () => {
-    const user = userEvent.setup()
-    renderLibrary()
-    await screen.findByText('react')
-    await user.click(screen.getByRole('button', { name: 'Repositories' }))
-    const panels = document.querySelectorAll('.library-panel')
-    expect([...panels].every(p => p.classList.contains('collapsed'))).toBe(true)
-  })
-
-  it('shows empty state when no repo or collection is selected', async () => {
-    renderLibrary()
-    expect(await screen.findByText('Your Library')).toBeInTheDocument()
-  })
-
-  it('shows repo count in empty state subtitle', async () => {
-    renderLibrary()
-    expect(await screen.findByText(/1 skill installed/)).toBeInTheDocument()
-  })
-
-  it('shows "No skills installed yet" when library is empty', async () => {
-    ;(window.api.library.getAll as ReturnType<typeof vi.fn>).mockResolvedValue([])
-    renderLibrary()
-    expect(await screen.findByText(/No skills installed yet/)).toBeInTheDocument()
-  })
-
-  it('switching to Collections panel shows the collections sidebar', async () => {
+  it('shows collections sidebar when Collections toggle is clicked', async () => {
     const user = userEvent.setup()
     renderLibrary()
     await screen.findByText('react')
