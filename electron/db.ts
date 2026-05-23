@@ -310,6 +310,28 @@ export function initSchema(db: Database.Database): void {
   try { db.exec(`ALTER TABLE repos ADD COLUMN archived_at       TEXT    DEFAULT NULL`) } catch {}
   try { db.exec(`ALTER TABLE repos ADD COLUMN forked_at         TEXT    DEFAULT NULL`) } catch {}
 
+  // Agents redesign — new columns on existing agents table
+  try { db.exec(`ALTER TABLE agents ADD COLUMN handle       TEXT NOT NULL DEFAULT ''`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN color_start  TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN color_end    TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN emoji        TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN pinned       INTEGER NOT NULL DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN pinned_at    TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN last_used_at TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN presets_json TEXT NOT NULL DEFAULT '[]'`) } catch {}
+
+  // Agents redesign — edit-history snapshots table (writes wired up in Phase C)
+  db.exec(`CREATE TABLE IF NOT EXISTS agent_revisions (
+    id           TEXT PRIMARY KEY,
+    agent_id     TEXT NOT NULL,
+    body         TEXT NOT NULL,
+    presets_json TEXT NOT NULL,
+    summary      TEXT NOT NULL,
+    kind         TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+  )`)
+
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`
     CREATE INDEX IF NOT EXISTS repos_starred_at      ON repos(starred_at);
@@ -318,6 +340,9 @@ export function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_engagement_ts     ON engagement_events(ts DESC);
     CREATE INDEX IF NOT EXISTS idx_engagement_repo   ON engagement_events(repo_id);
     CREATE INDEX IF NOT EXISTS repos_update_available ON repos(update_available);
+    CREATE INDEX IF NOT EXISTS idx_agents_pinned    ON agents(pinned, pinned_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_agents_last_used ON agents(last_used_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_revisions_agent  ON agent_revisions(agent_id, created_at DESC);
   `)
 }
 
