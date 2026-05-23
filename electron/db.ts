@@ -153,6 +153,27 @@ export function initSchema(db: Database.Database): void {
       PRIMARY KEY (owner, name)
     );
 
+    CREATE TABLE IF NOT EXISTS agent_folders (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      color_start TEXT,
+      color_end   TEXT,
+      description TEXT,
+      created_at  TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS agents (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      body        TEXT NOT NULL,
+      folder_id   TEXT REFERENCES agent_folders(id) ON DELETE SET NULL,
+      created_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_agents_folder  ON agents(folder_id);
+    CREATE INDEX IF NOT EXISTS idx_agents_updated ON agents(updated_at DESC);
+
     -- ETag cache for conditional GitHub REST requests (If-None-Match).
     -- Rows are keyed by full URL since the same URL may be hit from multiple
     -- code paths. A 304 response from GitHub does NOT count against the
