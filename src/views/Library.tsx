@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useMatch, useLocation, Routes, Route } from 'react-router-dom'
 import { type LibraryRow, type StarredRepoRow, type RepoRow } from '../types/repo'
 import type { CollectionRow } from '../types/repo'
@@ -43,19 +43,30 @@ export default function Library() {
     window.api.starred.getRecentlyUnstarred().then(setUnstarredRows).catch(() => {})
   }, [toast])
 
+  // Trailing-edge debounce for event-driven refreshes so bursts of
+  // `library:changed` + status events coalesce into one IPC round-trip.
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null
+      refreshAll()
+    }, 150)
+  }, [refreshAll])
+
   useEffect(() => {
     refreshAll()
   }, [refreshAll])
 
   useEffect(() => {
-    window.addEventListener('library:changed', refreshAll)
-    return () => window.removeEventListener('library:changed', refreshAll)
-  }, [refreshAll])
+    window.addEventListener('library:changed', scheduleRefresh)
+    return () => window.removeEventListener('library:changed', scheduleRefresh)
+  }, [scheduleRefresh])
 
   useEffect(() => {
     const onStatusChanged = ({ ids }: { ids: string[] }) => {
       if (!ids.length) return
-      refreshAll()
+      scheduleRefresh()
     }
     const onToast = ({ message }: { message: string }) => {
       toast(message, 'success')
@@ -66,7 +77,13 @@ export default function Library() {
       window.api.updates.offStatusChanged(onStatusChanged)
       window.api.updates.offToast(onToast)
     }
-  }, [refreshAll, toast])
+  }, [scheduleRefresh, toast])
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     window.api.settings.get('projectsFolder').then(folder => {

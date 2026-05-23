@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 
 export type LearningPhase = 'cloning' | 'validating' | 'generating' | 'verifying' | 'persisting'
 export type LearningTerminalState = 'completed' | 'cancelled' | 'failed'
@@ -81,8 +81,10 @@ export function LearningProgressProvider({ children }: { children: React.ReactNo
     await window.api.skill.cancelLearn(owner, name)
   }, [])
 
+  const value = useMemo(() => ({ states, startLearn, cancelLearn }), [states, startLearn, cancelLearn])
+
   return (
-    <LearningProgressContext.Provider value={{ states, startLearn, cancelLearn }}>
+    <LearningProgressContext.Provider value={value}>
       {children}
     </LearningProgressContext.Provider>
   )

@@ -1,5 +1,5 @@
 // src/components/LibrarySidebar.tsx
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback, memo } from 'react'
 import { useLocation, useNavigate, useMatch } from 'react-router-dom'
 import { Home, Search } from 'lucide-react'
 import './LibrarySidebar.css'
@@ -140,14 +140,13 @@ export default function LibrarySidebar({
     )
   }, [unstarredRows, searchTerm])
 
-  const handleRepoContextMenu = (e: React.MouseEvent, entry: LibraryEntry & { kind: 'repo' }) => {
-    e.preventDefault()
-    setMenu({
-      x: e.clientX,
-      y: e.clientY,
-      target: { owner: entry.row.owner, name: entry.row.name, isStarred: entry.isStarred },
-    })
-  }
+  const handleRepoContextMenu = useCallback(
+    (e: React.MouseEvent, target: RepoContextMenuTarget) => {
+      e.preventDefault()
+      setMenu({ x: e.clientX, y: e.clientY, target })
+    },
+    [],
+  )
 
   return (
     <aside className="library-sidebar">
@@ -203,15 +202,16 @@ export default function LibrarySidebar({
         )}
         {visible.map(entry => {
           if (entry.kind === 'repo') {
-            const { row, isInstalled } = entry
+            const { row, isInstalled, isStarred } = entry
             return (
               <SidebarRepoRow
                 key={row.id}
                 row={row}
                 isInstalled={isInstalled}
+                isStarred={isStarred}
                 selected={selectedId === row.id}
-                onSelect={() => onSelect(row, isInstalled)}
-                onContextMenu={(e) => handleRepoContextMenu(e, entry)}
+                onSelect={onSelect}
+                onContextMenu={handleRepoContextMenu}
               />
             )
           }
@@ -255,9 +255,10 @@ export default function LibrarySidebar({
                   key={`archived-${row.id}`}
                   row={row}
                   isInstalled={entry.isInstalled}
+                  isStarred={entry.isStarred}
                   selected={selectedId === row.id}
-                  onSelect={() => onSelect(row, entry.isInstalled)}
-                  onContextMenu={(e) => handleRepoContextMenu(e, entry)}
+                  onSelect={onSelect}
+                  onContextMenu={handleRepoContextMenu}
                 />
               )
             })}
@@ -280,9 +281,10 @@ export default function LibrarySidebar({
                 key={`unstarred-${row.id}`}
                 row={row}
                 isInstalled={false}
+                isStarred={false}
                 selected={selectedId === row.id}
-                onSelect={() => onSelect(row, false)}
-                onContextMenu={(e) => handleRepoContextMenu(e, { kind: 'repo', row, isInstalled: false, isStarred: false })}
+                onSelect={onSelect}
+                onContextMenu={handleRepoContextMenu}
               />
             ))}
           </div>
@@ -310,28 +312,39 @@ export default function LibrarySidebar({
   )
 }
 
-function SidebarRepoRow({
-  row, isInstalled, selected, onSelect, onContextMenu,
-}: {
+interface SidebarRepoRowProps {
   row: RepoRow | LibraryRow | StarredRepoRow
   isInstalled: boolean
+  isStarred: boolean
   selected: boolean
-  onSelect: () => void
-  onContextMenu: (e: React.MouseEvent) => void
-}) {
+  onSelect: (row: RepoRow, isInstalled: boolean) => void
+  onContextMenu: (e: React.MouseEvent, target: RepoContextMenuTarget) => void
+}
+
+const SidebarRepoRow = memo(function SidebarRepoRow({
+  row, isInstalled, isStarred, selected, onSelect, onContextMenu,
+}: SidebarRepoRowProps) {
   const { state } = useLearningProgress(row.owner, row.name)
   const learning = !!state && state.state === 'running'
   const percent = state?.percent ?? 0
+
+  const handleClick = useCallback(() => onSelect(row, isInstalled), [onSelect, row.owner, row.name, isInstalled])
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) =>
+      onContextMenu(e, { owner: row.owner, name: row.name, isStarred }),
+    [onContextMenu, row.owner, row.name, isStarred],
+  )
+
   return (
     <button
       className={`library-sidebar-item${selected ? ' selected' : ''}${isInstalled ? ' installed' : ' uninstalled'}${learning ? ' learning' : ''}`}
-      onClick={onSelect}
-      onContextMenu={onContextMenu}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
       title={`${row.owner}/${row.name}`}
     >
       <span className="library-sidebar-avatar">
         {row.avatar_url
-          ? <img src={row.avatar_url} alt="" />
+          ? <img src={row.avatar_url} alt="" loading="lazy" decoding="async" />
           : <span className="library-sidebar-avatar-fallback">{(row.name?.[0] ?? '?').toUpperCase()}</span>
         }
       </span>
@@ -346,4 +359,4 @@ function SidebarRepoRow({
       )}
     </button>
   )
-}
+})
