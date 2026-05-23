@@ -2236,29 +2236,26 @@ ipcMain.handle('github:getMyRepos', async () => {
 })
 
 ipcMain.handle('projects:scanFolder', async (_event, folderPath: string) => {
-  const fs = require('fs') as typeof import('fs')
-  const path = require('path') as typeof import('path')
-
   let entries: string[]
-  try { entries = fs.readdirSync(folderPath) } catch { return [] }
+  try { entries = await fs.readdir(folderPath) } catch { return [] }
 
-  const results: { name: string; path: string; isGit: boolean; owner: string | null; repoName: string | null }[] = []
-
-  for (const entry of entries) {
+  const scanned = await Promise.all(entries.map(async entry => {
     const fullPath = path.join(folderPath, entry)
     let stat: import('fs').Stats
-    try { stat = fs.statSync(fullPath) } catch { continue }
-    if (!stat.isDirectory()) continue
+    try { stat = await fs.stat(fullPath) } catch { return null }
+    if (!stat.isDirectory()) return null
 
     const gitDir = path.join(fullPath, '.git')
-    const isGit = fs.existsSync(gitDir)
+    let isGit = false
+    try { await fs.access(gitDir); isGit = true } catch { /* not a git repo */ }
+
     let owner: string | null = null
     let repoName: string | null = null
 
     if (isGit) {
       const configPath = path.join(gitDir, 'config')
       try {
-        const cfg = fs.readFileSync(configPath, 'utf8')
+        const cfg = await fs.readFile(configPath, 'utf8')
         const httpsMatch = cfg.match(/url\s*=\s*https?:\/\/github\.com\/([^/\s]+)\/([^/\s.]+)/)
         const sshMatch   = cfg.match(/url\s*=\s*git@github\.com:([^/\s]+)\/([^/\s.]+)/)
         const m = httpsMatch ?? sshMatch
@@ -2266,10 +2263,10 @@ ipcMain.handle('projects:scanFolder', async (_event, folderPath: string) => {
       } catch { /* no config readable */ }
     }
 
-    results.push({ name: entry, path: fullPath, isGit, owner, repoName })
-  }
+    return { name: entry, path: fullPath, isGit, owner, repoName }
+  }))
 
-  return results
+  return scanned.filter((r): r is NonNullable<typeof r> => r !== null)
 })
 
 ipcMain.handle('projects:openFolder', async (_event, folderPath: string) => {

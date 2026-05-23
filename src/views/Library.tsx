@@ -6,6 +6,7 @@ import type { LocalProject } from '../types/library'
 import { useToast } from '../contexts/Toast'
 import { useRepoNav } from '../contexts/RepoNav'
 import { useArchivedRepos } from '../hooks/useArchivedRepos'
+import { useLocalProjects } from '../hooks/useLocalProjects'
 import { getRecentVisits, recordRecentVisit } from '../lib/recentVisits'
 import type { RecentEntry } from '../lib/recentVisits'
 import LibrarySidebar from '../components/LibrarySidebar'
@@ -28,7 +29,7 @@ export default function Library() {
   const [rows, setRows] = useState<LibraryRow[]>([])
   const [starredRows, setStarredRows] = useState<StarredRepoRow[]>([])
   const [unstarredRows, setUnstarredRows] = useState<StarredRepoRow[]>([])
-  const [localProjects, setLocalProjects] = useState<LocalProject[]>([])
+  const localProjects = useLocalProjects()
   const [recentVisits, setRecentVisits] = useState<RecentEntry[]>(() => getRecentVisits())
 
   const refreshRecentVisits = useCallback(() => {
@@ -83,14 +84,6 @@ export default function Library() {
     return () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
     }
-  }, [])
-
-  useEffect(() => {
-    window.api.settings.get('projectsFolder').then(folder => {
-      if (folder) {
-        window.api.projects?.scanFolder(folder).then(setLocalProjects).catch(() => {})
-      }
-    }).catch(() => {})
   }, [])
 
   const repoSelectedId = useMemo(() => {
