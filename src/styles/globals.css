@@ -6256,8 +6256,11 @@ a {
 .split-button--learned .split-button-action:hover:not(:disabled),
 .split-button--learned .split-button-caret:hover { background: #7c3aed; }
 .split-button-action:disabled { opacity: 0.85; cursor: default; }
+/* Position is set inline by the component (portal + getBoundingClientRect).
+   Stays in the global stacking context (document.body) so it can never be
+   trapped under .article-layout-tabs-slot or any other sticky layer. */
 .split-button-menu {
-  position: absolute; top: calc(100% + 4px); right: 0; z-index: 1500;
+  z-index: 2000;
   background: #15151a; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;
   min-width: 160px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); overflow: hidden;
   display: flex; flex-direction: column;
