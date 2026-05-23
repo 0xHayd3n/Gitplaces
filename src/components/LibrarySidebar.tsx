@@ -7,6 +7,7 @@ import type { LibraryRow, StarredRepoRow, RepoRow } from '../types/repo'
 import type { LibraryEntry, LocalProject, ActiveSegment } from '../types/library'
 import type { RecentEntry } from '../lib/recentVisits'
 import { filterLibraryEntries } from '../lib/libraryFilter'
+import { useLearningProgress } from '../hooks/useLearningProgress'
 import RepoContextMenu, { type RepoContextMenuTarget } from './RepoContextMenu'
 
 export type { ActiveSegment }
@@ -161,24 +162,14 @@ export default function LibrarySidebar({
           if (entry.kind === 'repo') {
             const { row, isInstalled } = entry
             return (
-              <button
+              <SidebarRepoRow
                 key={row.id}
-                className={`library-sidebar-item${selectedId === row.id ? ' selected' : ''}${isInstalled ? ' installed' : ' uninstalled'}`}
-                onClick={() => onSelect(row, isInstalled)}
-                onContextMenu={e => handleRepoContextMenu(e, entry)}
-                title={`${row.owner}/${row.name}`}
-              >
-                <span className="library-sidebar-avatar">
-                  {row.avatar_url
-                    ? <img src={row.avatar_url} alt="" />
-                    : <span className="library-sidebar-avatar-fallback">{(row.name?.[0] ?? '?').toUpperCase()}</span>
-                  }
-                </span>
-                <span className="library-sidebar-name">{row.name}</span>
-                <span className="library-sidebar-type-icon">
-                  <GitHubIcon />
-                </span>
-              </button>
+                row={row}
+                isInstalled={isInstalled}
+                selected={selectedId === row.id}
+                onSelect={() => onSelect(row, isInstalled)}
+                onContextMenu={(e) => handleRepoContextMenu(e, entry)}
+              />
             )
           }
 
@@ -212,5 +203,43 @@ export default function LibrarySidebar({
         />
       )}
     </aside>
+  )
+}
+
+function SidebarRepoRow({
+  row, isInstalled, selected, onSelect, onContextMenu,
+}: {
+  row: RepoRow | LibraryRow | StarredRepoRow
+  isInstalled: boolean
+  selected: boolean
+  onSelect: () => void
+  onContextMenu: (e: React.MouseEvent) => void
+}) {
+  const { state } = useLearningProgress(row.owner, row.name)
+  const learning = !!state && state.state === 'running'
+  const percent = state?.percent ?? 0
+  return (
+    <button
+      className={`library-sidebar-item${selected ? ' selected' : ''}${isInstalled ? ' installed' : ' uninstalled'}${learning ? ' learning' : ''}`}
+      onClick={onSelect}
+      onContextMenu={onContextMenu}
+      title={`${row.owner}/${row.name}`}
+    >
+      <span className="library-sidebar-avatar">
+        {row.avatar_url
+          ? <img src={row.avatar_url} alt="" />
+          : <span className="library-sidebar-avatar-fallback">{(row.name?.[0] ?? '?').toUpperCase()}</span>
+        }
+      </span>
+      <span className="library-sidebar-name">{row.name}</span>
+      {learning
+        ? <span className="library-sidebar-percent">{percent}%</span>
+        : <span className="library-sidebar-type-icon"><GitHubIcon /></span>}
+      {learning && (
+        <span className="library-sidebar-progress">
+          <span className="library-sidebar-progress-fill" style={{ width: `${percent}%` }} />
+        </span>
+      )}
+    </button>
   )
 }

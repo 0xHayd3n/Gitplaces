@@ -237,6 +237,44 @@
   opacity: 0.55;
 }
 
+/* ── Learning row state ─────────────────────────────────── */
+
+.library-sidebar-item.learning {
+  position: relative;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.25);
+  border-radius: 4px;
+}
+
+.library-sidebar-item.learning .library-sidebar-name { color: rgba(255, 255, 255, 1); }
+
+.library-sidebar-percent {
+  font-size: 10px;
+  font-weight: 600;
+  color: #a78bfa;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.library-sidebar-progress {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: rgba(139, 92, 246, 0.15);
+  border-radius: 0 0 4px 4px;
+  overflow: hidden;
+}
+
+.library-sidebar-progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+  transition: width 0.3s ease;
+}
+
+/* Mini-mode: keep highlight + bar, hide percent (name is already hidden) */
+.library-panel.mini .library-sidebar-percent { display: none; }
+
 /* ── Activity button ──────────────────────────────────── */
 
 .library-activity-row {
