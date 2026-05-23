@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import AgentDetail from './AgentDetail'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
 
@@ -106,5 +106,50 @@ describe('AgentDetail', () => {
     await waitFor(() =>
       expect(window.api.agents.update).toHaveBeenCalledWith('a1', { folderId: null }),
     )
+  })
+
+  it('resets edit mode when navigating between agents', async () => {
+    const otherAgent: AgentRow = {
+      id: 'a2', name: 'Other agent', body: '# Other\n\nother body.',
+      folder_id: null, created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z',
+    }
+    ;(window as any).api.agents.getAll = vi.fn()
+      .mockResolvedValueOnce({ folders, agents: [baseAgent] })
+      .mockResolvedValueOnce({ folders, agents: [otherAgent] })
+
+    // A small wrapper that exposes a navigate button so we can trigger real in-router navigation
+    function NavButton() {
+      const navigate = useNavigate()
+      return <button type="button" onClick={() => navigate('/library/agent/a2')}>Go to a2</button>
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/library/agent/a1']}>
+        <NavButton />
+        <Routes>
+          <Route path="/library/agent/:id" element={<AgentDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Copy editor' }))
+    fireEvent.click(screen.getByRole('button', { name: /Edit/ }))
+    expect(screen.getByRole('textbox', { name: /Body/ })).toBeTruthy()
+
+    // Navigate to /library/agent/a2 via the real router
+    fireEvent.click(screen.getByRole('button', { name: /Go to a2/ }))
+    await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Other agent' }))
+    // After navigation, the body textarea should be absent (back in preview mode)
+    expect(screen.queryByRole('textbox', { name: /Body/ })).toBeNull()
+  })
+
+  it('shows nameDraft in header after inline name edit even before save resolves', async () => {
+    setup()
+    await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Copy editor' }))
+    fireEvent.click(screen.getByRole('heading', { level: 2 }))
+    const nameInput = screen.getByDisplayValue('Copy editor') as HTMLInputElement
+    fireEvent.change(nameInput, { target: { value: 'Renamed agent' } })
+    fireEvent.blur(nameInput)
+    // After blur, header should reflect the new name (nameDraft), not stale agent.name
+    expect(screen.getByRole('heading', { level: 2, name: 'Renamed agent' })).toBeTruthy()
   })
 })

@@ -28,6 +28,10 @@ export default function AgentDetail() {
   useEffect(() => {
     if (!id) return
     let cancelled = false
+    setEditing(false)
+    setNameEditing(false)
+    if (bodyTimer.current) { clearTimeout(bodyTimer.current); bodyTimer.current = null }
+    if (nameTimer.current) { clearTimeout(nameTimer.current); nameTimer.current = null }
     ;(async () => {
       const { folders, agents } = await window.api.agents.getAll()
       if (cancelled) return
@@ -40,6 +44,11 @@ export default function AgentDetail() {
     return () => { cancelled = true }
   }, [id])
 
+  const editingRef = useRef(false)
+  const nameEditingRef = useRef(false)
+  useEffect(() => { editingRef.current = editing }, [editing])
+  useEffect(() => { nameEditingRef.current = nameEditing }, [nameEditing])
+
   // Listen for external changes
   useEffect(() => {
     if (!id) return
@@ -47,12 +56,12 @@ export default function AgentDetail() {
       const { agents } = await window.api.agents.getAll()
       const a = agents.find(x => x.id === id) ?? null
       setAgent(a)
-      if (!editing) setBodyDraft(a?.body ?? '')
-      if (!nameEditing) setNameDraft(a?.name ?? '')
+      if (!editingRef.current) setBodyDraft(a?.body ?? '')
+      if (!nameEditingRef.current) setNameDraft(a?.name ?? '')
     }
     window.api.agents.onChanged(cb)
     return () => window.api.agents.offChanged(cb)
-  }, [id, editing, nameEditing])
+  }, [id])
 
   const scheduleSaveBody = useCallback((value: string) => {
     if (!id) return
@@ -128,7 +137,7 @@ export default function AgentDetail() {
           />
         ) : (
           <h2 style={{ flex: 1, margin: 0, cursor: 'text' }} onClick={() => setNameEditing(true)}>
-            {agent.name}
+            {nameDraft || agent.name}
           </h2>
         )}
         <button type="button" onClick={handleDuplicate} aria-label="Duplicate">Duplicate</button>
