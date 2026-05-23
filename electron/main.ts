@@ -1225,6 +1225,13 @@ ipcMain.handle('starred:getRecentlyUnstarred', async () => {
 })
 
 // ── Skill IPC ───────────────────────────────────────────────────
+
+// Percent mapping for the 5 learning phases. Bar fills in 20% chunks as each
+// phase completes. Validate-hit path skips 'generating' so 20% → 80% directly.
+const LEARN_PHASE_PERCENT = {
+  cloning: 20, validating: 40, generating: 60, verifying: 80, persisting: 100,
+} as const
+
 // detectClaudeCode: just checks if the binary exists (not auth state)
 ipcMain.handle('skill:detectClaudeCode', async () => detectClaudeCode())
 
@@ -1291,7 +1298,12 @@ ipcMain.handle('skill:logoutClaude', async () => {
   await logoutClaude()
 })
 
-ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?: {
+ipcMain.handle('skill:cancelLearn', (_event, owner: string, name: string) => {
+  const key = `${owner}/${name}` as const
+  return { cancelled: learnProcessRegistry.cancel(key) }
+})
+
+ipcMain.handle('skill:generate', async (event, owner: string, name: string, options?: {
   flavour?: 'library' | 'codebase' | 'domain',
   enabledComponents?: string[],
   enabledTools?:      string[],
@@ -1380,6 +1392,12 @@ ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?
         repoRoot: process.cwd(), resourcesPath: process.resourcesPath,
       })
       const learnKey = `${owner}/${name}` as const
+      const startedAt = Date.now()
+      const safeSend = (payload: { phase: string; percent: number; state: 'running' | 'completed' | 'cancelled' | 'failed'; error?: string }) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('skill:learn-progress', { owner, name, ...payload, elapsedMs: Date.now() - startedAt })
+        }
+      }
       const trackedSpawn: typeof spawnAnatomy = (r, args, cwd, env) =>
         spawnAnatomy(r, args, cwd, env, {
           onProcess: (proc) => {
@@ -1387,13 +1405,32 @@ ipcMain.handle('skill:generate', async (_, owner: string, name: string, options?
             proc.on('close', () => learnProcessRegistry.unregister(learnKey))
           },
         })
-      const a = await generateViaAnatomy(
-        { token, owner, name, defaultBranch: repo.default_branch ?? 'main', apiKey: apiKey ?? undefined },
-        { ensureClone, spawnAnatomy: trackedSpawn, readFile: readFileOrNull, runtime: rt },
-        path.join(app.getPath('userData'), 'anatomy-cache'),
-      )
-      await persistAnatomySkill(db, app.getPath('userData'), repo.id, owner, name, a, version)
-      return { content: a.content, version, generated_at: new Date().toISOString(), warnings: a.warnings }
+      try {
+        const a = await generateViaAnatomy(
+          { token, owner, name, defaultBranch: repo.default_branch ?? 'main', apiKey: apiKey ?? undefined },
+          {
+            ensureClone, spawnAnatomy: trackedSpawn, readFile: readFileOrNull, runtime: rt,
+            onProgress: (phase) => safeSend({ phase, percent: LEARN_PHASE_PERCENT[phase], state: 'running' }),
+          },
+          path.join(app.getPath('userData'), 'anatomy-cache'),
+        )
+        safeSend({ phase: 'persisting', percent: LEARN_PHASE_PERCENT.persisting, state: 'running' })
+        await persistAnatomySkill(db, app.getPath('userData'), repo.id, owner, name, a, version)
+        safeSend({ phase: 'persisting', percent: 100, state: 'completed' })
+        return { content: a.content, version, generated_at: new Date().toISOString(), warnings: a.warnings }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        // SIGTERM exit appears as exit code 143 (or null) surfaced through tryGenerate/verify.
+        const cancelled = /\b143\b|SIGTERM|SIGKILL|cancel/i.test(msg)
+        safeSend({
+          phase: cancelled ? 'cancelled' : 'failed',
+          percent: 0,
+          state: cancelled ? 'cancelled' : 'failed',
+          error: cancelled ? undefined : msg,
+        })
+        if (cancelled) return { cancelled: true }
+        throw err
+      }
     }
   }
 
