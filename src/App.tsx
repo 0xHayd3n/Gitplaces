@@ -42,7 +42,7 @@ function AppContent() {
   const pageKey = (backgroundLocation ?? location).pathname.split('/')[1] || 'root'
   const { background } = useAppearance()
   const [aiOpen, setAiOpen] = useState(false)
-  const { text: tooltipText, nodeRef: tooltipRef } = useTooltip()
+  const { nodeRef: tooltipRef } = useTooltip()
   const isDiscoverPage = location.pathname === '/' || location.pathname.startsWith('/discover') || location.pathname.startsWith('/library') || location.pathname.startsWith('/repo/') || location.pathname.startsWith('/create')
 
   const toggleAi = useCallback(() => setAiOpen(o => !o), [])
@@ -116,7 +116,7 @@ function AppContent() {
         </Suspense>
       )}
       {createPortal(
-        <div ref={tooltipRef} className="app-tooltip" style={{ opacity: tooltipText ? 1 : 0 }}>{tooltipText}</div>,
+        <div ref={tooltipRef} className="app-tooltip" />,
         document.body,
       )}
     </div>
