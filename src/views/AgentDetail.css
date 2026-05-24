@@ -759,6 +759,9 @@
 }
 
 .agent-detail-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
@@ -767,8 +770,18 @@
   padding: 10px 14px;
   cursor: pointer;
   transition: color 120ms, border-color 120ms;
+  font-family: inherit;
 }
 .agent-detail-tab:hover { color: var(--t2); }
+
+.agent-detail-tabs-spacer {
+  flex: 1;
+}
+.agent-detail-tabs-sep {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 8px 6px;
+}
 .agent-detail-tab[aria-selected="true"] {
   color: var(--accent-text);
   border-bottom-color: var(--accent);
