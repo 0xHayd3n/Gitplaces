@@ -483,3 +483,190 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ── Variable / Preset bar ───────────────────────────────────── */
+
+.agent-bar {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 0 0 18px;
+  overflow: hidden;
+}
+
+.agent-bar-presets {
+  border-right: 1px solid var(--border);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.15);
+}
+.agent-bar-presets-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t3);
+  padding: 0 6px 6px;
+}
+
+.agent-bar-preset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-left: 2px solid transparent;
+  border-radius: 5px;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--t2);
+}
+.agent-bar-preset:hover { background: var(--bg3); }
+.agent-bar-preset--active {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+  color: var(--t1);
+}
+
+.agent-bar-preset-dot {
+  font-size: 8px;
+  color: var(--accent-text);
+  opacity: 0;
+  width: 8px;
+}
+.agent-bar-preset--active .agent-bar-preset-dot { opacity: 1; }
+
+.agent-bar-preset-text { flex: 1; min-width: 0; }
+.agent-bar-preset-name {
+  font-size: 12px;
+  color: var(--t1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-bar-preset-handle {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--accent-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-bar-new-btn {
+  background: transparent;
+  border: 1px dashed var(--border2);
+  color: var(--t3);
+  padding: 6px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+.agent-bar-new-btn:hover { color: var(--accent-text); border-color: var(--accent-border); }
+
+.agent-bar-new-form { padding: 6px 8px; }
+.agent-bar-new-input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--accent-border);
+  border-radius: 4px;
+  color: var(--t1);
+  font-size: 12px;
+  padding: 4px 6px;
+  outline: none;
+  box-sizing: border-box;
+}
+.agent-bar-new-error {
+  font-size: 10px;
+  color: var(--red-text);
+  margin-top: 3px;
+}
+
+.agent-bar-content {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.agent-bar-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.agent-bar-sub-handle {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--accent-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.agent-bar-meta {
+  font-size: 10px;
+  color: var(--t3);
+}
+
+.agent-bar-vars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.agent-bar-var-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.agent-bar-var-name {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--t2);
+}
+.agent-bar-var-input {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: var(--t1);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+}
+.agent-bar-var-input:focus { border-color: var(--accent-border); }
+
+.agent-bar-preview-block {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.agent-bar-preview-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--t3);
+  margin-bottom: 5px;
+}
+.agent-bar-preview {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px 10px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--t2);
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
