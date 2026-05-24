@@ -51,55 +51,42 @@ export default function AgentsLanding() {
     return <div className="agents-landing-loading">Loading…</div>
   }
 
-  const showOnboarding = pinned.length === 0 && recent.length === 0
-
   return (
     <div className="agents-landing">
       <header className="agents-landing-header">
-        <div className="agents-landing-eyebrow">AGENTS</div>
-        <h1 className="agents-landing-title">Your prompt library</h1>
-        <p className="agents-landing-sub">
-          {agents.length} agent{agents.length === 1 ? '' : 's'} · Click any in the sidebar, or copy a handle.
-        </p>
+        <div className="agents-landing-header-text">
+          <div className="agents-landing-eyebrow">AGENTS</div>
+          <h1 className="agents-landing-title">Your prompt library</h1>
+          <p className="agents-landing-sub">
+            {agents.length} agent{agents.length === 1 ? '' : 's'} · Click any in the sidebar, or copy a handle.
+          </p>
+        </div>
+        <Link to="/library/agent/new" className="agents-landing-new-btn">+ New agent</Link>
       </header>
 
-      {showOnboarding ? (
-        <div className="agents-landing-onboarding">
-          <h2>Start your library</h2>
-          <p>
-            Each agent is a reusable system prompt. Give it a <code>@handle</code>, add{' '}
-            <code>{'{{variables}}'}</code>, save named presets, and the Copy button drops
-            it into any AI tool with the right framing.
-          </p>
-          <Link to="/library/agent/new" className="agents-landing-cta">+ New agent</Link>
-        </div>
-      ) : (
-        <>
-          {pinned.length > 0 && (
-            <section className="agents-landing-section">
-              <h2>Pinned</h2>
-              <div
-                className="agents-landing-pinned-grid"
-                style={{ gridTemplateColumns: `repeat(${PINNED_COLS}, minmax(0, 1fr))` }}
-              >
-                {pinned.map(a => (
-                  <PinnedCard key={a.id} agent={a} />
-                ))}
-              </div>
-            </section>
-          )}
+      {pinned.length > 0 && (
+        <section className="agents-landing-section">
+          <h2>Pinned</h2>
+          <div
+            className="agents-landing-pinned-grid"
+            style={{ gridTemplateColumns: `repeat(${PINNED_COLS}, minmax(0, 1fr))` }}
+          >
+            {pinned.map(a => (
+              <PinnedCard key={a.id} agent={a} />
+            ))}
+          </div>
+        </section>
+      )}
 
-          {recent.length > 0 && (
-            <section className="agents-landing-section">
-              <h2>Recent</h2>
-              <ul className="agents-landing-recent">
-                {recent.map(a => (
-                  <RecentRow key={a.id} agent={a} />
-                ))}
-              </ul>
-            </section>
-          )}
-        </>
+      {recent.length > 0 && (
+        <section className="agents-landing-section">
+          <h2>Recent</h2>
+          <div className="agents-landing-recent-strip">
+            {recent.map(a => (
+              <RecentCard key={a.id} agent={a} />
+            ))}
+          </div>
+        </section>
       )}
     </div>
   )
@@ -128,23 +115,25 @@ function PinnedCard({ agent }: { agent: AgentRow }) {
   )
 }
 
-function RecentRow({ agent }: { agent: AgentRow }) {
+function RecentCard({ agent }: { agent: AgentRow }) {
   const swatchStyle: React.CSSProperties = {
     background: agent.color_end
       ? `linear-gradient(135deg, ${agent.color_start ?? '#888'}, ${agent.color_end})`
       : (agent.color_start ?? '#888'),
   }
   return (
-    <li className="agents-landing-recent-row" data-testid="agents-landing-recent-row">
-      <Link to={`/library/agent/${agent.id}`} className="agents-landing-recent-link">
-        <div className="agents-landing-recent-swatch" style={swatchStyle}>
-          {agent.emoji ?? ''}
-        </div>
-        <span className="agents-landing-recent-handle">@{agent.handle}</span>
-        <span className="agents-landing-recent-name">{agent.name}</span>
-        <span className="agents-landing-recent-time">{relativeTime(agent.last_used_at)}</span>
-      </Link>
-    </li>
+    <Link
+      to={`/library/agent/${agent.id}`}
+      className="agents-landing-recent-card"
+      data-testid="agents-landing-recent-card"
+    >
+      <div className="agents-landing-recent-card-swatch" style={swatchStyle}>
+        {agent.emoji ?? ''}
+      </div>
+      <div className="agents-landing-recent-card-handle">@{agent.handle}</div>
+      <div className="agents-landing-recent-card-name">{agent.name}</div>
+      <span className="agents-landing-recent-card-time">{relativeTime(agent.last_used_at)}</span>
+    </Link>
   )
 }
 

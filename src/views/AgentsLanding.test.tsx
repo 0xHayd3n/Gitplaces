@@ -39,16 +39,20 @@ function setup() {
 }
 
 describe('AgentsLanding', () => {
-  it('renders the onboarding card when there are no pinned or recent agents', async () => {
+  it('shows only the header (no centered onboarding card) when there are no pinned or recent', async () => {
     ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({
       folders: [],
       agents: [agent({ name: 'Brand new', handle: 'brand-new' })],
     })
     setup()
     await waitFor(() => screen.getByText(/your prompt library/i))
-    expect(screen.getByText(/new agent/i)).toBeTruthy()
+    // Pinned and Recent sections should not render
     expect(screen.queryByText(/^pinned$/i)).toBeNull()
     expect(screen.queryByText(/^recent$/i)).toBeNull()
+    // The big centered onboarding card / CTA is gone
+    expect(screen.queryByText(/each agent is a reusable system prompt/i)).toBeNull()
+    // The header right-aligned "+ New agent" link is still there
+    expect(screen.getByRole('link', { name: /\+ New agent/ })).toBeTruthy()
   })
 
   it('renders the pinned grid when pinned agents exist', async () => {
@@ -104,7 +108,7 @@ describe('AgentsLanding', () => {
     ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders: [], agents: many })
     setup()
     await waitFor(() => screen.getByText(/^recent$/i))
-    const rows = screen.getAllByTestId('agents-landing-recent-row')
+    const rows = screen.getAllByTestId('agents-landing-recent-card')
     expect(rows.length).toBeLessThanOrEqual(10)
   })
 
@@ -132,5 +136,24 @@ describe('AgentsLanding', () => {
     })
     setup()
     await waitFor(() => screen.getByText(/3 agents/i))
+  })
+
+  it('renders a "+ New agent" link in the header right slot', async () => {
+    setup()
+    await waitFor(() => screen.getByText(/your prompt library/i))
+    const link = screen.getByRole('link', { name: /\+ New agent/ })
+    expect(link.getAttribute('href')).toBe('/library/agent/new')
+  })
+
+  it('recent items render as horizontal cards (no .agents-landing-recent-row list)', async () => {
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({
+      folders: [],
+      agents: [agent({ name: 'Recent A', handle: 'recent-a', last_used_at: '2026-05-25T10:00:00Z' })],
+    })
+    setup()
+    await waitFor(() => screen.getByText('Recent A'))
+    expect(screen.getByTestId('agents-landing-recent-card')).toBeTruthy()
+    // Legacy vertical row no longer present
+    expect(document.querySelector('.agents-landing-recent-row')).toBeNull()
   })
 })
