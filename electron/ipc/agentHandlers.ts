@@ -1,4 +1,5 @@
 import { app, ipcMain, BrowserWindow } from 'electron'
+import path from 'node:path'
 import { getDb } from '../db'
 import {
   getAllAgents,
@@ -152,5 +153,19 @@ export function registerAgentHandlers(): void {
     const db = getDb(app.getPath('userData'))
     recordUse(db, agentId, presetId)
     broadcastChanged()
+  })
+
+  ipcMain.handle('agents:mcp:getConfigSnippet', async () => {
+    const launcherPath = path.join(app.getAppPath(), 'electron', 'mcp-launcher.cjs')
+    const dbPath = path.join(app.getPath('userData'), 'gitsuite.db')
+    const snippet = {
+      mcpServers: {
+        'git-suite-agents': {
+          command: 'node',
+          args: [launcherPath, dbPath],
+        },
+      },
+    }
+    return JSON.stringify(snippet, null, 2)
   })
 }

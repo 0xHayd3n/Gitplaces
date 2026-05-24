@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { AgentRow, AgentFolderRow, AgentRevision } from '../types/agent'
+import type { AgentRow, AgentFolderRow, AgentRevision, AgentPreset } from '../types/agent'
 import { parseAgentPresets } from '../types/agent'
 import { useToast } from '../contexts/Toast'
 import { buildPersonaPayload, deriveDescription } from '../utils/copyPayload'
@@ -352,9 +352,7 @@ export default function AgentDetail() {
           </div>
         )}
         {activeTab === 'mcp' && (
-          <div className="agent-detail-tab-placeholder">
-            MCP launcher configuration is coming in Phase D.
-          </div>
+          <AgentMcpTab agent={agent} presets={presets} />
         )}
         {activeTab === 'history' && (
           revisionsLoaded ? (
@@ -380,6 +378,49 @@ export default function AgentDetail() {
           {saveStatus === 'saved' && 'saved ✓'}
         </span>
       </footer>
+    </div>
+  )
+}
+
+function AgentMcpTab({ agent, presets }: { agent: AgentRow; presets: AgentPreset[] }) {
+  const [snippet, setSnippet] = useState<string | null>(null)
+  useEffect(() => {
+    window.api.agents.mcp.getConfigSnippet().then(setSnippet).catch(() => setSnippet(null))
+  }, [])
+  const copySnippet = async () => {
+    if (!snippet) return
+    await navigator.clipboard.writeText(snippet)
+  }
+  return (
+    <div className="agent-detail-mcp">
+      <section className="agent-detail-mcp-section">
+        <h3>Resources</h3>
+        <p className="agent-detail-mcp-hint">
+          Reference this agent from any MCP-capable client using these URIs:
+        </p>
+        <ul className="agent-detail-mcp-uris">
+          <li><code>agent://{agent.handle}</code></li>
+          {presets.map(p => (
+            <li key={p.id}><code>agent://{agent.handle}/{p.slug}</code></li>
+          ))}
+        </ul>
+      </section>
+      <section className="agent-detail-mcp-section">
+        <h3>Client configuration</h3>
+        <p className="agent-detail-mcp-hint">
+          Paste this snippet into your MCP client's config (e.g.{' '}
+          <code>~/.claude/settings.json</code>):
+        </p>
+        <pre className="agent-detail-mcp-snippet">{snippet ?? 'Loading…'}</pre>
+        <button
+          type="button"
+          className="agent-detail-action"
+          onClick={copySnippet}
+          disabled={!snippet}
+        >
+          Copy MCP config
+        </button>
+      </section>
     </div>
   )
 }

@@ -35,6 +35,11 @@ function makeApi() {
       delete: vi.fn(),
       duplicate: vi.fn(),
       recordUse: vi.fn().mockResolvedValue(undefined),
+      mcp: {
+        getConfigSnippet: vi.fn().mockResolvedValue(JSON.stringify({
+          mcpServers: { 'git-suite-agents': { command: 'node', args: ['/path/to/mcp-launcher.cjs', '/path/to/db'] } },
+        }, null, 2)),
+      },
       onChanged: vi.fn(),
       offChanged: vi.fn(),
       onRevisionAdded: vi.fn(),
@@ -482,5 +487,38 @@ describe('AgentDetail — pin toggle', () => {
     await waitForLoaded()
     fireEvent.click(screen.getByRole('button', { name: /^Unpin$/ }))
     await waitFor(() => expect(window.api.agents.update).toHaveBeenCalledWith('a1', { pinned: false }))
+  })
+})
+
+describe('AgentDetail — MCP tab', () => {
+  it('renders the resource URIs for the current agent', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /^MCP$/ }))
+    expect(await screen.findByText('agent://copy-editor')).toBeTruthy()
+  })
+
+  it('renders preset sub-handle URIs when the agent has presets', async () => {
+    const withPresets: AgentRow = {
+      ...baseAgent,
+      presets_json: JSON.stringify([
+        { id: 'p1', name: 'Security', slug: 'security-review', values: {} },
+      ]),
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [withPresets] })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /^MCP$/ }))
+    expect(await screen.findByText('agent://copy-editor/security-review')).toBeTruthy()
+  })
+
+  it('Copy MCP config button writes the snippet to the clipboard', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /^MCP$/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /copy mcp config/i }))
+    await waitFor(() =>
+      expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(expect.stringContaining('git-suite-agents')),
+    )
   })
 })

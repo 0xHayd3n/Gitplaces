@@ -222,6 +222,9 @@ declare global {
           revert(agentId: string, revisionId: string): Promise<import('./types/agent').AgentRow>
         }
         recordUse(agentId: string, presetId: string | null): Promise<void>
+        mcp: {
+          getConfigSnippet(): Promise<string>
+        }
         onRevisionAdded(cb: (rev: import('./types/agent').AgentRevision) => void): void
         offRevisionAdded(cb: (rev: import('./types/agent').AgentRevision) => void): void
         onChanged(cb: () => void): void

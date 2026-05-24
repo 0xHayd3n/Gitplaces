@@ -221,6 +221,10 @@ contextBridge.exposeInMainWorld('api', {
     recordUse: (agentId: string, presetId: string | null) =>
       ipcRenderer.invoke('agents:recordUse', agentId, presetId) as Promise<void>,
 
+    mcp: {
+      getConfigSnippet: () => ipcRenderer.invoke('agents:mcp:getConfigSnippet') as Promise<string>,
+    },
+
     onRevisionAdded: (cb: (rev: import('../src/types/agent').AgentRevision) => void) => {
       const wrapper = (_: unknown, rev: import('../src/types/agent').AgentRevision) => cb(rev)
       callbackWrappers.set(cb, wrapper)
