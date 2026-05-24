@@ -482,6 +482,8 @@ export function recordUse(
   _presetId: string | null,  // forward-compat; per-preset tracking deferred
 ): void {
   assertAgentExists(db, agentId)
-  const ts = nowIso()
-  db.prepare(`UPDATE agents SET last_used_at = ?, updated_at = ? WHERE id = ?`).run(ts, ts, agentId)
+  // Intentionally does NOT bump updated_at: getAllAgents sorts by updated_at
+  // DESC, and a Copy click should not promote an unedited agent to the top
+  // of the sidebar. last_used_at is the recent-use signal.
+  db.prepare(`UPDATE agents SET last_used_at = ? WHERE id = ?`).run(nowIso(), agentId)
 }

@@ -156,7 +156,14 @@ export function registerAgentHandlers(): void {
   })
 
   ipcMain.handle('agents:mcp:getConfigSnippet', async () => {
-    const launcherPath = path.join(app.getAppPath(), 'electron', 'mcp-launcher.cjs')
+    // In packaged builds the launcher lives inside asar by default, which
+    // Node can't execute. We emit the path it *would* have if the build is
+    // configured to unpack `electron/` via electron-builder's `asarUnpack`.
+    // Until that build config lands, packaged users will need to point at
+    // the unpacked location themselves.
+    const launcherPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'mcp-launcher.cjs')
+      : path.join(app.getAppPath(), 'electron', 'mcp-launcher.cjs')
     const dbPath = path.join(app.getPath('userData'), 'gitsuite.db')
     const snippet = {
       mcpServers: {

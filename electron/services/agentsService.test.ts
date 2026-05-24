@@ -750,12 +750,12 @@ describe('agentsService — recordUse', () => {
     expect(() => recordUse(db, 'no-such-agent', null)).toThrow(/agent/i)
   })
 
-  it('bumps updated_at', async () => {
+  it('does NOT bump updated_at — recent-use must not promote the agent in updated_at ordering', async () => {
     const before = db.prepare(`SELECT updated_at FROM agents WHERE id = ?`).get(agentId) as { updated_at: string }
     await new Promise(r => setTimeout(r, 5))
     recordUse(db, agentId, null)
     const after = db.prepare(`SELECT updated_at FROM agents WHERE id = ?`).get(agentId) as { updated_at: string }
-    expect(after.updated_at > before.updated_at).toBe(true)
+    expect(after.updated_at).toBe(before.updated_at)
   })
 
   it('does NOT record a revision (recordUse is metadata-only)', () => {

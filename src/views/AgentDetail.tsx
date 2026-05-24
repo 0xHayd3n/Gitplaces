@@ -383,13 +383,19 @@ export default function AgentDetail() {
 }
 
 function AgentMcpTab({ agent, presets }: { agent: AgentRow; presets: AgentPreset[] }) {
+  const { toast } = useToast()
   const [snippet, setSnippet] = useState<string | null>(null)
   useEffect(() => {
     window.api.agents.mcp.getConfigSnippet().then(setSnippet).catch(() => setSnippet(null))
   }, [])
   const copySnippet = async () => {
     if (!snippet) return
-    await navigator.clipboard.writeText(snippet)
+    try {
+      await navigator.clipboard.writeText(snippet)
+      toast('Copied MCP config', 'success')
+    } catch {
+      toast('Copy failed', 'error')
+    }
   }
   return (
     <div className="agent-detail-mcp">
