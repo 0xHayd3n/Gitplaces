@@ -37,6 +37,9 @@ function groupByDay(revisions: AgentRevision[], now: Date): Array<{ label: strin
 
 export default function AgentHistoryTimeline({ revisions, onRestore }: Props) {
   const [openDiffId, setOpenDiffId] = useState<string | null>(null)
+  // Recapture "now" each time the revisions list refreshes so live updates
+  // re-anchor Today/Yesterday correctly. Empty deps would freeze the labels
+  // at mount and break live updates that cross a day boundary.
   const now = useMemo(() => new Date(), [revisions])
   const groups = useMemo(() => groupByDay(revisions, now), [revisions, now])
 

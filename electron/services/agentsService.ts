@@ -1,7 +1,8 @@
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
-import type { AgentRow, AgentFolderRow } from '../../src/types/agent'
-import { isValidHandle, dedupeHandle } from '../../src/utils/agentSlug'
+import type { AgentRow, AgentFolderRow, AgentPreset, AgentRevision } from '../../src/types/agent'
+import { parseAgentPresets } from '../../src/types/agent'
+import { isValidHandle, dedupeHandle, slugifyName } from '../../src/utils/agentSlug'
 
 export const AGENT_NAME_MAX = 200
 export const AGENT_BODY_MAX = 1_048_576 // 1 MiB
@@ -233,10 +234,6 @@ export function getAllAgents(db: Database.Database): AgentsAllPayload {
 
 // ── Presets ─────────────────────────────────────────────────────────
 
-import { slugifyName } from '../../src/utils/agentSlug'
-import { parseAgentPresets } from '../../src/types/agent'
-import type { AgentPreset } from '../../src/types/agent'
-
 export const PRESET_NAME_MAX = 80
 export const PRESETS_JSON_MAX = 64 * 1024
 
@@ -379,8 +376,6 @@ export function duplicatePreset(
 }
 
 // ── Revisions ───────────────────────────────────────────────────────
-
-import type { AgentRevision } from '../../src/types/agent'
 
 export const REVISION_RETENTION = 20
 

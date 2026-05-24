@@ -15,12 +15,17 @@ function broadcastChanged(): void {
   }
 }
 
-function broadcastRevisionAdded(agentId: string): void {
+function latestRevisionId(agentId: string): string | null {
   const db = getDb(app.getPath('userData'))
-  // listRevisions returns newest first, so [0] is the just-inserted revision.
+  return listRevisions(db, agentId)[0]?.id ?? null
+}
+
+function broadcastRevisionAddedIfNew(agentId: string, priorRevId: string | null): void {
+  const db = getDb(app.getPath('userData'))
   const revs = listRevisions(db, agentId)
   if (revs.length === 0) return
   const rev = revs[0]
+  if (rev.id === priorRevId) return  // no new revision was actually inserted
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send('agents:revision-added', rev)
   }
@@ -36,15 +41,17 @@ export function registerAgentHandlers(): void {
     const db = getDb(app.getPath('userData'))
     const row = createAgent(db, input)
     broadcastChanged()
-    broadcastRevisionAdded(row.id)
+    // New agent has no prior revision; createAgent always inserts a `create` snapshot.
+    broadcastRevisionAddedIfNew(row.id, null)
     return row
   })
 
   ipcMain.handle('agents:update', async (_, id: string, patch: UpdateAgentPatch) => {
     const db = getDb(app.getPath('userData'))
+    const priorRevId = latestRevisionId(id)
     const row = updateAgent(db, id, patch)
     broadcastChanged()
-    if (patch.body !== undefined) broadcastRevisionAdded(id)
+    broadcastRevisionAddedIfNew(id, priorRevId)
     return row
   })
 
@@ -88,9 +95,10 @@ export function registerAgentHandlers(): void {
     values?: Record<string, string>,
   ) => {
     const db = getDb(app.getPath('userData'))
+    const priorRevId = latestRevisionId(agentId)
     const preset = createPreset(db, agentId, name, values)
     broadcastChanged()
-    broadcastRevisionAdded(agentId)
+    broadcastRevisionAddedIfNew(agentId, priorRevId)
     return preset
   })
 
@@ -101,24 +109,27 @@ export function registerAgentHandlers(): void {
     patch: { name?: string; values?: Record<string, string> },
   ) => {
     const db = getDb(app.getPath('userData'))
+    const priorRevId = latestRevisionId(agentId)
     const preset = updatePreset(db, agentId, presetId, patch)
     broadcastChanged()
-    broadcastRevisionAdded(agentId)
+    broadcastRevisionAddedIfNew(agentId, priorRevId)
     return preset
   })
 
   ipcMain.handle('agents:presets:delete', async (_, agentId: string, presetId: string) => {
     const db = getDb(app.getPath('userData'))
+    const priorRevId = latestRevisionId(agentId)
     deletePreset(db, agentId, presetId)
     broadcastChanged()
-    broadcastRevisionAdded(agentId)
+    broadcastRevisionAddedIfNew(agentId, priorRevId)
   })
 
   ipcMain.handle('agents:presets:duplicate', async (_, agentId: string, presetId: string) => {
     const db = getDb(app.getPath('userData'))
+    const priorRevId = latestRevisionId(agentId)
     const preset = duplicatePreset(db, agentId, presetId)
     broadcastChanged()
-    broadcastRevisionAdded(agentId)
+    broadcastRevisionAddedIfNew(agentId, priorRevId)
     return preset
   })
 
@@ -129,9 +140,10 @@ export function registerAgentHandlers(): void {
 
   ipcMain.handle('agents:revisions:revert', async (_, agentId: string, revisionId: string) => {
     const db = getDb(app.getPath('userData'))
+    const priorRevId = latestRevisionId(agentId)
     const row = revertToRevision(db, agentId, revisionId)
     broadcastChanged()
-    broadcastRevisionAdded(agentId)
+    broadcastRevisionAddedIfNew(agentId, priorRevId)
     return row
   })
 }
