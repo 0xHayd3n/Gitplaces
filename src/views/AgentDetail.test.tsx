@@ -108,6 +108,48 @@ describe('AgentDetail', () => {
     expect(screen.getByText('Writing')).toBeTruthy()  // f1 folder name
   })
 
+  it('double-clicking the title enters rename mode', async () => {
+    setup()
+    await waitForLoaded()
+    const title = screen.getByRole('heading', { level: 2, name: 'Copy editor' })
+    fireEvent.click(title)
+    expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull()
+    fireEvent.doubleClick(title)
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeTruthy()
+  })
+
+  it('double-clicking the handle local part enters handle edit mode', async () => {
+    setup()
+    await waitForLoaded()
+    const handleSpan = screen.getByText('copy-editor')
+    fireEvent.doubleClick(handleSpan)
+    const input = screen.getByRole('textbox', { name: 'Handle' }) as HTMLInputElement
+    expect(input.value).toBe('copy-editor')
+  })
+
+  it('handle edit saves a valid new handle on blur', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.doubleClick(screen.getByText('copy-editor'))
+    const input = screen.getByRole('textbox', { name: 'Handle' }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'new-handle' } })
+    fireEvent.blur(input)
+    await waitFor(() =>
+      expect(window.api.agents.update).toHaveBeenCalledWith('a1', { handle: 'new-handle' }),
+    )
+  })
+
+  it('handle edit rejects an invalid handle without saving', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.doubleClick(screen.getByText('copy-editor'))
+    const input = screen.getByRole('textbox', { name: 'Handle' }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'INVALID!' } })
+    fireEvent.blur(input)
+    expect(window.api.agents.update).not.toHaveBeenCalledWith('a1', { handle: 'INVALID!' })
+    expect(input.className).toContain('agent-detail-handle-input--error')
+  })
+
   it('toggles to edit mode and shows the textarea', async () => {
     setup()
     await waitForLoaded()
@@ -197,7 +239,7 @@ describe('AgentDetail', () => {
   it('shows nameDraft in header after inline name edit even before save resolves', async () => {
     setup()
     await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Copy editor' }))
-    fireEvent.click(screen.getByRole('heading', { level: 2 }))
+    fireEvent.doubleClick(screen.getByRole('heading', { level: 2 }))
     const nameInput = screen.getByDisplayValue('Copy editor') as HTMLInputElement
     fireEvent.change(nameInput, { target: { value: 'Renamed agent' } })
     fireEvent.blur(nameInput)
