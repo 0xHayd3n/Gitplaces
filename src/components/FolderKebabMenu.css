@@ -1,0 +1,72 @@
+.folder-kebab-menu {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px;
+  min-width: 200px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.folder-kebab-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--t2);
+  font-size: 11px;
+  padding: 7px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: left;
+}
+.folder-kebab-item:hover { background: rgba(255, 255, 255, 0.06); color: var(--t1); }
+.folder-kebab-item--danger:hover { color: var(--red-text); background: var(--red-soft); }
+
+.folder-kebab-accessory-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.folder-kebab-accessory-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.folder-kebab-color-row {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 4px;
+  padding: 4px 8px 8px;
+}
+.folder-kebab-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+}
+.folder-kebab-swatch[data-active="true"] {
+  box-shadow: 0 0 0 1.5px var(--t1);
+}
+.folder-kebab-swatch--none {
+  background: transparent;
+  position: relative;
+}
+.folder-kebab-swatch--none::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 45%, var(--border2) 45%, var(--border2) 55%, transparent 55%);
+}
+
+.folder-kebab-emoji-host {
+  padding: 4px 8px 8px;
+}
