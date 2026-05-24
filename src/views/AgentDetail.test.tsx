@@ -34,6 +34,7 @@ function makeApi() {
       })),
       delete: vi.fn(),
       duplicate: vi.fn(),
+      recordUse: vi.fn().mockResolvedValue(undefined),
       onChanged: vi.fn(),
       offChanged: vi.fn(),
       onRevisionAdded: vi.fn(),
@@ -416,5 +417,38 @@ describe('AgentDetail — History tab', () => {
       })
     })
     expect(screen.queryByText('Other agent edit')).toBeNull()
+  })
+})
+
+describe('AgentDetail — recordUse on Copy', () => {
+  it('calls window.api.agents.recordUse with the agent id and active preset id after a successful Copy', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    await waitFor(() => expect(window.api.agents.recordUse).toHaveBeenCalledWith('a1', null))
+  })
+
+  it('passes the active preset id when one is selected', async () => {
+    const agentWithPreset: AgentRow = {
+      ...baseAgent,
+      body: 'Look at {{focus}}.',
+      presets_json: JSON.stringify([
+        { id: 'p-sec', name: 'Security review', slug: 'security-review', values: { focus: 'auth' } },
+      ]),
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithPreset] })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    await waitFor(() => expect(window.api.agents.recordUse).toHaveBeenCalledWith('a1', 'p-sec'))
+  })
+
+  it('does NOT call recordUse if clipboard write fails', async () => {
+    ;(navigator.clipboard.writeText as any) = vi.fn().mockRejectedValue(new Error('denied'))
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    await new Promise(r => setTimeout(r, 0))
+    expect(window.api.agents.recordUse).not.toHaveBeenCalled()
   })
 })

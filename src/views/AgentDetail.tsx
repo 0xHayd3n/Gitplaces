@@ -170,8 +170,18 @@ export default function AgentDetail() {
       presetSlug: activePreset?.slug ?? null,
       presetValues: activePreset?.values,
     })
-    await navigator.clipboard.writeText(payload)
+    try {
+      await navigator.clipboard.writeText(payload)
+    } catch {
+      toast('Copy failed', 'error')
+      return
+    }
     toast(`Copied @${agent.handle}${activePreset ? `/${activePreset.slug}` : ''}`, 'success')
+    try {
+      await window.api.agents.recordUse(agent.id, activePreset?.id ?? null)
+    } catch {
+      // Non-fatal; the copy already succeeded.
+    }
   }
 
   const handleDelete = async () => {
