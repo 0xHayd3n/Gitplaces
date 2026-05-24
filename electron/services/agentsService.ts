@@ -349,3 +349,85 @@ export function duplicatePreset(
   writePresets(db, agentId, [...presets, dup])
   return dup
 }
+
+// ── Revisions ───────────────────────────────────────────────────────
+
+import type { AgentRevision } from '../../src/types/agent'
+
+export const REVISION_RETENTION = 20
+
+type RevisionKind = 'create' | 'body_edit' | 'preset_change' | 'revert'
+
+function pruneRevisions(db: Database.Database, agentId: string): void {
+  db.prepare(`
+    DELETE FROM agent_revisions
+    WHERE agent_id = ?
+      AND id NOT IN (
+        SELECT id FROM agent_revisions
+        WHERE agent_id = ?
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT ?
+      )
+  `).run(agentId, agentId, REVISION_RETENTION)
+}
+
+function rowToRevision(row: {
+  id: string; agent_id: string; body: string; presets_json: string;
+  summary: string; kind: string; created_at: string;
+}): AgentRevision {
+  return {
+    id: row.id,
+    agent_id: row.agent_id,
+    body: row.body,
+    presets: parseAgentPresets(row.presets_json),
+    summary: row.summary,
+    kind: row.kind as RevisionKind,
+    created_at: row.created_at,
+  }
+}
+
+export function recordRevision(
+  db: Database.Database,
+  agentId: string,
+  body: string,
+  presetsJson: string,
+  kind: RevisionKind,
+  summary: string,
+): AgentRevision {
+  assertAgentExists(db, agentId)
+  const id = randomUUID()
+  // Ensure strictly-monotonic created_at per agent so ORDER BY created_at is
+  // a total ordering — Date.now() is ms-precision and a tight insert loop
+  // routinely produces ties otherwise.
+  const last = db.prepare(
+    `SELECT created_at FROM agent_revisions WHERE agent_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1`,
+  ).get(agentId) as { created_at: string } | undefined
+  let created_at = nowIso()
+  if (last && created_at <= last.created_at) {
+    const bumped = new Date(new Date(last.created_at).getTime() + 1).toISOString()
+    created_at = bumped
+  }
+  db.prepare(`
+    INSERT INTO agent_revisions (id, agent_id, body, presets_json, summary, kind, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, agentId, body, presetsJson, summary, kind, created_at)
+  pruneRevisions(db, agentId)
+  const row = db.prepare(`SELECT * FROM agent_revisions WHERE id = ?`).get(id) as
+    | { id: string; agent_id: string; body: string; presets_json: string; summary: string; kind: string; created_at: string }
+    | undefined
+  if (!row) throw new Error('Revision was pruned immediately on insert (REVISION_RETENTION misconfigured)')
+  return rowToRevision(row)
+}
+
+export function listRevisions(db: Database.Database, agentId: string): AgentRevision[] {
+  assertAgentExists(db, agentId)
+  const rows = db.prepare(`
+    SELECT * FROM agent_revisions
+    WHERE agent_id = ?
+    ORDER BY created_at DESC, rowid DESC
+  `).all(agentId) as {
+    id: string; agent_id: string; body: string; presets_json: string;
+    summary: string; kind: string; created_at: string;
+  }[]
+  return rows.map(rowToRevision)
+}

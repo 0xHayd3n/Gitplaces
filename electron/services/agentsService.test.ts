@@ -412,3 +412,114 @@ describe('agentsService — presets', () => {
     expect(after.updated_at > before.updated_at).toBe(true)
   })
 })
+
+import {
+  recordRevision, listRevisions,
+  REVISION_RETENTION,
+} from './agentsService'
+
+describe('agentsService — recordRevision + retention', () => {
+  let db: Database.Database
+  let agentId: string
+  beforeEach(() => {
+    db = freshDb()
+    const a = createAgent(db, {
+      name: 'A', body: '# A\nbody', folderId: null,
+      handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null,
+    })
+    agentId = a.id
+  })
+
+  it('inserts a revision and returns the row', () => {
+    const rev = recordRevision(db, agentId, '# A\nv2', '[]', 'body_edit', 'Edited body')
+    expect(rev.id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(rev.agent_id).toBe(agentId)
+    expect(rev.body).toBe('# A\nv2')
+    expect(rev.kind).toBe('body_edit')
+    expect(rev.summary).toBe('Edited body')
+    expect(rev.created_at).toMatch(/T/)
+    expect(rev.presets).toEqual([])
+  })
+
+  it('parses presets_json into the returned revision.presets array', () => {
+    const rev = recordRevision(
+      db, agentId, '#', '[{"id":"p1","name":"x","slug":"x","values":{}}]',
+      'preset_change', 'Added preset',
+    )
+    expect(rev.presets).toEqual([{ id: 'p1', name: 'x', slug: 'x', values: {} }])
+  })
+
+  it('REVISION_RETENTION is 20', () => {
+    expect(REVISION_RETENTION).toBe(20)
+  })
+
+  it('prunes older revisions when count exceeds REVISION_RETENTION', () => {
+    for (let i = 0; i < REVISION_RETENTION + 5; i++) {
+      recordRevision(db, agentId, `v${i}`, '[]', 'body_edit', `edit ${i}`)
+    }
+    const count = (db.prepare(`SELECT COUNT(*) as n FROM agent_revisions WHERE agent_id = ?`).get(agentId) as { n: number }).n
+    expect(count).toBe(REVISION_RETENTION)
+  })
+
+  it('pruning keeps the most recent rows', () => {
+    for (let i = 0; i < REVISION_RETENTION + 3; i++) {
+      recordRevision(db, agentId, `v${i}`, '[]', 'body_edit', `edit ${i}`)
+    }
+    const summaries = (db.prepare(
+      `SELECT summary FROM agent_revisions WHERE agent_id = ? ORDER BY created_at ASC`,
+    ).all(agentId) as { summary: string }[]).map(r => r.summary)
+    expect(summaries[0]).toBe('edit 3')
+    expect(summaries[summaries.length - 1]).toBe(`edit ${REVISION_RETENTION + 2}`)
+  })
+
+  it('retention is per-agent — pruning one agent does not affect another', () => {
+    const b = createAgent(db, { name: 'B', body: 'b', folderId: null, handle: 'b', colorStart: '#111111', colorEnd: null, emoji: null })
+    for (let i = 0; i < REVISION_RETENTION + 5; i++) recordRevision(db, agentId, 'x', '[]', 'body_edit', `a${i}`)
+    for (let i = 0; i < 3; i++) recordRevision(db, b.id, 'x', '[]', 'body_edit', `b${i}`)
+    const aCount = (db.prepare(`SELECT COUNT(*) as n FROM agent_revisions WHERE agent_id = ?`).get(agentId) as { n: number }).n
+    const bCount = (db.prepare(`SELECT COUNT(*) as n FROM agent_revisions WHERE agent_id = ?`).get(b.id) as { n: number }).n
+    expect(aCount).toBe(REVISION_RETENTION)
+    expect(bCount).toBe(3)
+  })
+
+  it('FK cascade: deleting the agent removes its revisions', () => {
+    recordRevision(db, agentId, 'x', '[]', 'body_edit', 'e')
+    recordRevision(db, agentId, 'y', '[]', 'body_edit', 'f')
+    deleteAgent(db, agentId)
+    const count = (db.prepare(`SELECT COUNT(*) as n FROM agent_revisions WHERE agent_id = ?`).get(agentId) as { n: number }).n
+    expect(count).toBe(0)
+  })
+})
+
+describe('agentsService — listRevisions', () => {
+  let db: Database.Database
+  let agentId: string
+  beforeEach(() => {
+    db = freshDb()
+    const a = createAgent(db, { name: 'A', body: 'b', folderId: null, handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null })
+    agentId = a.id
+  })
+
+  it('returns revisions newest first', async () => {
+    recordRevision(db, agentId, 'v1', '[]', 'body_edit', 'first')
+    await new Promise(r => setTimeout(r, 5))
+    recordRevision(db, agentId, 'v2', '[]', 'body_edit', 'second')
+    const revs = listRevisions(db, agentId)
+    expect(revs[0].summary).toBe('second')
+    expect(revs[1].summary).toBe('first')
+  })
+
+  it('returns an empty array when there are no revisions', () => {
+    expect(listRevisions(db, agentId)).toEqual([])
+  })
+
+  it('throws on unknown agentId', () => {
+    expect(() => listRevisions(db, 'no-such-agent')).toThrow(/agent/i)
+  })
+
+  it('parses presets_json on each row', () => {
+    recordRevision(db, agentId, 'x', '[{"id":"p1","name":"x","slug":"x","values":{}}]', 'preset_change', 'p')
+    const revs = listRevisions(db, agentId)
+    expect(revs[0].presets).toEqual([{ id: 'p1', name: 'x', slug: 'x', values: {} }])
+  })
+})
