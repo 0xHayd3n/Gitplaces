@@ -160,10 +160,12 @@ describe('AgentDetail', () => {
     expect(screen.getByRole('tab', { name: /settings/i })).toBeTruthy()
   })
 
-  it('toggles to edit mode and shows the textarea', async () => {
+  it('Prompt tab textarea is always present (no Edit toggle)', async () => {
     setup()
     await waitForLoaded()
-    fireEvent.click(screen.getByRole('button', { name: /^Edit$/ }))
+    // No Edit button anywhere
+    expect(screen.queryByRole('button', { name: /^Edit$/ })).toBeNull()
+    // Textarea is present immediately on load (even though body is non-empty)
     const ta = screen.getByRole('textbox', { name: /Body/ }) as HTMLTextAreaElement
     expect(ta.value).toContain('Copy editor')
   })
@@ -171,16 +173,9 @@ describe('AgentDetail', () => {
   it('debounced auto-save calls api.agents.update 1500ms after last keystroke', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     setup()
-    // Flush the initial async load (Promise microtasks are not faked)
-    await act(async () => {
-      await new Promise<void>(resolve => setImmediate(resolve))
-    })
-    await act(async () => {
-      await new Promise<void>(resolve => setImmediate(resolve))
-    })
-    // The name h2 should be visible now
+    await act(async () => { await new Promise<void>(resolve => setImmediate(resolve)) })
+    await act(async () => { await new Promise<void>(resolve => setImmediate(resolve)) })
     expect(screen.getByRole('heading', { level: 2, name: 'Copy editor' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /^Edit$/ }))
     const ta = screen.getByRole('textbox', { name: /Body/ })
     fireEvent.change(ta, { target: { value: 'changed body' } })
     expect(window.api.agents.update).not.toHaveBeenCalled()
@@ -188,19 +183,7 @@ describe('AgentDetail', () => {
     expect(window.api.agents.update).toHaveBeenCalledWith('a1', { body: 'changed body' })
   })
 
-  it('Copy uses live bodyDraft (unsaved edits) when in edit mode', async () => {
-    setup()
-    await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Copy editor' }))
-    fireEvent.click(screen.getByRole('button', { name: /^Edit$/ }))
-    const ta = screen.getByRole('textbox', { name: /Body/ })
-    fireEvent.change(ta, { target: { value: 'live unsaved content' } })
-    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
-    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
-    const payload = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
-    expect(payload).toContain('live unsaved content')
-  })
-
-  it('resets edit mode when navigating between agents', async () => {
+  it('switches the rendered body when navigating between agents', async () => {
     const otherAgent: AgentRow = {
       id: 'a2',
       name: 'Other agent',
@@ -221,7 +204,6 @@ describe('AgentDetail', () => {
       .mockResolvedValueOnce({ folders, agents: [baseAgent] })
       .mockResolvedValueOnce({ folders, agents: [otherAgent] })
 
-    // A small wrapper that exposes a navigate button so we can trigger real in-router navigation
     function NavButton() {
       const navigate = useNavigate()
       return <button type="button" onClick={() => navigate('/library/agent/a2')}>Go to a2</button>
@@ -236,14 +218,10 @@ describe('AgentDetail', () => {
       </MemoryRouter>,
     )
     await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Copy editor' }))
-    fireEvent.click(screen.getByRole('button', { name: /^Edit$/ }))
-    expect(screen.getByRole('textbox', { name: /Body/ })).toBeTruthy()
-
-    // Navigate to /library/agent/a2 via the real router
-    fireEvent.click(screen.getByRole('button', { name: /Go to a2/ }))
+    fireEvent.click(screen.getByText('Go to a2'))
     await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Other agent' }))
-    // After navigation, the body textarea should be absent (back in preview mode)
-    expect(screen.queryByRole('textbox', { name: /Body/ })).toBeNull()
+    const ta = screen.getByRole('textbox', { name: /Body/ }) as HTMLTextAreaElement
+    expect(ta.value).toContain('other body.')
   })
 
   it('shows nameDraft in header after inline name edit even before save resolves', async () => {
