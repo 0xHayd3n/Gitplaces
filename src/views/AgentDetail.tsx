@@ -24,7 +24,6 @@ export default function AgentDetail() {
 
   const [agent, setAgent] = useState<AgentRow | null>(null)
   const [folders, setFolders] = useState<AgentFolderRow[]>([])
-  const [editing, setEditing] = useState(false)
   const [bodyDraft, setBodyDraft] = useState('')
   const [nameDraft, setNameDraft] = useState('')
   const [nameEditing, setNameEditing] = useState(false)
@@ -56,7 +55,6 @@ export default function AgentDetail() {
       setAgent(a)
       setBodyDraft(a?.body ?? '')
       setNameDraft(a?.name ?? '')
-      setEditing(a !== null && a.body === '')
       setTakenHandles(agents.filter(x => x.id !== id).map(x => x.handle))
     })()
     return () => { cancelled = true }
@@ -104,12 +102,8 @@ export default function AgentDetail() {
     return () => window.api.agents.offRevisionAdded(cb)
   }, [id])
 
-  const editingRef = useRef(false)
   const nameEditingRef = useRef(false)
-  useEffect(() => { editingRef.current = editing }, [editing])
   useEffect(() => { nameEditingRef.current = nameEditing }, [nameEditing])
-
-  useEffect(() => { if (editing) bodyRef.current?.focus() }, [editing])
 
   useEffect(() => {
     if (!id) return
@@ -117,7 +111,7 @@ export default function AgentDetail() {
       const { agents } = await window.api.agents.getAll()
       const a = agents.find(x => x.id === id) ?? null
       setAgent(a)
-      if (!editingRef.current) setBodyDraft(a?.body ?? '')
+      setBodyDraft(a?.body ?? '')
       if (!nameEditingRef.current) setNameDraft(a?.name ?? '')
     }
     window.api.agents.onChanged(cb)
@@ -157,7 +151,7 @@ export default function AgentDetail() {
     return folders.find(f => f.id === agent.folder_id)?.name ?? 'Unfiled'
   }, [agent, folders])
 
-  const liveBody = editing ? bodyDraft : (agent?.body ?? '')
+  const liveBody = bodyDraft
   const description = useMemo(() => deriveDescription(liveBody), [liveBody])
   const bodyChars = liveBody.length
 
@@ -323,7 +317,7 @@ export default function AgentDetail() {
 
       <div className="agent-detail-body">
         {activeTab === 'prompt' && (
-          <>
+          <div className="agent-detail-prompt-body">
             {variables.length > 0 && (
               <AgentVariablePresetBar
                 agent={agent}
@@ -332,21 +326,27 @@ export default function AgentDetail() {
                 onActivePresetChange={setActivePresetId}
               />
             )}
-            {editing ? (
-              <textarea
-                ref={bodyRef}
-                className="agent-detail-textarea"
-                aria-label="Body"
-                placeholder="Paste your markdown here…"
-                value={bodyDraft}
-                onChange={e => { setBodyDraft(e.target.value); scheduleSaveBody(e.target.value) }}
-              />
-            ) : (
-              <div className="agent-detail-rendered">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{agent.body}</ReactMarkdown>
-              </div>
+            <textarea
+              ref={bodyRef}
+              className="agent-detail-textarea"
+              aria-label="Body"
+              placeholder="Write the markdown that defines this agent's persona. Use {{variable}} placeholders for things you'll fill in per copy."
+              value={bodyDraft}
+              onChange={e => { setBodyDraft(e.target.value); scheduleSaveBody(e.target.value) }}
+            />
+            {saveStatus !== 'idle' && (
+              <span
+                className={
+                  'agent-detail-save-pill ' +
+                  (saveStatus === 'saving'
+                    ? 'agent-detail-save-pill--saving'
+                    : 'agent-detail-save-pill--saved')
+                }
+              >
+                {saveStatus === 'saving' ? 'saving…' : 'saved ✓'}
+              </span>
             )}
-          </>
+          </div>
         )}
         {activeTab === 'preview' && (
           <div className="agent-detail-tab-placeholder">

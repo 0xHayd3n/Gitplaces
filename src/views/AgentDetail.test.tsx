@@ -235,63 +235,33 @@ describe('AgentDetail', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Renamed agent' })).toBeTruthy()
   })
 
-  it('auto-enters edit mode and focuses the textarea when body is empty', async () => {
-    const emptyAgent: AgentRow = {
-      id: 'a1',
-      name: 'Agent 1',
-      handle: 'agent-1',
-      body: '',
-      folder_id: null,
-      color_start: '#6366f1',
-      color_end: null,
-      emoji: null,
-      pinned: 0,
-      pinned_at: null,
-      last_used_at: null,
-      presets_json: '[]',
-      created_at: '2026-05-23T00:00:00Z',
-      updated_at: '2026-05-23T00:00:00Z',
-    }
-    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [emptyAgent] })
-    setup()
-    await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Agent 1' }))
-    const ta = screen.getByRole('textbox', { name: /Body/ }) as HTMLTextAreaElement
-    expect(ta).toBeTruthy()
-    expect(document.activeElement).toBe(ta)
-  })
-
-  it('stays in preview mode when body is non-empty', async () => {
-    setup()
-    await waitForLoaded()
-    expect(screen.queryByRole('textbox', { name: /Body/ })).toBeNull()
-  })
 })
 
 describe('AgentDetail — tabs', () => {
-  it('renders the four tab buttons with Prompt active by default', async () => {
+  it('renders the five tab buttons with Prompt active by default', async () => {
     setup()
     await waitForLoaded()
-    expect(screen.getByRole('tab', { name: /^Prompt$/ }).getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByRole('tab', { name: /^Preview$/ })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: /^MCP$/ })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: /^History$/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /prompt/i }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: /preview/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /mcp/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /history/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /settings/i })).toBeTruthy()
   })
 
-  it('clicking Preview shows the preview placeholder and hides the body editor', async () => {
+  it('clicking Preview hides the editor textarea', async () => {
     setup()
     await waitForLoaded()
-    fireEvent.click(screen.getByRole('tab', { name: /^Preview$/ }))
-    expect(screen.getByRole('tab', { name: /^Preview$/ }).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(screen.getByRole('tab', { name: /preview/i }))
+    expect(screen.getByRole('tab', { name: /preview/i }).getAttribute('aria-selected')).toBe('true')
     expect(screen.queryByRole('textbox', { name: /Body/ })).toBeNull()
-    expect(screen.getByText(/preview tab/i)).toBeTruthy()
   })
 
-  it('clicking back on Prompt restores the body view', async () => {
+  it('clicking back on Prompt restores the body editor', async () => {
     setup()
     await waitForLoaded()
-    fireEvent.click(screen.getByRole('tab', { name: /^Preview$/ }))
-    fireEvent.click(screen.getByRole('tab', { name: /^Prompt$/ }))
-    expect(screen.getAllByText(/Hello body/).length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('tab', { name: /preview/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /prompt/i }))
+    expect(screen.getByRole('textbox', { name: /Body/ })).toBeTruthy()
   })
 })
 
