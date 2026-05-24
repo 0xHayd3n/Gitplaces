@@ -281,7 +281,7 @@ describe('AgentDetail — tabs', () => {
     const select = screen.getByLabelText(/folder/i) as HTMLSelectElement
     fireEvent.change(select, { target: { value: '__unfiled' } })
     await waitFor(() =>
-      expect(window.api.agents.update).toHaveBeenCalledWith('a1', { folder_id: null }),
+      expect(window.api.agents.update).toHaveBeenCalledWith('a1', { folderId: null }),
     )
   })
 

@@ -61,8 +61,8 @@ export default function AgentSwatchPopover({ agent }: Props) {
               setColorEnd(next.colorEnd)
               setHarmony(next.harmony)
               window.api.agents.update(agent.id, {
-                color_start: next.colorStart,
-                color_end: next.colorEnd,
+                colorStart: next.colorStart,
+                colorEnd: next.colorEnd,
               })
             }}
           />

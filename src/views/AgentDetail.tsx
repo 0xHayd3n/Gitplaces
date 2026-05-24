@@ -484,7 +484,7 @@ function AgentSettingsTab({
   const onFolderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value
     window.api.agents.update(agent.id, {
-      folder_id: value === '__unfiled' ? null : value,
+      folderId: value === '__unfiled' ? null : value,
     })
   }
   return (

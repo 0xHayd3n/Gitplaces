@@ -78,16 +78,16 @@ describe('AgentSwatchPopover', () => {
     expect(call[1].emoji).toBeTruthy()
   })
 
-  it('color picker hex change calls api.agents.update with color_start', async () => {
+  it('color picker hex change calls api.agents.update with colorStart', async () => {
     render(<AgentSwatchPopover agent={agent} />)
     fireEvent.click(screen.getByRole('button', { name: /edit appearance/i }))
     const startHex = screen.getByLabelText('Start hex') as HTMLInputElement
     fireEvent.change(startHex, { target: { value: '#ff0000' } })
     await waitFor(() => expect(window.api.agents.update).toHaveBeenCalled())
     const call = (window.api.agents.update as any).mock.calls.find(
-      (c: any[]) => 'color_start' in c[1],
+      (c: any[]) => 'colorStart' in c[1],
     )
     expect(call).toBeTruthy()
-    expect(call[1].color_start).toBe('#ff0000')
+    expect(call[1].colorStart).toBe('#ff0000')
   })
 })
