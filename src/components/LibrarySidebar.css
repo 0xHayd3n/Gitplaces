@@ -465,12 +465,12 @@
   position: relative;
 }
 .agents-sidebar-new-plus {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-border);
-  color: var(--accent-text);
+  width: 80px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--t2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -479,9 +479,13 @@
   transition: background 120ms, color 120ms, border-color 120ms;
 }
 .agents-sidebar-new-plus:hover {
-  background: var(--accent-hover);
+  background: var(--bg2);
   color: var(--t1);
-  border-color: var(--accent);
+  border-color: var(--border2);
+}
+
+.agents-sidebar-root .library-sidebar-section {
+  border-top: none;
 }
 .agents-sidebar-new-menu {
   position: absolute;
