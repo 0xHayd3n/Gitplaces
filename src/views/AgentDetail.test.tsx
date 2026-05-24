@@ -227,3 +227,31 @@ describe('AgentDetail', () => {
     expect(screen.queryByRole('textbox', { name: /Body/ })).toBeNull()
   })
 })
+
+describe('AgentDetail — tabs', () => {
+  it('renders the four tab buttons with Prompt active by default', async () => {
+    setup()
+    await waitForLoaded()
+    expect(screen.getByRole('tab', { name: /^Prompt$/ }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: /^Preview$/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /^MCP$/ })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /^History$/ })).toBeTruthy()
+  })
+
+  it('clicking Preview shows the preview placeholder and hides the body editor', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /^Preview$/ }))
+    expect(screen.getByRole('tab', { name: /^Preview$/ }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.queryByRole('textbox', { name: /Body/ })).toBeNull()
+    expect(screen.getByText(/preview tab/i)).toBeTruthy()
+  })
+
+  it('clicking back on Prompt restores the body view', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /^Preview$/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Prompt$/ }))
+    expect(screen.getAllByText(/Hello body/).length).toBeGreaterThan(0)
+  })
+})

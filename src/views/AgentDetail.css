@@ -670,3 +670,37 @@
   max-height: 200px;
   overflow-y: auto;
 }
+
+/* ── Tab bar ───────────────────────────────────────────────── */
+
+.agent-detail-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 28px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.agent-detail-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--t3);
+  font-size: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+.agent-detail-tab:hover { color: var(--t2); }
+.agent-detail-tab[aria-selected="true"] {
+  color: var(--accent-text);
+  border-bottom-color: var(--accent);
+}
+
+.agent-detail-tab-placeholder {
+  padding: 24px 28px;
+  color: var(--t3);
+  font-size: 12px;
+  line-height: 1.5;
+}

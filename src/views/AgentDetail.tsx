@@ -21,6 +21,7 @@ export default function AgentDetail() {
   const [nameDraft, setNameDraft] = useState('')
   const [nameEditing, setNameEditing] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+  const [activeTab, setActiveTab] = useState<'prompt' | 'preview' | 'mcp' | 'history'>('prompt')
 
   const bodyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nameTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -205,19 +206,54 @@ export default function AgentDetail() {
         </div>
       </header>
 
+      <nav className="agent-detail-tabs" role="tablist">
+        {(['prompt', 'preview', 'mcp', 'history'] as const).map(tab => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            className="agent-detail-tab"
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab === 'prompt' ? 'Prompt'
+              : tab === 'preview' ? 'Preview'
+              : tab === 'mcp' ? 'MCP'
+              : 'History'}
+          </button>
+        ))}
+      </nav>
+
       <div className="agent-detail-body">
-        {editing ? (
-          <textarea
-            ref={bodyRef}
-            className="agent-detail-textarea"
-            aria-label="Body"
-            placeholder="Paste your markdown here…"
-            value={bodyDraft}
-            onChange={e => { setBodyDraft(e.target.value); scheduleSaveBody(e.target.value) }}
-          />
-        ) : (
-          <div className="agent-detail-rendered">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{agent.body}</ReactMarkdown>
+        {activeTab === 'prompt' && (
+          editing ? (
+            <textarea
+              ref={bodyRef}
+              className="agent-detail-textarea"
+              aria-label="Body"
+              placeholder="Paste your markdown here…"
+              value={bodyDraft}
+              onChange={e => { setBodyDraft(e.target.value); scheduleSaveBody(e.target.value) }}
+            />
+          ) : (
+            <div className="agent-detail-rendered">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{agent.body}</ReactMarkdown>
+            </div>
+          )
+        )}
+        {activeTab === 'preview' && (
+          <div className="agent-detail-tab-placeholder">
+            The Preview tab will render the full clipboard payload in a future phase. For now, see the preview block on the Prompt tab.
+          </div>
+        )}
+        {activeTab === 'mcp' && (
+          <div className="agent-detail-tab-placeholder">
+            MCP launcher configuration is coming in Phase D.
+          </div>
+        )}
+        {activeTab === 'history' && (
+          <div className="agent-detail-tab-placeholder">
+            Revision history is coming in Phase C.
           </div>
         )}
       </div>
