@@ -22,6 +22,7 @@ interface Props {
   onSelect: (row: RepoRow, isInstalled: boolean) => void
   onSelectLocal: (project: LocalProject) => void
   onSelectColl?: (id: string, coll: CollectionRow) => void
+  onModeChange?: (mode: 'repos' | 'collections' | 'agents') => void
 }
 
 function ReposIcon({ size = 13 }: { size?: number }) {
@@ -79,7 +80,7 @@ export default function LibrarySidebar({
   installedRows, starredRows, unstarredRows, localProjects,
   archivedSet,
   selectedId, selectedLocalPath, collSelectedId = null,
-  onSelect, onSelectLocal, onSelectColl,
+  onSelect, onSelectLocal, onSelectColl, onModeChange,
 }: Props) {
   const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
   const collMatch = useMatch('/library/collection/:id')
@@ -106,6 +107,8 @@ export default function LibrarySidebar({
   useEffect(() => {
     if (agentMatch) setMode('agents')
   }, [agentMatch?.params.id])
+
+  useEffect(() => { onModeChange?.(mode) }, [mode, onModeChange])
 
   const allEntries = useMemo<LibraryEntry[]>(() => {
     const map = new Map<string, LibraryEntry>()

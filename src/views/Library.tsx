@@ -12,6 +12,7 @@ import type { RecentEntry } from '../lib/recentVisits'
 import LibraryDetailRoutes from '../components/LibraryDetailRoutes'
 import LibrarySidebar from '../components/LibrarySidebar'
 import ActivityFeed from '../components/ActivityFeed'
+import AgentsLanding from './AgentsLanding'
 import { primeRepoCacheFromRows } from './RepoDetail'
 import { prewarmStaticDither } from '../hooks/useBayerDither'
 import { cameraIdxForRepo } from '../utils/repoCameraSeed'
@@ -34,6 +35,7 @@ export default function Library() {
   const [unstarredRows, setUnstarredRows] = useState<StarredRepoRow[]>([])
   const localProjects = useLocalProjects()
   const [recentVisits, setRecentVisits] = useState<RecentEntry[]>(() => getRecentVisits())
+  const [mode, setMode] = useState<'repos' | 'collections' | 'agents'>('repos')
 
   const refreshRecentVisits = useCallback(() => {
     setRecentVisits(getRecentVisits())
@@ -168,6 +170,7 @@ export default function Library() {
             onSelect={handleRepoSelect}
             onSelectLocal={handleLocalSelect}
             onSelectColl={handleCollSelect}
+            onModeChange={setMode}
           />
         </div>
 
@@ -175,6 +178,8 @@ export default function Library() {
           <div className="library-detail-area">
             {hasDetail ? (
               <LibraryDetailRoutes />
+            ) : mode === 'agents' ? (
+              <AgentsLanding />
             ) : (
               <ActivityFeed />
             )}
