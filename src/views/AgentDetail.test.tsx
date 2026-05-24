@@ -255,3 +255,72 @@ describe('AgentDetail — tabs', () => {
     expect(screen.getAllByText(/Hello body/).length).toBeGreaterThan(0)
   })
 })
+
+describe('AgentDetail — variable/preset bar integration', () => {
+  it('does NOT render the bar when the body has no {{variables}}', async () => {
+    setup()
+    await waitForLoaded()
+    expect(screen.queryByText('PRESETS')).toBeNull()
+  })
+
+  it('renders the bar on the Prompt tab when variables are present', async () => {
+    const agentWithVars: AgentRow = {
+      ...baseAgent,
+      body: 'Look at {{focus}} for {{language}}.',
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithVars] })
+    setup()
+    await waitForLoaded()
+    expect(screen.getByText('PRESETS')).toBeTruthy()
+    expect(screen.getByText('{{focus}}')).toBeTruthy()
+    expect(screen.getByText('{{language}}')).toBeTruthy()
+  })
+
+  it('hides the bar on tabs other than Prompt even when variables are present', async () => {
+    const agentWithVars: AgentRow = {
+      ...baseAgent,
+      body: 'Look at {{focus}}.',
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithVars] })
+    setup()
+    await waitForLoaded()
+    expect(screen.getByText('PRESETS')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: /^Preview$/ }))
+    expect(screen.queryByText('PRESETS')).toBeNull()
+  })
+
+  it('hero Copy uses preset sub-handle and substitutes variables when a preset is active', async () => {
+    const agentWithPreset: AgentRow = {
+      ...baseAgent,
+      body: 'Look at {{focus}} for {{language}}.',
+      presets_json: JSON.stringify([
+        { id: 'p1', name: 'Security review', slug: 'security-review',
+          values: { focus: 'auth', language: 'TS' } },
+      ]),
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithPreset] })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
+    const payload = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
+    expect(payload).toMatch(/^You are @copy-editor\/security-review/)
+    expect(payload).toContain('Look at auth for TS.')
+  })
+
+  it('hero Copy leaves variables raw when no preset is active', async () => {
+    const agentWithVars: AgentRow = {
+      ...baseAgent,
+      body: 'Look at {{focus}}.',
+      presets_json: '[]',
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithVars] })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
+    const payload = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
+    expect(payload).toMatch(/^You are @copy-editor,/)
+    expect(payload).toContain('Look at {{focus}}.')
+  })
+})

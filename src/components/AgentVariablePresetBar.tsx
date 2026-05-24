@@ -183,6 +183,7 @@ function PresetRow({ agent, preset, active, onClick }: PresetRowProps) {
   return (
     <button
       type="button"
+      aria-label={`Activate preset ${preset.name}`}
       className={`agent-bar-preset${active ? ' agent-bar-preset--active' : ''}`}
       onClick={onClick}
     >

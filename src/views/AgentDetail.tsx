@@ -3,8 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
+import { parseAgentPresets } from '../types/agent'
 import { useToast } from '../contexts/Toast'
 import { buildPersonaPayload, deriveDescription } from '../utils/copyPayload'
+import { detectVariables } from '../utils/agentVariables'
+import AgentVariablePresetBar from '../components/AgentVariablePresetBar'
 import './AgentDetail.css'
 
 type SaveStatus = 'idle' | 'saving' | 'saved'
@@ -22,6 +25,7 @@ export default function AgentDetail() {
   const [nameEditing, setNameEditing] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [activeTab, setActiveTab] = useState<'prompt' | 'preview' | 'mcp' | 'history'>('prompt')
+  const [activePresetId, setActivePresetId] = useState<string | null>(null)
 
   const bodyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nameTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -45,6 +49,17 @@ export default function AgentDetail() {
     })()
     return () => { cancelled = true }
   }, [id])
+
+  // When the agent loads or its preset list changes, default the active preset
+  // to the first one (or null if none).
+  useEffect(() => {
+    if (!agent) { setActivePresetId(null); return }
+    const presets = parseAgentPresets(agent.presets_json)
+    setActivePresetId(prev => {
+      if (prev && presets.some(p => p.id === prev)) return prev
+      return presets[0]?.id ?? null
+    })
+  }, [agent])
 
   const editingRef = useRef(false)
   const nameEditingRef = useRef(false)
@@ -103,11 +118,23 @@ export default function AgentDetail() {
   const description = useMemo(() => deriveDescription(liveBody), [liveBody])
   const bodyChars = liveBody.length
 
+  const variables = useMemo(() => detectVariables(liveBody), [liveBody])
+  const activePreset = useMemo(() => {
+    if (!agent || !activePresetId) return null
+    return parseAgentPresets(agent.presets_json).find(p => p.id === activePresetId) ?? null
+  }, [agent, activePresetId])
+
   const handleCopy = async () => {
     if (!agent) return
-    const payload = buildPersonaPayload({ handle: agent.handle, description, body: liveBody })
+    const payload = buildPersonaPayload({
+      handle: agent.handle,
+      description,
+      body: liveBody,
+      presetSlug: activePreset?.slug ?? null,
+      presetValues: activePreset?.values,
+    })
     await navigator.clipboard.writeText(payload)
-    toast(`Copied @${agent.handle}`, 'success')
+    toast(`Copied @${agent.handle}${activePreset ? `/${activePreset.slug}` : ''}`, 'success')
   }
 
   const handleDelete = async () => {
@@ -226,20 +253,30 @@ export default function AgentDetail() {
 
       <div className="agent-detail-body">
         {activeTab === 'prompt' && (
-          editing ? (
-            <textarea
-              ref={bodyRef}
-              className="agent-detail-textarea"
-              aria-label="Body"
-              placeholder="Paste your markdown here…"
-              value={bodyDraft}
-              onChange={e => { setBodyDraft(e.target.value); scheduleSaveBody(e.target.value) }}
-            />
-          ) : (
-            <div className="agent-detail-rendered">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{agent.body}</ReactMarkdown>
-            </div>
-          )
+          <>
+            {variables.length > 0 && (
+              <AgentVariablePresetBar
+                agent={agent}
+                variables={variables}
+                activePresetId={activePresetId}
+                onActivePresetChange={setActivePresetId}
+              />
+            )}
+            {editing ? (
+              <textarea
+                ref={bodyRef}
+                className="agent-detail-textarea"
+                aria-label="Body"
+                placeholder="Paste your markdown here…"
+                value={bodyDraft}
+                onChange={e => { setBodyDraft(e.target.value); scheduleSaveBody(e.target.value) }}
+              />
+            ) : (
+              <div className="agent-detail-rendered">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{agent.body}</ReactMarkdown>
+              </div>
+            )}
+          </>
         )}
         {activeTab === 'preview' && (
           <div className="agent-detail-tab-placeholder">
