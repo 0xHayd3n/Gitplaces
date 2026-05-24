@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentRow, AgentPreset } from '../types/agent'
 import { parseAgentPresets } from '../types/agent'
-import { substituteVariables } from '../utils/agentVariables'
 import { buildPersonaPayload, deriveDescription } from '../utils/copyPayload'
 
 interface Props {
