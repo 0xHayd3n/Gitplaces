@@ -544,13 +544,6 @@
   box-shadow: inset 3px 0 0 var(--folder-accent);
 }
 
-.agents-sidebar-folder-caret {
-  width: 10px;
-  font-size: 9px;
-  color: var(--t3);
-  flex-shrink: 0;
-}
-
 .agents-sidebar-folder-avatar {
   width: 16px;
   height: 16px;
@@ -560,6 +553,28 @@
   font-size: 14px;
   color: var(--t3);
   flex-shrink: 0;
+  position: relative;
+}
+
+.agents-sidebar-folder-badge {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--t1);
+  font-size: 9px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  box-sizing: border-box;
 }
 
 .agents-sidebar-folder-name {
@@ -582,13 +597,6 @@
   padding: 2px 6px;
   font-family: inherit;
   outline: none;
-}
-
-.agents-sidebar-folder-count {
-  font-size: 10px;
-  color: var(--t3);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
 }
 
 .agents-sidebar-folder-kebab {

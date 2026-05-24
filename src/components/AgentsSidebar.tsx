@@ -230,12 +230,17 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
               }}
               onContextMenu={g.id !== null ? (e) => onFolderRightClick(e, g.id!) : undefined}
             >
-              <span className="agents-sidebar-folder-caret">{isOpen ? '▾' : '▸'}</span>
               <span
                 className="agents-sidebar-folder-avatar"
                 data-testid={g.id ? `folder-avatar-${g.id}` : 'folder-avatar-unfiled'}
               >
-                {g.emoji ?? <Folder size={14} strokeWidth={1.8} />}
+                {!isOpen && g.agents.length > 0 && (
+                  <span
+                    className="agents-sidebar-folder-badge"
+                    data-testid={g.id ? `folder-badge-${g.id}` : 'folder-badge-unfiled'}
+                  >{g.agents.length}</span>
+                )}
+                {g.emoji ?? <Folder size={14} strokeWidth={1.8} fill="currentColor" />}
               </span>
               {isRenaming ? (
                 <input
@@ -265,7 +270,6 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
                   {g.name}
                 </span>
               )}
-              <span className="agents-sidebar-folder-count">({g.agents.length})</span>
               {g.id !== null && (
                 <button
                   type="button"
