@@ -243,7 +243,7 @@
 .agent-detail-save-pill {
   position: absolute;
   bottom: 18px;
-  right: 18px;
+  right: 32px;
   display: inline-flex;
   align-items: center;
   gap: 5px;

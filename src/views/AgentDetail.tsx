@@ -111,8 +111,10 @@ export default function AgentDetail() {
       const { agents } = await window.api.agents.getAll()
       const a = agents.find(x => x.id === id) ?? null
       setAgent(a)
-      setBodyDraft(a?.body ?? '')
+      // Don't clobber an in-progress draft if a save is pending.
+      if (!bodyTimer.current) setBodyDraft(a?.body ?? '')
       if (!nameEditingRef.current) setNameDraft(a?.name ?? '')
+      setTakenHandles(agents.filter(x => x.id !== id).map(x => x.handle))
     }
     window.api.agents.onChanged(cb)
     return () => window.api.agents.offChanged(cb)
@@ -438,8 +440,9 @@ function HandleRow({
           onChange={e => { setDraft(e.target.value); setError(null) }}
           onBlur={commit}
           onKeyDown={e => {
-            if (e.key === 'Enter') commit()
-            else if (e.key === 'Escape') cancel()
+            // Delegate Enter to blur so only one commit() fires.
+            if (e.key === 'Enter') { e.preventDefault(); inputRef.current?.blur() }
+            else if (e.key === 'Escape') { e.preventDefault(); cancel() }
           }}
           aria-label="Handle"
           title={error ?? ''}
@@ -582,7 +585,7 @@ function AgentMcpTab({ agent, presets }: { agent: AgentRow; presets: AgentPreset
         <pre className="agent-detail-mcp-snippet">{snippet ?? 'Loading…'}</pre>
         <button
           type="button"
-          className="agent-detail-action"
+          className="agent-detail-settings-btn"
           onClick={copySnippet}
           disabled={!snippet}
         >

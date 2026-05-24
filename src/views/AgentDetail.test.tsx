@@ -150,6 +150,19 @@ describe('AgentDetail', () => {
     expect(input.className).toContain('agent-detail-handle-input--error')
   })
 
+  it('Escape reverts handle edit without saving', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.doubleClick(screen.getByText('copy-editor'))
+    const input = screen.getByRole('textbox', { name: 'Handle' }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'something-else' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    // Input is gone, span is back with the original handle
+    expect(screen.queryByRole('textbox', { name: 'Handle' })).toBeNull()
+    expect(screen.getByText('copy-editor')).toBeTruthy()
+    expect(window.api.agents.update).not.toHaveBeenCalledWith('a1', { handle: 'something-else' })
+  })
+
   it('tab bar includes Prompt, Preview, MCP, History, Settings', async () => {
     setup()
     await waitForLoaded()
