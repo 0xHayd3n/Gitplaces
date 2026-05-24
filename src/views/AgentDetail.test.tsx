@@ -307,6 +307,27 @@ describe('AgentDetail — tabs', () => {
     const payload = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
     expect(payload).toContain('unsaved draft body')
   })
+
+  it('Settings tab Duplicate button calls api.agents.duplicate', async () => {
+    ;(window as any).api.agents.duplicate = vi.fn().mockResolvedValue({ id: 'a-dup' })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Duplicate$/ }))
+    await waitFor(() => expect(window.api.agents.duplicate).toHaveBeenCalledWith('a1'))
+  })
+
+  it('Settings tab Delete button confirms and calls api.agents.delete', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    ;(window as any).api.agents.delete = vi.fn().mockResolvedValue(undefined)
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /delete agent/i }))
+    expect(confirmSpy).toHaveBeenCalled()
+    await waitFor(() => expect(window.api.agents.delete).toHaveBeenCalledWith('a1'))
+    confirmSpy.mockRestore()
+  })
 })
 
 describe('AgentDetail — variable/preset bar integration', () => {
