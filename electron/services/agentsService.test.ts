@@ -271,3 +271,144 @@ describe('agentsService — getAllAgents', () => {
     expect(agents.map(a => a.id)).toEqual([a3.id, a2.id, a1.id])
   })
 })
+
+import {
+  createPreset, updatePreset, deletePreset, duplicatePreset,
+  PRESET_NAME_MAX, PRESETS_JSON_MAX,
+} from './agentsService'
+import { parseAgentPresets } from '../../src/types/agent'
+
+describe('agentsService — presets', () => {
+  let db: Database.Database
+  let agentId: string
+  beforeEach(() => {
+    db = freshDb()
+    const a = createAgent(db, {
+      name: 'Reviewer',
+      body: 'Look at {{focus}} for {{language}}',
+      folderId: null,
+      handle: 'reviewer',
+      colorStart: '#6366f1',
+      colorEnd: null,
+      emoji: null,
+    })
+    agentId = a.id
+  })
+
+  it('createPreset returns a preset with derived slug + given values', () => {
+    const p = createPreset(db, agentId, 'Security review', { focus: 'auth', language: 'TS' })
+    expect(p.name).toBe('Security review')
+    expect(p.slug).toBe('security-review')
+    expect(p.values).toEqual({ focus: 'auth', language: 'TS' })
+    expect(p.id).toMatch(/^[0-9a-f-]{36}$/)
+  })
+
+  it('createPreset persists the preset to presets_json', () => {
+    createPreset(db, agentId, 'Style nitpick', { focus: 'naming' })
+    const row = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string }
+    const presets = parseAgentPresets(row.presets_json)
+    expect(presets.length).toBe(1)
+    expect(presets[0].name).toBe('Style nitpick')
+  })
+
+  it('createPreset defaults values to {} when omitted', () => {
+    const p = createPreset(db, agentId, 'Empty')
+    expect(p.values).toEqual({})
+  })
+
+  it('createPreset rejects empty/whitespace name', () => {
+    expect(() => createPreset(db, agentId, '')).toThrow(/name/i)
+    expect(() => createPreset(db, agentId, '   ')).toThrow(/name/i)
+  })
+
+  it('createPreset rejects name exceeding PRESET_NAME_MAX', () => {
+    const name = 'x'.repeat(PRESET_NAME_MAX + 1)
+    expect(() => createPreset(db, agentId, name)).toThrow(/name.*length/i)
+  })
+
+  it('createPreset rejects unknown agentId', () => {
+    expect(() => createPreset(db, 'no-such-agent', 'X')).toThrow(/agent/i)
+  })
+
+  it('createPreset dedupes slug per agent when two presets share a slug', () => {
+    const p1 = createPreset(db, agentId, 'Security review')
+    const p2 = createPreset(db, agentId, 'Security review')
+    expect(p1.slug).toBe('security-review')
+    expect(p2.slug).toBe('security-review-2')
+    expect(p1.id).not.toBe(p2.id)
+  })
+
+  it('updatePreset changes name and regenerates slug', () => {
+    const p = createPreset(db, agentId, 'Security review', { focus: 'auth' })
+    const updated = updatePreset(db, agentId, p.id, { name: 'Security audit' })
+    expect(updated.name).toBe('Security audit')
+    expect(updated.slug).toBe('security-audit')
+    expect(updated.values).toEqual({ focus: 'auth' })
+  })
+
+  it('updatePreset can change values without affecting name/slug', () => {
+    const p = createPreset(db, agentId, 'Security review', { focus: 'auth' })
+    const updated = updatePreset(db, agentId, p.id, { values: { focus: 'SQL injection' } })
+    expect(updated.name).toBe('Security review')
+    expect(updated.slug).toBe('security-review')
+    expect(updated.values).toEqual({ focus: 'SQL injection' })
+  })
+
+  it('updatePreset dedupes slug against OTHER presets when renaming', () => {
+    createPreset(db, agentId, 'Style nitpick')
+    const p = createPreset(db, agentId, 'Quick review')
+    const updated = updatePreset(db, agentId, p.id, { name: 'Style nitpick' })
+    expect(updated.slug).toBe('style-nitpick-2')
+  })
+
+  it('updatePreset is a no-op slug change when renaming to same name', () => {
+    const p = createPreset(db, agentId, 'Security review')
+    const updated = updatePreset(db, agentId, p.id, { name: 'Security review' })
+    expect(updated.slug).toBe('security-review')
+  })
+
+  it('updatePreset throws on unknown presetId', () => {
+    expect(() => updatePreset(db, agentId, 'no-such-preset', { name: 'X' })).toThrow(/preset/i)
+  })
+
+  it('deletePreset removes the preset', () => {
+    const p = createPreset(db, agentId, 'Security review')
+    deletePreset(db, agentId, p.id)
+    const row = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string }
+    expect(parseAgentPresets(row.presets_json)).toEqual([])
+  })
+
+  it('deletePreset on unknown id is a no-op', () => {
+    createPreset(db, agentId, 'X')
+    expect(() => deletePreset(db, agentId, 'no-such-preset')).not.toThrow()
+    const row = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string }
+    expect(parseAgentPresets(row.presets_json).length).toBe(1)
+  })
+
+  it('duplicatePreset copies values and appends " (copy)" to the name with unique slug', () => {
+    const p = createPreset(db, agentId, 'Security review', { focus: 'auth' })
+    const dup = duplicatePreset(db, agentId, p.id)
+    expect(dup.name).toBe('Security review (copy)')
+    expect(dup.slug).toBe('security-review-copy')
+    expect(dup.values).toEqual({ focus: 'auth' })
+    expect(dup.id).not.toBe(p.id)
+  })
+
+  it('createPreset rejects when serialised presets exceed PRESETS_JSON_MAX', () => {
+    const bigValue = 'x'.repeat(1024)
+    let count = 0
+    expect(() => {
+      while (count < 200) {
+        createPreset(db, agentId, `Preset ${count++}`, { focus: bigValue })
+      }
+    }).toThrow(/presets.*size|too large/i)
+  })
+
+  it('updateAgent bumps updated_at when presets change', async () => {
+    const before = db.prepare(`SELECT updated_at FROM agents WHERE id = ?`).get(agentId) as { updated_at: string }
+    await new Promise(r => setTimeout(r, 5))
+    createPreset(db, agentId, 'P')
+    const after = db.prepare(`SELECT updated_at FROM agents WHERE id = ?`).get(agentId) as { updated_at: string }
+    expect(after.updated_at > before.updated_at).toBe(true)
+  })
+})

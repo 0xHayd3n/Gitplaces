@@ -218,3 +218,131 @@ export function getAllAgents(db: Database.Database): AgentsAllPayload {
   const agents  = db.prepare('SELECT * FROM agents ORDER BY updated_at DESC').all() as AgentRow[]
   return { folders, agents }
 }
+
+// ── Presets ─────────────────────────────────────────────────────────
+
+import { slugifyName } from '../../src/utils/agentSlug'
+import { parseAgentPresets } from '../../src/types/agent'
+import type { AgentPreset } from '../../src/types/agent'
+
+export const PRESET_NAME_MAX = 80
+export const PRESETS_JSON_MAX = 64 * 1024
+
+function assertAgentExists(db: Database.Database, agentId: string): void {
+  const row = db.prepare('SELECT id FROM agents WHERE id = ?').get(agentId)
+  if (!row) throw new Error(`Unknown agent id: ${agentId}`)
+}
+
+function readPresets(db: Database.Database, agentId: string): AgentPreset[] {
+  const row = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string } | undefined
+  if (!row) throw new Error(`Unknown agent id: ${agentId}`)
+  return parseAgentPresets(row.presets_json)
+}
+
+function writePresets(db: Database.Database, agentId: string, presets: AgentPreset[]): void {
+  const json = JSON.stringify(presets)
+  if (json.length > PRESETS_JSON_MAX) {
+    throw new Error(`Presets size ${json.length} exceeds ${PRESETS_JSON_MAX}`)
+  }
+  db.prepare(`UPDATE agents SET presets_json = ?, updated_at = ? WHERE id = ?`)
+    .run(json, nowIso(), agentId)
+}
+
+function derivePresetSlug(name: string, existing: AgentPreset[], exceptId?: string): string {
+  const base = slugifyName(name)
+  const taken = existing
+    .filter(p => p.id !== exceptId)
+    .map(p => p.slug)
+  const lowerTaken = new Set(taken.map(s => s.toLowerCase()))
+  if (!lowerTaken.has(base)) return base
+  let i = 2
+  while (lowerTaken.has(`${base}-${i}`)) i++
+  return `${base}-${i}`
+}
+
+function assertPresetName(name: string): string {
+  const trimmed = name.trim()
+  if (trimmed.length === 0) throw new Error('Preset name must not be empty')
+  if (trimmed.length > PRESET_NAME_MAX) {
+    throw new Error(`Preset name length ${trimmed.length} exceeds ${PRESET_NAME_MAX}`)
+  }
+  return trimmed
+}
+
+export function createPreset(
+  db: Database.Database,
+  agentId: string,
+  name: string,
+  values: Record<string, string> = {},
+): AgentPreset {
+  assertAgentExists(db, agentId)
+  const normalisedName = assertPresetName(name)
+  const presets = readPresets(db, agentId)
+  const preset: AgentPreset = {
+    id: randomUUID(),
+    name: normalisedName,
+    slug: derivePresetSlug(normalisedName, presets),
+    values: { ...values },
+  }
+  writePresets(db, agentId, [...presets, preset])
+  return preset
+}
+
+export function updatePreset(
+  db: Database.Database,
+  agentId: string,
+  presetId: string,
+  patch: { name?: string; values?: Record<string, string> },
+): AgentPreset {
+  assertAgentExists(db, agentId)
+  const presets = readPresets(db, agentId)
+  const idx = presets.findIndex(p => p.id === presetId)
+  if (idx < 0) throw new Error(`Unknown preset id: ${presetId}`)
+  const current = presets[idx]
+
+  let nextName = current.name
+  let nextSlug = current.slug
+  if (patch.name !== undefined) {
+    nextName = assertPresetName(patch.name)
+    nextSlug = derivePresetSlug(nextName, presets, presetId)
+  }
+  const nextValues = patch.values !== undefined ? { ...patch.values } : current.values
+
+  const updated: AgentPreset = { id: current.id, name: nextName, slug: nextSlug, values: nextValues }
+  const nextPresets = [...presets]
+  nextPresets[idx] = updated
+  writePresets(db, agentId, nextPresets)
+  return updated
+}
+
+export function deletePreset(db: Database.Database, agentId: string, presetId: string): void {
+  assertAgentExists(db, agentId)
+  const presets = readPresets(db, agentId)
+  const next = presets.filter(p => p.id !== presetId)
+  if (next.length === presets.length) return
+  writePresets(db, agentId, next)
+}
+
+export function duplicatePreset(
+  db: Database.Database,
+  agentId: string,
+  presetId: string,
+): AgentPreset {
+  assertAgentExists(db, agentId)
+  const presets = readPresets(db, agentId)
+  const src = presets.find(p => p.id === presetId)
+  if (!src) throw new Error(`Unknown preset id: ${presetId}`)
+  const suffix = ' (copy)'
+  const baseName = src.name.length + suffix.length > PRESET_NAME_MAX
+    ? src.name.slice(0, PRESET_NAME_MAX - suffix.length)
+    : src.name
+  const dupName = `${baseName}${suffix}`
+  const dup: AgentPreset = {
+    id: randomUUID(),
+    name: dupName,
+    slug: derivePresetSlug(dupName, presets),
+    values: { ...src.values },
+  }
+  writePresets(db, agentId, [...presets, dup])
+  return dup
+}
