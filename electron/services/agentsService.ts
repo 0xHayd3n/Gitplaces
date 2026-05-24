@@ -459,3 +459,24 @@ export function listRevisions(db: Database.Database, agentId: string): AgentRevi
   }[]
   return rows.map(rowToRevision)
 }
+
+export function revertToRevision(
+  db: Database.Database,
+  agentId: string,
+  revisionId: string,
+): AgentRow {
+  assertAgentExists(db, agentId)
+  const rev = db.prepare(`SELECT * FROM agent_revisions WHERE id = ?`).get(revisionId) as
+    | { id: string; agent_id: string; body: string; presets_json: string; summary: string; kind: string; created_at: string }
+    | undefined
+  if (!rev) throw new Error(`Unknown revision id: ${revisionId}`)
+  if (rev.agent_id !== agentId) throw new Error(`Revision ${revisionId} does not belong to agent ${agentId}`)
+
+  db.prepare(`UPDATE agents SET body = ?, presets_json = ?, updated_at = ? WHERE id = ?`)
+    .run(rev.body, rev.presets_json, nowIso(), agentId)
+
+  recordRevision(db, agentId, rev.body, rev.presets_json, 'revert', `Reverted to "${rev.summary}"`)
+
+  const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as AgentRow
+  return row
+}

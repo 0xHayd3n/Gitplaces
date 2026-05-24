@@ -659,3 +659,61 @@ describe('agentsService — snapshots on preset CRUD', () => {
     expect(revs[0].summary).toContain('P')
   })
 })
+
+import { revertToRevision } from './agentsService'
+
+describe('agentsService — revertToRevision', () => {
+  let db: Database.Database
+  let agentId: string
+  beforeEach(() => {
+    db = freshDb()
+    const a = createAgent(db, {
+      name: 'A', body: 'v1', folderId: null,
+      handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null,
+    })
+    agentId = a.id
+    updateAgent(db, agentId, { body: 'v2' })
+    updateAgent(db, agentId, { body: 'v3' })
+  })
+
+  it('writes the older body back into the agent', () => {
+    const revs = listRevisions(db, agentId)
+    // revs[0] = body_edit(v3), revs[1] = body_edit(v2), revs[2] = create(v1)
+    const v1 = revs[2]
+    expect(v1.kind).toBe('create')
+    expect(v1.body).toBe('v1')
+    const restored = revertToRevision(db, agentId, v1.id)
+    expect(restored.body).toBe('v1')
+  })
+
+  it('inserts a new "revert" revision snapshot', () => {
+    const revs = listRevisions(db, agentId)
+    const v1 = revs[2]
+    revertToRevision(db, agentId, v1.id)
+    const after = listRevisions(db, agentId)
+    expect(after[0].kind).toBe('revert')
+    expect(after[0].body).toBe('v1')
+    expect(after[0].summary).toMatch(/revert/i)
+  })
+
+  it('restores presets_json as well', () => {
+    // Create a fresh agent with presets, capture a revision, then change presets, then revert.
+    const fresh = createAgent(db, { name: 'B', body: 'b', folderId: null, handle: 'b', colorStart: '#000000', colorEnd: null, emoji: null })
+    const p = createPreset(db, fresh.id, 'P', { x: 'old' })  // snapshot 'preset_change'
+    const target = listRevisions(db, fresh.id)[0]  // the preset_change snapshot with the preset
+    updatePreset(db, fresh.id, p.id, { values: { x: 'new' } })  // another snapshot
+    const restored = revertToRevision(db, fresh.id, target.id)
+    const presets = parseAgentPresets(restored.presets_json)
+    expect(presets[0].values).toEqual({ x: 'old' })
+  })
+
+  it('throws on unknown revisionId', () => {
+    expect(() => revertToRevision(db, agentId, 'no-such-rev')).toThrow(/revision/i)
+  })
+
+  it('throws when revision belongs to a different agent', () => {
+    const b = createAgent(db, { name: 'B', body: 'x', folderId: null, handle: 'b', colorStart: '#000000', colorEnd: null, emoji: null })
+    const otherRev = listRevisions(db, b.id)[0]
+    expect(() => revertToRevision(db, agentId, otherRev.id)).toThrow(/revision/i)
+  })
+})
