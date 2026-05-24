@@ -200,6 +200,17 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('agents:renameFolder', id, name) as Promise<import('../src/types/agent').AgentFolderRow>,
     deleteFolder: (id: string) => ipcRenderer.invoke('agents:deleteFolder', id) as Promise<void>,
 
+    presets: {
+      create: (agentId: string, name: string, values?: Record<string, string>) =>
+        ipcRenderer.invoke('agents:presets:create', agentId, name, values) as Promise<import('../src/types/agent').AgentPreset>,
+      update: (agentId: string, presetId: string, patch: { name?: string; values?: Record<string, string> }) =>
+        ipcRenderer.invoke('agents:presets:update', agentId, presetId, patch) as Promise<import('../src/types/agent').AgentPreset>,
+      delete: (agentId: string, presetId: string) =>
+        ipcRenderer.invoke('agents:presets:delete', agentId, presetId) as Promise<void>,
+      duplicate: (agentId: string, presetId: string) =>
+        ipcRenderer.invoke('agents:presets:duplicate', agentId, presetId) as Promise<import('../src/types/agent').AgentPreset>,
+    },
+
     onChanged: (cb: () => void) => {
       const wrapper = () => cb()
       callbackWrappers.set(cb, wrapper)

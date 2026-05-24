@@ -4,6 +4,7 @@ import {
   getAllAgents,
   createAgent, updateAgent, deleteAgent, duplicateAgent,
   createFolder, renameFolder, deleteFolder,
+  createPreset, updatePreset, deletePreset, duplicatePreset,
   type CreateAgentInput, type UpdateAgentPatch,
 } from '../services/agentsService'
 
@@ -64,5 +65,42 @@ export function registerAgentHandlers(): void {
     const db = getDb(app.getPath('userData'))
     deleteFolder(db, id)
     broadcastChanged()
+  })
+
+  ipcMain.handle('agents:presets:create', async (
+    _,
+    agentId: string,
+    name: string,
+    values?: Record<string, string>,
+  ) => {
+    const db = getDb(app.getPath('userData'))
+    const preset = createPreset(db, agentId, name, values)
+    broadcastChanged()
+    return preset
+  })
+
+  ipcMain.handle('agents:presets:update', async (
+    _,
+    agentId: string,
+    presetId: string,
+    patch: { name?: string; values?: Record<string, string> },
+  ) => {
+    const db = getDb(app.getPath('userData'))
+    const preset = updatePreset(db, agentId, presetId, patch)
+    broadcastChanged()
+    return preset
+  })
+
+  ipcMain.handle('agents:presets:delete', async (_, agentId: string, presetId: string) => {
+    const db = getDb(app.getPath('userData'))
+    deletePreset(db, agentId, presetId)
+    broadcastChanged()
+  })
+
+  ipcMain.handle('agents:presets:duplicate', async (_, agentId: string, presetId: string) => {
+    const db = getDb(app.getPath('userData'))
+    const preset = duplicatePreset(db, agentId, presetId)
+    broadcastChanged()
+    return preset
   })
 }

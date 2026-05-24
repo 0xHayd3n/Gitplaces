@@ -211,6 +211,12 @@ declare global {
         createFolder(name: string): Promise<import('./types/agent').AgentFolderRow>
         renameFolder(id: string, name: string): Promise<import('./types/agent').AgentFolderRow>
         deleteFolder(id: string): Promise<void>
+        presets: {
+          create(agentId: string, name: string, values?: Record<string, string>): Promise<import('./types/agent').AgentPreset>
+          update(agentId: string, presetId: string, patch: { name?: string; values?: Record<string, string> }): Promise<import('./types/agent').AgentPreset>
+          delete(agentId: string, presetId: string): Promise<void>
+          duplicate(agentId: string, presetId: string): Promise<import('./types/agent').AgentPreset>
+        }
         onChanged(cb: () => void): void
         offChanged(cb: () => void): void
       }
