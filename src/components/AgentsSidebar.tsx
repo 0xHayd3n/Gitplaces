@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMatch, useNavigate } from 'react-router-dom'
-import { Folder, MoreHorizontal, Plus } from 'lucide-react'
+import { Folder, Plus, Settings } from 'lucide-react'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
 import AgentContextMenu from './AgentContextMenu'
 import FolderKebabMenu from './FolderKebabMenu'
@@ -228,7 +228,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
                   toggle(key)
                 }
               }}
-              onContextMenu={(e) => onFolderRightClick(e, g.id)}
+              onContextMenu={g.id !== null ? (e) => onFolderRightClick(e, g.id!) : undefined}
             >
               <span className="agents-sidebar-folder-caret">{isOpen ? '▾' : '▸'}</span>
               <span
@@ -266,15 +266,17 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
                 </span>
               )}
               <span className="agents-sidebar-folder-count">({g.agents.length})</span>
-              <button
-                type="button"
-                className="agents-sidebar-folder-kebab"
-                data-testid={g.id ? `folder-kebab-${g.id}` : 'folder-kebab-unfiled'}
-                aria-label="Folder menu"
-                onClick={(e) => onFolderKebabClick(e, g.id)}
-              >
-                <MoreHorizontal size={14} />
-              </button>
+              {g.id !== null && (
+                <button
+                  type="button"
+                  className="agents-sidebar-folder-kebab"
+                  data-testid={`folder-kebab-${g.id}`}
+                  aria-label="Customise folder"
+                  onClick={(e) => onFolderKebabClick(e, g.id)}
+                >
+                  <Settings size={14} />
+                </button>
+              )}
             </div>
 
             {isOpen && g.agents.map(a => (
@@ -347,17 +349,16 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
         />
       )}
 
-      {menu && menu.target.kind === 'folder' && (
+      {menu && menu.target.kind === 'folder' && menu.target.folderId !== null && currentMenuFolder && (
         <FolderKebabMenu
           x={menu.x}
           y={menu.y}
           folderId={menu.target.folderId}
-          currentColor={currentMenuFolder?.color_start ?? null}
-          currentEmoji={currentMenuFolder?.emoji ?? null}
+          currentColor={currentMenuFolder.color_start}
+          currentEmoji={currentMenuFolder.emoji}
           onClose={() => setMenu(null)}
           onRename={(id) => startInlineRename(id)}
           onDelete={handleDeleteFolder}
-          onNewFolder={handleNewFolder}
         />
       )}
     </div>
