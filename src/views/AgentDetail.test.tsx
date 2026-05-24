@@ -79,20 +79,18 @@ async function waitForLoaded() {
 }
 
 describe('AgentDetail', () => {
-  it('renders the agent name and rendered body', async () => {
+  it('renders the hero with scoped handle, title, swatch and meta chips', async () => {
     setup()
     await waitForLoaded()
-    // "Hello body." appears in both the rendered markdown and the derived description chip
-    expect(screen.getAllByText(/Hello body/).length).toBeGreaterThan(0)
-  })
-
-  it('renders the hero with @handle, name, swatch and description', async () => {
-    setup()
-    await waitForLoaded()
-    expect(screen.getByText('@copy-editor')).toBeTruthy()
-    expect(screen.getByTestId('agent-hero-swatch').style.background).toBe('rgb(16, 185, 129)')
-    // Description paragraph plus the rendered markdown both contain "Hello body"
-    expect(screen.getAllByText(/Hello body/).length).toBeGreaterThan(0)
+    // Title (name) is the h2
+    expect(screen.getByRole('heading', { level: 2, name: 'Copy editor' })).toBeTruthy()
+    // Handle row shows the scope prefix and the local part
+    expect(screen.getByText('git-suite/')).toBeTruthy()
+    expect(screen.getByText('copy-editor')).toBeTruthy()
+    // Swatch is now a button with aria-label "Edit appearance"
+    expect(screen.getByRole('button', { name: /edit appearance/i })).toBeTruthy()
+    // Folder chip
+    expect(screen.getByText('Writing')).toBeTruthy()
   })
 
   it('Copy button writes the persona payload to the clipboard', async () => {
