@@ -300,6 +300,9 @@ export function createPreset(
     values: { ...values },
   }
   writePresets(db, agentId, [...presets, preset])
+  const after = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string }
+  const body = (db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agentId) as { body: string }).body
+  recordRevision(db, agentId, body, after.presets_json, 'preset_change', `Added preset "${preset.name}"`)
   return preset
 }
 
@@ -327,15 +330,25 @@ export function updatePreset(
   const nextPresets = [...presets]
   nextPresets[idx] = updated
   writePresets(db, agentId, nextPresets)
+  const after = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string }
+  const body = (db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agentId) as { body: string }).body
+  const summary = patch.name !== undefined && patch.name.trim() !== current.name
+    ? `Renamed preset "${current.name}" to "${nextName}"`
+    : `Updated preset "${nextName}"`
+  recordRevision(db, agentId, body, after.presets_json, 'preset_change', summary)
   return updated
 }
 
 export function deletePreset(db: Database.Database, agentId: string, presetId: string): void {
   assertAgentExists(db, agentId)
   const presets = readPresets(db, agentId)
+  const target = presets.find(p => p.id === presetId)
+  if (!target) return  // no-op on unknown id, no snapshot
   const next = presets.filter(p => p.id !== presetId)
-  if (next.length === presets.length) return
   writePresets(db, agentId, next)
+  const after = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string }
+  const body = (db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agentId) as { body: string }).body
+  recordRevision(db, agentId, body, after.presets_json, 'preset_change', `Deleted preset "${target.name}"`)
 }
 
 export function duplicatePreset(
@@ -359,6 +372,9 @@ export function duplicatePreset(
     values: { ...src.values },
   }
   writePresets(db, agentId, [...presets, dup])
+  const after = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string }
+  const body = (db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agentId) as { body: string }).body
+  recordRevision(db, agentId, body, after.presets_json, 'preset_change', `Duplicated preset "${src.name}"`)
   return dup
 }
 

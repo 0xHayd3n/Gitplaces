@@ -586,3 +586,76 @@ describe('agentsService — snapshots on agent CRUD', () => {
     expect(revs[0].presets[0].name).toBe('P1')
   })
 })
+
+describe('agentsService — snapshots on preset CRUD', () => {
+  let db: Database.Database
+  let agentId: string
+  beforeEach(() => {
+    db = freshDb()
+    const a = createAgent(db, {
+      name: 'A', body: 'b', folderId: null,
+      handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null,
+    })
+    agentId = a.id
+  })
+
+  it('createPreset records a preset_change snapshot', () => {
+    createPreset(db, agentId, 'Security review', { focus: 'auth' })
+    const revs = listRevisions(db, agentId)
+    expect(revs[0].kind).toBe('preset_change')
+    expect(revs[0].summary).toContain('Added')
+    expect(revs[0].summary).toContain('Security review')
+    expect(revs[0].presets.length).toBe(1)
+  })
+
+  it('updatePreset records "Renamed" when name changes', () => {
+    const p = createPreset(db, agentId, 'Old name')
+    updatePreset(db, agentId, p.id, { name: 'New name' })
+    const revs = listRevisions(db, agentId)
+    expect(revs[0].kind).toBe('preset_change')
+    expect(revs[0].summary).toContain('Renamed')
+    expect(revs[0].summary).toContain('Old name')
+    expect(revs[0].summary).toContain('New name')
+  })
+
+  it('updatePreset records "Updated" when only values change', () => {
+    const p = createPreset(db, agentId, 'P')
+    updatePreset(db, agentId, p.id, { values: { focus: 'auth' } })
+    const revs = listRevisions(db, agentId)
+    expect(revs[0].kind).toBe('preset_change')
+    expect(revs[0].summary).toContain('Updated')
+    expect(revs[0].summary).toContain('P')
+  })
+
+  it('updatePreset records "Renamed" when both name and values change', () => {
+    const p = createPreset(db, agentId, 'P', { x: 'old' })
+    updatePreset(db, agentId, p.id, { name: 'Q', values: { x: 'new' } })
+    const revs = listRevisions(db, agentId)
+    expect(revs[0].summary).toContain('Renamed')
+  })
+
+  it('deletePreset records a preset_change snapshot', () => {
+    const p = createPreset(db, agentId, 'P')
+    deletePreset(db, agentId, p.id)
+    const revs = listRevisions(db, agentId)
+    expect(revs[0].kind).toBe('preset_change')
+    expect(revs[0].summary).toContain('Deleted')
+    expect(revs[0].summary).toContain('P')
+  })
+
+  it('deletePreset on unknown id does NOT snapshot', () => {
+    createPreset(db, agentId, 'X')
+    const before = listRevisions(db, agentId).length
+    deletePreset(db, agentId, 'no-such-preset')
+    expect(listRevisions(db, agentId).length).toBe(before)
+  })
+
+  it('duplicatePreset records a preset_change snapshot', () => {
+    const p = createPreset(db, agentId, 'P')
+    duplicatePreset(db, agentId, p.id)
+    const revs = listRevisions(db, agentId)
+    expect(revs[0].kind).toBe('preset_change')
+    expect(revs[0].summary).toContain('Duplicated')
+    expect(revs[0].summary).toContain('P')
+  })
+})
