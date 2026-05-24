@@ -59,4 +59,35 @@ describe('AgentSwatchPopover', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('button', { name: /emoji/i })).toBeNull())
   })
+
+  it('selecting an emoji calls api.agents.update with the new emoji', async () => {
+    render(<AgentSwatchPopover agent={agent} />)
+    fireEvent.click(screen.getByRole('button', { name: /edit appearance/i }))
+    // Open the AgentEmojiPicker's own popover
+    fireEvent.click(screen.getByRole('button', { name: /emoji/i }))
+    // Pick the first emoji cell in the grid
+    const cells = document.querySelectorAll('.agent-emoji-cell')
+    expect(cells.length).toBeGreaterThan(0)
+    fireEvent.click(cells[0] as HTMLButtonElement)
+    await waitFor(() => expect(window.api.agents.update).toHaveBeenCalled())
+    const call = (window.api.agents.update as any).mock.calls.find(
+      (c: any[]) => 'emoji' in c[1],
+    )
+    expect(call).toBeTruthy()
+    expect(call[0]).toBe('a1')
+    expect(call[1].emoji).toBeTruthy()
+  })
+
+  it('color picker hex change calls api.agents.update with color_start', async () => {
+    render(<AgentSwatchPopover agent={agent} />)
+    fireEvent.click(screen.getByRole('button', { name: /edit appearance/i }))
+    const startHex = screen.getByLabelText('Start hex') as HTMLInputElement
+    fireEvent.change(startHex, { target: { value: '#ff0000' } })
+    await waitFor(() => expect(window.api.agents.update).toHaveBeenCalled())
+    const call = (window.api.agents.update as any).mock.calls.find(
+      (c: any[]) => 'color_start' in c[1],
+    )
+    expect(call).toBeTruthy()
+    expect(call[1].color_start).toBe('#ff0000')
+  })
 })
