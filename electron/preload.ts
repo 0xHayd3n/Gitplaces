@@ -218,6 +218,9 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.invoke('agents:revisions:revert', agentId, revisionId) as Promise<import('../src/types/agent').AgentRow>,
     },
 
+    recordUse: (agentId: string, presetId: string | null) =>
+      ipcRenderer.invoke('agents:recordUse', agentId, presetId) as Promise<void>,
+
     onRevisionAdded: (cb: (rev: import('../src/types/agent').AgentRevision) => void) => {
       const wrapper = (_: unknown, rev: import('../src/types/agent').AgentRevision) => cb(rev)
       callbackWrappers.set(cb, wrapper)

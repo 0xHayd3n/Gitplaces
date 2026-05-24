@@ -221,6 +221,7 @@ declare global {
           list(agentId: string): Promise<import('./types/agent').AgentRevision[]>
           revert(agentId: string, revisionId: string): Promise<import('./types/agent').AgentRow>
         }
+        recordUse(agentId: string, presetId: string | null): Promise<void>
         onRevisionAdded(cb: (rev: import('./types/agent').AgentRevision) => void): void
         offRevisionAdded(cb: (rev: import('./types/agent').AgentRevision) => void): void
         onChanged(cb: () => void): void

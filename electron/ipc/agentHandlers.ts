@@ -6,6 +6,7 @@ import {
   createFolder, renameFolder, deleteFolder,
   createPreset, updatePreset, deletePreset, duplicatePreset,
   listRevisions, revertToRevision,
+  recordUse,
   type CreateAgentInput, type UpdateAgentPatch,
 } from '../services/agentsService'
 
@@ -145,5 +146,11 @@ export function registerAgentHandlers(): void {
     broadcastChanged()
     broadcastRevisionAddedIfNew(agentId, priorRevId)
     return row
+  })
+
+  ipcMain.handle('agents:recordUse', async (_, agentId: string, presetId: string | null) => {
+    const db = getDb(app.getPath('userData'))
+    recordUse(db, agentId, presetId)
+    broadcastChanged()
   })
 }
