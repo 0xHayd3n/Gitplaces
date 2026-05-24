@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Copy, Pin, Folder, FileText, Clock } from 'lucide-react'
+import { Copy, Pin, Folder, FileText, Clock, Edit3, Eye, Plug, Settings as SettingsIcon } from 'lucide-react'
 import type { AgentRow, AgentFolderRow, AgentRevision, AgentPreset } from '../types/agent'
 import { parseAgentPresets } from '../types/agent'
 import { useToast } from '../contexts/Toast'
@@ -29,7 +29,7 @@ export default function AgentDetail() {
   const [nameDraft, setNameDraft] = useState('')
   const [nameEditing, setNameEditing] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
-  const [activeTab, setActiveTab] = useState<'prompt' | 'preview' | 'mcp' | 'history'>('prompt')
+  const [activeTab, setActiveTab] = useState<'prompt' | 'preview' | 'mcp' | 'history' | 'settings'>('prompt')
   const [activePresetId, setActivePresetId] = useState<string | null>(null)
   const [revisions, setRevisions] = useState<AgentRevision[]>([])
   const [revisionsLoaded, setRevisionsLoaded] = useState(false)
@@ -272,21 +272,53 @@ export default function AgentDetail() {
       </header>
 
       <nav className="agent-detail-tabs" role="tablist">
-        {(['prompt', 'preview', 'mcp', 'history'] as const).map(tab => (
-          <button
-            key={tab}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === tab}
-            className="agent-detail-tab"
-            onClick={() => setActiveTab(tab)}
-          >
-            {tab === 'prompt' ? 'Prompt'
-              : tab === 'preview' ? 'Preview'
-              : tab === 'mcp' ? 'MCP'
-              : 'History'}
-          </button>
-        ))}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'prompt'}
+          className="agent-detail-tab"
+          onClick={() => setActiveTab('prompt')}
+        >
+          <Edit3 size={13} /> Prompt
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'preview'}
+          className="agent-detail-tab"
+          onClick={() => setActiveTab('preview')}
+        >
+          <Eye size={13} /> Preview
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'mcp'}
+          className="agent-detail-tab"
+          onClick={() => setActiveTab('mcp')}
+        >
+          <Plug size={13} /> MCP
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'history'}
+          className="agent-detail-tab"
+          onClick={() => setActiveTab('history')}
+        >
+          <Clock size={13} /> History
+        </button>
+        <span className="agent-detail-tabs-spacer" />
+        <span className="agent-detail-tabs-sep" aria-hidden="true" />
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'settings'}
+          className="agent-detail-tab"
+          onClick={() => setActiveTab('settings')}
+        >
+          <SettingsIcon size={13} /> Settings
+        </button>
       </nav>
 
       <div className="agent-detail-body">

@@ -150,6 +150,16 @@ describe('AgentDetail', () => {
     expect(input.className).toContain('agent-detail-handle-input--error')
   })
 
+  it('tab bar includes Prompt, Preview, MCP, History, Settings', async () => {
+    setup()
+    await waitForLoaded()
+    expect(screen.getByRole('tab', { name: /prompt/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /preview/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /mcp/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /history/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /settings/i })).toBeTruthy()
+  })
+
   it('toggles to edit mode and shows the textarea', async () => {
     setup()
     await waitForLoaded()
