@@ -704,3 +704,106 @@
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* ── History timeline ──────────────────────────────────────── */
+
+.agent-history {
+  padding: 12px 28px 24px;
+  font-size: 12px;
+  color: var(--t2);
+}
+
+.agent-history-empty {
+  padding: 24px 28px;
+  color: var(--t3);
+  font-size: 12px;
+}
+
+.agent-history-group { margin-bottom: 12px; }
+
+.agent-history-row {
+  display: grid;
+  grid-template-columns: 70px 14px 1fr auto;
+  align-items: start;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 4px;
+}
+.agent-history-row:hover { background: rgba(255, 255, 255, 0.03); }
+
+.agent-history-time {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--t3);
+  padding-top: 2px;
+}
+
+.agent-history-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--t3);
+  margin-top: 5px;
+  justify-self: center;
+}
+.agent-history-dot--body_edit     { background: var(--accent); }
+.agent-history-dot--create        { background: #22c55e; }
+.agent-history-dot--revert        { background: #f59e0b; }
+.agent-history-dot--preset_change { background: var(--t3); }
+
+.agent-history-summary {
+  color: var(--t1);
+  line-height: 1.5;
+}
+
+.agent-history-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.agent-history-row:hover .agent-history-actions { opacity: 1; }
+
+.agent-history-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--t2);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.agent-history-btn:hover {
+  color: var(--accent-text);
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+
+.agent-history-diff {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+.agent-history-diff-pane {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px 10px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--t2);
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow: auto;
+}
+.agent-history-diff-pane--old {
+  border-left: 2px solid #f87171;
+}
+.agent-history-diff-pane--new {
+  border-left: 2px solid #4ade80;
+}
