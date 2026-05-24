@@ -376,19 +376,6 @@ export default function AgentDetail() {
           />
         )}
       </div>
-
-      <footer className="agent-detail-footer">
-        <span
-          className={
-            'agent-detail-save-status' +
-            (saveStatus === 'saving' ? ' agent-detail-save-status--saving' : '') +
-            (saveStatus === 'saved' ? ' agent-detail-save-status--saved' : '')
-          }
-        >
-          {saveStatus === 'saving' && 'saving…'}
-          {saveStatus === 'saved' && 'saved ✓'}
-        </span>
-      </footer>
     </div>
   )
 }

@@ -342,28 +342,6 @@
 .agent-detail-rendered a { color: var(--accent-text); }
 .agent-detail-rendered a:hover { color: var(--accent-light); }
 
-/* Footer ──────────────────────────────────────────────── */
-
-.agent-detail-footer {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 28px;
-  border-top: 1px solid var(--border);
-  background: var(--bg2);
-  flex-shrink: 0;
-  min-height: 24px;
-}
-
-.agent-detail-save-status {
-  margin-left: auto;
-  font-size: 10px;
-  color: var(--t3);
-  font-style: italic;
-}
-.agent-detail-save-status--saving { color: var(--amber); }
-.agent-detail-save-status--saved  { color: var(--accent-text); font-style: normal; }
-
 /* Loading state ──────────────────────────────────────── */
 
 .agent-detail-loading {
