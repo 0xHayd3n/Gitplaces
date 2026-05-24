@@ -284,6 +284,29 @@ describe('AgentDetail — tabs', () => {
       expect(window.api.agents.update).toHaveBeenCalledWith('a1', { folder_id: null }),
     )
   })
+
+  it('Settings tab "Copy entire prompt" copies the persona payload', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy entire prompt/i }))
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
+    const payload = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
+    expect(payload).toMatch(/^You are @copy-editor/)
+    expect(payload).toContain('Hello body.')
+  })
+
+  it('Settings tab "Copy entire prompt" reflects unsaved textarea edits', async () => {
+    setup()
+    await waitForLoaded()
+    const ta = screen.getByRole('textbox', { name: /Body/ })
+    fireEvent.change(ta, { target: { value: 'unsaved draft body' } })
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy entire prompt/i }))
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
+    const payload = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
+    expect(payload).toContain('unsaved draft body')
+  })
 })
 
 describe('AgentDetail — variable/preset bar integration', () => {
@@ -319,7 +342,7 @@ describe('AgentDetail — variable/preset bar integration', () => {
     expect(screen.queryByText('PRESETS')).toBeNull()
   })
 
-  it('hero Copy uses preset sub-handle and substitutes variables when a preset is active', async () => {
+  it('Settings Copy entire prompt uses preset sub-handle and substitutes variables when a preset is active', async () => {
     const agentWithPreset: AgentRow = {
       ...baseAgent,
       body: 'Look at {{focus}} for {{language}}.',
@@ -331,14 +354,15 @@ describe('AgentDetail — variable/preset bar integration', () => {
     ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithPreset] })
     setup()
     await waitForLoaded()
-    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy entire prompt/i }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
     const payload = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
     expect(payload).toMatch(/^You are @copy-editor\/security-review/)
     expect(payload).toContain('Look at auth for TS.')
   })
 
-  it('hero Copy leaves variables raw when no preset is active', async () => {
+  it('Settings Copy entire prompt leaves variables raw when no preset is active', async () => {
     const agentWithVars: AgentRow = {
       ...baseAgent,
       body: 'Look at {{focus}}.',
@@ -347,7 +371,8 @@ describe('AgentDetail — variable/preset bar integration', () => {
     ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithVars] })
     setup()
     await waitForLoaded()
-    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy entire prompt/i }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
     const payload = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
     expect(payload).toMatch(/^You are @copy-editor,/)
@@ -443,11 +468,12 @@ describe('AgentDetail — History tab', () => {
   })
 })
 
-describe('AgentDetail — recordUse on Copy', () => {
-  it('calls window.api.agents.recordUse with the agent id and active preset id after a successful Copy', async () => {
+describe('AgentDetail — recordUse on Copy entire prompt', () => {
+  it('calls window.api.agents.recordUse with the agent id and null preset after a successful Copy', async () => {
     setup()
     await waitForLoaded()
-    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy entire prompt/i }))
     await waitFor(() => expect(window.api.agents.recordUse).toHaveBeenCalledWith('a1', null))
   })
 
@@ -462,7 +488,8 @@ describe('AgentDetail — recordUse on Copy', () => {
     ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithPreset] })
     setup()
     await waitForLoaded()
-    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy entire prompt/i }))
     await waitFor(() => expect(window.api.agents.recordUse).toHaveBeenCalledWith('a1', 'p-sec'))
   })
 
@@ -470,7 +497,8 @@ describe('AgentDetail — recordUse on Copy', () => {
     ;(navigator.clipboard.writeText as any) = vi.fn().mockRejectedValue(new Error('denied'))
     setup()
     await waitForLoaded()
-    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy entire prompt/i }))
     await new Promise(r => setTimeout(r, 0))
     expect(window.api.agents.recordUse).not.toHaveBeenCalled()
   })
