@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Copy, Pin, Folder, FileText, Clock, Edit3, Eye, Plug, Settings as SettingsIcon } from 'lucide-react'
+import { Copy, Pin, Folder, FileText, Clock, Edit3, Eye, Plug, Settings as SettingsIcon, CopyPlus, Trash2 } from 'lucide-react'
 import type { AgentRow, AgentFolderRow, AgentRevision, AgentPreset } from '../types/agent'
 import { parseAgentPresets } from '../types/agent'
 import { useToast } from '../contexts/Toast'
@@ -366,6 +366,15 @@ export default function AgentDetail() {
             <div className="agent-detail-tab-placeholder">Loading history…</div>
           )
         )}
+        {activeTab === 'settings' && (
+          <AgentSettingsTab
+            agent={agent}
+            folders={folders}
+            onCopyPayload={handleCopy}
+            onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
+          />
+        )}
       </div>
 
       <footer className="agent-detail-footer">
@@ -468,6 +477,82 @@ function HandleRow({
       >
         <Copy size={13} />
       </button>
+    </div>
+  )
+}
+
+function AgentSettingsTab({
+  agent,
+  folders,
+  onCopyPayload,
+  onDuplicate,
+  onDelete,
+}: {
+  agent: AgentRow
+  folders: AgentFolderRow[]
+  onCopyPayload: () => void
+  onDuplicate: () => void
+  onDelete: () => void
+}) {
+  const onFolderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value
+    window.api.agents.update(agent.id, {
+      folder_id: value === '__unfiled' ? null : value,
+    })
+  }
+  return (
+    <div className="agent-detail-settings-grid">
+      <label className="agent-detail-settings-label" htmlFor="agent-settings-folder">Folder</label>
+      <div className="agent-detail-settings-field">
+        <select
+          id="agent-settings-folder"
+          value={agent.folder_id ?? '__unfiled'}
+          onChange={onFolderChange}
+        >
+          <option value="__unfiled">Unfiled</option>
+          {folders.map(f => (
+            <option key={f.id} value={f.id}>{f.name}</option>
+          ))}
+        </select>
+        <div className="agent-detail-settings-hint">Move this agent into a folder in the sidebar.</div>
+      </div>
+
+      <div className="agent-detail-settings-label">Export prompt</div>
+      <div className="agent-detail-settings-field">
+        <button
+          type="button"
+          className="agent-detail-settings-btn"
+          onClick={onCopyPayload}
+        >
+          <Copy size={13} /> Copy entire prompt
+        </button>
+        <div className="agent-detail-settings-hint">
+          Copies the full rendered persona markdown to the clipboard — for chats without the MCP server.
+        </div>
+      </div>
+
+      <div className="agent-detail-settings-label">Manage</div>
+      <div className="agent-detail-settings-field">
+        <div className="agent-detail-settings-row-actions">
+          <button
+            type="button"
+            className="agent-detail-settings-btn"
+            onClick={onDuplicate}
+          >
+            <CopyPlus size={13} /> Duplicate
+          </button>
+          <button
+            type="button"
+            className="agent-detail-settings-btn agent-detail-settings-btn--danger"
+            onClick={onDelete}
+          >
+            <Trash2 size={13} /> Delete agent
+          </button>
+        </div>
+        <div className="agent-detail-settings-hint">
+          Duplicate creates a copy with a new handle. Delete cannot be undone.
+        </div>
+      </div>
     </div>
   )
 }

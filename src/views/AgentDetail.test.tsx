@@ -273,6 +273,17 @@ describe('AgentDetail — tabs', () => {
       expect(screen.getByRole('heading', { level: 1, name: 'Copy editor' })).toBeTruthy()
     })
   })
+
+  it('Settings tab Folder dropdown changes the agent\'s folder', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    const select = screen.getByLabelText(/folder/i) as HTMLSelectElement
+    fireEvent.change(select, { target: { value: '__unfiled' } })
+    await waitFor(() =>
+      expect(window.api.agents.update).toHaveBeenCalledWith('a1', { folder_id: null }),
+    )
+  })
 })
 
 describe('AgentDetail — variable/preset bar integration', () => {
