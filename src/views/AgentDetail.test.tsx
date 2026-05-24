@@ -93,14 +93,13 @@ describe('AgentDetail', () => {
     expect(screen.getByText('Writing')).toBeTruthy()
   })
 
-  it('Copy button writes the persona payload to the clipboard', async () => {
+  it('handle copy icon copies @git-suite/<handle> to the clipboard', async () => {
     setup()
     await waitForLoaded()
-    fireEvent.click(screen.getByRole('button', { name: /copy/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy @git-suite\/copy-editor/i }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
-    const payload = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
-    expect(payload).toMatch(/^You are @copy-editor/)
-    expect(payload).toContain('Hello body.')
+    const text = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
+    expect(text).toBe('@git-suite/copy-editor')
   })
 
   it('shows the folder name as a meta chip', async () => {
