@@ -53,3 +53,56 @@ describe('buildPersonaPayload', () => {
     expect(out.startsWith('You are @a, A description.\n\n')).toBe(true)  // no double-period
   })
 })
+
+describe('buildPersonaPayload — preset support', () => {
+  it('uses @handle/preset-slug in the framing line when presetSlug is provided', () => {
+    const out = buildPersonaPayload({
+      handle: 'reviewer',
+      description: 'a strict reviewer',
+      body: 'Body.',
+      presetSlug: 'security-review',
+    })
+    expect(out.startsWith('You are @reviewer/security-review, a strict reviewer.\n\n')).toBe(true)
+  })
+
+  it('substitutes variables in the body using presetValues', () => {
+    const out = buildPersonaPayload({
+      handle: 'r',
+      description: '',
+      body: 'Look at {{focus}} carefully.',
+      presetSlug: 'sec',
+      presetValues: { focus: 'auth' },
+    })
+    expect(out).toContain('Look at auth carefully.')
+  })
+
+  it('leaves variables raw when no presetValues are provided', () => {
+    const out = buildPersonaPayload({
+      handle: 'r',
+      description: '',
+      body: 'See {{focus}}.',
+    })
+    expect(out).toContain('See {{focus}}.')
+  })
+
+  it('leaves missing-value variables raw and substitutes provided ones', () => {
+    const out = buildPersonaPayload({
+      handle: 'r',
+      description: '',
+      body: '{{a}} and {{b}}',
+      presetSlug: 'p',
+      presetValues: { a: 'one' },
+    })
+    expect(out).toContain('one and {{b}}')
+  })
+
+  it('omits the sub-handle when presetSlug is null/undefined', () => {
+    const out = buildPersonaPayload({
+      handle: 'r',
+      description: 'd',
+      body: 'b',
+      presetSlug: null,
+    })
+    expect(out.startsWith('You are @r, d.\n\n')).toBe(true)
+  })
+})

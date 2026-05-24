@@ -1,3 +1,5 @@
+import { substituteVariables } from './agentVariables'
+
 const DESCRIPTION_MAX = 200
 
 export function deriveDescription(body: string): string {
@@ -6,7 +8,6 @@ export function deriveDescription(body: string): string {
     const trimmed = line.trim()
     if (trimmed.length === 0) continue
     if (trimmed.startsWith('#')) continue
-    // Strip simple markdown formatting (bold, italic, code, links)
     const cleaned = trimmed
       .replace(/\*\*([^*]+)\*\*/g, '$1')
       .replace(/__([^_]+)__/g, '$1')
@@ -20,17 +21,21 @@ export function deriveDescription(body: string): string {
 }
 
 export interface PersonaPayloadInput {
-  handle: string             // without leading '@'
-  description: string        // already trimmed; may be empty
+  handle: string
+  description: string
   body: string
+  presetSlug?: string | null
+  presetValues?: Record<string, string>
 }
 
 export function buildPersonaPayload(input: PersonaPayloadInput): string {
-  const { handle, description, body } = input
+  const { handle, description, body, presetSlug, presetValues } = input
+  const callable = presetSlug ? `${handle}/${presetSlug}` : handle
   const framing = description.length > 0
-    ? `You are @${handle}, ${stripTrailingPunct(description)}.`
-    : `You are @${handle}.`
-  return `${framing}\n\n${body}`
+    ? `You are @${callable}, ${stripTrailingPunct(description)}.`
+    : `You are @${callable}.`
+  const substituted = presetValues ? substituteVariables(body, presetValues) : body
+  return `${framing}\n\n${substituted}`
 }
 
 function stripTrailingPunct(s: string): string {
