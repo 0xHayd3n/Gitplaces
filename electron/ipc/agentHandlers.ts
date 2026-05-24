@@ -4,11 +4,11 @@ import { getDb } from '../db'
 import {
   getAllAgents,
   createAgent, updateAgent, deleteAgent, duplicateAgent,
-  createFolder, renameFolder, deleteFolder,
+  createFolder, renameFolder, deleteFolder, updateFolder,
   createPreset, updatePreset, deletePreset, duplicatePreset,
   listRevisions, revertToRevision,
   recordUse,
-  type CreateAgentInput, type UpdateAgentPatch,
+  type CreateAgentInput, type UpdateAgentPatch, type UpdateFolderPatch,
 } from '../services/agentsService'
 
 function broadcastChanged(): void {
@@ -80,6 +80,13 @@ export function registerAgentHandlers(): void {
   ipcMain.handle('agents:renameFolder', async (_, id: string, name: string) => {
     const db = getDb(app.getPath('userData'))
     const row = renameFolder(db, id, name)
+    broadcastChanged()
+    return row
+  })
+
+  ipcMain.handle('agents:updateFolder', async (_, id: string, patch: UpdateFolderPatch) => {
+    const db = getDb(app.getPath('userData'))
+    const row = updateFolder(db, id, patch)
     broadcastChanged()
     return row
   })

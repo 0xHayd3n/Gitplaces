@@ -198,6 +198,13 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('agents:createFolder', name) as Promise<import('../src/types/agent').AgentFolderRow>,
     renameFolder: (id: string, name: string) =>
       ipcRenderer.invoke('agents:renameFolder', id, name) as Promise<import('../src/types/agent').AgentFolderRow>,
+    updateFolder: (id: string, patch: {
+      name?: string
+      colorStart?: string | null
+      colorEnd?:   string | null
+      emoji?:      string | null
+    }) =>
+      ipcRenderer.invoke('agents:updateFolder', id, patch) as Promise<import('../src/types/agent').AgentFolderRow>,
     deleteFolder: (id: string) => ipcRenderer.invoke('agents:deleteFolder', id) as Promise<void>,
 
     presets: {
