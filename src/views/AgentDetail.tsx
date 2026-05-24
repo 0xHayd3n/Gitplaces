@@ -51,16 +51,20 @@ export default function AgentDetail() {
     return () => { cancelled = true }
   }, [id])
 
+  const presets = useMemo(
+    () => (agent ? parseAgentPresets(agent.presets_json) : []),
+    [agent],
+  )
+
   // When the agent loads or its preset list changes, default the active preset
   // to the first one (or null if none).
   useEffect(() => {
     if (!agent) { setActivePresetId(null); return }
-    const presets = parseAgentPresets(agent.presets_json)
     setActivePresetId(prev => {
       if (prev && presets.some(p => p.id === prev)) return prev
       return presets[0]?.id ?? null
     })
-  }, [agent])
+  }, [agent, presets])
 
   const editingRef = useRef(false)
   const nameEditingRef = useRef(false)
@@ -120,10 +124,10 @@ export default function AgentDetail() {
   const bodyChars = liveBody.length
 
   const variables = useMemo(() => detectVariables(liveBody), [liveBody])
-  const activePreset = useMemo(() => {
-    if (!agent || !activePresetId) return null
-    return parseAgentPresets(agent.presets_json).find(p => p.id === activePresetId) ?? null
-  }, [agent, activePresetId])
+  const activePreset = useMemo(
+    () => (activePresetId ? presets.find(p => p.id === activePresetId) ?? null : null),
+    [presets, activePresetId],
+  )
 
   const handleCopy = async () => {
     if (!agent) return

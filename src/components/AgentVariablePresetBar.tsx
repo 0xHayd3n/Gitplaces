@@ -125,7 +125,7 @@ export default function AgentVariablePresetBar({
                 if (e.key === 'Enter') { e.preventDefault(); submitCreate() }
                 else if (e.key === 'Escape') { e.preventDefault(); cancelCreate() }
               }}
-              onBlur={() => { if (newName.trim().length === 0) cancelCreate() }}
+              onBlur={cancelCreate}
               maxLength={80}
             />
             {createError && <div className="agent-bar-new-error">{createError}</div>}

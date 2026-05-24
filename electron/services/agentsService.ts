@@ -248,6 +248,9 @@ function writePresets(db: Database.Database, agentId: string, presets: AgentPres
     .run(json, nowIso(), agentId)
 }
 
+// Slug length is bounded transitively by `slugifyName` (HANDLE_MAX = 64 chars).
+// A numeric dedupe suffix (e.g. `-12`) can push past that, which is fine —
+// preset slugs aren't constrained to the handle regex.
 function derivePresetSlug(name: string, existing: AgentPreset[], exceptId?: string): string {
   const base = slugifyName(name)
   const taken = existing
