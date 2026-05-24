@@ -4,6 +4,7 @@ export interface AgentFolderRow {
   color_start: string | null
   color_end:   string | null
   description: string | null
+  emoji:       string | null
   created_at:  string
 }
 

@@ -313,6 +313,9 @@ export function initSchema(db: Database.Database): void {
   try { db.exec(`ALTER TABLE repos ADD COLUMN archived_at       TEXT    DEFAULT NULL`) } catch {}
   try { db.exec(`ALTER TABLE repos ADD COLUMN forked_at         TEXT    DEFAULT NULL`) } catch {}
 
+  // Agents polish — folder emoji
+  try { db.exec(`ALTER TABLE agent_folders ADD COLUMN emoji TEXT`) } catch {}
+
   // Agents redesign — new columns on existing agents table.
   // Note: the UNIQUE constraint on `handle` is added in a later migration
   // step after backfill writes valid values into existing rows.

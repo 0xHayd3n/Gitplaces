@@ -6,8 +6,8 @@ import AgentsSidebar from './AgentsSidebar'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
 
 const folders: AgentFolderRow[] = [
-  { id: 'f1', name: 'Writing', color_start: null, color_end: null, description: null, created_at: '2026-05-23T00:00:00Z' },
-  { id: 'f2', name: 'Research', color_start: null, color_end: null, description: null, created_at: '2026-05-23T00:00:00Z' },
+  { id: 'f1', name: 'Writing', color_start: null, color_end: null, description: null, emoji: null, created_at: '2026-05-23T00:00:00Z' },
+  { id: 'f2', name: 'Research', color_start: null, color_end: null, description: null, emoji: null, created_at: '2026-05-23T00:00:00Z' },
 ]
 const agents: AgentRow[] = [
   { id: 'a1', name: 'Copy editor',   handle: 'copy-editor',   body: '# Copy editor\nbody',

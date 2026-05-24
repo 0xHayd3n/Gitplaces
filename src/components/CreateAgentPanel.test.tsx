@@ -6,7 +6,7 @@ import CreateAgentPanel from './CreateAgentPanel'
 import type { AgentFolderRow, AgentRow } from '../types/agent'
 
 const folders: AgentFolderRow[] = [
-  { id: 'f1', name: 'Engineering', color_start: null, color_end: null, description: null, created_at: 't' },
+  { id: 'f1', name: 'Engineering', color_start: null, color_end: null, description: null, emoji: null, created_at: 't' },
 ]
 
 function makeApi() {
