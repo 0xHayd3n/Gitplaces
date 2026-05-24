@@ -103,13 +103,28 @@ describe('AgentsSidebar', () => {
     expect(screen.queryByText('Copy editor')).toBeNull()
   })
 
-  it('"+ New agent" navigates to /library/agent/new', async () => {
+  it('plus button opens a menu with "New agent" + "New folder"; New agent navigates', async () => {
     renderSidebar()
-    await waitFor(() => screen.getByRole('button', { name: /\+ New agent/ }))
-    fireEvent.click(screen.getByRole('button', { name: /\+ New agent/ }))
+    await waitFor(() => screen.getByLabelText(/create new/i))
+    fireEvent.click(screen.getByLabelText(/create new/i))
+    expect(screen.getByRole('menuitem', { name: /new agent/i })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: /new folder/i })).toBeTruthy()
+    fireEvent.click(screen.getByRole('menuitem', { name: /new agent/i }))
     await waitFor(() =>
       expect(screen.getByTestId('location').textContent).toBe('/library/agent/new'),
     )
+  })
+
+  it('plus button "New folder" prompts and calls createFolder', async () => {
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Drafts')
+    renderSidebar()
+    await waitFor(() => screen.getByLabelText(/create new/i))
+    fireEvent.click(screen.getByLabelText(/create new/i))
+    fireEvent.click(screen.getByRole('menuitem', { name: /new folder/i }))
+    await waitFor(() => {
+      expect((window as any).api.agents.createFolder).toHaveBeenCalledWith('Drafts')
+    })
+    promptSpy.mockRestore()
   })
 
   it('renders a color swatch per agent row', async () => {

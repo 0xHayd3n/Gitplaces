@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMatch, useNavigate } from 'react-router-dom'
-import { Folder, MoreHorizontal } from 'lucide-react'
+import { Folder, MoreHorizontal, Plus } from 'lucide-react'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
 import AgentContextMenu from './AgentContextMenu'
 import FolderKebabMenu from './FolderKebabMenu'
@@ -33,6 +33,24 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   const renameInputRef = useRef<HTMLInputElement | null>(null)
+  const [showNewMenu, setShowNewMenu] = useState(false)
+  const newMenuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!showNewMenu) return
+    function handle(e: MouseEvent) {
+      if (newMenuRef.current && !newMenuRef.current.contains(e.target as Node)) {
+        setShowNewMenu(false)
+      }
+    }
+    function key(e: KeyboardEvent) { if (e.key === 'Escape') setShowNewMenu(false) }
+    window.addEventListener('mousedown', handle)
+    window.addEventListener('keydown',  key)
+    return () => {
+      window.removeEventListener('mousedown', handle)
+      window.removeEventListener('keydown',  key)
+    }
+  }, [showNewMenu])
 
   const onAgentRightClick = (e: React.MouseEvent, agentId: string) => {
     e.preventDefault()
@@ -290,13 +308,29 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
         )
       })}
 
-      <div className="agents-sidebar-new-wrap">
+      <div className="agents-sidebar-new-wrap" ref={newMenuRef}>
+        {showNewMenu && (
+          <div className="agents-sidebar-new-menu" role="menu">
+            <button
+              role="menuitem"
+              type="button"
+              onClick={() => { setShowNewMenu(false); handleNewAgent() }}
+            >New agent</button>
+            <button
+              role="menuitem"
+              type="button"
+              onClick={() => { setShowNewMenu(false); handleNewFolder() }}
+            >New folder</button>
+          </div>
+        )}
         <button
           type="button"
-          className="library-sidebar-seg agents-sidebar-new"
-          onClick={handleNewAgent}
+          className="agents-sidebar-new-plus"
+          aria-label="Create new"
+          aria-expanded={showNewMenu}
+          onClick={() => setShowNewMenu(v => !v)}
         >
-          + New agent
+          <Plus size={20} strokeWidth={2} />
         </button>
       </div>
 
