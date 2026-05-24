@@ -211,6 +211,26 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.invoke('agents:presets:duplicate', agentId, presetId) as Promise<import('../src/types/agent').AgentPreset>,
     },
 
+    revisions: {
+      list: (agentId: string) =>
+        ipcRenderer.invoke('agents:revisions:list', agentId) as Promise<import('../src/types/agent').AgentRevision[]>,
+      revert: (agentId: string, revisionId: string) =>
+        ipcRenderer.invoke('agents:revisions:revert', agentId, revisionId) as Promise<import('../src/types/agent').AgentRow>,
+    },
+
+    onRevisionAdded: (cb: (rev: import('../src/types/agent').AgentRevision) => void) => {
+      const wrapper = (_: unknown, rev: import('../src/types/agent').AgentRevision) => cb(rev)
+      callbackWrappers.set(cb, wrapper)
+      ipcRenderer.on('agents:revision-added', wrapper)
+    },
+    offRevisionAdded: (cb: (rev: import('../src/types/agent').AgentRevision) => void) => {
+      const wrapper = callbackWrappers.get(cb)
+      if (wrapper) {
+        ipcRenderer.removeListener('agents:revision-added', wrapper)
+        callbackWrappers.delete(cb)
+      }
+    },
+
     onChanged: (cb: () => void) => {
       const wrapper = () => cb()
       callbackWrappers.set(cb, wrapper)

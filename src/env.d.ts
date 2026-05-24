@@ -217,6 +217,12 @@ declare global {
           delete(agentId: string, presetId: string): Promise<void>
           duplicate(agentId: string, presetId: string): Promise<import('./types/agent').AgentPreset>
         }
+        revisions: {
+          list(agentId: string): Promise<import('./types/agent').AgentRevision[]>
+          revert(agentId: string, revisionId: string): Promise<import('./types/agent').AgentRow>
+        }
+        onRevisionAdded(cb: (rev: import('./types/agent').AgentRevision) => void): void
+        offRevisionAdded(cb: (rev: import('./types/agent').AgentRevision) => void): void
         onChanged(cb: () => void): void
         offChanged(cb: () => void): void
       }
