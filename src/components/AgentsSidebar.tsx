@@ -2,8 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMatch, useNavigate } from 'react-router-dom'
 import { Folder, MoreHorizontal } from 'lucide-react'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
-import AgentContextMenu, { type AgentMenuKind } from './AgentContextMenu'
+import AgentContextMenu from './AgentContextMenu'
 import FolderKebabMenu from './FolderKebabMenu'
+
+type SidebarMenuTarget =
+  | { kind: 'agent';  agentId: string }
+  | { kind: 'folder'; folderId: string | null }   // null = synthetic Unfiled
 
 interface Props {
   searchTerm?: string
@@ -25,7 +29,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
   const [folders, setFolders] = useState<AgentFolderRow[]>([])
   const [agents,  setAgents]  = useState<AgentRow[]>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const [menu, setMenu] = useState<{ x: number; y: number; target: AgentMenuKind } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; target: SidebarMenuTarget } | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   const renameInputRef = useRef<HTMLInputElement | null>(null)
@@ -35,12 +39,12 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
     setMenu({ x: e.clientX, y: e.clientY, target: { kind: 'agent', agentId } })
   }
 
-  const onFolderRightClick = (e: React.MouseEvent, folderId: string) => {
+  const onFolderRightClick = (e: React.MouseEvent, folderId: string | null) => {
     e.preventDefault()
     setMenu({ x: e.clientX, y: e.clientY, target: { kind: 'folder', folderId } })
   }
 
-  const onFolderKebabClick = (e: React.MouseEvent, folderId: string) => {
+  const onFolderKebabClick = (e: React.MouseEvent, folderId: string | null) => {
     e.stopPropagation()
     const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
     setMenu({ x: rect.right - 4, y: rect.bottom + 4, target: { kind: 'folder', folderId } })
@@ -85,6 +89,14 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
   const handleDeleteFolder = async (id: string) => {
     if (!confirm('Delete this folder? Agents inside it will move to Unfiled.')) return
     await window.api.agents.deleteFolder(id)
+  }
+
+  const handleNewFolder = async () => {
+    const name = prompt('Folder name')
+    if (name === null) return
+    const trimmed = name.trim()
+    if (trimmed.length === 0) return
+    await window.api.agents.createFolder(trimmed)
   }
 
   const handleMoveAgent = async (id: string) => {
@@ -166,7 +178,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
     navigate('/library/agent/new')
   }
 
-  const currentMenuFolder = menu?.target.kind === 'folder'
+  const currentMenuFolder = menu?.target.kind === 'folder' && menu.target.folderId !== null
     ? folders.find(f => f.id === menu.target.folderId) ?? null
     : null
 
@@ -198,7 +210,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
                   toggle(key)
                 }
               }}
-              onContextMenu={g.id ? (e) => onFolderRightClick(e, g.id!) : undefined}
+              onContextMenu={(e) => onFolderRightClick(e, g.id)}
             >
               <span className="agents-sidebar-folder-caret">{isOpen ? '▾' : '▸'}</span>
               <span
@@ -236,17 +248,15 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
                 </span>
               )}
               <span className="agents-sidebar-folder-count">({g.agents.length})</span>
-              {g.id && (
-                <button
-                  type="button"
-                  className="agents-sidebar-folder-kebab"
-                  data-testid={`folder-kebab-${g.id}`}
-                  aria-label="Folder menu"
-                  onClick={(e) => onFolderKebabClick(e, g.id!)}
-                >
-                  <MoreHorizontal size={14} />
-                </button>
-              )}
+              <button
+                type="button"
+                className="agents-sidebar-folder-kebab"
+                data-testid={g.id ? `folder-kebab-${g.id}` : 'folder-kebab-unfiled'}
+                aria-label="Folder menu"
+                onClick={(e) => onFolderKebabClick(e, g.id)}
+              >
+                <MoreHorizontal size={14} />
+              </button>
             </div>
 
             {isOpen && g.agents.map(a => (
@@ -303,16 +313,17 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
         />
       )}
 
-      {menu && menu.target.kind === 'folder' && currentMenuFolder && (
+      {menu && menu.target.kind === 'folder' && (
         <FolderKebabMenu
           x={menu.x}
           y={menu.y}
           folderId={menu.target.folderId}
-          currentColor={currentMenuFolder.color_start}
-          currentEmoji={currentMenuFolder.emoji}
+          currentColor={currentMenuFolder?.color_start ?? null}
+          currentEmoji={currentMenuFolder?.emoji ?? null}
           onClose={() => setMenu(null)}
           onRename={(id) => startInlineRename(id)}
           onDelete={handleDeleteFolder}
+          onNewFolder={handleNewFolder}
         />
       )}
     </div>

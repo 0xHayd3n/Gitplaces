@@ -163,12 +163,21 @@ describe('AgentsSidebar', () => {
     expect(unpinnedRow.querySelector('.agents-sidebar-row-pin')).toBeNull()
   })
 
-  it('shows a kebab button next to each named folder (not Unfiled)', async () => {
+  it('shows a kebab button next to every folder (named and Unfiled)', async () => {
     renderSidebar()
     await waitFor(() => screen.getByText(/Writing/))
     expect(screen.getByTestId('folder-kebab-f1')).toBeTruthy()
     expect(screen.getByTestId('folder-kebab-f2')).toBeTruthy()
-    expect(screen.queryByTestId('folder-kebab-__unfiled__')).toBeNull()
+    expect(screen.getByTestId('folder-kebab-unfiled')).toBeTruthy()
+  })
+
+  it('Unfiled kebab opens a menu showing only "New folder…"', async () => {
+    renderSidebar()
+    await waitFor(() => screen.getByText(/Unfiled/))
+    fireEvent.click(screen.getByTestId('folder-kebab-unfiled'))
+    expect(screen.getByRole('menuitem', { name: /new folder/i })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: /rename/i })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /delete/i })).toBeNull()
   })
 
   it('clicking the kebab opens the FolderKebabMenu', async () => {

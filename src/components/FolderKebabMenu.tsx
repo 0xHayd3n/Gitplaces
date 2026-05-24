@@ -16,18 +16,20 @@ export const FOLDER_PALETTE: readonly { name: string; hex: string }[] = [
 interface Props {
   x: number
   y: number
-  folderId: string
+  folderId: string | null   // null = synthetic Unfiled
   currentColor: string | null
   currentEmoji: string | null
-  onClose:  () => void
-  onRename: (id: string) => void
-  onDelete: (id: string) => void
+  onClose:     () => void
+  onRename:    (id: string) => void
+  onDelete:    (id: string) => void
+  onNewFolder: () => void
 }
 
 export default function FolderKebabMenu({
   x, y, folderId, currentColor, currentEmoji,
-  onClose, onRename, onDelete,
+  onClose, onRename, onDelete, onNewFolder,
 }: Props) {
+  const isSynthetic = folderId === null
   const ref = useRef<HTMLDivElement>(null)
   const [showColors, setShowColors] = useState(false)
   const [showEmoji,  setShowEmoji]  = useState(false)
@@ -46,11 +48,13 @@ export default function FolderKebabMenu({
   }, [onClose])
 
   const pickColor = async (hex: string | null) => {
+    if (folderId === null) return
     await window.api.agents.updateFolder(folderId, { colorStart: hex })
     onClose()
   }
 
   const pickEmoji = async (emoji: string | null) => {
+    if (folderId === null) return
     await window.api.agents.updateFolder(folderId, { emoji })
     setShowEmoji(false)
     onClose()
@@ -62,61 +66,74 @@ export default function FolderKebabMenu({
 
   return (
     <div ref={ref} role="menu" className="folder-kebab-menu" style={style}>
-      <button
-        role="menuitem" type="button" className="folder-kebab-item"
-        onClick={() => { onRename(folderId); onClose() }}
-      >Rename</button>
+      {!isSynthetic && (
+        <button
+          role="menuitem" type="button" className="folder-kebab-item"
+          onClick={() => { onRename(folderId!); onClose() }}
+        >Rename</button>
+      )}
 
-      <button
-        role="menuitem" type="button" className="folder-kebab-item"
-        onClick={() => setShowColors(v => !v)}
-      >
-        Color
-        {currentColor && (
-          <span className="folder-kebab-accessory-dot" style={{ background: currentColor }} />
-        )}
-      </button>
-      {showColors && (
-        <div className="folder-kebab-color-row" data-testid="folder-color-swatches">
-          {FOLDER_PALETTE.map(c => (
-            <button
-              key={c.hex}
-              type="button"
-              className="folder-kebab-swatch"
-              aria-label={c.name}
-              data-active={currentColor === c.hex ? 'true' : undefined}
-              style={{ background: c.hex }}
-              onClick={() => pickColor(c.hex)}
-            />
-          ))}
+      {!isSynthetic && (
+        <>
           <button
-            type="button"
-            className="folder-kebab-swatch folder-kebab-swatch--none"
-            aria-label="None"
-            onClick={() => pickColor(null)}
-          />
-        </div>
+            role="menuitem" type="button" className="folder-kebab-item"
+            onClick={() => setShowColors(v => !v)}
+          >
+            Color
+            {currentColor && (
+              <span className="folder-kebab-accessory-dot" style={{ background: currentColor }} />
+            )}
+          </button>
+          {showColors && (
+            <div className="folder-kebab-color-row" data-testid="folder-color-swatches">
+              {FOLDER_PALETTE.map(c => (
+                <button
+                  key={c.hex}
+                  type="button"
+                  className="folder-kebab-swatch"
+                  aria-label={c.name}
+                  data-active={currentColor === c.hex ? 'true' : undefined}
+                  style={{ background: c.hex }}
+                  onClick={() => pickColor(c.hex)}
+                />
+              ))}
+              <button
+                type="button"
+                className="folder-kebab-swatch folder-kebab-swatch--none"
+                aria-label="None"
+                onClick={() => pickColor(null)}
+              />
+            </div>
+          )}
+
+          <button
+            role="menuitem" type="button" className="folder-kebab-item"
+            onClick={() => setShowEmoji(v => !v)}
+          >
+            Emoji
+            {currentEmoji && (
+              <span className="folder-kebab-accessory-emoji">{currentEmoji}</span>
+            )}
+          </button>
+          {showEmoji && (
+            <div className="folder-kebab-emoji-host">
+              <AgentEmojiPicker value={currentEmoji} onChange={pickEmoji} />
+            </div>
+          )}
+        </>
       )}
 
       <button
         role="menuitem" type="button" className="folder-kebab-item"
-        onClick={() => setShowEmoji(v => !v)}
-      >
-        Emoji
-        {currentEmoji && (
-          <span className="folder-kebab-accessory-emoji">{currentEmoji}</span>
-        )}
-      </button>
-      {showEmoji && (
-        <div className="folder-kebab-emoji-host">
-          <AgentEmojiPicker value={currentEmoji} onChange={pickEmoji} />
-        </div>
-      )}
+        onClick={() => { onNewFolder(); onClose() }}
+      >New folder…</button>
 
-      <button
-        role="menuitem" type="button" className="folder-kebab-item folder-kebab-item--danger"
-        onClick={() => { onDelete(folderId); onClose() }}
-      >Delete folder</button>
+      {!isSynthetic && (
+        <button
+          role="menuitem" type="button" className="folder-kebab-item folder-kebab-item--danger"
+          onClick={() => { onDelete(folderId!); onClose() }}
+        >Delete folder</button>
+      )}
     </div>
   )
 }
