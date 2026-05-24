@@ -349,8 +349,8 @@ export default function AgentDetail() {
           </div>
         )}
         {activeTab === 'preview' && (
-          <div className="agent-detail-tab-placeholder">
-            The Preview tab will render the full clipboard payload in a future phase. For now, see the preview block on the Prompt tab.
+          <div className="agent-detail-rendered">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{agent.body}</ReactMarkdown>
           </div>
         )}
         {activeTab === 'mcp' && (

@@ -263,6 +263,16 @@ describe('AgentDetail — tabs', () => {
     fireEvent.click(screen.getByRole('tab', { name: /prompt/i }))
     expect(screen.getByRole('textbox', { name: /Body/ })).toBeTruthy()
   })
+
+  it('Preview tab renders markdown of agent.body', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /preview/i }))
+    // The markdown body contains `# Copy editor` — appears as h1 in the rendered output
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'Copy editor' })).toBeTruthy()
+    })
+  })
 })
 
 describe('AgentDetail — variable/preset bar integration', () => {
