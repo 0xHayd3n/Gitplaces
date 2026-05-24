@@ -452,9 +452,15 @@
 
 /* ── Agents-sidebar: top "+ New agent" wrapper ─────────── */
 
+.agents-sidebar-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
 .agents-sidebar-new-wrap {
-  padding: 8px 8px 10px;
-  border-bottom: 1px solid var(--glass-border);
+  padding: 10px 8px 8px;
+  border-top: 1px solid var(--glass-border);
+  margin-top: auto;
   flex-shrink: 0;
 }
 .agents-sidebar-new {

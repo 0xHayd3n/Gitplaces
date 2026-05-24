@@ -171,17 +171,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
     : null
 
   return (
-    <>
-      <div className="agents-sidebar-new-wrap">
-        <button
-          type="button"
-          className="library-sidebar-seg agents-sidebar-new"
-          onClick={handleNewAgent}
-        >
-          + New agent
-        </button>
-      </div>
-
+    <div className="agents-sidebar-root">
       {groups.length === 0 && (
         <div className="library-sidebar-empty">No agents</div>
       )}
@@ -290,6 +280,16 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
         )
       })}
 
+      <div className="agents-sidebar-new-wrap">
+        <button
+          type="button"
+          className="library-sidebar-seg agents-sidebar-new"
+          onClick={handleNewAgent}
+        >
+          + New agent
+        </button>
+      </div>
+
       {menu && menu.target.kind === 'agent' && (
         <AgentContextMenu
           x={menu.x}
@@ -315,6 +315,6 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
           onDelete={handleDeleteFolder}
         />
       )}
-    </>
+    </div>
   )
 }
