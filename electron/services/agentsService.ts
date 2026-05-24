@@ -110,7 +110,9 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
     INSERT INTO agents (id, name, handle, body, folder_id, color_start, color_end, emoji, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, name, input.handle, input.body, input.folderId, input.colorStart, input.colorEnd, input.emoji, ts, ts)
-  return db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow
+  const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow
+  recordRevision(db, id, row.body, '[]', 'create', 'Created agent')
+  return row
 }
 
 export interface UpdateAgentPatch {
@@ -129,6 +131,13 @@ export function updateAgent(
   id: string,
   patch: UpdateAgentPatch,
 ): AgentRow {
+  // Read prior body if we'll need to detect a real change to snapshot. Only
+  // care when patch.body is present.
+  let priorBody: string | null = null
+  if (patch.body !== undefined) {
+    const prior = db.prepare('SELECT body FROM agents WHERE id = ?').get(id) as { body: string } | undefined
+    priorBody = prior?.body ?? null
+  }
   const sets: string[] = []
   const params: unknown[] = []
 
@@ -177,6 +186,9 @@ export function updateAgent(
 
   const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow | undefined
   if (!row) throw new Error(`Unknown agent id: ${id}`)
+  if (patch.body !== undefined && priorBody !== null && priorBody !== patch.body) {
+    recordRevision(db, id, row.body, row.presets_json, 'body_edit', 'Edited body')
+  }
   return row
 }
 

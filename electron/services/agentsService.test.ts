@@ -474,12 +474,14 @@ describe('agentsService — recordRevision + retention', () => {
 
   it('retention is per-agent — pruning one agent does not affect another', () => {
     const b = createAgent(db, { name: 'B', body: 'b', folderId: null, handle: 'b', colorStart: '#111111', colorEnd: null, emoji: null })
+    // createAgent now records a 'create' snapshot for each agent; account for that.
     for (let i = 0; i < REVISION_RETENTION + 5; i++) recordRevision(db, agentId, 'x', '[]', 'body_edit', `a${i}`)
     for (let i = 0; i < 3; i++) recordRevision(db, b.id, 'x', '[]', 'body_edit', `b${i}`)
     const aCount = (db.prepare(`SELECT COUNT(*) as n FROM agent_revisions WHERE agent_id = ?`).get(agentId) as { n: number }).n
     const bCount = (db.prepare(`SELECT COUNT(*) as n FROM agent_revisions WHERE agent_id = ?`).get(b.id) as { n: number }).n
     expect(aCount).toBe(REVISION_RETENTION)
-    expect(bCount).toBe(3)
+    // b has the create snapshot + 3 manual revisions
+    expect(bCount).toBe(4)
   })
 
   it('FK cascade: deleting the agent removes its revisions', () => {
@@ -510,7 +512,15 @@ describe('agentsService — listRevisions', () => {
   })
 
   it('returns an empty array when there are no revisions', () => {
-    expect(listRevisions(db, agentId)).toEqual([])
+    // createAgent now records a 'create' snapshot, so use a fresh DB without going
+    // through createAgent — insert an agent row directly so there are zero revisions.
+    const freshDbInner = new Database(':memory:')
+    initSchema(freshDbInner)
+    freshDbInner.prepare(`
+      INSERT INTO agents (id, name, handle, body, folder_id, color_start, color_end, emoji, created_at, updated_at)
+      VALUES ('bare', 'bare', 'bare', '', NULL, '#000000', NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
+    `).run()
+    expect(listRevisions(freshDbInner, 'bare')).toEqual([])
   })
 
   it('throws on unknown agentId', () => {
@@ -521,5 +531,58 @@ describe('agentsService — listRevisions', () => {
     recordRevision(db, agentId, 'x', '[{"id":"p1","name":"x","slug":"x","values":{}}]', 'preset_change', 'p')
     const revs = listRevisions(db, agentId)
     expect(revs[0].presets).toEqual([{ id: 'p1', name: 'x', slug: 'x', values: {} }])
+  })
+})
+
+describe('agentsService — snapshots on agent CRUD', () => {
+  let db: Database.Database
+  beforeEach(() => { db = freshDb() })
+
+  it('createAgent inserts a "create" revision snapshot', () => {
+    const a = createAgent(db, {
+      name: 'A', body: '# A', folderId: null,
+      handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null,
+    })
+    const revs = listRevisions(db, a.id)
+    expect(revs.length).toBe(1)
+    expect(revs[0].kind).toBe('create')
+    expect(revs[0].body).toBe('# A')
+    expect(revs[0].summary).toMatch(/created/i)
+  })
+
+  it('updateAgent records a body_edit snapshot when body changes', () => {
+    const a = createAgent(db, { name: 'A', body: 'v1', folderId: null, handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null })
+    updateAgent(db, a.id, { body: 'v2' })
+    const revs = listRevisions(db, a.id)
+    // newest first: body_edit, then create
+    expect(revs[0].kind).toBe('body_edit')
+    expect(revs[0].body).toBe('v2')
+    expect(revs[1].kind).toBe('create')
+  })
+
+  it('updateAgent does NOT snapshot when body is unchanged', () => {
+    const a = createAgent(db, { name: 'A', body: 'same', folderId: null, handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null })
+    updateAgent(db, a.id, { body: 'same' })
+    const revs = listRevisions(db, a.id)
+    expect(revs.length).toBe(1)
+    expect(revs[0].kind).toBe('create')
+  })
+
+  it('updateAgent does NOT snapshot when only metadata fields change', () => {
+    const a = createAgent(db, { name: 'A', body: 'v', folderId: null, handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null })
+    updateAgent(db, a.id, { name: 'B', emoji: '🌟' })
+    const revs = listRevisions(db, a.id)
+    expect(revs.length).toBe(1)
+    expect(revs[0].kind).toBe('create')
+  })
+
+  it('updateAgent body_edit snapshot captures the current presets_json too', () => {
+    const a = createAgent(db, { name: 'A', body: 'v', folderId: null, handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null })
+    createPreset(db, a.id, 'P1')   // this records a preset_change snapshot (Task 3 adds the wiring; meanwhile assertion still holds because revs[0] will be the body_edit we make next)
+    updateAgent(db, a.id, { body: 'v2' })
+    const revs = listRevisions(db, a.id)
+    expect(revs[0].kind).toBe('body_edit')
+    expect(revs[0].presets.length).toBe(1)
+    expect(revs[0].presets[0].name).toBe('P1')
   })
 })
