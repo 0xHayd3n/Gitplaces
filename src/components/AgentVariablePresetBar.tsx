@@ -31,11 +31,18 @@ export default function AgentVariablePresetBar({
     activePreset?.values ?? {},
   )
 
-  // Sync localValues whenever the active preset changes (or its values change
-  // from outside, e.g. another window edited the same preset).
+  // Sync localValues only when the active preset CHANGES (by id). We don't
+  // watch activePreset.values — a debounced save broadcasts 'agents:changed',
+  // which would otherwise overwrite in-flight keystrokes between debounce
+  // intervals. Multi-window collaborative editing of the same preset is out
+  // of scope for Phase B.
+  const lastSyncedPresetId = useRef<string | null>(activePresetId)
   useEffect(() => {
-    setLocalValues(activePreset?.values ?? {})
-  }, [activePreset])
+    if (activePresetId !== lastSyncedPresetId.current) {
+      setLocalValues(activePreset?.values ?? {})
+      lastSyncedPresetId.current = activePresetId
+    }
+  }, [activePresetId, activePreset])
 
   // Debounced save: when localValues change while a preset is active, push to
   // window.api.agents.presets.update.

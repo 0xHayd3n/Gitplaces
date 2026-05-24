@@ -35,6 +35,7 @@ export default function AgentDetail() {
     if (!id) return
     let cancelled = false
     setNameEditing(false)
+    setActiveTab('prompt')
     if (bodyTimer.current) { clearTimeout(bodyTimer.current); bodyTimer.current = null }
     if (nameTimer.current) { clearTimeout(nameTimer.current); nameTimer.current = null }
     ;(async () => {
