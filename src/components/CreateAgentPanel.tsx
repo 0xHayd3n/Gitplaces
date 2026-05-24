@@ -95,33 +95,37 @@ export default function CreateAgentPanel() {
         <h2>New agent</h2>
       </header>
 
-      <div className="create-agent-field">
-        <label htmlFor="cap-name" className="create-agent-label">Name</label>
-        <input
-          id="cap-name"
-          type="text"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          maxLength={200}
-          autoFocus
-        />
-      </div>
+      <section className="create-agent-section">
+        <div className="create-agent-section-label">Identity</div>
 
-      <div className="create-agent-field">
-        <label htmlFor="cap-handle" className="create-agent-label">Handle</label>
-        <input
-          id="cap-handle"
-          type="text"
-          value={handle}
-          onChange={e => { setHandle(e.target.value); setHandleEdited(true) }}
-        />
-        <div className="create-agent-hint">
-          Auto from name (space → dash, lowercase). Must be unique.
+        <div className="create-agent-field">
+          <label htmlFor="cap-name" className="create-agent-label">Name</label>
+          <input
+            id="cap-name"
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            maxLength={200}
+            autoFocus
+          />
         </div>
-      </div>
 
-      <div className="create-agent-field">
-        <div className="create-agent-label">Customisation</div>
+        <div className="create-agent-field">
+          <label htmlFor="cap-handle" className="create-agent-label">Handle</label>
+          <input
+            id="cap-handle"
+            type="text"
+            value={handle}
+            onChange={e => { setHandle(e.target.value); setHandleEdited(true) }}
+          />
+          <div className="create-agent-hint">
+            Auto from name (space → dash, lowercase). Must be unique.
+          </div>
+        </div>
+      </section>
+
+      <section className="create-agent-section">
+        <div className="create-agent-section-label">Appearance</div>
         <div className="create-agent-custom">
           <div onMouseDown={() => setColorTouched(true)}>
             <AgentColorPicker
@@ -141,15 +145,18 @@ export default function CreateAgentPanel() {
             <AgentEmojiPicker value={emoji} onChange={setEmoji} />
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="create-agent-field">
-        <label htmlFor="cap-folder" className="create-agent-label">Folder</label>
-        <select id="cap-folder" value={folderId ?? ''} onChange={e => setFolderId(e.target.value || null)}>
-          <option value="">Unfiled</option>
-          {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-        </select>
-      </div>
+      <section className="create-agent-section">
+        <div className="create-agent-section-label">Organize</div>
+        <div className="create-agent-field">
+          <label htmlFor="cap-folder" className="create-agent-label">Folder</label>
+          <select id="cap-folder" value={folderId ?? ''} onChange={e => setFolderId(e.target.value || null)}>
+            <option value="">Unfiled</option>
+            {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        </div>
+      </section>
 
       <div className="create-agent-preview">
         <div

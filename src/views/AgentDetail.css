@@ -274,7 +274,7 @@
 
 .create-agent-panel {
   padding: 24px 28px;
-  max-width: 720px;
+  max-width: 640px;
   margin: 0 auto;
   color: var(--t2);
 }
@@ -283,7 +283,16 @@
   color: var(--t1);
   margin: 0 0 18px;
 }
-.create-agent-field { margin-bottom: 14px; }
+.create-agent-section { margin-bottom: 22px; }
+.create-agent-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--t3);
+  margin: 0 0 10px;
+  font-weight: 500;
+}
+.create-agent-field { margin-bottom: 10px; }
 .create-agent-label {
   display: block;
   font-size: 11px;
