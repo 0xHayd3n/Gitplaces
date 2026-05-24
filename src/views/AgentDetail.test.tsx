@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import AgentDetail from './AgentDetail'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
@@ -36,6 +36,12 @@ function makeApi() {
       duplicate: vi.fn(),
       onChanged: vi.fn(),
       offChanged: vi.fn(),
+      onRevisionAdded: vi.fn(),
+      offRevisionAdded: vi.fn(),
+      revisions: {
+        list: vi.fn().mockResolvedValue([]),
+        revert: vi.fn(),
+      },
     },
   }
 }
@@ -322,5 +328,93 @@ describe('AgentDetail — variable/preset bar integration', () => {
     const payload = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
     expect(payload).toMatch(/^You are @copy-editor,/)
     expect(payload).toContain('Look at {{focus}}.')
+  })
+})
+
+describe('AgentDetail — History tab', () => {
+  const revisionsFixture: import('../types/agent').AgentRevision[] = [
+    {
+      id: 'rev-2', agent_id: 'a1', body: 'v2', presets: [],
+      summary: 'Edited body', kind: 'body_edit',
+      created_at: '2026-05-25T15:00:00Z',
+    },
+    {
+      id: 'rev-1', agent_id: 'a1', body: 'v1', presets: [],
+      summary: 'Created agent', kind: 'create',
+      created_at: '2026-05-25T10:00:00Z',
+    },
+  ]
+
+  beforeEach(() => {
+    ;(window as any).api.agents.revisions = {
+      list: vi.fn().mockResolvedValue(revisionsFixture),
+      revert: vi.fn().mockResolvedValue({ ...baseAgent, body: 'v1' }),
+    }
+    ;(window as any).api.agents.onRevisionAdded = vi.fn()
+    ;(window as any).api.agents.offRevisionAdded = vi.fn()
+  })
+
+  it('fetches revisions when the History tab is opened', async () => {
+    setup()
+    await waitForLoaded()
+    expect(window.api.agents.revisions.list).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('tab', { name: /^History$/ }))
+    await waitFor(() => expect(window.api.agents.revisions.list).toHaveBeenCalledWith('a1'))
+    expect(await screen.findByText('Edited body')).toBeTruthy()
+    expect(await screen.findByText('Created agent')).toBeTruthy()
+  })
+
+  it('clicking Restore calls window.api.agents.revisions.revert', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /^History$/ }))
+    await screen.findByText('Edited body')
+    const oldRow = screen.getByText('Created agent').closest('.agent-history-row') as HTMLElement
+    fireEvent.click(within(oldRow).getByRole('button', { name: /restore/i }))
+    await waitFor(() => expect(window.api.agents.revisions.revert).toHaveBeenCalledWith('a1', 'rev-1'))
+  })
+
+  it('subscribes to onRevisionAdded when the component mounts and unsubscribes on unmount', async () => {
+    const { unmount } = setup()
+    await waitForLoaded()
+    expect(window.api.agents.onRevisionAdded).toHaveBeenCalled()
+    unmount()
+    expect(window.api.agents.offRevisionAdded).toHaveBeenCalled()
+  })
+
+  it('prepends an incoming revision-added event to the timeline', async () => {
+    let listener: ((rev: import('../types/agent').AgentRevision) => void) | null = null
+    ;(window as any).api.agents.onRevisionAdded = vi.fn((cb: any) => { listener = cb })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /^History$/ }))
+    await screen.findByText('Edited body')
+    expect(listener).not.toBeNull()
+    act(() => {
+      listener!({
+        id: 'rev-3', agent_id: 'a1', body: 'v3', presets: [],
+        summary: 'Updated preset "X"', kind: 'preset_change',
+        created_at: '2026-05-25T17:00:00Z',
+      })
+    })
+    expect(await screen.findByText('Updated preset "X"')).toBeTruthy()
+  })
+
+  it('ignores revision-added events for a different agent', async () => {
+    let listener: ((rev: import('../types/agent').AgentRevision) => void) | null = null
+    ;(window as any).api.agents.onRevisionAdded = vi.fn((cb: any) => { listener = cb })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /^History$/ }))
+    await screen.findByText('Edited body')
+    act(() => {
+      listener!({
+        id: 'rev-other', agent_id: 'OTHER', body: 'x', presets: [],
+        summary: 'Other agent edit', kind: 'body_edit',
+        created_at: '2026-05-25T18:00:00Z',
+      })
+    })
+    expect(screen.queryByText('Other agent edit')).toBeNull()
   })
 })

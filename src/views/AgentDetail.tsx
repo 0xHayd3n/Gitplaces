@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { AgentRow, AgentFolderRow } from '../types/agent'
+import type { AgentRow, AgentFolderRow, AgentRevision } from '../types/agent'
 import { parseAgentPresets } from '../types/agent'
 import { useToast } from '../contexts/Toast'
 import { buildPersonaPayload, deriveDescription } from '../utils/copyPayload'
 import { detectVariables } from '../utils/agentVariables'
 import AgentVariablePresetBar from '../components/AgentVariablePresetBar'
+import AgentHistoryTimeline from '../components/AgentHistoryTimeline'
 import './AgentDetail.css'
 
 type SaveStatus = 'idle' | 'saving' | 'saved'
@@ -26,6 +27,8 @@ export default function AgentDetail() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [activeTab, setActiveTab] = useState<'prompt' | 'preview' | 'mcp' | 'history'>('prompt')
   const [activePresetId, setActivePresetId] = useState<string | null>(null)
+  const [revisions, setRevisions] = useState<AgentRevision[]>([])
+  const [revisionsLoaded, setRevisionsLoaded] = useState(false)
 
   const bodyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nameTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -36,6 +39,8 @@ export default function AgentDetail() {
     let cancelled = false
     setNameEditing(false)
     setActiveTab('prompt')
+    setRevisions([])
+    setRevisionsLoaded(false)
     if (bodyTimer.current) { clearTimeout(bodyTimer.current); bodyTimer.current = null }
     if (nameTimer.current) { clearTimeout(nameTimer.current); nameTimer.current = null }
     ;(async () => {
@@ -65,6 +70,33 @@ export default function AgentDetail() {
       return presets[0]?.id ?? null
     })
   }, [agent, presets])
+
+  // Fetch revisions when the History tab becomes active (lazy load — most
+  // sessions never open History).
+  useEffect(() => {
+    if (activeTab !== 'history' || !id) return
+    let cancelled = false
+    setRevisionsLoaded(false)
+    ;(async () => {
+      const list = await window.api.agents.revisions.list(id)
+      if (cancelled) return
+      setRevisions(list)
+      setRevisionsLoaded(true)
+    })()
+    return () => { cancelled = true }
+  }, [activeTab, id])
+
+  // Live updates: subscribe to 'agents:revision-added' and prepend matching
+  // revisions to the timeline.
+  useEffect(() => {
+    if (!id) return
+    const cb = (rev: AgentRevision) => {
+      if (rev.agent_id !== id) return
+      setRevisions(prev => [rev, ...prev])
+    }
+    window.api.agents.onRevisionAdded(cb)
+    return () => window.api.agents.offRevisionAdded(cb)
+  }, [id])
 
   const editingRef = useRef(false)
   const nameEditingRef = useRef(false)
@@ -153,6 +185,14 @@ export default function AgentDetail() {
     if (!id) return
     const dup = await window.api.agents.duplicate(id)
     navigate(`/library/agent/${dup.id}`)
+  }
+
+  const handleRestore = async (revisionId: string) => {
+    if (!id) return
+    if (!confirm('Restore this revision? Current body and presets will be replaced.')) return
+    await window.api.agents.revisions.revert(id, revisionId)
+    // The 'agents:changed' broadcast will refresh `agent`; the
+    // 'agents:revision-added' broadcast will prepend the new revert snapshot.
   }
 
   if (!agent) return <div className="agent-detail-loading">Loading…</div>
@@ -294,9 +334,14 @@ export default function AgentDetail() {
           </div>
         )}
         {activeTab === 'history' && (
-          <div className="agent-detail-tab-placeholder">
-            Revision history is coming in Phase C.
-          </div>
+          revisionsLoaded ? (
+            <AgentHistoryTimeline
+              revisions={revisions}
+              onRestore={handleRestore}
+            />
+          ) : (
+            <div className="agent-detail-tab-placeholder">Loading history…</div>
+          )
         )}
       </div>
 
