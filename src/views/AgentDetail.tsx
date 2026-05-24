@@ -2,13 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { Copy, Pin, Folder, FileText, Clock } from 'lucide-react'
 import type { AgentRow, AgentFolderRow, AgentRevision, AgentPreset } from '../types/agent'
 import { parseAgentPresets } from '../types/agent'
 import { useToast } from '../contexts/Toast'
 import { buildPersonaPayload, deriveDescription } from '../utils/copyPayload'
 import { detectVariables } from '../utils/agentVariables'
+import { AGENT_SCOPE, formatScopedHandle } from '../utils/agentScope'
+import { isValidHandle } from '../utils/agentSlug'
 import AgentVariablePresetBar from '../components/AgentVariablePresetBar'
 import AgentHistoryTimeline from '../components/AgentHistoryTimeline'
+import AgentSwatchPopover from '../components/AgentSwatchPopover'
 import './AgentDetail.css'
 
 type SaveStatus = 'idle' | 'saving' | 'saved'
@@ -29,6 +33,7 @@ export default function AgentDetail() {
   const [activePresetId, setActivePresetId] = useState<string | null>(null)
   const [revisions, setRevisions] = useState<AgentRevision[]>([])
   const [revisionsLoaded, setRevisionsLoaded] = useState(false)
+  const [takenHandles, setTakenHandles] = useState<string[]>([])
 
   const bodyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nameTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -52,6 +57,7 @@ export default function AgentDetail() {
       setBodyDraft(a?.body ?? '')
       setNameDraft(a?.name ?? '')
       setEditing(a !== null && a.body === '')
+      setTakenHandles(agents.filter(x => x.id !== id).map(x => x.handle))
     })()
     return () => { cancelled = true }
   }, [id])
@@ -212,24 +218,14 @@ export default function AgentDetail() {
 
   if (!agent) return <div className="agent-detail-loading">Loading…</div>
 
-  const swatchStyle: React.CSSProperties = {
-    background: agent.color_end
-      ? `linear-gradient(135deg, ${agent.color_start ?? '#888'}, ${agent.color_end})`
-      : (agent.color_start ?? '#888'),
-  }
-
   return (
     <div className="agent-detail">
-      <header className="agent-detail-hero">
-        <div
-          className="agent-detail-swatch"
-          data-testid="agent-hero-swatch"
-          style={swatchStyle}
-        >
-          {agent.emoji ?? ''}
-        </div>
+      <header
+        className="agent-detail-hero"
+        style={{ ['--agent-color' as any]: agent.color_start ?? 'var(--accent)' }}
+      >
+        <AgentSwatchPopover agent={agent} />
         <div className="agent-detail-id-block">
-          <div className="agent-detail-handle">@{agent.handle}</div>
           {nameEditing ? (
             <input
               className="agent-detail-title-input"
@@ -244,59 +240,33 @@ export default function AgentDetail() {
           ) : (
             <h2
               className="agent-detail-title"
-              onClick={() => setNameEditing(true)}
-              title="Click to rename"
+              onDoubleClick={() => setNameEditing(true)}
+              title="Double-click to rename"
             >
               {nameDraft || agent.name}
             </h2>
           )}
-          {description && <p className="agent-detail-description">{description}</p>}
+          <HandleRow
+            handle={agent.handle}
+            agentId={agent.id}
+            takenHandles={takenHandles}
+            onCopied={(text) => toast(`Copied ${text}`, 'success')}
+          />
           <div className="agent-detail-meta">
-            <span className="agent-detail-chip">{currentFolderName}</span>
-            <span className="agent-detail-chip">{(bodyChars / 1024).toFixed(1)} kb</span>
-            <span className="agent-detail-chip">Updated {new Date(agent.updated_at).toLocaleString()}</span>
+            <span className="agent-detail-chip"><Folder size={11} /> {currentFolderName}</span>
+            <span className="agent-detail-chip"><FileText size={11} /> {(bodyChars / 1024).toFixed(1)} kb</span>
+            <span className="agent-detail-chip"><Clock size={11} /> Updated {new Date(agent.updated_at).toLocaleString()}</span>
           </div>
         </div>
         <div className="agent-detail-actions">
           <button
             type="button"
-            className="agent-detail-copy"
-            onClick={handleCopy}
-            aria-label="Copy"
-          >
-            📋 Copy
-          </button>
-          <button
-            type="button"
-            className="agent-detail-action"
-            onClick={() => setEditing(e => !e)}
-            aria-label={editing ? 'Preview' : 'Edit'}
-          >
-            {editing ? 'Preview' : 'Edit'}
-          </button>
-          <button
-            type="button"
-            className="agent-detail-action"
+            className={'agent-detail-pin-btn' + (agent.pinned === 1 ? ' agent-detail-pin-btn--on' : '')}
             onClick={handlePinToggle}
             aria-label={agent.pinned === 1 ? 'Unpin' : 'Pin'}
+            title={agent.pinned === 1 ? 'Unpin' : 'Pin'}
           >
-            {agent.pinned === 1 ? 'Unpin' : 'Pin'}
-          </button>
-          <button
-            type="button"
-            className="agent-detail-action"
-            onClick={handleDuplicate}
-            aria-label="Duplicate"
-          >
-            Duplicate
-          </button>
-          <button
-            type="button"
-            className="agent-detail-action agent-detail-action--danger"
-            onClick={handleDelete}
-            aria-label="Delete"
-          >
-            Delete
+            <Pin size={18} />
           </button>
         </div>
       </header>
@@ -378,6 +348,94 @@ export default function AgentDetail() {
           {saveStatus === 'saved' && 'saved ✓'}
         </span>
       </footer>
+    </div>
+  )
+}
+
+function HandleRow({
+  handle,
+  agentId,
+  takenHandles,
+  onCopied,
+}: {
+  handle: string
+  agentId: string
+  takenHandles: readonly string[]
+  onCopied: (text: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(handle)
+  const [error, setError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { setDraft(handle); setError(null) }, [handle])
+  useEffect(() => { if (editing) inputRef.current?.focus() }, [editing])
+
+  const scope = AGENT_SCOPE
+
+  const commit = async () => {
+    const trimmed = draft.trim()
+    if (trimmed === handle) { setEditing(false); return }
+    if (!isValidHandle(trimmed)) { setError('Invalid handle'); return }
+    if (takenHandles.includes(trimmed)) { setError('Handle already in use'); return }
+    try {
+      await window.api.agents.update(agentId, { handle: trimmed })
+      setEditing(false); setError(null)
+    } catch {
+      setError('Save failed')
+    }
+  }
+
+  const cancel = () => { setDraft(handle); setEditing(false); setError(null) }
+
+  const onCopy = async () => {
+    const text = formatScopedHandle(handle)
+    try {
+      await navigator.clipboard.writeText(text)
+      onCopied(text)
+    } catch {
+      // toast handled by parent on failure path if needed
+    }
+  }
+
+  return (
+    <div className="agent-detail-handle-row">
+      <span className="agent-detail-handle-at">@</span>
+      <span className="agent-detail-handle-scope">{scope}/</span>
+      {editing ? (
+        <input
+          ref={inputRef}
+          className={'agent-detail-handle-input' + (error ? ' agent-detail-handle-input--error' : '')}
+          value={draft}
+          onChange={e => { setDraft(e.target.value); setError(null) }}
+          onBlur={commit}
+          onKeyDown={e => {
+            if (e.key === 'Enter') commit()
+            else if (e.key === 'Escape') cancel()
+          }}
+          aria-label="Handle"
+          title={error ?? ''}
+          maxLength={64}
+          size={Math.max(draft.length, 4)}
+        />
+      ) : (
+        <span
+          className="agent-detail-handle"
+          onDoubleClick={() => setEditing(true)}
+          title="Double-click to edit"
+        >
+          {handle}
+        </span>
+      )}
+      <button
+        type="button"
+        className="agent-detail-copy-handle"
+        onClick={onCopy}
+        aria-label={`Copy @${scope}/${handle}`}
+        title={`Copy @${scope}/${handle}`}
+      >
+        <Copy size={13} />
+      </button>
     </div>
   )
 }
