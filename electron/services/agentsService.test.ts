@@ -4,7 +4,7 @@ import Database from 'better-sqlite3'
 import { initSchema } from '../db'
 import {
   createAgent, updateAgent, deleteAgent, duplicateAgent, getAllAgents,
-  createFolder, renameFolder, deleteFolder,
+  createFolder, renameFolder, deleteFolder, updateFolder,
   AGENT_NAME_MAX, AGENT_BODY_MAX,
 } from './agentsService'
 
@@ -57,6 +57,73 @@ describe('agentsService — folders', () => {
     const all = getAllAgents(db)
     expect(all.folders.find(x => x.id === f.id)).toBeUndefined()
     expect(all.agents.find(x => x.id === a.id)?.folder_id).toBeNull()
+  })
+})
+
+describe('agentsService — updateFolder', () => {
+  let db: Database.Database
+  beforeEach(() => { db = freshDb() })
+
+  it('updates the folder name and returns the row', () => {
+    const f = createFolder(db, 'Writing')
+    const updated = updateFolder(db, f.id, { name: 'Research' })
+    expect(updated.name).toBe('Research')
+    expect(updated.id).toBe(f.id)
+  })
+
+  it('normalises a whitespace name to "Untitled folder"', () => {
+    const f = createFolder(db, 'Writing')
+    const updated = updateFolder(db, f.id, { name: '   ' })
+    expect(updated.name).toBe('Untitled folder')
+  })
+
+  it('rejects names exceeding AGENT_NAME_MAX', () => {
+    const f = createFolder(db, 'Writing')
+    expect(() => updateFolder(db, f.id, { name: 'x'.repeat(AGENT_NAME_MAX + 1) }))
+      .toThrow(/name.*length/i)
+  })
+
+  it('sets colorStart to a hex value', () => {
+    const f = createFolder(db, 'Writing')
+    const updated = updateFolder(db, f.id, { colorStart: '#22c55e' })
+    expect(updated.color_start).toBe('#22c55e')
+  })
+
+  it('clears colorStart when null is passed', () => {
+    const f = createFolder(db, 'Writing')
+    updateFolder(db, f.id, { colorStart: '#22c55e' })
+    const cleared = updateFolder(db, f.id, { colorStart: null })
+    expect(cleared.color_start).toBeNull()
+  })
+
+  it('rejects invalid hex for colorStart', () => {
+    const f = createFolder(db, 'Writing')
+    expect(() => updateFolder(db, f.id, { colorStart: 'red' }))
+      .toThrow(/hex/i)
+  })
+
+  it('sets and clears emoji', () => {
+    const f = createFolder(db, 'Writing')
+    const set = updateFolder(db, f.id, { emoji: '📝' })
+    expect(set.emoji).toBe('📝')
+    const cleared = updateFolder(db, f.id, { emoji: null })
+    expect(cleared.emoji).toBeNull()
+  })
+
+  it('an empty patch is a no-op that still returns the row', () => {
+    const f = createFolder(db, 'Writing')
+    const updated = updateFolder(db, f.id, {})
+    expect(updated.name).toBe('Writing')
+  })
+
+  it('throws on unknown id', () => {
+    expect(() => updateFolder(db, 'nope', { name: 'X' })).toThrow(/folder/i)
+  })
+
+  it('renameFolder still works after refactor (back-compat)', () => {
+    const f = createFolder(db, 'Writing')
+    const updated = renameFolder(db, f.id, 'Research')
+    expect(updated.name).toBe('Research')
   })
 })
 

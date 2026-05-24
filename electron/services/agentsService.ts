@@ -69,13 +69,50 @@ export function createFolder(db: Database.Database, name: string): AgentFolderRo
   return db.prepare('SELECT * FROM agent_folders WHERE id = ?').get(id) as AgentFolderRow
 }
 
-export function renameFolder(db: Database.Database, id: string, name: string): AgentFolderRow {
-  const normalised = normaliseFolderName(name)
-  assertNameLen(normalised)
-  db.prepare('UPDATE agent_folders SET name = ? WHERE id = ?').run(normalised, id)
+export interface UpdateFolderPatch {
+  name?: string
+  colorStart?: string | null
+  colorEnd?:   string | null
+  emoji?:      string | null
+}
+
+export function updateFolder(
+  db: Database.Database,
+  id: string,
+  patch: UpdateFolderPatch,
+): AgentFolderRow {
+  const sets: string[] = []
+  const params: unknown[] = []
+
+  if (patch.name !== undefined) {
+    const name = normaliseFolderName(patch.name)
+    assertNameLen(name)
+    sets.push('name = ?'); params.push(name)
+  }
+  if (patch.colorStart !== undefined) {
+    if (patch.colorStart !== null) assertValidHex('colorStart', patch.colorStart)
+    sets.push('color_start = ?'); params.push(patch.colorStart)
+  }
+  if (patch.colorEnd !== undefined) {
+    if (patch.colorEnd !== null) assertValidHex('colorEnd', patch.colorEnd)
+    sets.push('color_end = ?'); params.push(patch.colorEnd)
+  }
+  if (patch.emoji !== undefined) {
+    sets.push('emoji = ?'); params.push(patch.emoji)
+  }
+
+  if (sets.length > 0) {
+    params.push(id)
+    db.prepare(`UPDATE agent_folders SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+  }
+
   const row = db.prepare('SELECT * FROM agent_folders WHERE id = ?').get(id) as AgentFolderRow | undefined
   if (!row) throw new Error(`Unknown folder id: ${id}`)
   return row
+}
+
+export function renameFolder(db: Database.Database, id: string, name: string): AgentFolderRow {
+  return updateFolder(db, id, { name })
 }
 
 export function deleteFolder(db: Database.Database, id: string): void {
