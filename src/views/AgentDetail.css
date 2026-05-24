@@ -991,3 +991,76 @@
   word-break: break-word;
   overflow-x: auto;
 }
+
+/* ── Settings tab ───────────────────────────────────────── */
+
+.agent-detail-settings-grid {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 18px 24px;
+  max-width: 720px;
+  padding: 6px 0;
+}
+.agent-detail-settings-label {
+  font-size: 11px;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-top: 8px;
+}
+.agent-detail-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.agent-detail-settings-field select,
+.agent-detail-settings-field input[type="text"] {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 10px;
+  color: var(--t1);
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+}
+.agent-detail-settings-field select:focus,
+.agent-detail-settings-field input[type="text"]:focus {
+  border-color: var(--accent-border);
+}
+.agent-detail-settings-hint {
+  font-size: 11px;
+  color: var(--t3);
+  line-height: 1.5;
+}
+.agent-detail-settings-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.agent-detail-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--t1);
+  padding: 6px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.agent-detail-settings-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border2);
+}
+.agent-detail-settings-btn--danger {
+  color: var(--red-text);
+  border-color: var(--red-border);
+  background: var(--red-soft);
+}
+.agent-detail-settings-btn--danger:hover {
+  background: rgba(248, 113, 113, 0.12);
+}
