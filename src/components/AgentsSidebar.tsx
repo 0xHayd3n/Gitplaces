@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMatch, useNavigate } from 'react-router-dom'
+import { Folder, MoreHorizontal } from 'lucide-react'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
 import AgentContextMenu, { type AgentMenuKind } from './AgentContextMenu'
+import FolderKebabMenu from './FolderKebabMenu'
 
 interface Props {
   searchTerm?: string
@@ -10,6 +12,8 @@ interface Props {
 interface FolderGroup {
   id: string | null   // null = synthetic "Unfiled"
   name: string
+  emoji: string | null
+  color: string | null
   agents: AgentRow[]
 }
 
@@ -19,9 +23,12 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
   const selectedId = agentMatch?.params.id ?? null
 
   const [folders, setFolders] = useState<AgentFolderRow[]>([])
-  const [agents, setAgents] = useState<AgentRow[]>([])
+  const [agents,  setAgents]  = useState<AgentRow[]>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [menu, setMenu] = useState<{ x: number; y: number; target: AgentMenuKind } | null>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  const renameInputRef = useRef<HTMLInputElement | null>(null)
 
   const onAgentRightClick = (e: React.MouseEvent, agentId: string) => {
     e.preventDefault()
@@ -31,6 +38,12 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
   const onFolderRightClick = (e: React.MouseEvent, folderId: string) => {
     e.preventDefault()
     setMenu({ x: e.clientX, y: e.clientY, target: { kind: 'folder', folderId } })
+  }
+
+  const onFolderKebabClick = (e: React.MouseEvent, folderId: string) => {
+    e.stopPropagation()
+    const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect()
+    setMenu({ x: rect.right - 4, y: rect.bottom + 4, target: { kind: 'folder', folderId } })
   }
 
   const handleRenameAgent = async (id: string) => {
@@ -48,10 +61,25 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
     await window.api.agents.duplicate(id)
   }
 
-  const handleRenameFolder = async (id: string) => {
-    const current = folders.find(f => f.id === id)
-    const next = prompt('Rename folder', current?.name ?? '')
-    if (next != null) await window.api.agents.renameFolder(id, next)
+  const startInlineRename = (folderId: string) => {
+    const f = folders.find(x => x.id === folderId)
+    if (!f) return
+    setRenamingId(folderId)
+    setRenameDraft(f.name)
+  }
+
+  const commitRename = async () => {
+    if (renamingId === null) return
+    const id = renamingId
+    const draft = renameDraft
+    setRenamingId(null)
+    setRenameDraft('')
+    await window.api.agents.updateFolder(id, { name: draft })
+  }
+
+  const cancelRename = () => {
+    setRenamingId(null)
+    setRenameDraft('')
   }
 
   const handleDeleteFolder = async (id: string) => {
@@ -60,10 +88,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
   }
 
   const handleMoveAgent = async (id: string) => {
-    const choice = prompt(
-      'Move to folder. Type folder name (blank for Unfiled):',
-      '',
-    )
+    const choice = prompt('Move to folder. Type folder name (blank for Unfiled):', '')
     if (choice === null) return
     if (choice.trim() === '') {
       await window.api.agents.update(id, { folderId: null })
@@ -92,6 +117,13 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
     return () => window.api.agents.offChanged(cb)
   }, [load])
 
+  useEffect(() => {
+    if (renamingId && renameInputRef.current) {
+      renameInputRef.current.focus()
+      renameInputRef.current.select()
+    }
+  }, [renamingId])
+
   const groups: FolderGroup[] = useMemo(() => {
     const q = searchTerm.trim().toLowerCase()
     const match = (a: AgentRow) =>
@@ -114,12 +146,16 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
       .map(f => ({
         id: f.id,
         name: f.name,
+        emoji: f.emoji,
+        color: f.color_start,
         agents: byFolder.get(f.id) ?? [],
       }))
       .filter(g => q === '' || g.agents.length > 0)
       .sort((a, b) => a.name.localeCompare(b.name))
     const out: FolderGroup[] = []
-    if (unfiled.length > 0) out.push({ id: null, name: 'Unfiled', agents: unfiled })
+    if (unfiled.length > 0) {
+      out.push({ id: null, name: 'Unfiled', emoji: null, color: null, agents: unfiled })
+    }
     return out.concat(folderGroups)
   }, [folders, agents, searchTerm])
 
@@ -130,13 +166,16 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
     navigate('/library/agent/new')
   }
 
+  const currentMenuFolder = menu?.target.kind === 'folder'
+    ? folders.find(f => f.id === menu.target.folderId) ?? null
+    : null
+
   return (
     <>
-      <div style={{ padding: '8px', flexShrink: 0 }}>
+      <div className="agents-sidebar-new-wrap">
         <button
           type="button"
-          className="library-sidebar-seg"
-          style={{ width: '100%' }}
+          className="library-sidebar-seg agents-sidebar-new"
           onClick={handleNewAgent}
         >
           + New agent
@@ -150,18 +189,76 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
       {groups.map(g => {
         const key = g.id ?? '__unfiled__'
         const isOpen = expanded[key] ?? true
+        const isRenaming = g.id !== null && renamingId === g.id
+        const headerStyle = g.color ? ({ ['--folder-accent' as any]: g.color } as React.CSSProperties) : undefined
         return (
           <div key={key} className="library-sidebar-section">
-            <button
-              type="button"
-              className="library-sidebar-section-header"
-              onClick={() => toggle(key)}
-              onContextMenu={g.id ? (e) => onFolderRightClick(e, g.id!) : undefined}
+            <div
+              role="button"
+              tabIndex={0}
               aria-expanded={isOpen}
+              className="agents-sidebar-folder-header"
+              data-has-accent={g.color ? 'true' : undefined}
+              style={headerStyle}
+              onClick={() => { if (!isRenaming) toggle(key) }}
+              onKeyDown={(e) => {
+                if (isRenaming) return
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  toggle(key)
+                }
+              }}
+              onContextMenu={g.id ? (e) => onFolderRightClick(e, g.id!) : undefined}
             >
-              <span className="library-sidebar-section-caret">{isOpen ? '▾' : '▸'}</span>
-              {g.name} ({g.agents.length})
-            </button>
+              <span className="agents-sidebar-folder-caret">{isOpen ? '▾' : '▸'}</span>
+              <span
+                className="agents-sidebar-folder-avatar"
+                data-testid={g.id ? `folder-avatar-${g.id}` : 'folder-avatar-unfiled'}
+              >
+                {g.emoji ?? <Folder size={14} strokeWidth={1.8} />}
+              </span>
+              {isRenaming ? (
+                <input
+                  ref={renameInputRef}
+                  className="agents-sidebar-folder-rename-input"
+                  data-testid={`folder-rename-${g.id}`}
+                  value={renameDraft}
+                  onChange={(e) => setRenameDraft(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => {
+                    e.stopPropagation()
+                    if (e.key === 'Enter') { e.preventDefault(); commitRename() }
+                    else if (e.key === 'Escape') { e.preventDefault(); cancelRename() }
+                  }}
+                  onBlur={commitRename}
+                />
+              ) : (
+                <span
+                  className="agents-sidebar-folder-name"
+                  data-testid={g.id ? `folder-name-${g.id}` : 'folder-name-unfiled'}
+                  onDoubleClick={(e) => {
+                    if (!g.id) return
+                    e.stopPropagation()
+                    startInlineRename(g.id)
+                  }}
+                >
+                  {g.name}
+                </span>
+              )}
+              <span className="agents-sidebar-folder-count">({g.agents.length})</span>
+              {g.id && (
+                <button
+                  type="button"
+                  className="agents-sidebar-folder-kebab"
+                  data-testid={`folder-kebab-${g.id}`}
+                  aria-label="Folder menu"
+                  onClick={(e) => onFolderKebabClick(e, g.id!)}
+                >
+                  <MoreHorizontal size={14} />
+                </button>
+              )}
+            </div>
+
             {isOpen && g.agents.map(a => (
               <button
                 key={a.id}
@@ -193,7 +290,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
         )
       })}
 
-      {menu && (
+      {menu && menu.target.kind === 'agent' && (
         <AgentContextMenu
           x={menu.x}
           y={menu.y}
@@ -203,8 +300,19 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
           onMoveAgent={handleMoveAgent}
           onDuplicate={handleDuplicate}
           onDeleteAgent={handleDeleteAgent}
-          onRenameFolder={handleRenameFolder}
-          onDeleteFolder={handleDeleteFolder}
+        />
+      )}
+
+      {menu && menu.target.kind === 'folder' && currentMenuFolder && (
+        <FolderKebabMenu
+          x={menu.x}
+          y={menu.y}
+          folderId={menu.target.folderId}
+          currentColor={currentMenuFolder.color_start}
+          currentEmoji={currentMenuFolder.emoji}
+          onClose={() => setMenu(null)}
+          onRename={(id) => startInlineRename(id)}
+          onDelete={handleDeleteFolder}
         />
       )}
     </>

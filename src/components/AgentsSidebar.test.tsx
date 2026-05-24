@@ -42,6 +42,12 @@ beforeEach(() => {
         created_at: '2026-05-23T00:00:00Z',
         updated_at: '2026-05-23T00:00:00Z',
       })),
+      updateFolder: vi.fn().mockResolvedValue({}),
+      renameFolder: vi.fn().mockResolvedValue({}),
+      deleteFolder: vi.fn().mockResolvedValue(undefined),
+      update: vi.fn().mockResolvedValue({}),
+      delete: vi.fn().mockResolvedValue(undefined),
+      duplicate: vi.fn().mockResolvedValue({}),
     },
   }
 })
@@ -64,8 +70,8 @@ describe('AgentsSidebar', () => {
   it('renders folder section headers sorted by name', async () => {
     renderSidebar()
     await waitFor(() => expect(screen.getByText(/Research/)).toBeTruthy())
-    const sections = screen.getAllByRole('button', { name: /Research|Writing|Unfiled/ })
-    const labels = sections.map(b => b.textContent)
+    const nameNodes = document.querySelectorAll('.agents-sidebar-folder-name')
+    const labels = Array.from(nameNodes).map(n => n.textContent ?? '')
     // Unfiled first (synthetic), then alphabetical: Research, Writing
     expect(labels[0]).toMatch(/Unfiled/)
     expect(labels[1]).toMatch(/Research/)
@@ -155,5 +161,73 @@ describe('AgentsSidebar', () => {
     expect(pinnedRow.querySelector('.agents-sidebar-row-pin')).toBeTruthy()
     const unpinnedRow = screen.getByText('Unpinned').closest('.library-sidebar-item') as HTMLElement
     expect(unpinnedRow.querySelector('.agents-sidebar-row-pin')).toBeNull()
+  })
+
+  it('shows a kebab button next to each named folder (not Unfiled)', async () => {
+    renderSidebar()
+    await waitFor(() => screen.getByText(/Writing/))
+    expect(screen.getByTestId('folder-kebab-f1')).toBeTruthy()
+    expect(screen.getByTestId('folder-kebab-f2')).toBeTruthy()
+    expect(screen.queryByTestId('folder-kebab-__unfiled__')).toBeNull()
+  })
+
+  it('clicking the kebab opens the FolderKebabMenu', async () => {
+    renderSidebar()
+    await waitFor(() => screen.getByText(/Writing/))
+    fireEvent.click(screen.getByTestId('folder-kebab-f1'))
+    expect(screen.getByRole('menuitem', { name: /rename/i })).toBeTruthy()
+  })
+
+  it('double-clicking a folder name shows an inline rename input', async () => {
+    renderSidebar()
+    await waitFor(() => screen.getByText(/Writing/))
+    const nameSpan = screen.getByTestId('folder-name-f1')
+    fireEvent.doubleClick(nameSpan)
+    const input = screen.getByTestId('folder-rename-f1') as HTMLInputElement
+    expect(input).toBeTruthy()
+    expect(input.value).toBe('Writing')
+  })
+
+  it('Enter on the rename input calls updateFolder and exits edit mode', async () => {
+    renderSidebar()
+    await waitFor(() => screen.getByText(/Writing/))
+    fireEvent.doubleClick(screen.getByTestId('folder-name-f1'))
+    const input = screen.getByTestId('folder-rename-f1') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'Drafts' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => {
+      expect((window as any).api.agents.updateFolder)
+        .toHaveBeenCalledWith('f1', { name: 'Drafts' })
+    })
+    expect(screen.queryByTestId('folder-rename-f1')).toBeNull()
+  })
+
+  it('Escape on the rename input cancels without calling updateFolder', async () => {
+    renderSidebar()
+    await waitFor(() => screen.getByText(/Writing/))
+    fireEvent.doubleClick(screen.getByTestId('folder-name-f1'))
+    const input = screen.getByTestId('folder-rename-f1') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'Drafts' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect((window as any).api.agents.updateFolder).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('folder-rename-f1')).toBeNull()
+  })
+
+  it('renders a default folder icon when emoji is null', async () => {
+    renderSidebar()
+    await waitFor(() => screen.getByText(/Writing/))
+    const avatar = screen.getByTestId('folder-avatar-f1')
+    expect(avatar.querySelector('svg')).toBeTruthy()
+  })
+
+  it('renders the emoji when folder.emoji is set', async () => {
+    const foldersWithEmoji = [
+      { ...folders[0], emoji: '📝' },
+      folders[1],
+    ]
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders: foldersWithEmoji, agents })
+    renderSidebar()
+    await waitFor(() => screen.getByText(/Writing/))
+    expect(screen.getByTestId('folder-avatar-f1').textContent).toContain('📝')
   })
 })
