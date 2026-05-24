@@ -452,3 +452,35 @@ describe('AgentDetail — recordUse on Copy', () => {
     expect(window.api.agents.recordUse).not.toHaveBeenCalled()
   })
 })
+
+describe('AgentDetail — pin toggle', () => {
+  it('renders a Pin button when the agent is not pinned', async () => {
+    setup()
+    await waitForLoaded()
+    expect(screen.getByRole('button', { name: /^Pin$/ })).toBeTruthy()
+  })
+
+  it('renders an Unpin button when the agent is pinned', async () => {
+    const pinnedAgent: AgentRow = { ...baseAgent, pinned: 1, pinned_at: '2026-05-25T00:00:00Z' }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [pinnedAgent] })
+    setup()
+    await waitForLoaded()
+    expect(screen.getByRole('button', { name: /^Unpin$/ })).toBeTruthy()
+  })
+
+  it('clicking Pin calls window.api.agents.update with pinned: true', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('button', { name: /^Pin$/ }))
+    await waitFor(() => expect(window.api.agents.update).toHaveBeenCalledWith('a1', { pinned: true }))
+  })
+
+  it('clicking Unpin calls window.api.agents.update with pinned: false', async () => {
+    const pinnedAgent: AgentRow = { ...baseAgent, pinned: 1, pinned_at: '2026-05-25T00:00:00Z' }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [pinnedAgent] })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('button', { name: /^Unpin$/ }))
+    await waitFor(() => expect(window.api.agents.update).toHaveBeenCalledWith('a1', { pinned: false }))
+  })
+})

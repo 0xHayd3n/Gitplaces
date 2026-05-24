@@ -442,3 +442,10 @@
   text-overflow: ellipsis;
   max-width: 90px;
 }
+
+.agents-sidebar-row-pin {
+  margin-left: 6px;
+  font-size: 10px;
+  color: var(--accent-text);
+  flex-shrink: 0;
+}

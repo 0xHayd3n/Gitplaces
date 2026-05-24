@@ -197,6 +197,11 @@ export default function AgentDetail() {
     navigate(`/library/agent/${dup.id}`)
   }
 
+  const handlePinToggle = async () => {
+    if (!agent) return
+    await window.api.agents.update(agent.id, { pinned: agent.pinned !== 1 })
+  }
+
   const handleRestore = async (revisionId: string) => {
     if (!id) return
     if (!confirm('Restore this revision? Current body and presets will be replaced.')) return
@@ -268,6 +273,14 @@ export default function AgentDetail() {
             aria-label={editing ? 'Preview' : 'Edit'}
           >
             {editing ? 'Preview' : 'Edit'}
+          </button>
+          <button
+            type="button"
+            className="agent-detail-action"
+            onClick={handlePinToggle}
+            aria-label={agent.pinned === 1 ? 'Unpin' : 'Pin'}
+          >
+            {agent.pinned === 1 ? 'Unpin' : 'Pin'}
           </button>
           <button
             type="button"

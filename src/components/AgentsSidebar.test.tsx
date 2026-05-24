@@ -139,4 +139,21 @@ describe('AgentsSidebar', () => {
     // Writing folder contains only "Copy editor" which doesn't match "lit"
     expect(screen.queryByText(/Writing/)).toBeNull()
   })
+
+  it('renders a star indicator next to the handle for pinned agents', async () => {
+    const pinnedAgents: AgentRow[] = [
+      { ...agents[0], id: 'pa1', name: 'PinnedAgent', handle: 'pinned-agent',
+        pinned: 1, pinned_at: '2026-05-25T00:00:00Z' },
+      { ...agents[0], id: 'pa2', name: 'Unpinned',    handle: 'unpinned',
+        pinned: 0, pinned_at: null },
+    ]
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: pinnedAgents })
+    renderSidebar()
+    await waitFor(() => screen.getByText(/Writing/))
+    fireEvent.click(screen.getByRole('button', { name: /Writing/ }))
+    const pinnedRow = (await screen.findByText('PinnedAgent')).closest('.library-sidebar-item') as HTMLElement
+    expect(pinnedRow.querySelector('.agents-sidebar-row-pin')).toBeTruthy()
+    const unpinnedRow = screen.getByText('Unpinned').closest('.library-sidebar-item') as HTMLElement
+    expect(unpinnedRow.querySelector('.agents-sidebar-row-pin')).toBeNull()
+  })
 })

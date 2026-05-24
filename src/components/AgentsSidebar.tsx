@@ -184,6 +184,9 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
                 </span>
                 <span className="library-sidebar-name">{a.name}</span>
                 <span className="agents-sidebar-handle">@{a.handle}</span>
+                {a.pinned === 1 && (
+                  <span className="agents-sidebar-row-pin" aria-label="Pinned" title="Pinned">★</span>
+                )}
               </button>
             ))}
           </div>
