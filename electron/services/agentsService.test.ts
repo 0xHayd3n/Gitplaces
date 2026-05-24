@@ -717,3 +717,52 @@ describe('agentsService — revertToRevision', () => {
     expect(() => revertToRevision(db, agentId, otherRev.id)).toThrow(/revision/i)
   })
 })
+
+import { recordUse } from './agentsService'
+
+describe('agentsService — recordUse', () => {
+  let db: Database.Database
+  let agentId: string
+  beforeEach(() => {
+    db = freshDb()
+    const a = createAgent(db, {
+      name: 'A', body: 'b', folderId: null,
+      handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null,
+    })
+    agentId = a.id
+  })
+
+  it('updates last_used_at to a fresh ISO timestamp', () => {
+    const before = db.prepare(`SELECT last_used_at FROM agents WHERE id = ?`).get(agentId) as { last_used_at: string | null }
+    expect(before.last_used_at).toBeNull()
+    recordUse(db, agentId, null)
+    const after = db.prepare(`SELECT last_used_at FROM agents WHERE id = ?`).get(agentId) as { last_used_at: string | null }
+    expect(after.last_used_at).toMatch(/T/)
+  })
+
+  it('accepts a non-null presetId (forward compat, no per-preset tracking yet)', () => {
+    expect(() => recordUse(db, agentId, 'p-xyz')).not.toThrow()
+    const row = db.prepare(`SELECT last_used_at FROM agents WHERE id = ?`).get(agentId) as { last_used_at: string | null }
+    expect(row.last_used_at).toMatch(/T/)
+  })
+
+  it('throws on unknown agentId', () => {
+    expect(() => recordUse(db, 'no-such-agent', null)).toThrow(/agent/i)
+  })
+
+  it('bumps updated_at', async () => {
+    const before = db.prepare(`SELECT updated_at FROM agents WHERE id = ?`).get(agentId) as { updated_at: string }
+    await new Promise(r => setTimeout(r, 5))
+    recordUse(db, agentId, null)
+    const after = db.prepare(`SELECT updated_at FROM agents WHERE id = ?`).get(agentId) as { updated_at: string }
+    expect(after.updated_at > before.updated_at).toBe(true)
+  })
+
+  it('does NOT record a revision (recordUse is metadata-only)', () => {
+    recordUse(db, agentId, null)
+    const revs = listRevisions(db, agentId)
+    // Should be just the initial 'create' revision from createAgent (Phase C).
+    expect(revs.length).toBe(1)
+    expect(revs[0].kind).toBe('create')
+  })
+})

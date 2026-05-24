@@ -475,3 +475,13 @@ export function revertToRevision(
   const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as AgentRow
   return row
 }
+
+export function recordUse(
+  db: Database.Database,
+  agentId: string,
+  _presetId: string | null,  // forward-compat; per-preset tracking deferred
+): void {
+  assertAgentExists(db, agentId)
+  const ts = nowIso()
+  db.prepare(`UPDATE agents SET last_used_at = ?, updated_at = ? WHERE id = ?`).run(ts, ts, agentId)
+}
