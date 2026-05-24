@@ -229,6 +229,41 @@
   min-height: 0;
 }
 
+.agent-detail-prompt-body {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.agent-detail-prompt-body .agent-detail-textarea {
+  flex: 1;
+}
+
+.agent-detail-save-pill {
+  position: absolute;
+  bottom: 18px;
+  right: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  pointer-events: none;
+  transition: opacity 200ms;
+}
+.agent-detail-save-pill--saving {
+  color: var(--amber);
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+.agent-detail-save-pill--saved {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.22);
+}
+
 .agent-detail-textarea {
   width: 100%;
   height: 100%;
