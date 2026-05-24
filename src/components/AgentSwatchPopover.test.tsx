@@ -37,4 +37,26 @@ describe('AgentSwatchPopover', () => {
     expect(btn.textContent).toBe('✏️')
     expect(btn.style.background).toBe('rgb(16, 185, 129)')
   })
+
+  it('clicking the swatch opens the popover; outside click closes it', async () => {
+    render(
+      <div>
+        <AgentSwatchPopover agent={agent} />
+        <button>outside</button>
+      </div>
+    )
+    expect(screen.queryByRole('button', { name: /emoji/i })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /edit appearance/i }))
+    expect(screen.getByRole('button', { name: /emoji/i })).toBeTruthy()
+    fireEvent.mouseDown(screen.getByText('outside'))
+    await waitFor(() => expect(screen.queryByRole('button', { name: /emoji/i })).toBeNull())
+  })
+
+  it('Escape key closes the popover', async () => {
+    render(<AgentSwatchPopover agent={agent} />)
+    fireEvent.click(screen.getByRole('button', { name: /edit appearance/i }))
+    expect(screen.getByRole('button', { name: /emoji/i })).toBeTruthy()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('button', { name: /emoji/i })).toBeNull())
+  })
 })
