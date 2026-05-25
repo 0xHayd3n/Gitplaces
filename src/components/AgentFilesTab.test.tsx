@@ -33,17 +33,25 @@ const agent: AgentRow = {
 }
 
 // Post-Phase-26 layout: primary file row at sort_order=0, siblings at >= 1.
+const backupDefaults = {
+  backup_github_sha: null,
+  backup_synced_at: null,
+  backup_sync_status: null,
+} as const
 const primaryFile: AgentFile = {
   id: 'pf-a1', agent_id: 'a1', filename: 'test.md',
   content: '# Main\n\nSee notes.md', sort_order: 0, created_at: 't', updated_at: 't',
+  ...backupDefaults,
 }
 const siblingNotes: AgentFile = {
   id: 'f1', agent_id: 'a1', filename: 'notes.md', content: '# Notes',
   sort_order: 1, created_at: 't', updated_at: 't',
+  ...backupDefaults,
 }
 const siblingScript: AgentFile = {
   id: 'f2', agent_id: 'a1', filename: 'scripts/run.sh', content: '#!/bin/bash',
   sort_order: 2, created_at: 't', updated_at: 't',
+  ...backupDefaults,
 }
 const files: AgentFile[] = [primaryFile, siblingNotes, siblingScript]
 
@@ -110,7 +118,7 @@ describe('AgentFilesTab', () => {
   })
 
   it('Add file button creates a new sibling file with sortOrder past existing siblings', async () => {
-    const created: AgentFile = { id: 'f3', agent_id: 'a1', filename: 'new.md', content: '', sort_order: 3, created_at: 't', updated_at: 't' }
+    const created: AgentFile = { id: 'f3', agent_id: 'a1', filename: 'new.md', content: '', sort_order: 3, created_at: 't', updated_at: 't', ...backupDefaults }
     ;(window as any).api.agents.files.create = vi.fn().mockResolvedValue(created)
     ;(window as any).api.agents.files.list = vi.fn()
       .mockResolvedValueOnce(files)

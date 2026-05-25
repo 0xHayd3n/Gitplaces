@@ -46,6 +46,10 @@ export interface AgentFile {
   sort_order: number
   created_at: string
   updated_at: string
+  // Backup sync to gitsuite-skills (parallel to skills/notes sync)
+  backup_github_sha:  string | null
+  backup_synced_at:   number | null
+  backup_sync_status: 'pending' | 'synced' | 'failed' | null
 }
 
 // Phase B+ uses these. Defined now so the AgentRevision interface for Phase C

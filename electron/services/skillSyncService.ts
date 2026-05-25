@@ -153,6 +153,13 @@ export async function setupRepo(
   _db!.prepare(
     "UPDATE sub_skills SET sync_status = 'pending' WHERE sync_status IS NULL"
   ).run()
+  // Same for agent backups — first-time setup should pick up every existing
+  // agent. Triggering the actual push is main.ts's job (avoids a circular
+  // import: agentsBackupSyncService already depends on this module for
+  // SKILLS_BACKUP_REPO).
+  _db!.prepare(
+    "UPDATE agent_files SET backup_sync_status = 'pending' WHERE backup_sync_status IS NULL"
+  ).run()
 
   // Fire-and-forget initial bulk sync — only push pending/failed rows
   void pushAll()

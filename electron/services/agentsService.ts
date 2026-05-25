@@ -193,8 +193,8 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
     )
     // Primary file row — sole source of truth for body content.
     db.prepare(`
-      INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 0, ?, ?)
+      INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at, backup_sync_status)
+      VALUES (?, ?, ?, ?, 0, ?, ?, 'pending')
     `).run(`pf-${id}`, id, `${input.handle}.md`, input.body, ts, ts)
   })
   insert()
@@ -307,17 +307,46 @@ export function updateAgent(
         : sets.join(', ')
       db.prepare(`UPDATE agents SET ${setsClause} WHERE id = ?`).run(...params)
     }
-    // Body — write to the primary file row.
+    // Body — write to the primary file row. Mark for backup re-push; the
+    // path is unchanged so the cached SHA is still valid.
     if (patch.body !== undefined) {
       db.prepare(
-        `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+        `UPDATE agent_files
+         SET content = ?, updated_at = ?, backup_sync_status = 'pending'
+         WHERE agent_id = ? AND sort_order = 0`
       ).run(patch.body, ts, id)
     }
-    // Handle rename — also rename the primary file row's filename.
+    // Frontmatter-affecting fields on the agents row change what previewSubagentFile()
+    // renders into the primary file. Mark the primary pending so a crash between
+    // here and the fire-and-forget pushAgentBackup() is still recoverable on
+    // the next startup via pushAllPendingAgents.
+    const frontmatterChanged =
+      patch.description !== undefined ||
+      patch.model !== undefined ||
+      patch.tools !== undefined ||
+      patch.argumentHint !== undefined ||
+      patch.isSubagent !== undefined ||
+      patch.isSlashCommand !== undefined
+    if (frontmatterChanged && patch.body === undefined && patch.handle === undefined) {
+      db.prepare(
+        `UPDATE agent_files
+         SET backup_sync_status = 'pending'
+         WHERE agent_id = ? AND sort_order = 0`
+      ).run(id)
+    }
+    // Handle rename — also rename the primary file row's filename. The
+    // backup path is agents/{handle}/{filename}, so a handle change moves
+    // every file under a new folder; cached SHAs are bound to the old
+    // folder and must be cleared so the next push creates fresh files.
     if (patch.handle !== undefined) {
       db.prepare(
         `UPDATE agent_files SET filename = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
       ).run(`${patch.handle}.md`, ts, id)
+      db.prepare(
+        `UPDATE agent_files
+         SET backup_github_sha = NULL, backup_sync_status = 'pending'
+         WHERE agent_id = ?`
+      ).run(id)
     }
   })
   apply()
@@ -668,7 +697,9 @@ export function revertToRevision(
     db.prepare(`UPDATE agents SET presets_json = ?, updated_at = ? WHERE id = ?`)
       .run(rev.presets_json, ts, agentId)
     db.prepare(
-      `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+      `UPDATE agent_files
+       SET content = ?, updated_at = ?, backup_sync_status = 'pending'
+       WHERE agent_id = ? AND sort_order = 0`
     ).run(rev.body, ts, agentId)
   })
   apply()
@@ -728,8 +759,8 @@ export function createFile(
   const ts = nowIso()
   const sortOrder = input.sortOrder ?? 0
   db.prepare(`
-    INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at, backup_sync_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
   `).run(id, agentId, input.filename, input.content, sortOrder, ts, ts)
   return db.prepare(`SELECT * FROM agent_files WHERE id = ?`).get(id) as AgentFile
 }
@@ -748,12 +779,17 @@ export function updateFile(
   if (patch.filename !== undefined) {
     assertValidFilename(patch.filename)
     sets.push('filename = ?'); params.push(patch.filename)
+    // Filename change moves the backup path — clear the cached SHA (bound to
+    // the old path) so the next push creates a fresh file.
+    sets.push('backup_github_sha = NULL')
   }
   if (patch.content !== undefined) { sets.push('content = ?'); params.push(patch.content) }
   if (patch.sortOrder !== undefined) { sets.push('sort_order = ?'); params.push(patch.sortOrder) }
   if (sets.length === 0) {
     return db.prepare(`SELECT * FROM agent_files WHERE id = ? AND agent_id = ?`).get(fileId, agentId) as AgentFile
   }
+  // Any content/filename/sort_order change needs to re-sync to backup.
+  sets.push("backup_sync_status = 'pending'")
   sets.push('updated_at = ?'); params.push(nowIso())
   params.push(fileId, agentId)
   db.prepare(`UPDATE agent_files SET ${sets.join(', ')} WHERE id = ? AND agent_id = ?`).run(...params)

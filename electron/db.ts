@@ -466,6 +466,13 @@ export function initSchema(db: Database.Database): void {
   // Idempotent across re-runs (try/catch ignores "no such column" on second pass).
   try { db.exec(`ALTER TABLE agents DROP COLUMN body`) } catch {}
 
+  // Agents backup sync — per-file mirroring to the user's gitsuite-skills repo.
+  // Tracked per-file (not per-agent) so adding/editing one file doesn't re-push
+  // every file in the agent.
+  try { db.exec(`ALTER TABLE agent_files ADD COLUMN backup_github_sha   TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agent_files ADD COLUMN backup_synced_at    INTEGER`) } catch {}
+  try { db.exec(`ALTER TABLE agent_files ADD COLUMN backup_sync_status  TEXT`) } catch {}
+
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`
     CREATE INDEX IF NOT EXISTS repos_starred_at      ON repos(starred_at);

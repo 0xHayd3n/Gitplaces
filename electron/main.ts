@@ -50,6 +50,7 @@ import { registerCreateHandlers, closeAllOnQuit } from './ipc/createHandlers'
 import { startVerificationService, enqueueRepo } from './services/verificationService'
 import { startSkillSyncService, push as skillSyncPush, pushAll as skillSyncPushAll, setupRepo as skillSyncSetupRepo } from './services/skillSyncService'
 import { startNotesSyncService, pushNote as notesSyncPush, pushAllPendingNotes, pullNote } from './services/notesSyncService'
+import { startAgentsBackupSyncService, pushAllPendingAgents } from './services/agentsBackupSyncService'
 import { parseOgImage, isGenericGitHubOg } from './services/ogImageService'
 import { getRepoUserEvents } from './services/repoUserEvents'
 import { getRepoStats, getRepoMomentum } from './services/repoStats'
@@ -1665,7 +1666,11 @@ ipcMain.handle('skill:getSubSkill', (_event, owner: string, name: string, skillT
 ipcMain.handle('skillSync:setup', async () => {
   const user = getGitHubUser()
   if (!user?.username) return { ok: false, error: 'Not authenticated' }
-  return skillSyncSetupRepo(user.username)
+  const result = await skillSyncSetupRepo(user.username)
+  // setupRepo marks agent_files pending; kick off the initial agent backup
+  // push from here to avoid a circular import inside skillSyncService.
+  if (result.ok) void pushAllPendingAgents()
+  return result
 })
 
 ipcMain.handle('skillSync:disconnect', async () => {
@@ -2660,7 +2665,9 @@ app.whenReady().then(() => {
     startVerificationService(db, mainWindow)
     startSkillSyncService(db, mainWindow)
     startNotesSyncService(db)
+    startAgentsBackupSyncService(db, mainWindow)
     if (getSyncEnabled()) void pushAllPendingNotes()
+    if (getSyncEnabled()) void pushAllPendingAgents()
     startUpdateService(db, mainWindow)
     // One-time, non-blocking: migrate any legacy (non-anatomy) installed
     // skills to the anatomy engine. Replace-on-success-only.

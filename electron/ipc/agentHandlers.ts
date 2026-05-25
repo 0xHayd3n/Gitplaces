@@ -28,6 +28,7 @@ import {
   previewSubagentFile, previewSlashCommandFile,
   type SyncResult,
 } from '../services/agentFileSyncService'
+import { pushAgent as pushAgentBackup } from '../services/agentsBackupSyncService'
 import type { AgentRow } from '../../src/types/agent'
 
 function broadcastChanged(): void {
@@ -158,6 +159,10 @@ async function runSyncAndPersist(
     ...(changes.synced_subagent_at !== undefined && { synced_subagent_at: changes.synced_subagent_at }),
     ...(changes.synced_slash_command_at !== undefined && { synced_slash_command_at: changes.synced_slash_command_at }),
   }
+  // Fire-and-forget backup push to gitsuite-skills. Doesn't block the IPC
+  // reply — the user shouldn't wait for a network call. Bails silently if
+  // sync isn't configured.
+  void pushAgentBackup(row.id)
   return warnings.length > 0
     ? { row: refreshed, syncWarning: warnings.join(' · ') }
     : { row: refreshed }
@@ -232,6 +237,7 @@ export function registerAgentHandlers(): void {
   ipcMain.handle('agents:duplicate', async (_, id: string) => {
     const db = getDb(app.getPath('userData'))
     const row = duplicateAgent(db, id)
+    void pushAgentBackup(row.id)
     broadcastChanged()
     return row
   })
@@ -317,6 +323,7 @@ export function registerAgentHandlers(): void {
     const db = getDb(app.getPath('userData'))
     const priorRevId = latestRevisionId(agentId)
     const row = revertToRevision(db, agentId, revisionId)
+    void pushAgentBackup(agentId)
     broadcastChanged()
     broadcastRevisionAddedIfNew(agentId, priorRevId)
     return row
@@ -334,17 +341,21 @@ export function registerAgentHandlers(): void {
 
   ipcMain.handle('agents:files:create', async (_, agentId: string, input: CreateFileInput) => {
     const file = createFile(getDb(app.getPath('userData')), agentId, input)
+    void pushAgentBackup(agentId)
     broadcastChanged()
     return file
   })
 
   ipcMain.handle('agents:files:update', async (_, agentId: string, fileId: string, patch: UpdateFilePatch) => {
     const file = updateFile(getDb(app.getPath('userData')), agentId, fileId, patch)
+    void pushAgentBackup(agentId)
     broadcastChanged()
     return file
   })
 
   ipcMain.handle('agents:files:delete', async (_, agentId: string, fileId: string) => {
+    // Local row is removed; backup file is intentionally left in the repo
+    // (same precedent as skills/notes — backup retains history). No push needed.
     deleteFile(getDb(app.getPath('userData')), agentId, fileId)
     broadcastChanged()
   })
@@ -379,6 +390,10 @@ export function registerAgentHandlers(): void {
       const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(result.agentId) as AgentRow
       const synced = await runSyncAndPersist(row, undefined, /* forceOverwrite */ false)
       syncWarning = synced.syncWarning
+    } else if (result.conflictResolved !== 'skipped') {
+      // Skill imports skip runSyncAndPersist (no ~/.claude/ surface) but still
+      // need to be backed up to gitsuite-skills like every other agent.
+      void pushAgentBackup(result.agentId)
     }
     broadcastChanged()
     return syncWarning ? { ...result, syncWarning } : result
