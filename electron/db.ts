@@ -257,6 +257,26 @@ export function initSchema(db: Database.Database): void {
   try { db.exec(`ALTER TABLE repos ADD COLUMN fetched_at INTEGER`) } catch {}
   try { db.exec(`ALTER TABLE repos ADD COLUMN starred_checked_at INTEGER`) } catch {}
 
+  // Phase 24 — Skill parity Phase 1: description + origin tracking + agent_files
+  try { db.exec(`ALTER TABLE agents ADD COLUMN description TEXT NOT NULL DEFAULT ''`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN origin_plugin TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN origin_path TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN origin_version TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN origin_imported_at TEXT`) } catch {}
+
+  db.exec(`CREATE TABLE IF NOT EXISTS agent_files (
+    id          TEXT PRIMARY KEY,
+    agent_id    TEXT NOT NULL,
+    filename    TEXT NOT NULL,
+    content     TEXT NOT NULL,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL,
+    UNIQUE (agent_id, filename),
+    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+  )`)
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_files_agent ON agent_files(agent_id)`)
+
   // Phase 20 – AI chat history
   db.exec(`CREATE TABLE IF NOT EXISTS ai_chats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
