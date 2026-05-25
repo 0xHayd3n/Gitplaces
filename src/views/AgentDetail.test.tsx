@@ -811,6 +811,39 @@ describe('AgentDetail — Settings tab Phase 2', () => {
     expect(input.value).toBe('[project-name]')
   })
 
+  // --- Sync status line ---
+
+  it('Sync status renders "Will sync on next save" when toggle is on but synced_subagent_at is null', async () => {
+    const enabledAgent: AgentRow = {
+      ...baseAgent,
+      is_subagent: 1,
+      synced_subagent_at: null,
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [enabledAgent] })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    expect(screen.getByText(/will sync on next save/i)).toBeTruthy()
+  })
+
+  it('Sync status renders "Synced to <path> · X min ago" when synced_subagent_at is set', async () => {
+    const tenMinAgoIso = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+    const enabledAgent: AgentRow = {
+      ...baseAgent,
+      is_subagent: 1,
+      synced_subagent_at: tenMinAgoIso,
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [enabledAgent] })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    // "Synced to" and the relative time render synchronously from props
+    expect(screen.getByText(/Synced to/)).toBeTruthy()
+    expect(screen.getByText(/10 min ago/)).toBeTruthy()
+    // The clickable path appears after sync.checkConflict resolves
+    await waitFor(() => expect(screen.getByText(/copy-editor\.md/)).toBeTruthy())
+  })
+
   // --- Sibling files info chip ---
 
   it('Sibling-files info chip appears when is_subagent=1 AND the agent has files', async () => {
