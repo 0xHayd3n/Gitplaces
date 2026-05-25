@@ -4,7 +4,7 @@
 
 **Goal:** Replace the `Prompt` tab in `AgentDetail` with an `Overview` tab (Layout C — hero + two-column split), and migrate `agent.body` to a primary row in `agent_files` (filename `<handle>.md`, `sort_order = 0`) so every consumer reads body through one file-based path.
 
-**Architecture:** Phase 26 DB migration backfills a primary `agent_files` row per agent, then drops `agents.body`. The service layer (`agentsService.ts`) gains a `getPrimaryFile()` reader and guards on `deleteFile`/`updateFile`/handle rename. The sync layer (`agentFileSyncService.ts`) takes primary content as an argument instead of reading it off the agent row. A new `agents:primaryContent(id)` IPC route lets the renderer fetch body content; `AgentDetail.tsx` uses it on agent load, hosts the new Overview component, and removes Prompt. `AgentFilesTab.tsx` drops its synthetic `'main'` code path. The MCP launcher and skill importer route through the primary file row.
+**Architecture:** Phase 26 DB migration backfills a primary `agent_files` row per agent (the `agents.body` column is kept through Tasks 1–8 as a transitional dual-write; Task 9 drops it once provably dead). The service layer (`agentsService.ts`) gains a `getPrimaryFile()` reader and guards on `deleteFile`/`updateFile`/handle rename. Writers dual-write body content to both the column and the primary file row in a single transaction so the two are always in sync. The sync layer (`agentFileSyncService.ts`) takes primary content as an argument instead of reading it off the agent row. A new `agents:primaryContent(id)` IPC route lets the renderer fetch body content; `AgentDetail.tsx` uses it on agent load, hosts the new Overview component, and removes Prompt. `AgentFilesTab.tsx` drops its synthetic `'main'` code path. The MCP launcher and skill importer route through the primary file row. Task 9 stops the dual-write, drops the `agents.body` column, and drops the `AgentRow.body` field.
 
 **Tech Stack:** TypeScript, React, Electron IPC, better-sqlite3 (SQLite 3.47+), Vitest + @testing-library/react, `lucide-react` icons, `gray-matter` (already a dep).
 
@@ -16,7 +16,7 @@
 
 | File | Action | Responsibility |
 |------|--------|----------------|
-| `electron/db.ts` | Modify | Phase 26 migration block — backfill primary `agent_files` rows; drop `agents.body` (final task). |
+| `electron/db.ts` | Modify | Phase 26 migration — backfill primary `agent_files` rows (Task 1). Drop `agents.body` column (Task 9). |
 | `electron/db.body-to-primary-file.migration.test.ts` | Create | Migration tests: backfill, sort_order shift, idempotency, drop verification. |
 | `electron/services/agentsService.ts` | Modify | Add `getPrimaryFile()`. Route `createAgent`/`updateAgent(body)` through primary file. Auto-rename primary on handle change. Guards: cannot delete or rename the primary row. Update `duplicateAgent` and revision callers. |
 | `electron/services/agentsService.test.ts` | Modify | New tests for primary file behaviour + guards; remove tests that asserted `agent.body` column behaviour. |
@@ -81,20 +81,16 @@ describe('Phase 26 migration — body → primary file', () => {
   let db: Database.Database
   beforeEach(() => { db = freshDb() })
 
-  it('backfills a primary file row for every existing agent', () => {
-    // We need to simulate the pre-migration state: an agent exists, no primary file.
-    // initSchema runs every migration in order, so we have to insert the agent THEN
-    // assert that the primary file row exists (proving Phase 26 ran).
+  it('backfills a primary file row when an agent is added pre-migration', () => {
+    // Simulate pre-Phase-26 state: insert an agent directly without a primary
+    // file row. (initSchema already ran in freshDb but had no agents to migrate.)
+    // Re-running initSchema then triggers Phase 26's backfill for the new agent.
     const id = seedAgent(db, { handle: 'foo', body: 'hello world' })
-    // After initSchema, Phase 26 has already run for this row.
+    db.prepare(`DELETE FROM agent_files WHERE agent_id = ? AND sort_order = 0`).run(id)
+    initSchema(db)
     const row = db.prepare(
       `SELECT filename, content, sort_order FROM agent_files WHERE agent_id = ? AND sort_order = 0`
     ).get(id) as { filename: string; content: string; sort_order: number } | undefined
-    // NOTE: initSchema in test runs migrations on an empty DB then we insert.
-    // We need a way to trigger Phase 26 on existing rows. Adjust test to insert
-    // agent BEFORE Phase 26 ran by calling a helper that re-runs the migration.
-    // For now, the migration handler should also run on initSchema for any agents
-    // without a primary file row — see Step 3.
     expect(row).toBeDefined()
     expect(row!.filename).toBe('foo.md')
     expect(row!.content).toBe('hello world')
@@ -103,6 +99,8 @@ describe('Phase 26 migration — body → primary file', () => {
 
   it('creates a primary file row with empty content when body is empty', () => {
     const id = seedAgent(db, { handle: 'empty', body: '' })
+    db.prepare(`DELETE FROM agent_files WHERE agent_id = ? AND sort_order = 0`).run(id)
+    initSchema(db)
     const row = db.prepare(
       `SELECT content FROM agent_files WHERE agent_id = ? AND sort_order = 0`
     ).get(id) as { content: string }
@@ -111,8 +109,6 @@ describe('Phase 26 migration — body → primary file', () => {
 
   it('shifts any pre-existing sibling at sort_order = 0 to sort_order = 1', () => {
     const id = seedAgent(db, { handle: 'sib', body: 'main body' })
-    // Manually delete the auto-created primary row, insert a sibling at sort_order=0,
-    // then re-run migration logic by calling a helper.
     db.prepare(`DELETE FROM agent_files WHERE agent_id = ?`).run(id)
     db.prepare(`
       INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
@@ -131,6 +127,7 @@ describe('Phase 26 migration — body → primary file', () => {
 
   it('migration is idempotent — re-running creates no duplicates', () => {
     const id = seedAgent(db, { handle: 'idem' })
+    db.prepare(`DELETE FROM agent_files WHERE agent_id = ? AND sort_order = 0`).run(id)
     initSchema(db)
     initSchema(db)
     const rows = db.prepare(
@@ -139,10 +136,9 @@ describe('Phase 26 migration — body → primary file', () => {
     expect(rows.length).toBe(1)
   })
 
-  it('drops the agents.body column after backfill', () => {
-    seedAgent(db)
+  it('keeps the agents.body column intact after Task 1 (drop happens in Task 9)', () => {
     const cols = db.prepare(`PRAGMA table_info(agents)`).all() as { name: string }[]
-    expect(cols.map(c => c.name)).not.toContain('body')
+    expect(cols.map(c => c.name)).toContain('body')
   })
 })
 ```
@@ -157,18 +153,17 @@ Expected: FAIL — most tests fail (no Phase 26 migration yet); some may also fa
 Insert into `electron/db.ts` immediately after line 287 (the Phase 25 `synced_slash_command_at` line):
 
 ```ts
-  // Phase 26 — Body-as-file: backfill primary agent_files row per agent, then drop agents.body.
-  // Idempotent: skipped agents stay skipped on re-run.
-  const agentsWithBody = (() => {
-    try {
-      return db.prepare(`SELECT id, handle, body, created_at, updated_at FROM agents`).all() as Array<{
-        id: string; handle: string; body: string; created_at: string; updated_at: string;
-      }>
-    } catch {
-      // body column may already have been dropped by a prior run — nothing to backfill
-      return []
-    }
-  })()
+  // Phase 26 — Body-as-file: backfill a primary agent_files row per agent.
+  // The agents.body column is intentionally kept for the duration of this branch;
+  // Task 9 drops it once every consumer has switched to reading the primary file.
+  // Writers in Tasks 2–8 dual-write to both the column and the primary row to
+  // keep them in sync. Idempotent on re-run: agents that already have a primary
+  // file row are skipped.
+  const agentsWithBody = db.prepare(
+    `SELECT id, handle, body, created_at, updated_at FROM agents`
+  ).all() as Array<{
+    id: string; handle: string; body: string; created_at: string; updated_at: string;
+  }>
   for (const a of agentsWithBody) {
     const existing = db.prepare(
       `SELECT 1 FROM agent_files WHERE agent_id = ? AND sort_order = 0`
@@ -191,8 +186,6 @@ Insert into `electron/db.ts` immediately after line 287 (the Phase 25 `synced_sl
       console.warn(`[phase 26] skip backfill for agent ${a.id}:`, err)
     }
   }
-  // Drop the body column once every agent has its primary file row.
-  try { db.exec(`ALTER TABLE agents DROP COLUMN body`) } catch {}
 ```
 
 **Note on ID format:** the prefix `pf-${a.id}` keeps the primary-file rows identifiable in the DB without colliding with `randomUUID()`-style IDs used elsewhere. They're stable across re-runs (idempotent).
@@ -212,14 +205,15 @@ Expected: many failures in `agentsService.test.ts` and others — they'll be add
 ```bash
 git add electron/db.ts electron/db.body-to-primary-file.migration.test.ts
 git commit -m "$(cat <<'EOF'
-feat(agents): Phase 26 migration — backfill primary agent_files rows, drop agents.body
+feat(agents): Phase 26 migration — backfill primary agent_files rows
 
 For every agent, create an agent_files row at sort_order=0 named <handle>.md
 with the body column's content. Existing siblings at sort_order=0 step down
-to 1. Idempotent on re-run. Drops agents.body once backfilled.
+to 1. Idempotent on re-run.
 
-Subsequent commits update consumers to read body through the primary file
-row instead of agents.body.
+Body column is intentionally kept — Task 9 drops it after every consumer
+has switched to reading the primary file. During Tasks 2–8 writers
+dual-write to keep the column and the primary row in sync.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -415,7 +409,7 @@ export function updateFile(
 }
 ```
 
-**3c.** Update `createAgent` — remove `body` from the INSERT, write to primary file instead. Locate the existing `createAgent` and update:
+**3c.** Update `createAgent` — keep writing to the `body` column (dual-write through Task 8), additionally write the primary `agent_files` row. Wrap the multi-statement writes in a transaction so partial failures don't leave the DB inconsistent. Locate the existing `createAgent` and update:
 
 ```ts
 export function createAgent(db: Database.Database, input: CreateAgentInput): AgentRow {
@@ -442,23 +436,29 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
 
   const id = randomUUID()
   const ts = nowIso()
-  db.prepare(`
-    INSERT INTO agents (
-      id, name, handle, folder_id, color_start, color_end, emoji, description,
-      tools, model, is_subagent, is_slash_command, argument_hint,
-      created_at, updated_at
+
+  const insert = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO agents (
+        id, name, handle, body, folder_id, color_start, color_end, emoji, description,
+        tools, model, is_subagent, is_slash_command, argument_hint,
+        created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, name, input.handle, input.body, input.folderId, input.colorStart, input.colorEnd, input.emoji, input.description ?? '',
+      tools, model, isSubagent, isSlashCommand, argumentHint,
+      ts, ts,
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id, name, input.handle, input.folderId, input.colorStart, input.colorEnd, input.emoji, input.description ?? '',
-    tools, model, isSubagent, isSlashCommand, argumentHint,
-    ts, ts,
-  )
-  // Primary file row — every agent has exactly one of these.
-  db.prepare(`
-    INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
-    VALUES (?, ?, ?, ?, 0, ?, ?)
-  `).run(`pf-${id}`, id, `${input.handle}.md`, input.body, ts, ts)
+    // Primary file row — dual-write of the same content. Task 9 drops agents.body
+    // once every consumer is reading from agent_files.
+    db.prepare(`
+      INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 0, ?, ?)
+    `).run(`pf-${id}`, id, `${input.handle}.md`, input.body, ts, ts)
+  })
+  insert()
+
   const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow
   recordRevision(db, id, input.body, '[]', 'create', 'Created agent')
   return row
@@ -491,7 +491,12 @@ export function updateAgent(
     assertNameLen(name)
     sets.push('name = ?'); params.push(name)
   }
-  // NOTE: patch.body is intentionally NOT included in the agents SET — it lives in agent_files now.
+  // Dual-write body to agents.body (kept through Task 8 for branch-green safety).
+  // The primary file row is updated below in lockstep.
+  if (patch.body !== undefined) {
+    assertBodyLen(patch.body)
+    sets.push('body = ?'); params.push(patch.body)
+  }
   if (patch.folderId !== undefined) {
     if (patch.folderId !== null) assertFolderExists(db, patch.folderId)
     sets.push('folder_id = ?'); params.push(patch.folderId)
@@ -540,26 +545,26 @@ export function updateAgent(
   }
 
   const ts = nowIso()
-  if (sets.length > 0) {
-    sets.push('updated_at = ?'); params.push(ts)
-    params.push(id)
-    db.prepare(`UPDATE agents SET ${sets.join(', ')} WHERE id = ?`).run(...params)
-  }
-
-  // Body update — write to primary file row, not agents.body
-  if (patch.body !== undefined) {
-    assertBodyLen(patch.body)
-    db.prepare(
-      `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
-    ).run(patch.body, ts, id)
-  }
-
-  // Handle rename — also rename the primary file
-  if (patch.handle !== undefined) {
-    db.prepare(
-      `UPDATE agent_files SET filename = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
-    ).run(`${patch.handle}.md`, ts, id)
-  }
+  const apply = db.transaction(() => {
+    if (sets.length > 0) {
+      sets.push('updated_at = ?'); params.push(ts)
+      params.push(id)
+      db.prepare(`UPDATE agents SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+    }
+    // Body — dual-write to primary file row (lockstep with agents.body update above)
+    if (patch.body !== undefined) {
+      db.prepare(
+        `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+      ).run(patch.body, ts, id)
+    }
+    // Handle rename — also rename the primary file row
+    if (patch.handle !== undefined) {
+      db.prepare(
+        `UPDATE agent_files SET filename = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+      ).run(`${patch.handle}.md`, ts, id)
+    }
+  })
+  apply()
 
   const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(id) as AgentRow | undefined
   if (!row) throw new Error(`Unknown agent id: ${id}`)
@@ -617,13 +622,15 @@ export function revertToRevision(
   if (rev.agent_id !== agentId) throw new Error(`Revision ${revisionId} does not belong to agent ${agentId}`)
 
   const ts = nowIso()
-  // Restore primary file content from the revision
-  db.prepare(
-    `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
-  ).run(rev.body, ts, agentId)
-  // Bump presets + updated_at on the agent row
-  db.prepare(`UPDATE agents SET presets_json = ?, updated_at = ? WHERE id = ?`)
-    .run(rev.presets_json, ts, agentId)
+  const apply = db.transaction(() => {
+    // Dual-write: body column + primary file row (lockstep)
+    db.prepare(`UPDATE agents SET body = ?, presets_json = ?, updated_at = ? WHERE id = ?`)
+      .run(rev.body, rev.presets_json, ts, agentId)
+    db.prepare(
+      `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+    ).run(rev.body, ts, agentId)
+  })
+  apply()
 
   recordRevision(db, agentId, rev.body, rev.presets_json, 'revert', `Reverted to "${rev.summary}"`)
 
@@ -667,18 +674,20 @@ Existing tests that DO reference `agent.body` need updating:
 ```bash
 git add electron/services/agentsService.ts electron/services/agentsService.test.ts
 git commit -m "$(cat <<'EOF'
-feat(agents): service layer routes body through primary file row
+feat(agents): service layer dual-writes body to primary agent_files row
 
-- createAgent writes body to agent_files (sort_order=0, filename=<handle>.md)
-  instead of agents.body
-- updateAgent({ body }) updates the primary row; updateAgent({ handle }) also
-  renames the primary row's filename
-- duplicateAgent reads source primary content; new primary created via createAgent
-- deleteFile throws on primary row; updateFile throws on filename change of
-  primary row
-- revertToRevision restores primary file content
-- New getPrimaryFile(db, agentId) reader
-- Preset helpers read body from primary file row
+- createAgent + updateAgent({ body }) + revertToRevision now dual-write
+  the body to the primary file row (sort_order=0, filename=<handle>.md)
+  inside a db.transaction. The agents.body column is also updated in
+  lockstep — Task 9 drops the column once every consumer is reading
+  from agent_files.
+- updateAgent({ handle }) renames the primary file row's filename.
+- duplicateAgent reads source primary content; new primary created via
+  createAgent.
+- deleteFile throws on primary row; updateFile throws on filename change
+  of primary row.
+- New getPrimaryFile(db, agentId) reader.
+- Preset helpers read body from primary file row.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -2312,38 +2321,226 @@ EOF
 
 ---
 
-## Phase 5: Type cleanup
+## Phase 5: Type + column cleanup
 
-### Task 9: Remove `body` from `AgentRow`
+### Task 9: Drop `agents.body` column + `AgentRow.body` field; stop dual-writing
 
 **Files:**
+- Modify: `electron/db.ts`
+- Modify: `electron/services/agentsService.ts`
+- Modify: `electron/services/agentsService.test.ts`
 - Modify: `src/types/agent.ts`
 
-By now, no code reads `agent.body` (everything routes through `primaryContent`). The field is dead — remove it.
+By now (after Tasks 1–8), no code reads `agent.body` — every consumer routes through the primary file row. The column and field are dead writes. Drop them.
 
-- [ ] **Step 1: Remove the field from the type**
+- [ ] **Step 1: Remove the field from `AgentRow`**
 
 In `src/types/agent.ts`, locate `AgentRow` (around line 11) and remove the `body: string` line.
 
-- [ ] **Step 2: TS check**
+- [ ] **Step 2: Stop dual-writing `body` in `createAgent`**
+
+In `electron/services/agentsService.ts`, update the `createAgent` INSERT to drop the `body` column from both the column list and values:
+
+```ts
+const insert = db.transaction(() => {
+  db.prepare(`
+    INSERT INTO agents (
+      id, name, handle, folder_id, color_start, color_end, emoji, description,
+      tools, model, is_subagent, is_slash_command, argument_hint,
+      created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, name, input.handle, input.folderId, input.colorStart, input.colorEnd, input.emoji, input.description ?? '',
+    tools, model, isSubagent, isSlashCommand, argumentHint,
+    ts, ts,
+  )
+  // Primary file row — sole source of truth.
+  db.prepare(`
+    INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 0, ?, ?)
+  `).run(`pf-${id}`, id, `${input.handle}.md`, input.body, ts, ts)
+})
+insert()
+```
+
+- [ ] **Step 3: Stop dual-writing `body` in `updateAgent`**
+
+In `electron/services/agentsService.ts`, remove the `body` column from the SET clause (it stays in the primary file UPDATE inside the transaction):
+
+```ts
+// REMOVE this block:
+if (patch.body !== undefined) {
+  assertBodyLen(patch.body)
+  sets.push('body = ?'); params.push(patch.body)
+}
+```
+
+But KEEP the `assertBodyLen` check — move it to where the patch.body branch starts. Inside the transaction, the primary-file `UPDATE` already exists from Task 2; that stays.
+
+Restructure:
+
+```ts
+// Validate body length up-front
+if (patch.body !== undefined) {
+  assertBodyLen(patch.body)
+}
+
+// … sets builder for other columns unchanged (no body) …
+
+const ts = nowIso()
+const apply = db.transaction(() => {
+  if (sets.length > 0) {
+    sets.push('updated_at = ?'); params.push(ts)
+    params.push(id)
+    db.prepare(`UPDATE agents SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+  }
+  if (patch.body !== undefined) {
+    db.prepare(
+      `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+    ).run(patch.body, ts, id)
+  }
+  if (patch.handle !== undefined) {
+    db.prepare(
+      `UPDATE agent_files SET filename = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+    ).run(`${patch.handle}.md`, ts, id)
+  }
+})
+apply()
+```
+
+Note: `updated_at` is only bumped on the agents row when there's at least one column in `sets`. If the patch contains only `body`, no other agents column changes — but we still want to track the edit. Update the logic:
+
+```ts
+const apply = db.transaction(() => {
+  // Always bump updated_at when body changes, even if no other agents column changed
+  const bumpUpdatedAt = sets.length > 0 || patch.body !== undefined
+  if (bumpUpdatedAt && sets.length === 0) {
+    db.prepare(`UPDATE agents SET updated_at = ? WHERE id = ?`).run(ts, id)
+  } else if (sets.length > 0) {
+    sets.push('updated_at = ?'); params.push(ts)
+    params.push(id)
+    db.prepare(`UPDATE agents SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+  }
+  if (patch.body !== undefined) {
+    db.prepare(
+      `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+    ).run(patch.body, ts, id)
+  }
+  if (patch.handle !== undefined) {
+    db.prepare(
+      `UPDATE agent_files SET filename = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+    ).run(`${patch.handle}.md`, ts, id)
+  }
+})
+apply()
+```
+
+- [ ] **Step 4: Stop dual-writing `body` in `revertToRevision`**
+
+```ts
+const apply = db.transaction(() => {
+  db.prepare(`UPDATE agents SET presets_json = ?, updated_at = ? WHERE id = ?`)
+    .run(rev.presets_json, ts, agentId)
+  db.prepare(
+    `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+  ).run(rev.body, ts, agentId)
+})
+apply()
+```
+
+- [ ] **Step 5: Drop the `body` column from the schema**
+
+In `electron/db.ts`, after the Phase 26 backfill loop, add:
+
+```ts
+  // Phase 26 — Body-as-file (cont.): drop agents.body once every consumer
+  // reads from the primary agent_files row. Wrapped in try/catch for
+  // idempotency across re-runs.
+  try { db.exec(`ALTER TABLE agents DROP COLUMN body`) } catch {}
+```
+
+Also update the agents-table `CREATE TABLE IF NOT EXISTS` block (around line 168) to drop the `body TEXT NOT NULL` line, so fresh databases match post-migration schema:
+
+```sql
+-- BEFORE:
+CREATE TABLE IF NOT EXISTS agents (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  handle      TEXT NOT NULL UNIQUE,
+  body        TEXT NOT NULL,
+  -- … rest
+)
+
+-- AFTER:
+CREATE TABLE IF NOT EXISTS agents (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  handle      TEXT NOT NULL UNIQUE,
+  -- … rest (no body)
+)
+```
+
+- [ ] **Step 6: Update the migration test from Task 1**
+
+In `electron/db.body-to-primary-file.migration.test.ts`, update the "keeps the agents.body column intact" test to assert the column is now DROPPED:
+
+```ts
+it('drops the agents.body column after Task 9', () => {
+  const cols = db.prepare(`PRAGMA table_info(agents)`).all() as { name: string }[]
+  expect(cols.map(c => c.name)).not.toContain('body')
+})
+```
+
+Also update the `seedAgent` helper — it currently INSERTs with `body`. Since the column no longer exists in fresh DBs, the helper needs to remove `body` from the column list and instead seed via createAgent or by inserting the primary file row directly. Suggested update:
+
+```ts
+function seedAgent(db: Database.Database, overrides: Partial<{
+  id: string; handle: string; body: string;
+}> = {}) {
+  const id = overrides.id ?? `a-${Math.random().toString(36).slice(2, 8)}`
+  const handle = overrides.handle ?? 'my-agent'
+  const body = overrides.body ?? 'Agent body content.'
+  db.prepare(`
+    INSERT INTO agents (id, name, handle, folder_id, color_start, color_end, emoji,
+      created_at, updated_at, description, model)
+    VALUES (?, 'Test', ?, NULL, '#888888', NULL, NULL,
+      '2026-05-25T00:00:00.000Z', '2026-05-25T00:00:00.000Z', '', 'inherit')
+  `).run(id, handle)
+  // Primary file row — simulating what Phase 26 backfill or createAgent would do.
+  db.prepare(`
+    INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 0, ?, ?)
+  `).run(`pf-${id}`, id, `${handle}.md`, body, '2026-05-25T00:00:00.000Z', '2026-05-25T00:00:00.000Z')
+  return id
+}
+```
+
+The "backfill" / "sort_order shift" / "idempotent" tests still work because they explicitly `DELETE FROM agent_files` before re-running `initSchema(db)`, exercising the backfill loop on the pre-existing agents row.
+
+- [ ] **Step 7: TS check + full test run**
 
 Run: `npx tsc --noEmit`
-Expected: clean. If any errors, fix them — they're real bugs (some consumer still reading body that we missed).
+Expected: clean.
 
-- [ ] **Step 3: Run the full agent suite**
-
-Run: `npm test -- --run agent`
+Run: `npm test -- --run agent 2>&1 | tail -20`
 Expected: all pass.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/types/agent.ts
+git add electron/db.ts electron/services/agentsService.ts electron/services/agentsService.test.ts electron/db.body-to-primary-file.migration.test.ts src/types/agent.ts
 git commit -m "$(cat <<'EOF'
-chore(agents): remove body field from AgentRow
+chore(agents): drop agents.body column + AgentRow.body field
 
-Every consumer reads body through agents:primaryContent now. Drop the
-field from the type — TypeScript would already flag any stragglers.
+Every consumer now reads body through the primary agent_files row. The
+agents.body column has been dual-written by createAgent / updateAgent /
+revertToRevision since Task 2 — those writes are now removed, the
+column is dropped via Phase 26 (cont.), and AgentRow.body is removed
+from the type.
+
+The CREATE TABLE for agents drops body from the column list so fresh
+databases match post-migration schema. Migration test updated.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
