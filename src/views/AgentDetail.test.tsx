@@ -643,3 +643,45 @@ describe('AgentDetail — MCP tab', () => {
     )
   })
 })
+
+describe('AgentDetail — Settings tab Phase 2', () => {
+  // --- Model & tools ---
+
+  it('Model dropdown renders current value selected; changing it calls update with the new model', async () => {
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    const select = screen.getByLabelText(/^Model$/) as HTMLSelectElement
+    expect(select.value).toBe('inherit')
+    fireEvent.change(select, { target: { value: 'opus' } })
+    await waitFor(() =>
+      expect(window.api.agents.update).toHaveBeenCalledWith('a1', { model: 'opus' }),
+    )
+  })
+
+  it('Tools picker shows "Inherit all" selected when tools=null; switching to "Restrict to:" calls update with []', async () => {
+    setup() // baseAgent.tools === null
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    const inheritRadio = screen.getByLabelText(/inherit all/i) as HTMLInputElement
+    expect(inheritRadio.checked).toBe(true)
+    fireEvent.click(screen.getByLabelText(/restrict to/i))
+    await waitFor(() =>
+      expect(window.api.agents.update).toHaveBeenCalledWith('a1', { tools: [] }),
+    )
+  })
+
+  it('Toggling a tool checkbox in the grid calls update with the new tools array', async () => {
+    const restrictedAgent: AgentRow = { ...baseAgent, tools: '[]' }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [restrictedAgent] })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    const readCheckbox = screen.getByLabelText(/^Read$/) as HTMLInputElement
+    expect(readCheckbox.checked).toBe(false)
+    fireEvent.click(readCheckbox)
+    await waitFor(() =>
+      expect(window.api.agents.update).toHaveBeenCalledWith('a1', { tools: ['Read'] }),
+    )
+  })
+})
