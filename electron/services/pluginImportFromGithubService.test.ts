@@ -6,7 +6,7 @@ vi.mock('../store')
 
 import * as github from '../github'
 import * as store from '../store'
-import { discoverSkillsInRepo, readSkillFromRepo, RepoNotAccessibleError } from './pluginImportFromGithubService'
+import { discoverSkillsInRepo, readSkillFromRepo, discoverPluginInRepo, readTargetFromRepo, RepoNotAccessibleError } from './pluginImportFromGithubService'
 
 const mockedGithub = vi.mocked(github)
 const mockedStore = vi.mocked(store)
@@ -311,5 +311,140 @@ describe('readSkillFromRepo — bare-root', () => {
     expect(skill.files.map(f => f.filename)).toEqual(['helper.md'])
     expect(skill.origin?.path).toBe('.')
     expect(skill.origin?.plugin).toBe('o/singleskill')
+  })
+})
+
+describe('discoverPluginInRepo — mixed kinds', () => {
+  it('returns skills, subagents, and slashCommands from a plugin-shaped repo', async () => {
+    mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
+    mockedGithub.getBranch.mockResolvedValue({ commitSha: 'abc1234', rootTreeSha: 'rootsha' })
+    mockedGithub.getTreeBySha
+      // Root tree
+      .mockResolvedValueOnce([
+        { path: 'skills',   mode: '040000', type: 'tree', sha: 'skillssha' },
+        { path: 'agents',   mode: '040000', type: 'tree', sha: 'agentssha' },
+        { path: 'commands', mode: '040000', type: 'tree', sha: 'commandssha' },
+      ])
+      // skills/ tree
+      .mockResolvedValueOnce([
+        { path: 'a-skill', mode: '040000', type: 'tree', sha: 'askillsha' },
+      ])
+      // skills/a-skill/ tree
+      .mockResolvedValueOnce([
+        { path: 'SKILL.md', mode: '100644', type: 'blob', sha: 'skillmdsha' },
+      ])
+      // agents/ tree
+      .mockResolvedValueOnce([
+        { path: 'agent-one.md', mode: '100644', type: 'blob', sha: 'agent1sha' },
+      ])
+      // commands/ tree
+      .mockResolvedValueOnce([
+        { path: 'cmd-one.md', mode: '100644', type: 'blob', sha: 'cmd1sha' },
+      ])
+    mockedGithub.getRawFileBytes.mockImplementation(async (_t, _o, _n, _b, p) => {
+      if (p === 'skills/a-skill/SKILL.md') return Buffer.from(`---\nname: a-skill\ndescription: Sk.\n---\nbody`, 'utf-8')
+      if (p === 'agents/agent-one.md')    return Buffer.from(`---\nname: agent-one\ndescription: Ag.\ncolor: red\n---\nbody`, 'utf-8')
+      if (p === 'commands/cmd-one.md')    return Buffer.from(`---\ndescription: Cmd.\nargument-hint: [x]\n---\nbody`, 'utf-8')
+      throw new Error(`unexpected raw fetch: ${p}`)
+    })
+
+    const index = await discoverPluginInRepo('owner', 'repo')
+
+    expect(index.layout).toBe('plugin')
+    expect(index.skills.map(s => s.name)).toEqual(['a-skill'])
+    expect(index.subagents.map(s => s.name)).toEqual(['agent-one'])
+    expect(index.subagents[0].color).toBe('red')
+    expect(index.subagents[0].description).toBe('Ag.')
+    expect(index.subagents[0].path).toBe('agents/agent-one.md')
+    expect(index.slashCommands.map(c => c.name)).toEqual(['cmd-one'])
+    expect(index.slashCommands[0].argumentHint).toBe('[x]')
+    expect(index.slashCommands[0].description).toBe('Cmd.')
+    expect(index.slashCommands[0].path).toBe('commands/cmd-one.md')
+  })
+
+  it('returns empty subagent/command arrays when only skills/ exists (regression)', async () => {
+    mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
+    mockedGithub.getBranch.mockResolvedValue({ commitSha: 'sha', rootTreeSha: 'root' })
+    mockedGithub.getTreeBySha
+      .mockResolvedValueOnce([{ path: 'skills', mode: '040000', type: 'tree', sha: 'sk' }])
+      .mockResolvedValueOnce([{ path: 's1', mode: '040000', type: 'tree', sha: 's1sha' }])
+      .mockResolvedValueOnce([{ path: 'SKILL.md', mode: '100644', type: 'blob', sha: 'sm' }])
+    mockedGithub.getRawFileBytes.mockResolvedValue(Buffer.from(`---\nname: s1\ndescription: x\n---\n`, 'utf-8'))
+
+    const index = await discoverPluginInRepo('o', 'r')
+
+    expect(index.layout).toBe('plugin')
+    expect(index.skills).toHaveLength(1)
+    expect(index.subagents).toEqual([])
+    expect(index.slashCommands).toEqual([])
+  })
+
+  it('preserves bare-root layout for repos with only a root SKILL.md', async () => {
+    mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
+    mockedGithub.getBranch.mockResolvedValue({ commitSha: 'sha', rootTreeSha: 'root' })
+    mockedGithub.getTreeBySha
+      .mockResolvedValueOnce([{ path: 'SKILL.md', mode: '100644', type: 'blob', sha: 'sm' }])
+    mockedGithub.getRawFileBytes.mockResolvedValue(Buffer.from(`---\nname: bare\ndescription: x\n---\n`, 'utf-8'))
+
+    const index = await discoverPluginInRepo('o', 'r')
+
+    expect(index.layout).toBe('bare-root')
+    expect(index.skills).toHaveLength(1)
+    expect(index.subagents).toEqual([])
+    expect(index.slashCommands).toEqual([])
+  })
+})
+
+describe('readTargetFromRepo', () => {
+  it('reads a sub-agent and returns ParsedSubagent with origin', async () => {
+    mockedGithub.getRawFileBytes.mockResolvedValue(
+      Buffer.from(`---\nname: agent-x\ndescription: An agent.\ncolor: blue\nmodel: sonnet\ntools: Read, Grep\n---\nagent body`, 'utf-8'),
+    )
+
+    const target = await readTargetFromRepo('owner', 'repo', 'main', 'abc1234567', 'agents/agent-x.md', 'subagent')
+
+    expect(target.kind).toBe('subagent')
+    expect(target.name).toBe('agent-x')
+    expect(target.handle).toBe('agent-x')
+    expect(target.description).toBe('An agent.')
+    if (target.kind === 'subagent') expect(target.color).toBe('blue')
+    expect(target.model).toBe('sonnet')
+    expect(target.tools).toEqual(['Read', 'Grep'])
+    expect(target.origin?.plugin).toBe('owner/repo')
+    expect(target.origin?.path).toBe('agents/agent-x.md')
+    expect(target.origin?.pluginVersion).toBe('abc1234')   // sliced to 7
+  })
+
+  it('reads a slash command and returns ParsedSlashCommand with origin', async () => {
+    mockedGithub.getRawFileBytes.mockResolvedValue(
+      Buffer.from(`---\ndescription: A cmd.\nargument-hint: [x]\n---\ncommand body`, 'utf-8'),
+    )
+
+    const target = await readTargetFromRepo('owner', 'repo', 'main', 'def4567890', 'commands/my-cmd.md', 'slashCommand')
+
+    expect(target.kind).toBe('slashCommand')
+    expect(target.name).toBe('my-cmd')
+    expect(target.description).toBe('A cmd.')
+    expect(target.argumentHint).toBe('[x]')
+    expect(target.model).toBe('inherit')
+    expect(target.tools).toBeNull()
+    expect(target.origin?.path).toBe('commands/my-cmd.md')
+  })
+
+  it('reads a skill by delegating to readSkillFromRepo', async () => {
+    mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
+    mockedGithub.getBranch.mockResolvedValue({ commitSha: 'sha', rootTreeSha: 'root' })
+    mockedGithub.getTreeBySha
+      .mockResolvedValueOnce([{ path: 'skills', mode: '040000', type: 'tree', sha: 'sk' }])
+      .mockResolvedValueOnce([{ path: 'my-skill', mode: '040000', type: 'tree', sha: 'mss' }])
+      .mockResolvedValueOnce([{ path: 'SKILL.md', mode: '100644', type: 'blob', sha: 'sm' }])
+    mockedGithub.getRawFileBytes.mockResolvedValue(
+      Buffer.from(`---\nname: my-skill\ndescription: A skill.\n---\nbody`, 'utf-8'),
+    )
+
+    const target = await readTargetFromRepo('owner', 'repo', 'main', 'abc1234', 'skills/my-skill', 'skill')
+
+    expect(target.kind).toBe('skill')
+    expect(target.name).toBe('my-skill')
   })
 })

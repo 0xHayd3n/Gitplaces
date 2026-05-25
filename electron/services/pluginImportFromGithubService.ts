@@ -1,8 +1,9 @@
+import path from 'node:path'
 import matter from 'gray-matter'
 import { getRepo, getBranch, getTreeBySha, getRawFileBytes } from '../github'
 import { getToken } from '../store'
 import { slugifyName } from '../../src/utils/agentSlug'
-import type { DiscoveredSkill, ParsedSkill } from './pluginImportService'
+import type { DiscoveredSkill, ParsedSkill, ParsedImportTarget, ParsedSubagent, ParsedSlashCommand } from './pluginImportService'
 import { parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint } from './frontmatterFields'
 
 export class RepoNotAccessibleError extends Error {
@@ -19,6 +20,31 @@ export interface RepoSkillIndex {
   commitSha: string
   layout: 'skills-dir' | 'bare-root'
   skills: DiscoveredSkill[]
+}
+
+export interface DiscoveredSubagentRemote {
+  name: string
+  path: string           // repo-relative
+  description: string | null
+  color: string | null
+}
+
+export interface DiscoveredSlashCommandRemote {
+  name: string
+  path: string
+  description: string | null
+  argumentHint: string | null
+}
+
+export interface RepoPluginIndex {
+  owner: string
+  name: string
+  branch: string
+  commitSha: string
+  layout: 'skills-dir' | 'bare-root' | 'plugin'
+  skills: DiscoveredSkill[]
+  subagents: DiscoveredSubagentRemote[]
+  slashCommands: DiscoveredSlashCommandRemote[]
 }
 
 interface TreeEntry { path: string; mode: string; type: 'blob' | 'tree'; sha: string; size?: number }
@@ -54,6 +80,126 @@ export async function discoverSkillsInRepo(
   }
 
   return { owner, name, branch, commitSha, layout: 'skills-dir', skills: [] }
+}
+
+export async function discoverPluginInRepo(
+  owner: string,
+  name: string,
+): Promise<RepoPluginIndex> {
+  const token = getToken() ?? null
+  let repo: { default_branch: string }
+  try {
+    repo = await getRepo(token, owner, name)
+  } catch {
+    throw new RepoNotAccessibleError(owner, name)
+  }
+  const branch = repo.default_branch
+  const { commitSha, rootTreeSha } = await getBranch(token, owner, name, branch)
+  const rootEntries = await getTreeBySha(token, owner, name, rootTreeSha)
+
+  const skillsEntry = rootEntries.find(e => e.path === 'skills' && e.type === 'tree')
+  const agentsEntry = rootEntries.find(e => e.path === 'agents' && e.type === 'tree')
+  const commandsEntry = rootEntries.find(e => e.path === 'commands' && e.type === 'tree')
+
+  // Bare-root layout: a single SKILL.md at the repo root, no subdirs.
+  if (!skillsEntry && !agentsEntry && !commandsEntry) {
+    const rootSkillMd = rootEntries.find(e => e.path === 'SKILL.md' && e.type === 'blob')
+    if (rootSkillMd) {
+      const skill = await summarizeBareRoot(token, owner, name, branch, rootEntries)
+      return {
+        owner, name, branch, commitSha,
+        layout: 'bare-root',
+        skills: skill ? [skill] : [],
+        subagents: [],
+        slashCommands: [],
+      }
+    }
+    return { owner, name, branch, commitSha, layout: 'plugin', skills: [], subagents: [], slashCommands: [] }
+  }
+
+  const skills = skillsEntry
+    ? await listSkillsUnderSkillsDir(token, owner, name, branch, skillsEntry.sha)
+    : []
+  const subagents = agentsEntry
+    ? await listSubagentsInRepo(token, owner, name, branch, agentsEntry.sha)
+    : []
+  const slashCommands = commandsEntry
+    ? await listSlashCommandsInRepo(token, owner, name, branch, commandsEntry.sha)
+    : []
+
+  return {
+    owner, name, branch, commitSha,
+    layout: 'plugin',
+    skills, subagents, slashCommands,
+  }
+}
+
+async function listSubagentsInRepo(
+  token: string | null,
+  owner: string,
+  name: string,
+  branch: string,
+  agentsTreeSha: string,
+): Promise<DiscoveredSubagentRemote[]> {
+  const entries = await getTreeBySha(token, owner, name, agentsTreeSha)
+  const out: DiscoveredSubagentRemote[] = []
+  for (const e of entries) {
+    if (e.type !== 'blob') continue
+    if (!e.path.endsWith('.md')) continue
+    if (IGNORE_NAMES.has(e.path)) continue
+    const repoPath = `agents/${e.path}`
+    const filenameStem = path.basename(e.path, '.md')
+    let displayName = filenameStem
+    let description: string | null = null
+    let color: string | null = null
+    try {
+      const buf = await getRawFileBytes(token, owner, name, branch, repoPath)
+      const parsed = matter(buf.toString('utf-8'))
+      const data = parsed.data as Record<string, unknown>
+      if (typeof data.name === 'string' && data.name.length > 0) displayName = data.name
+      if (typeof data.description === 'string') description = data.description
+      if (typeof data.color === 'string') color = data.color
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[pluginImportFromGithubService] Failed to fetch ${repoPath}:`, err)
+      continue
+    }
+    out.push({ name: displayName, path: repoPath, description, color })
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+async function listSlashCommandsInRepo(
+  token: string | null,
+  owner: string,
+  name: string,
+  branch: string,
+  commandsTreeSha: string,
+): Promise<DiscoveredSlashCommandRemote[]> {
+  const entries = await getTreeBySha(token, owner, name, commandsTreeSha)
+  const out: DiscoveredSlashCommandRemote[] = []
+  for (const e of entries) {
+    if (e.type !== 'blob') continue
+    if (!e.path.endsWith('.md')) continue
+    if (IGNORE_NAMES.has(e.path)) continue
+    const repoPath = `commands/${e.path}`
+    const filenameStem = path.basename(e.path, '.md')
+    let description: string | null = null
+    let argumentHint: string | null = null
+    try {
+      const buf = await getRawFileBytes(token, owner, name, branch, repoPath)
+      const parsed = matter(buf.toString('utf-8'))
+      const data = parsed.data as Record<string, unknown>
+      if (typeof data.description === 'string') description = data.description
+      argumentHint = parseArgumentHint(data['argument-hint'])
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[pluginImportFromGithubService] Failed to fetch ${repoPath}:`, err)
+      continue
+    }
+    out.push({ name: filenameStem, path: repoPath, description, argumentHint })
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 const BARE_ROOT_EXTRA_EXCLUDES = new Set([
@@ -271,4 +417,72 @@ async function collectFilesRecursive(
       await collectFilesRecursive(token, owner, name, sub, rel, isBareRoot, out)
     }
   }
+}
+
+// ── Per-target fetch (kind-aware) ──────────────────────────────────
+
+export async function readTargetFromRepo(
+  owner: string,
+  name: string,
+  branch: string,
+  commitSha: string,
+  repoPath: string,
+  kind: 'skill' | 'subagent' | 'slashCommand',
+): Promise<ParsedImportTarget> {
+  if (kind === 'skill') {
+    return readSkillFromRepo(owner, name, branch, commitSha, repoPath)
+  }
+
+  const token = getToken() ?? null
+  const buf = await getRawFileBytes(token, owner, name, branch, repoPath)
+  const parsed = matter(buf.toString('utf-8'))
+  const data = parsed.data as Record<string, unknown>
+  const filenameStem = path.basename(repoPath, '.md')
+
+  if (kind === 'subagent') {
+    const targetName = typeof data.name === 'string' && data.name.length > 0 ? data.name : filenameStem
+    const description = typeof data.description === 'string' ? data.description : ''
+    const model = parseModelFrontmatter(data.model)
+    const tools = parseToolsFrontmatter(data.tools)
+    const color = typeof data.color === 'string' ? data.color : null
+    const sub: ParsedSubagent = {
+      kind: 'subagent',
+      name: targetName,
+      handle: slugifyName(targetName),
+      description,
+      body: parsed.content.trim(),
+      files: [] as never[],
+      origin: {
+        plugin: `${owner}/${name}`,
+        pluginVersion: commitSha.slice(0, 7),
+        path: repoPath,
+      },
+      model,
+      tools,
+      argumentHint: null,
+      color,
+    }
+    return sub
+  }
+
+  // slashCommand
+  const description = typeof data.description === 'string' ? data.description : ''
+  const argumentHint = parseArgumentHint(data['argument-hint'])
+  const cmd: ParsedSlashCommand = {
+    kind: 'slashCommand',
+    name: filenameStem,
+    handle: slugifyName(filenameStem),
+    description,
+    body: parsed.content.trim(),
+    files: [] as never[],
+    origin: {
+      plugin: `${owner}/${name}`,
+      pluginVersion: commitSha.slice(0, 7),
+      path: repoPath,
+    },
+    model: 'inherit',
+    tools: null,
+    argumentHint,
+  }
+  return cmd
 }
