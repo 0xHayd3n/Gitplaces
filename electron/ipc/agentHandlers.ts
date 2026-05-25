@@ -73,6 +73,24 @@ async function pluginDiscoveryRoots(): Promise<string[]> {
   } catch {
     // cache dir missing — ignore
   }
+
+  // Marketplaces layout: ~/.claude/plugins/marketplaces/<source>/plugins/<plugin>/.
+  // Each <source>/plugins/ directory becomes a root so discoverPlugins sees
+  // its children as plugin dirs. This is where official Anthropic plugins
+  // (feature-dev, hookify, etc.) actually live.
+  const marketplacesDir = path.join(home, '.claude', 'plugins', 'marketplaces')
+  try {
+    const sources = await fs.readdir(marketplacesDir, { withFileTypes: true })
+    for (const source of sources) {
+      if (!source.isDirectory()) continue
+      const sourcePluginsDir = path.join(marketplacesDir, source.name, 'plugins')
+      const stat = await fs.stat(sourcePluginsDir).catch(() => null)
+      if (stat?.isDirectory()) roots.push(sourcePluginsDir)
+    }
+  } catch {
+    // marketplaces dir missing — ignore
+  }
+
   return roots
 }
 
