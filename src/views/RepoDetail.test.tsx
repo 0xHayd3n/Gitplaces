@@ -64,6 +64,7 @@ function setupDetail(
   releases: object[] | 'reject' = [],
   userEvents: object[] | 'reject' = [],
   anatomyPayload: object | null = null,
+  pluginIndex: { skills: object[]; subagents: object[]; slashCommands: object[] } | 'hang' = { skills: [], subagents: [], slashCommands: [] },
 ) {
   const releasesFn = releases === 'reject'
     ? vi.fn().mockRejectedValue(new Error('boom'))
@@ -136,6 +137,16 @@ function setupDetail(
       engagement: {
         logClick: vi.fn().mockResolvedValue(undefined),
         getRecentlyVisited: vi.fn().mockResolvedValue([]),
+      },
+      agents: {
+        import: {
+          discoverPluginInRepo: pluginIndex === 'hang'
+            ? vi.fn().mockReturnValue(new Promise(() => { /* never resolves — simulates in-flight scan */ }))
+            : vi.fn().mockResolvedValue({
+              owner: 'vercel', name: 'next.js', branch: 'main', commitSha: 'abc1234',
+              layout: 'plugin', ...pluginIndex,
+            }),
+        },
       },
     },
     writable: true, configurable: true,
@@ -413,5 +424,47 @@ describe('releaseRowToFeedEvent', () => {
     expect(release.body).toBe('big release')
     expect(release.prerelease).toBe(false)
     expect(release.assets).toHaveLength(1)
+  })
+})
+
+describe('RepoDetail import-to-agent menu item', () => {
+  it('does not render the menu item when the repo has no importable agent content', async () => {
+    setupDetail(null)
+    await waitFor(() => screen.getAllByText('next.js'))
+    // Wait for the deferred detection effect to actually fire (proves it ran
+    // and resolved with an empty index) — avoids a time-based wait that would
+    // be flaky on slow CI workers.
+    await waitFor(
+      () => expect((window.api.agents.import.discoverPluginInRepo as ReturnType<typeof vi.fn>)).toHaveBeenCalled(),
+      { timeout: 1500 },
+    )
+    fireEvent.click(screen.getByLabelText('Open menu'))
+    expect(screen.queryByText('Import to agent library…')).toBeNull()
+  })
+
+  it('renders the menu item when discoverPluginInRepo reports importable content', async () => {
+    setupDetail(
+      null, null, undefined, [], [], [], null,
+      { skills: [{ name: 's', path: 'skills/s/SKILL.md', description: '', fileCount: 1 }], subagents: [], slashCommands: [] },
+    )
+    await waitFor(() => screen.getAllByText('next.js'))
+    // Wait for the deferred detection effect to resolve before opening the menu.
+    await waitFor(
+      () => expect((window.api.agents.import.discoverPluginInRepo as ReturnType<typeof vi.fn>)).toHaveBeenCalled(),
+      { timeout: 1500 },
+    )
+    fireEvent.click(screen.getByLabelText('Open menu'))
+    await waitFor(() => expect(screen.getByText('Import to agent library…')).toBeInTheDocument())
+  })
+
+  it('shows a "Scanning for agents…" placeholder while detection is in-flight', async () => {
+    setupDetail(null, null, undefined, [], [], [], null, 'hang')
+    await waitFor(() => screen.getAllByText('next.js'))
+    // Open the menu immediately — the hanging discoverPluginInRepo mock means
+    // isDetectingAgents stays true, so the scanning placeholder must appear.
+    fireEvent.click(screen.getByLabelText('Open menu'))
+    expect(screen.getByText('Scanning for agents…')).toBeInTheDocument()
+    // Real action is not yet shown.
+    expect(screen.queryByText('Import to agent library…')).toBeNull()
   })
 })

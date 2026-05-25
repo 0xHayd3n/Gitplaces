@@ -6344,6 +6344,20 @@ a {
 .split-button-cancel-icon { display: inline-flex; gap: 3px; }
 .split-button-cancel-icon span { width: 4px; height: 14px; background: currentColor; }
 
+/* Placeholder shown in the dropdown while an action's preconditions are
+   still being checked (e.g. "Scanning for agents…" while discoverPluginInRepo
+   probes the repo). Non-interactive, visually muted, with a small spinner. */
+.split-button-menu button.split-button-menu-item--scanning,
+.split-button-menu button.split-button-menu-item--scanning:hover {
+  opacity: 0.55; cursor: default; background: transparent; font-style: italic;
+}
+.split-button-scanning-spinner {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1.5px solid currentColor; border-top-color: transparent;
+  display: inline-block; animation: split-button-spin 0.9s linear infinite;
+}
+@keyframes split-button-spin { to { transform: rotate(360deg); } }
+
 /* ── Learn status inline (RepoDetail action row) ─────────────────── */
 .learn-status-inline { display: flex; flex-direction: column; justify-content: center; min-width: 180px; }
 .learn-status-label { color: var(--accent-text); font-size: 10px; letter-spacing: 0.1em; line-height: 1.3; }

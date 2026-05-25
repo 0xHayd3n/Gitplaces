@@ -501,8 +501,13 @@ export function primeRepoCacheFromRows(rows: ReadonlyArray<RepoRow>) {
 // without serving stale data for very long.
 const SESSION_CACHE_TTL_MS = 5 * 60 * 1000
 
-const _releasesCache = new Map<string, { value: ReleaseRow[]; ts: number }>()
-const _starredCache  = new Map<string, { value: boolean;       ts: number }>()
+const _releasesCache     = new Map<string, { value: ReleaseRow[]; ts: number }>()
+const _starredCache      = new Map<string, { value: boolean;       ts: number }>()
+// Caches only the boolean answer "does this repo have importable agent
+// content?" (skills / sub-agents / slash commands). We don't cache the full
+// RepoPluginIndex — its descriptions/colors are only needed once the import
+// dialog opens, which re-fetches from scratch.
+const _pluginIndexCache  = new Map<string, { value: boolean;       ts: number }>()
 // Test-only seam: these module-singleton caches persist for the process
 // lifetime (intentional in-app session caching). Tests that mount RepoDetail
 // for the same owner/name share a cacheKey, so without a reset one test's
@@ -511,6 +516,7 @@ export function __resetRepoDetailCaches(): void {
   _repoCache.clear()
   _releasesCache.clear()
   _starredCache.clear()
+  _pluginIndexCache.clear()
 }
 function readSessionCache<T>(map: Map<string, { value: T; ts: number }>, key: string): T | undefined {
   const entry = map.get(key)
@@ -705,6 +711,13 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     return s?.openClone === true
   })
   const [importAgentOpen, setImportAgentOpen] = useState(false)
+  // Gates the "Import to agent library…" menu item. canImportAgents goes true
+  // only once discoverPluginInRepo confirms importable content. While the scan
+  // is in-flight, isDetectingAgents is true so the dropdown can show a disabled
+  // "Scanning for agents…" placeholder — lets the user see the import path is
+  // being checked rather than wondering if the option exists at all.
+  const [canImportAgents, setCanImportAgents] = useState(false)
+  const [isDetectingAgents, setIsDetectingAgents] = useState(true)
 
   // Video state
   const [videoLinks, setVideoLinks]   = useState<YouTubeLink[]>([])
@@ -986,6 +999,59 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
 
     return () => cancelIdle(handle)
   }, [owner, name, isComponentLibrary, repo?.default_branch])
+
+  // Detect whether this repo contains importable agent content
+  // (skills/, agents/, commands/) so the dropdown's "Import to agent library…"
+  // menu item only appears for repos where it would actually do something.
+  // Deferred via requestIdleCallback so it doesn't compete with critical
+  // render. Cached for 5 min per repo. Errors are not cached, so transient
+  // failures (offline, rate-limit) get retried on the next visit.
+  useEffect(() => {
+    if (!owner || !name) return
+    setCanImportAgents(false)
+    setIsDetectingAgents(true)
+    const cacheKey = `${owner}/${name}`
+    const cached = readSessionCache(_pluginIndexCache, cacheKey)
+    if (cached !== undefined) {
+      setCanImportAgents(cached)
+      setIsDetectingAgents(false)
+      return
+    }
+
+    let cancelled = false
+    type IdleHandle = number
+    const requestIdle: (cb: () => void, opts?: { timeout: number }) => IdleHandle =
+      typeof window.requestIdleCallback === 'function'
+        ? (cb, opts) => window.requestIdleCallback(cb, opts) as unknown as IdleHandle
+        : (cb) => window.setTimeout(cb, 500) as unknown as IdleHandle
+    const cancelIdle: (h: IdleHandle) => void =
+      typeof window.cancelIdleCallback === 'function'
+        ? (h) => window.cancelIdleCallback(h)
+        : (h) => window.clearTimeout(h)
+
+    const handle = requestIdle(() => {
+      const importApi = window.api.agents?.import
+      if (!importApi?.discoverPluginInRepo) {
+        setIsDetectingAgents(false)
+        return
+      }
+      importApi.discoverPluginInRepo(`${owner}/${name}`)
+        .then(index => {
+          if (cancelled) return
+          const has = index.skills.length + index.subagents.length + index.slashCommands.length > 0
+          setCanImportAgents(has)
+          setIsDetectingAgents(false)
+          writeSessionCache(_pluginIndexCache, cacheKey, has)
+        })
+        .catch(() => {
+          if (cancelled) return
+          setIsDetectingAgents(false)
+          /* swallow — button stays hidden, retry on next visit */
+        })
+    }, { timeout: 3000 })
+
+    return () => { cancelled = true; cancelIdle(handle) }
+  }, [owner, name])
 
   // Releases — deferred fetch. Fires only when the user is on (or navigates
   // to) the Activities tab, since `releases` is no longer used outside of
@@ -2085,6 +2151,8 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                 onFork={handleFork}
                 archived={archived}
                 onArchive={handleArchive}
+                canImportAgents={canImportAgents}
+                isDetectingAgents={isDetectingAgents}
                 onImportToAgentLibrary={() => setImportAgentOpen(true)}
                 translationStatus={activeTab === 'readme' ? {
                   translating,
@@ -2149,6 +2217,8 @@ type RepoArticleActionRowProps = {
   onFork: () => void
   archived: boolean
   onArchive: () => void
+  canImportAgents: boolean
+  isDetectingAgents: boolean
   onImportToAgentLibrary: () => void
   /** Translation status — rendered on the right when on the readme tab and translation is active */
   translationStatus?: {
@@ -2165,7 +2235,7 @@ function RepoArticleActionRow({
   cloneOpen, onToggleClone,
   onLearn, onUnlearn, onStar, onFork,
   archived, onArchive,
-  onImportToAgentLibrary,
+  canImportAgents, isDetectingAgents, onImportToAgentLibrary,
   translationStatus,
 }: RepoArticleActionRowProps) {
   const variant: 'primary' | 'idle' | 'learned' =
@@ -2195,20 +2265,30 @@ function RepoArticleActionRow({
       >
         <button onClick={onToggleClone}><PiGitBranchFill size={14} />Clone</button>
         <button onClick={onFork}><PiGitForkFill size={14} />Fork</button>
-        <button onClick={onArchive}>
-          <svg viewBox="0 0 24 24" width={14} height={14} fill="currentColor">
-            <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5z"/>
-          </svg>
-          {archived ? 'Unarchive' : 'Archive'}
-        </button>
-        <button onClick={onImportToAgentLibrary}>
-          <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="12" rx="2" />
-            <line x1="12" y1="8" x2="12" y2="20" />
-            <polyline points="8 16 12 20 16 16" />
-          </svg>
-          Import to agent library…
-        </button>
+        {learnState !== 'UNLEARNED' && (
+          <button onClick={onArchive}>
+            <svg viewBox="0 0 24 24" width={14} height={14} fill="currentColor">
+              <path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5z"/>
+            </svg>
+            {archived ? 'Unarchive' : 'Archive'}
+          </button>
+        )}
+        {isDetectingAgents && (
+          <button disabled className="split-button-menu-item--scanning">
+            <span className="split-button-scanning-spinner" aria-hidden="true" />
+            Scanning for agents…
+          </button>
+        )}
+        {canImportAgents && (
+          <button onClick={onImportToAgentLibrary}>
+            <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="12" rx="2" />
+              <line x1="12" y1="8" x2="12" y2="20" />
+              <polyline points="8 16 12 20 16 16" />
+            </svg>
+            Import to agent library…
+          </button>
+        )}
       </PrimaryActionSplitButton>
 
       <button
