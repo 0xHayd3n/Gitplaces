@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BookOpen, Bot, ChevronRight } from 'lucide-react'
 import type { DiscoveredPlugin } from '../../electron/services/pluginImportService'
-import { COLOR_MAP } from '../../electron/services/pluginImportService'
 import type { RepoPluginIndex } from '../../electron/services/pluginImportFromGithubService'
 import type { AgentFolderRow } from '../types/agent'
 import { parseGithubRepoUrl } from '../utils/parseGithubRepoUrl'
+import { COLOR_MAP } from '../utils/anthropicColors'
 
 type ImportKind = 'skill' | 'subagent' | 'slashCommand'
 type SelectionKey = `skill:${string}` | `subagent:${string}` | `slashCommand:${string}`

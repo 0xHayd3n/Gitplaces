@@ -5,6 +5,8 @@ import type Database from 'better-sqlite3'
 import { slugifyName, dedupeHandle } from '../../src/utils/agentSlug'
 import { createAgent, updateAgent, createFile, deleteFile, listFiles } from './agentsService'
 import { hashHandleToColor } from '../../src/utils/colorHarmony'
+import { COLOR_MAP } from '../../src/utils/anthropicColors'
+export { COLOR_MAP } from '../../src/utils/anthropicColors'
 import {
   parseModelFrontmatter,
   parseToolsFrontmatter,
@@ -47,17 +49,6 @@ export interface ParsedSlashCommand extends ParsedImportTargetBase {
 }
 
 export type ParsedImportTarget = ParsedSkill | ParsedSubagent | ParsedSlashCommand
-
-export const COLOR_MAP: Record<string, string> = {
-  red:    '#ef4444',
-  orange: '#f97316',
-  yellow: '#eab308',
-  green:  '#22c55e',
-  cyan:   '#06b6d4',
-  blue:   '#3b82f6',
-  purple: '#a855f7',
-  pink:   '#ec4899',
-}
 
 const IGNORE_NAMES = new Set(['.DS_Store', '.git', 'node_modules', '__pycache__'])
 const IGNORE_SUFFIXES = ['.swp']
