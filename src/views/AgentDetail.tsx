@@ -515,6 +515,18 @@ function AgentSettingsTab({
   onDuplicate: () => void
   onDelete: () => void
 }) {
+  const [siblingFileCount, setSiblingFileCount] = useState(0)
+
+  useEffect(() => {
+    if (agent.is_subagent !== 1) { setSiblingFileCount(0); return }
+    let cancelled = false
+    ;(async () => {
+      const files = await window.api.agents.files.list(agent.id)
+      if (!cancelled) setSiblingFileCount(files.length)
+    })()
+    return () => { cancelled = true }
+  }, [agent.id, agent.is_subagent])
+
   const onFolderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value
     window.api.agents.update(agent.id, {
@@ -571,6 +583,12 @@ function AgentSettingsTab({
           enabled={agent.is_slash_command === 1}
           syncedAt={agent.synced_slash_command_at}
         />
+        {agent.is_subagent === 1 && siblingFileCount > 0 && (
+          <div className="agent-detail-settings-hint">
+            Sibling files ({siblingFileCount}) are not synced to Claude Code in this phase.
+            Phase 4 plugin export will package them.
+          </div>
+        )}
       </div>
 
       {agent.is_slash_command === 1 && (

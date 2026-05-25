@@ -39,6 +39,7 @@ const baseAgent: AgentRow = {
 
 function makeApi() {
   return {
+    openExternal: vi.fn().mockResolvedValue(undefined),
     agents: {
       getAll: vi.fn().mockResolvedValue({ folders, agents: [baseAgent] }),
       update: vi.fn().mockImplementation(async (_id: string, patch: any) => ({
@@ -59,6 +60,22 @@ function makeApi() {
       revisions: {
         list: vi.fn().mockResolvedValue([]),
         revert: vi.fn(),
+      },
+      sync: {
+        checkConflict: vi.fn().mockResolvedValue({
+          subagentExists: false,
+          slashCommandExists: false,
+          subagentPath: '/home/user/.claude/agents/copy-editor.md',
+          slashCommandPath: '/home/user/.claude/commands/copy-editor.md',
+        }),
+        retry: vi.fn().mockResolvedValue({
+          subagent: { status: 'skipped' },
+          slashCommand: { status: 'skipped' },
+        }),
+        preview: vi.fn().mockResolvedValue({ subagent: null, slashCommand: null }),
+      },
+      files: {
+        list: vi.fn().mockResolvedValue([]),
       },
     },
   }
@@ -683,5 +700,111 @@ describe('AgentDetail — Settings tab Phase 2', () => {
     await waitFor(() =>
       expect(window.api.agents.update).toHaveBeenCalledWith('a1', { tools: ['Read'] }),
     )
+  })
+
+  // --- Surface toggles + conflict dialog ---
+
+  it('Subagent toggle ON without conflict calls update({ isSubagent: true }) and does not open the dialog', async () => {
+    // makeApi default: subagentExists=false
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByLabelText(/available as subagent/i))
+    await waitFor(() =>
+      expect(window.api.agents.update).toHaveBeenCalledWith('a1', { isSubagent: true }),
+    )
+    expect(screen.queryByText(/subagent file exists/i)).toBeNull()
+  })
+
+  it('Subagent toggle ON with subagentExists=true opens ConflictDialog and does not call update', async () => {
+    ;(window as any).api.agents.sync.checkConflict = vi.fn().mockResolvedValue({
+      subagentExists: true,
+      slashCommandExists: false,
+      subagentPath: '/home/user/.claude/agents/copy-editor.md',
+      slashCommandPath: '/home/user/.claude/commands/copy-editor.md',
+    })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByLabelText(/available as subagent/i))
+    expect(await screen.findByText(/subagent file exists/i)).toBeTruthy()
+    expect(window.api.agents.update).not.toHaveBeenCalled()
+  })
+
+  it('ConflictDialog Cancel closes the dialog and does not call update', async () => {
+    ;(window as any).api.agents.sync.checkConflict = vi.fn().mockResolvedValue({
+      subagentExists: true,
+      slashCommandExists: false,
+      subagentPath: '/home/user/.claude/agents/copy-editor.md',
+      slashCommandPath: '/home/user/.claude/commands/copy-editor.md',
+    })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByLabelText(/available as subagent/i))
+    await screen.findByText(/subagent file exists/i)
+    fireEvent.click(screen.getByRole('button', { name: /^Cancel$/ }))
+    await waitFor(() => expect(screen.queryByText(/subagent file exists/i)).toBeNull())
+    expect(window.api.agents.update).not.toHaveBeenCalled()
+  })
+
+  it('ConflictDialog Overwrite calls update({ isSubagent: true, forceOverwrite: true })', async () => {
+    ;(window as any).api.agents.sync.checkConflict = vi.fn().mockResolvedValue({
+      subagentExists: true,
+      slashCommandExists: false,
+      subagentPath: '/home/user/.claude/agents/copy-editor.md',
+      slashCommandPath: '/home/user/.claude/commands/copy-editor.md',
+    })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    fireEvent.click(screen.getByLabelText(/available as subagent/i))
+    await screen.findByText(/subagent file exists/i)
+    fireEvent.click(screen.getByRole('button', { name: /^Overwrite$/ }))
+    await waitFor(() =>
+      expect(window.api.agents.update).toHaveBeenCalledWith('a1', {
+        isSubagent: true,
+        forceOverwrite: true,
+      }),
+    )
+  })
+
+  it('Subagent toggle OFF calls update({ isSubagent: false }) without a dialog or forceOverwrite', async () => {
+    const enabledAgent: AgentRow = {
+      ...baseAgent,
+      is_subagent: 1,
+      synced_subagent_at: '2026-05-25T10:00:00Z',
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [enabledAgent] })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    const checkbox = screen.getByLabelText(/available as subagent/i) as HTMLInputElement
+    expect(checkbox.checked).toBe(true)
+    fireEvent.click(checkbox)
+    await waitFor(() =>
+      expect(window.api.agents.update).toHaveBeenCalledWith('a1', { isSubagent: false }),
+    )
+    expect(screen.queryByText(/subagent file exists/i)).toBeNull()
+  })
+
+  // --- Sibling files info chip ---
+
+  it('Sibling-files info chip appears when is_subagent=1 AND the agent has files', async () => {
+    const enabledAgent: AgentRow = {
+      ...baseAgent,
+      is_subagent: 1,
+      synced_subagent_at: '2026-05-25T10:00:00Z',
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [enabledAgent] })
+    ;(window as any).api.agents.files.list = vi.fn().mockResolvedValue([
+      { id: 'f1', agent_id: 'a1', filename: 'reference.md', content: '', sort_order: 0, created_at: '', updated_at: '' },
+      { id: 'f2', agent_id: 'a1', filename: 'script.sh',    content: '', sort_order: 1, created_at: '', updated_at: '' },
+      { id: 'f3', agent_id: 'a1', filename: 'notes.md',     content: '', sort_order: 2, created_at: '', updated_at: '' },
+    ])
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    await waitFor(() => expect(screen.getByText(/Sibling files \(3\)/)).toBeTruthy())
   })
 })
