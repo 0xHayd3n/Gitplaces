@@ -1,6 +1,9 @@
 import { app, ipcMain, BrowserWindow } from 'electron'
 import path from 'node:path'
+import os from 'node:os'
+import fs from 'node:fs/promises'
 import { getDb } from '../db'
+import { discoverPlugins, parseSkill, importSkill, type ParsedSkill, type ImportOptions } from '../services/skillImportService'
 import {
   getAllAgents,
   createAgent, updateAgent, deleteAgent, duplicateAgent,
@@ -33,6 +36,34 @@ function broadcastRevisionAddedIfNew(agentId: string, priorRevId: string | null)
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send('agents:revision-added', rev)
   }
+}
+
+async function pluginDiscoveryRoots(): Promise<string[]> {
+  const home = os.homedir()
+  const cwd = process.cwd()
+  const roots = [
+    path.join(home, '.claude', 'plugins'),
+    path.join(cwd, '.opencode', 'plugins'),
+  ]
+  // Cache layout: ~/.claude/plugins/cache/<source>/<plugin>/<version>/<files>.
+  // We add each <source>/<plugin>/ as a root so discoverPlugins sees the
+  // <version> directories as plugin dirs.
+  const cacheDir = path.join(home, '.claude', 'plugins', 'cache')
+  try {
+    const sources = await fs.readdir(cacheDir, { withFileTypes: true })
+    for (const source of sources) {
+      if (!source.isDirectory()) continue
+      const sourceDir = path.join(cacheDir, source.name)
+      const plugins = await fs.readdir(sourceDir, { withFileTypes: true })
+      for (const plugin of plugins) {
+        if (!plugin.isDirectory()) continue
+        roots.push(path.join(sourceDir, plugin.name))
+      }
+    }
+  } catch {
+    // cache dir missing — ignore
+  }
+  return roots
 }
 
 export function registerAgentHandlers(): void {
@@ -183,6 +214,21 @@ export function registerAgentHandlers(): void {
   ipcMain.handle('agents:files:delete', async (_, agentId: string, fileId: string) => {
     deleteFile(getDb(app.getPath('userData')), agentId, fileId)
     broadcastChanged()
+  })
+
+  ipcMain.handle('agents:import:discoverPlugins', async () => {
+    const roots = await pluginDiscoveryRoots()
+    return discoverPlugins(roots)
+  })
+
+  ipcMain.handle('agents:import:readSkillFromDisk', async (_, skillPath: string) => {
+    return parseSkill(skillPath)
+  })
+
+  ipcMain.handle('agents:import:importSkill', async (_, skill: ParsedSkill, opts: ImportOptions) => {
+    const result = importSkill(getDb(app.getPath('userData')), skill, opts)
+    broadcastChanged()
+    return result
   })
 
   ipcMain.handle('agents:mcp:getConfigSnippet', async () => {

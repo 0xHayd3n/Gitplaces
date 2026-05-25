@@ -237,6 +237,18 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.invoke('agents:files:delete', agentId, fileId) as Promise<void>,
     },
 
+    import: {
+      discoverPlugins: () =>
+        ipcRenderer.invoke('agents:import:discoverPlugins') as Promise<import('../electron/services/skillImportService').DiscoveredPlugin[]>,
+      readSkillFromDisk: (skillPath: string) =>
+        ipcRenderer.invoke('agents:import:readSkillFromDisk', skillPath) as Promise<import('../electron/services/skillImportService').ParsedSkill>,
+      importSkill: (
+        skill: import('../electron/services/skillImportService').ParsedSkill,
+        opts: { folderId: string | null; onConflict: 'overwrite' | 'skip' | 'rename' },
+      ) =>
+        ipcRenderer.invoke('agents:import:importSkill', skill, opts) as Promise<import('../electron/services/skillImportService').ImportResult>,
+    },
+
     recordUse: (agentId: string, presetId: string | null) =>
       ipcRenderer.invoke('agents:recordUse', agentId, presetId) as Promise<void>,
 
