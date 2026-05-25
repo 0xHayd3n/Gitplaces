@@ -6,6 +6,8 @@ import { slugifyName, dedupeHandle } from '../../src/utils/agentSlug'
 import { createAgent, updateAgent, createFile, deleteFile, listFiles } from './agentsService'
 import { hashHandleToColor } from '../../src/utils/colorHarmony'
 
+export type ImportedModel = 'sonnet' | 'opus' | 'haiku' | 'inherit'
+
 export interface ParsedSkill {
   name: string
   handle: string
@@ -13,6 +15,48 @@ export interface ParsedSkill {
   body: string
   files: { filename: string; content: string }[]
   origin: { plugin: string; pluginVersion: string | null; path: string } | null
+  // Phase 2
+  model: ImportedModel
+  tools: string[] | null
+  argumentHint: string | null
+}
+
+const FULL_TO_SHORT_MODEL: Record<string, ImportedModel> = {
+  'claude-sonnet-4-6': 'sonnet',
+  'claude-opus-4-7': 'opus',
+  'claude-haiku-4-5-20251001': 'haiku',
+}
+
+export function parseModelFrontmatter(raw: unknown): ImportedModel {
+  if (typeof raw !== 'string') return 'inherit'
+  if (raw === 'sonnet' || raw === 'opus' || raw === 'haiku' || raw === 'inherit') return raw
+  const mapped = FULL_TO_SHORT_MODEL[raw]
+  if (mapped) return mapped
+  // eslint-disable-next-line no-console
+  console.warn(`[skillImportService] Unknown model "${raw}", falling back to 'inherit'.`)
+  return 'inherit'
+}
+
+export function parseToolsFrontmatter(raw: unknown): string[] | null {
+  if (raw === null || raw === undefined) return null
+  if (Array.isArray(raw)) return raw.filter((t): t is string => typeof t === 'string')
+  if (typeof raw === 'string') {
+    if (raw.trim().length === 0) return []
+    return raw.split(',').map(s => s.trim()).filter(s => s.length > 0)
+  }
+  // eslint-disable-next-line no-console
+  console.warn(`[skillImportService] Unexpected tools type ${typeof raw}, treating as null.`)
+  return null
+}
+
+export function parseArgumentHint(raw: unknown): string | null {
+  if (typeof raw === 'string') return raw
+  // YAML parses `argument-hint: [project-name]` as the array ['project-name'].
+  // CC writes it as bracket-notation in the source; reconstruct so we can round-trip.
+  if (Array.isArray(raw)) {
+    return `[${raw.map(v => String(v)).join(', ')}]`
+  }
+  return null
 }
 
 const IGNORE_NAMES = new Set(['.DS_Store', '.git', 'node_modules', '__pycache__'])
@@ -36,8 +80,13 @@ export async function parseSkill(inputPath: string): Promise<ParsedSkill> {
     : path.basename(skillDir)
   const description = typeof data.description === 'string' ? data.description : ''
 
-  // Warn about unknown frontmatter keys (Phase 1 drops them)
-  const known = new Set(['name', 'description'])
+  // Phase 2 — pick up structured fields
+  const model = parseModelFrontmatter(data.model)
+  const tools = parseToolsFrontmatter(data.tools)
+  const argumentHint = parseArgumentHint(data['argument-hint'])
+
+  // Warn about unknown frontmatter keys (still dropped — Phase 4 will round-trip)
+  const known = new Set(['name', 'description', 'model', 'tools', 'argument-hint'])
   const dropped = Object.keys(data).filter(k => !known.has(k))
   if (dropped.length > 0) {
     // eslint-disable-next-line no-console
@@ -54,6 +103,9 @@ export async function parseSkill(inputPath: string): Promise<ParsedSkill> {
     body: parsed.content.trim(),
     files,
     origin: null, // populated by importSkill caller
+    model,
+    tools,
+    argumentHint,
   }
 }
 
@@ -229,6 +281,9 @@ export function importSkill(
           name: skill.name,
           body: skill.body,
           description: skill.description,
+          model: skill.model,
+          tools: skill.tools,
+          argumentHint: skill.argumentHint,
         })
         const ts = new Date().toISOString()
         db.prepare(`
@@ -279,6 +334,11 @@ function createFromScratch(
       colorEnd: null,
       emoji: null,
       description: skill.description,
+      model: skill.model,
+      tools: skill.tools,                  // CreateAgentInput accepts string[] | string | null
+      argumentHint: skill.argumentHint,
+      // Deliberately leaves is_subagent / is_slash_command at default (0).
+      // Importing should not auto-create files in ~/.claude/agents/.
     })
     agentId = agent.id
     const ts = new Date().toISOString()

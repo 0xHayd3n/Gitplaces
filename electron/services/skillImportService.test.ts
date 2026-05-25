@@ -2,7 +2,10 @@
 import { describe, it, expect } from 'vitest'
 import path from 'node:path'
 import Database from 'better-sqlite3'
-import { parseSkill, discoverPlugins, importSkill } from './skillImportService'
+import {
+  parseSkill, discoverPlugins, importSkill,
+  parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint,
+} from './skillImportService'
 import { initSchema } from '../db'
 import { createFolder } from './agentsService'
 
@@ -126,5 +129,137 @@ describe('importSkill', () => {
     expect(second.conflictResolved).toBe('renamed')
     const renamed = db.prepare(`SELECT handle FROM agents WHERE id = ?`).get(second.agentId) as any
     expect(renamed.handle).toBe('basic-skill-2')
+  })
+})
+
+describe('parseModelFrontmatter', () => {
+  it('returns inherit when undefined/null/non-string', () => {
+    expect(parseModelFrontmatter(undefined)).toBe('inherit')
+    expect(parseModelFrontmatter(null)).toBe('inherit')
+    expect(parseModelFrontmatter(42)).toBe('inherit')
+  })
+  it('passes through short forms', () => {
+    expect(parseModelFrontmatter('sonnet')).toBe('sonnet')
+    expect(parseModelFrontmatter('opus')).toBe('opus')
+    expect(parseModelFrontmatter('haiku')).toBe('haiku')
+    expect(parseModelFrontmatter('inherit')).toBe('inherit')
+  })
+  it('maps CC full-form model IDs to short forms', () => {
+    expect(parseModelFrontmatter('claude-sonnet-4-6')).toBe('sonnet')
+    expect(parseModelFrontmatter('claude-opus-4-7')).toBe('opus')
+    expect(parseModelFrontmatter('claude-haiku-4-5-20251001')).toBe('haiku')
+  })
+  it('falls back to inherit on unknown model strings', () => {
+    expect(parseModelFrontmatter('gpt-4')).toBe('inherit')
+    expect(parseModelFrontmatter('claude-3-opus')).toBe('inherit')
+  })
+})
+
+describe('parseToolsFrontmatter', () => {
+  it('returns null for missing values', () => {
+    expect(parseToolsFrontmatter(undefined)).toBeNull()
+    expect(parseToolsFrontmatter(null)).toBeNull()
+  })
+  it('parses comma-separated strings', () => {
+    expect(parseToolsFrontmatter('Read, Edit, Bash')).toEqual(['Read', 'Edit', 'Bash'])
+  })
+  it('trims whitespace around items', () => {
+    expect(parseToolsFrontmatter('  Read ,Edit  , Bash')).toEqual(['Read', 'Edit', 'Bash'])
+  })
+  it('accepts YAML arrays directly', () => {
+    expect(parseToolsFrontmatter(['Read', 'Edit'])).toEqual(['Read', 'Edit'])
+  })
+  it('returns [] for empty string', () => {
+    expect(parseToolsFrontmatter('')).toEqual([])
+  })
+  it('filters non-string entries from arrays', () => {
+    expect(parseToolsFrontmatter(['Read', 42, null, 'Edit'])).toEqual(['Read', 'Edit'])
+  })
+  it('returns null for unexpected types', () => {
+    expect(parseToolsFrontmatter(42)).toBeNull()
+    expect(parseToolsFrontmatter({ x: 1 })).toBeNull()
+  })
+})
+
+describe('parseArgumentHint', () => {
+  it('returns null for missing', () => {
+    expect(parseArgumentHint(undefined)).toBeNull()
+    expect(parseArgumentHint(null)).toBeNull()
+  })
+  it('returns the string when present', () => {
+    expect(parseArgumentHint('[project-name]')).toBe('[project-name]')
+  })
+  it('reconstructs bracket notation from YAML-parsed arrays', () => {
+    // `argument-hint: [project-name]` in YAML parses as ['project-name']
+    expect(parseArgumentHint(['project-name'])).toBe('[project-name]')
+    expect(parseArgumentHint(['arg-1', 'arg-2'])).toBe('[arg-1, arg-2]')
+  })
+  it('returns null for unexpected non-string non-array types', () => {
+    expect(parseArgumentHint(42)).toBeNull()
+    expect(parseArgumentHint({ x: 1 })).toBeNull()
+  })
+})
+
+describe('parseSkill — Phase 2 fields', () => {
+  it('picks up model from frontmatter', async () => {
+    const skill = await parseSkill(path.join(FIXTURES, 'with-model'))
+    expect(skill.model).toBe('sonnet')
+  })
+
+  it('picks up comma-separated tools', async () => {
+    const skill = await parseSkill(path.join(FIXTURES, 'with-tools'))
+    expect(skill.tools).toEqual(['Read', 'Edit', 'Bash'])
+  })
+
+  it('picks up YAML-array tools', async () => {
+    const skill = await parseSkill(path.join(FIXTURES, 'with-tools-array'))
+    expect(skill.tools).toEqual(['Read', 'Edit'])
+  })
+
+  it('picks up argument-hint', async () => {
+    const skill = await parseSkill(path.join(FIXTURES, 'with-argument-hint'))
+    expect(skill.argumentHint).toBe('[project-name]')
+  })
+
+  it('defaults to inherit/null when the new fields are absent', async () => {
+    const skill = await parseSkill(path.join(FIXTURES, 'basic'))
+    expect(skill.model).toBe('inherit')
+    expect(skill.tools).toBeNull()
+    expect(skill.argumentHint).toBeNull()
+  })
+})
+
+describe('importSkill — Phase 2 fields', () => {
+  it('populates the new columns on the agent row', async () => {
+    const db = openDb()
+    const folder = createFolder(db, 'Test')
+    const skill = await parseSkill(path.join(FIXTURES, 'with-tools'))
+    const result = importSkill(db, skill, { folderId: folder.id, onConflict: 'rename' })
+    const agent = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(result.agentId) as any
+    expect(agent.model).toBe('inherit')   // with-tools.md has no model: line
+    expect(agent.tools).toBe('["Read","Edit","Bash"]')
+    expect(agent.is_subagent).toBe(0)
+    expect(agent.is_slash_command).toBe(0)
+  })
+
+  it('does NOT auto-flip is_subagent even when source had tools:', async () => {
+    const db = openDb()
+    const folder = createFolder(db, 'Test')
+    const skill = await parseSkill(path.join(FIXTURES, 'with-tools'))
+    const result = importSkill(db, skill, { folderId: folder.id, onConflict: 'rename' })
+    const agent = db.prepare(`SELECT is_subagent FROM agents WHERE id = ?`).get(result.agentId) as any
+    expect(agent.is_subagent).toBe(0)
+  })
+
+  it('overwrite branch updates model/tools/argumentHint', async () => {
+    const db = openDb()
+    const folder = createFolder(db, 'Test')
+    const skill1 = await parseSkill(path.join(FIXTURES, 'basic'))
+    const first = importSkill(db, skill1, { folderId: folder.id, onConflict: 'rename' })
+    const skill2 = await parseSkill(path.join(FIXTURES, 'with-tools'))
+    const second = importSkill(db, { ...skill2, handle: skill1.handle }, { folderId: folder.id, onConflict: 'overwrite' })
+    expect(second.agentId).toBe(first.agentId)
+    const agent = db.prepare(`SELECT tools FROM agents WHERE id = ?`).get(first.agentId) as any
+    expect(agent.tools).toBe('["Read","Edit","Bash"]')
   })
 })
