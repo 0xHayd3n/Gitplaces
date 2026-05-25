@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
-import type { AgentRow, AgentFolderRow, AgentPreset, AgentRevision } from '../../src/types/agent'
+import type { AgentRow, AgentFolderRow, AgentPreset, AgentRevision, AgentFile } from '../../src/types/agent'
 import { parseAgentPresets } from '../../src/types/agent'
 import { isValidHandle, dedupeHandle, slugifyName } from '../../src/utils/agentSlug'
 
@@ -129,6 +129,7 @@ export interface CreateAgentInput {
   colorStart: string
   colorEnd: string | null
   emoji: string | null
+  description?: string
 }
 
 export function createAgent(db: Database.Database, input: CreateAgentInput): AgentRow {
@@ -145,9 +146,9 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
   const id = randomUUID()
   const ts = nowIso()
   db.prepare(`
-    INSERT INTO agents (id, name, handle, body, folder_id, color_start, color_end, emoji, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, name, input.handle, input.body, input.folderId, input.colorStart, input.colorEnd, input.emoji, ts, ts)
+    INSERT INTO agents (id, name, handle, body, folder_id, color_start, color_end, emoji, description, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, name, input.handle, input.body, input.folderId, input.colorStart, input.colorEnd, input.emoji, input.description ?? '', ts, ts)
   const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow
   recordRevision(db, id, row.body, '[]', 'create', 'Created agent')
   return row
@@ -162,6 +163,7 @@ export interface UpdateAgentPatch {
   colorEnd?: string | null
   emoji?: string | null
   pinned?: boolean
+  description?: string
 }
 
 export function updateAgent(
@@ -214,6 +216,9 @@ export function updateAgent(
       sets.push('pinned_at = ?'); params.push(nowIso())
     }
     // when unpinning, leave pinned_at alone (preserved for re-pin UX)
+  }
+  if (patch.description !== undefined) {
+    sets.push('description = ?'); params.push(patch.description)
   }
 
   if (sets.length > 0) {
@@ -523,4 +528,74 @@ export function recordUse(
   // DESC, and a Copy click should not promote an unedited agent to the top
   // of the sidebar. last_used_at is the recent-use signal.
   db.prepare(`UPDATE agents SET last_used_at = ? WHERE id = ?`).run(nowIso(), agentId)
+}
+
+// ── Agent files (sibling .md, scripts, etc.) ────────────────────────
+
+export interface CreateFileInput {
+  filename: string
+  content: string
+  sortOrder?: number
+}
+
+export interface UpdateFilePatch {
+  filename?: string
+  content?: string
+  sortOrder?: number
+}
+
+const FILENAME_RE = /^[\w./-]+$/
+
+function assertValidFilename(name: string): void {
+  if (name.length === 0 || name.length > 200) throw new Error(`Filename out of range: ${name}`)
+  if (!FILENAME_RE.test(name)) throw new Error(`Invalid filename: ${name}`)
+}
+
+export function listFiles(db: Database.Database, agentId: string): AgentFile[] {
+  return db.prepare(
+    `SELECT * FROM agent_files WHERE agent_id = ? ORDER BY sort_order ASC, filename ASC`,
+  ).all(agentId) as AgentFile[]
+}
+
+export function createFile(
+  db: Database.Database,
+  agentId: string,
+  input: CreateFileInput,
+): AgentFile {
+  assertValidFilename(input.filename)
+  const id = randomUUID()
+  const ts = nowIso()
+  const sortOrder = input.sortOrder ?? 0
+  db.prepare(`
+    INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, agentId, input.filename, input.content, sortOrder, ts, ts)
+  return db.prepare(`SELECT * FROM agent_files WHERE id = ?`).get(id) as AgentFile
+}
+
+export function updateFile(
+  db: Database.Database,
+  agentId: string,
+  fileId: string,
+  patch: UpdateFilePatch,
+): AgentFile {
+  const sets: string[] = []
+  const params: unknown[] = []
+  if (patch.filename !== undefined) {
+    assertValidFilename(patch.filename)
+    sets.push('filename = ?'); params.push(patch.filename)
+  }
+  if (patch.content !== undefined) { sets.push('content = ?'); params.push(patch.content) }
+  if (patch.sortOrder !== undefined) { sets.push('sort_order = ?'); params.push(patch.sortOrder) }
+  if (sets.length === 0) {
+    return db.prepare(`SELECT * FROM agent_files WHERE id = ? AND agent_id = ?`).get(fileId, agentId) as AgentFile
+  }
+  sets.push('updated_at = ?'); params.push(nowIso())
+  params.push(fileId, agentId)
+  db.prepare(`UPDATE agent_files SET ${sets.join(', ')} WHERE id = ? AND agent_id = ?`).run(...params)
+  return db.prepare(`SELECT * FROM agent_files WHERE id = ?`).get(fileId) as AgentFile
+}
+
+export function deleteFile(db: Database.Database, agentId: string, fileId: string): void {
+  db.prepare(`DELETE FROM agent_files WHERE id = ? AND agent_id = ?`).run(fileId, agentId)
 }

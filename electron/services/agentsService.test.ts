@@ -5,6 +5,7 @@ import { initSchema } from '../db'
 import {
   createAgent, updateAgent, deleteAgent, duplicateAgent, getAllAgents,
   createFolder, renameFolder, deleteFolder, updateFolder,
+  listFiles, createFile, updateFile, deleteFile,
   AGENT_NAME_MAX, AGENT_BODY_MAX,
 } from './agentsService'
 
@@ -831,5 +832,103 @@ describe('agentsService — recordUse', () => {
     // Should be just the initial 'create' revision from createAgent (Phase C).
     expect(revs.length).toBe(1)
     expect(revs[0].kind).toBe('create')
+  })
+})
+
+describe('agentsService — agent files', () => {
+  let db: Database.Database
+  let agentId: string
+  beforeEach(() => {
+    db = freshDb()
+    const a = createAgent(db, {
+      name: 'A', body: '# A', folderId: null,
+      handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null,
+    })
+    agentId = a.id
+  })
+
+  it('listFiles returns rows ordered by sort_order ascending', () => {
+    db.prepare(`
+      INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('f1', agentId, 'b.md', 'B', 1, '2026-05-25T00:00:00Z', '2026-05-25T00:00:00Z')
+    db.prepare(`
+      INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run('f2', agentId, 'a.md', 'A', 0, '2026-05-25T00:00:00Z', '2026-05-25T00:00:00Z')
+    const files = listFiles(db, agentId)
+    expect(files.map(f => f.filename)).toEqual(['a.md', 'b.md'])
+  })
+
+  it('createFile inserts a file and returns the row', () => {
+    const file = createFile(db, agentId, { filename: 'notes.md', content: '# Hi', sortOrder: 0 })
+    expect(file.filename).toBe('notes.md')
+    expect(file.content).toBe('# Hi')
+    expect(listFiles(db, agentId)).toHaveLength(1)
+  })
+
+  it('createFile rejects duplicate filenames within an agent', () => {
+    createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 0 })
+    expect(() => createFile(db, agentId, { filename: 'notes.md', content: 'b', sortOrder: 1 })).toThrow()
+  })
+
+  it('updateFile patches content and bumps updated_at', async () => {
+    const f = createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 0 })
+    await new Promise(r => setTimeout(r, 5))
+    const updated = updateFile(db, agentId, f.id, { content: 'b' })
+    expect(updated.content).toBe('b')
+    expect(updated.updated_at).not.toBe(f.updated_at)
+  })
+
+  it('updateFile can rename and rejects duplicate rename', () => {
+    const f1 = createFile(db, agentId, { filename: 'a.md', content: 'a', sortOrder: 0 })
+    createFile(db, agentId, { filename: 'b.md', content: 'b', sortOrder: 1 })
+    const renamed = updateFile(db, agentId, f1.id, { filename: 'c.md' })
+    expect(renamed.filename).toBe('c.md')
+    expect(() => updateFile(db, agentId, f1.id, { filename: 'b.md' })).toThrow()
+  })
+
+  it('deleteFile removes the row', () => {
+    const f = createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 0 })
+    deleteFile(db, agentId, f.id)
+    expect(listFiles(db, agentId)).toHaveLength(0)
+  })
+
+  it('deleting the agent cascade-deletes its files', () => {
+    createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 0 })
+    deleteAgent(db, agentId)
+    const rows = db.prepare(`SELECT COUNT(*) as c FROM agent_files WHERE agent_id = ?`).get(agentId) as { c: number }
+    expect(rows.c).toBe(0)
+  })
+})
+
+describe('agentsService — description', () => {
+  let db: Database.Database
+  beforeEach(() => { db = freshDb() })
+
+  it('createAgent accepts and persists description', () => {
+    const agent = createAgent(db, {
+      name: 'A', body: '# A', folderId: null,
+      handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null,
+      description: 'My description',
+    })
+    expect(agent.description).toBe('My description')
+  })
+
+  it('createAgent defaults description to empty string when omitted', () => {
+    const agent = createAgent(db, {
+      name: 'A', body: '# A', folderId: null,
+      handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null,
+    })
+    expect(agent.description).toBe('')
+  })
+
+  it('updateAgent patches description', () => {
+    const agent = createAgent(db, {
+      name: 'A', body: '# A', folderId: null,
+      handle: 'a', colorStart: '#000000', colorEnd: null, emoji: null,
+    })
+    const updated = updateAgent(db, agent.id, { description: 'New desc' })
+    expect(updated.description).toBe('New desc')
   })
 })
