@@ -632,15 +632,23 @@ import { readSkillFromRepo } from './skillImportFromGithubService'
 
 describe('readSkillFromRepo — skills-dir', () => {
   it('returns ParsedSkill with body, description, files, and origin populated', async () => {
-    mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
-    // The trees we'll walk inside skills/brainstorming/
+    // readSkillFromRepo walks: getTreeBySha(commitSha) → root → skills → brainstorming
+    // → scripts (because scripts/ is a subdir under brainstorming/).
+    // No getBranch — we pass commitSha straight to getTreeBySha (GitHub resolves
+    // commit SHAs as tree refs).
     mockedGithub.getTreeBySha
-      .mockResolvedValueOnce([   // skills/brainstorming/ root
+      .mockResolvedValueOnce([   // root tree (from commitSha)
+        { path: 'skills', mode: '040000', type: 'tree', sha: 'skillssha' },
+      ])
+      .mockResolvedValueOnce([   // skills/ tree
+        { path: 'brainstorming', mode: '040000', type: 'tree', sha: 'brainsha' },
+      ])
+      .mockResolvedValueOnce([   // skills/brainstorming/ tree
         { path: 'SKILL.md', mode: '100644', type: 'blob', sha: 'sksha' },
         { path: 'notes.md', mode: '100644', type: 'blob', sha: 'notesha' },
         { path: 'scripts',  mode: '040000', type: 'tree', sha: 'scrsha' },
       ])
-      .mockResolvedValueOnce([   // skills/brainstorming/scripts/
+      .mockResolvedValueOnce([   // skills/brainstorming/scripts/ tree
         { path: 'run.sh', mode: '100755', type: 'blob', sha: 'rsh' },
       ])
     mockedGithub.getRawFileBytes.mockImplementation(async (_t, _o, _n, _b, p) => {
@@ -649,12 +657,6 @@ describe('readSkillFromRepo — skills-dir', () => {
       if (p === 'skills/brainstorming/scripts/run.sh') return Buffer.from('#!/bin/bash', 'utf-8')
       throw new Error(`unexpected fetch: ${p}`)
     })
-    // For the tree walk, we need the tree SHA of skills/brainstorming.
-    // readSkillFromRepo resolves it via a root → skills → skill walk:
-    // we already mocked Tree calls above as a flat sequence; the implementation
-    // uses getRawFileBytes for content and a separate tree walk for the file
-    // index. Here we structure the mock so the first getTreeBySha gives the
-    // skill's contents directly; see implementation.
 
     const skill = await readSkillFromRepo('obra', 'superpowers', 'main', 'a1b2c3d4567', 'skills/brainstorming')
 
@@ -672,12 +674,18 @@ describe('readSkillFromRepo — skills-dir', () => {
   })
 
   it('continues with remaining files when one file fetch fails', async () => {
-    mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
-    mockedGithub.getTreeBySha.mockResolvedValueOnce([
-      { path: 'SKILL.md',  mode: '100644', type: 'blob', sha: 'sksha' },
-      { path: 'good.md',   mode: '100644', type: 'blob', sha: 'goodsha' },
-      { path: 'broken.md', mode: '100644', type: 'blob', sha: 'brokensha' },
-    ])
+    mockedGithub.getTreeBySha
+      .mockResolvedValueOnce([   // root
+        { path: 'skills', mode: '040000', type: 'tree', sha: 'skillssha' },
+      ])
+      .mockResolvedValueOnce([   // skills/
+        { path: 'foo', mode: '040000', type: 'tree', sha: 'foosha' },
+      ])
+      .mockResolvedValueOnce([   // skills/foo/
+        { path: 'SKILL.md',  mode: '100644', type: 'blob', sha: 'sksha' },
+        { path: 'good.md',   mode: '100644', type: 'blob', sha: 'goodsha' },
+        { path: 'broken.md', mode: '100644', type: 'blob', sha: 'brokensha' },
+      ])
     mockedGithub.getRawFileBytes.mockImplementation(async (_t, _o, _n, _b, p) => {
       if (p.endsWith('SKILL.md')) return Buffer.from(SKILL_MD_BODY, 'utf-8')
       if (p.endsWith('good.md')) return Buffer.from('good', 'utf-8')
@@ -685,26 +693,32 @@ describe('readSkillFromRepo — skills-dir', () => {
       throw new Error(`unexpected: ${p}`)
     })
 
-    const skill = await readSkillFromRepo('o', 'r', 'main', 'sha', 'skills/foo')
+    const skill = await readSkillFromRepo('o', 'r', 'main', 'sha1234', 'skills/foo')
 
     expect(skill.files.map(f => f.filename)).toContain('good.md')
     expect(skill.files.map(f => f.filename)).not.toContain('broken.md')
   })
 
   it('skips ignored files', async () => {
-    mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
-    mockedGithub.getTreeBySha.mockResolvedValueOnce([
-      { path: 'SKILL.md',   mode: '100644', type: 'blob', sha: 'sksha' },
-      { path: '.DS_Store',  mode: '100644', type: 'blob', sha: 'dssha' },
-      { path: 'real.md',    mode: '100644', type: 'blob', sha: 'rsha' },
-    ])
+    mockedGithub.getTreeBySha
+      .mockResolvedValueOnce([   // root
+        { path: 'skills', mode: '040000', type: 'tree', sha: 'skillssha' },
+      ])
+      .mockResolvedValueOnce([   // skills/
+        { path: 'foo', mode: '040000', type: 'tree', sha: 'foosha' },
+      ])
+      .mockResolvedValueOnce([   // skills/foo/
+        { path: 'SKILL.md',   mode: '100644', type: 'blob', sha: 'sksha' },
+        { path: '.DS_Store',  mode: '100644', type: 'blob', sha: 'dssha' },
+        { path: 'real.md',    mode: '100644', type: 'blob', sha: 'rsha' },
+      ])
     mockedGithub.getRawFileBytes.mockImplementation(async (_t, _o, _n, _b, p) => {
       if (p.endsWith('SKILL.md')) return Buffer.from(SKILL_MD_BODY, 'utf-8')
       if (p.endsWith('real.md')) return Buffer.from('r', 'utf-8')
       throw new Error(`unexpected: ${p}`)
     })
 
-    const skill = await readSkillFromRepo('o', 'r', 'main', 'sha', 'skills/foo')
+    const skill = await readSkillFromRepo('o', 'r', 'main', 'sha1234', 'skills/foo')
 
     expect(skill.files.map(f => f.filename)).toEqual(['real.md'])
   })
@@ -712,7 +726,6 @@ describe('readSkillFromRepo — skills-dir', () => {
 
 describe('readSkillFromRepo — bare-root', () => {
   it('excludes README.md, LICENSE, package.json from files[]', async () => {
-    mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
     mockedGithub.getTreeBySha.mockResolvedValueOnce([
       { path: 'README.md',       mode: '100644', type: 'blob', sha: 'r' },
       { path: 'LICENSE',         mode: '100644', type: 'blob', sha: 'l' },
@@ -726,7 +739,7 @@ describe('readSkillFromRepo — bare-root', () => {
       throw new Error(`unexpected: ${p}`)
     })
 
-    const skill = await readSkillFromRepo('o', 'singleskill', 'main', 'sha', '.')
+    const skill = await readSkillFromRepo('o', 'singleskill', 'main', 'sha1234', '.')
 
     expect(skill.files.map(f => f.filename)).toEqual(['helper.md'])
     expect(skill.origin?.path).toBe('.')
@@ -766,7 +779,7 @@ export async function readSkillFromRepo(
   repoPath: string,
 ): Promise<ParsedSkill> {
   const token = getToken() ?? null
-  const fileIndex = await listFilesUnderRepoPath(token, owner, name, branch, repoPath)
+  const fileIndex = await listFilesUnderRepoPath(token, owner, name, commitSha, repoPath)
   const isBareRoot = repoPath === '.'
   const skillMdPath = isBareRoot ? 'SKILL.md' : `${repoPath}/SKILL.md`
 
@@ -816,19 +829,20 @@ export async function readSkillFromRepo(
  * Returns relative paths (relative to repoPath, or to repo root for '.') of all
  * files under the given subtree, excluding ignored names and (for bare-root)
  * the extra-excluded files.
+ *
+ * Note: we pass `commitSha` directly to getTreeBySha as the root ref. GitHub's
+ * Git Trees API accepts either tree SHAs or commit SHAs (it resolves the commit
+ * to its root tree). This saves a getBranch call per read.
  */
 async function listFilesUnderRepoPath(
   token: string | null,
   owner: string,
   name: string,
-  branch: string,
+  commitSha: string,
   repoPath: string,
 ): Promise<string[]> {
   const isBareRoot = repoPath === '.'
-  // Resolve the tree SHA for repoPath. For root we re-fetch via getBranch+getTreeBySha;
-  // for nested paths we walk from the root tree down to the target dir.
-  const { rootTreeSha } = await getBranch(token, owner, name, branch)
-  let entries = await getTreeBySha(token, owner, name, rootTreeSha)
+  let entries = await getTreeBySha(token, owner, name, commitSha)
   if (!isBareRoot) {
     const segments = repoPath.split('/')
     for (const seg of segments) {
