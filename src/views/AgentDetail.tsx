@@ -13,6 +13,7 @@ import { isValidHandle } from '../utils/agentSlug'
 import AgentVariablePresetBar from '../components/AgentVariablePresetBar'
 import AgentHistoryTimeline from '../components/AgentHistoryTimeline'
 import AgentSwatchPopover from '../components/AgentSwatchPopover'
+import AgentFilesTab from '../components/AgentFilesTab'
 import './AgentDetail.css'
 
 type SaveStatus = 'idle' | 'saving' | 'saved'
@@ -386,6 +387,9 @@ export default function AgentDetail() {
           ) : (
             <div className="agent-detail-tab-placeholder">Loading history…</div>
           )
+        )}
+        {activeTab === 'files' && (
+          <AgentFilesTab agent={agent} />
         )}
         {activeTab === 'settings' && (
           <AgentSettingsTab
