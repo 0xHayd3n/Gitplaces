@@ -484,7 +484,7 @@ describe('agentsService — presets', () => {
 })
 
 import {
-  recordRevision, listRevisions,
+  recordRevision,
   REVISION_RETENTION,
 } from './agentsService'
 

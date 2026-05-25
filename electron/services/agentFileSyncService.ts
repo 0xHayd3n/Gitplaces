@@ -50,16 +50,16 @@ export const MODEL_FRONTMATTER: Record<'sonnet' | 'opus' | 'haiku', string> = {
   haiku:  'claude-haiku-4-5-20251001',
 }
 
-function resolvedDescription(agent: AgentRow): string {
+function resolvedDescription(agent: AgentRow, primaryContent: string): string {
   const explicit = agent.description?.trim()
   if (explicit) return explicit
-  return deriveDescription(agent.body)
+  return deriveDescription(primaryContent)
 }
 
-export function previewSubagentFile(agent: AgentRow): string {
+export function previewSubagentFile(agent: AgentRow, primaryContent: string): string {
   const data: Record<string, unknown> = {
     name: agent.handle,
-    description: resolvedDescription(agent),
+    description: resolvedDescription(agent, primaryContent),
   }
   const tools = parseAgentTools(agent.tools)
   if (tools !== null) {
@@ -68,17 +68,17 @@ export function previewSubagentFile(agent: AgentRow): string {
   if (agent.model !== 'inherit') {
     data.model = MODEL_FRONTMATTER[agent.model]
   }
-  return matter.stringify(agent.body, data)
+  return matter.stringify(primaryContent, data)
 }
 
-export function previewSlashCommandFile(agent: AgentRow): string {
+export function previewSlashCommandFile(agent: AgentRow, primaryContent: string): string {
   const data: Record<string, unknown> = {
-    description: resolvedDescription(agent),
+    description: resolvedDescription(agent, primaryContent),
   }
   if (agent.argument_hint && agent.argument_hint.trim().length > 0) {
     data['argument-hint'] = agent.argument_hint
   }
-  return matter.stringify(agent.body, data)
+  return matter.stringify(primaryContent, data)
 }
 
 // ── Sync result types ───────────────────────────────────────────────
@@ -104,6 +104,7 @@ export interface SyncContext {
 
 export async function syncAgentToDisk(
   agent: AgentRow,
+  primaryContent: string,
   ctx: SyncContext = {},
 ): Promise<SyncResult> {
   const [subagent, slashCommand] = await Promise.all([
@@ -112,7 +113,7 @@ export async function syncAgentToDisk(
       currentPath: subagentPath(agent.handle),
       oldPath: ctx.oldHandle ? subagentPath(ctx.oldHandle) : null,
       syncedAt: agent.synced_subagent_at,
-      content: () => previewSubagentFile(agent),
+      content: () => previewSubagentFile(agent, primaryContent),
       forceOverwrite: ctx.forceOverwrite === true,
     }),
     syncOneSurface({
@@ -120,7 +121,7 @@ export async function syncAgentToDisk(
       currentPath: slashCommandPath(agent.handle),
       oldPath: ctx.oldHandle ? slashCommandPath(ctx.oldHandle) : null,
       syncedAt: agent.synced_slash_command_at,
-      content: () => previewSlashCommandFile(agent),
+      content: () => previewSlashCommandFile(agent, primaryContent),
       forceOverwrite: ctx.forceOverwrite === true,
     }),
   ])

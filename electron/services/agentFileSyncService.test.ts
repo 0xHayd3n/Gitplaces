@@ -27,12 +27,16 @@ afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true })
 })
 
+// Primary content used in every sync test below — passed explicitly into
+// preview/sync calls since Task 3 moved body out of AgentRow's read path.
+const BODY = 'Agent body content.'
+
 function baseAgent(overrides: Partial<AgentRow> = {}): AgentRow {
   return {
     id: 'agent-1',
     name: 'My Agent',
     handle: 'my-agent',
-    body: 'Agent body content.',
+    body: BODY,
     folder_id: null,
     color_start: '#888888',
     color_end: null,
@@ -111,7 +115,7 @@ describe('checkConflict', () => {
 
 describe('previewSubagentFile', () => {
   it('writes name, description, and body — omits tools and model when defaults', () => {
-    const out = previewSubagentFile(baseAgent())
+    const out = previewSubagentFile(baseAgent(), BODY)
     expect(out).toContain('name: my-agent')
     expect(out).toContain('description: A test agent.')
     expect(out).not.toContain('tools:')
@@ -120,27 +124,27 @@ describe('previewSubagentFile', () => {
   })
 
   it('emits comma-separated tools when array is non-empty', () => {
-    const out = previewSubagentFile(baseAgent({ tools: '["Read","Edit","Bash"]' }))
+    const out = previewSubagentFile(baseAgent({ tools: '["Read","Edit","Bash"]' }), BODY)
     // gray-matter may or may not quote — assert via round-trip parse rather than byte match
     const parsed = matter(out)
     expect(parsed.data.tools).toBe('Read, Edit, Bash')
   })
 
   it('emits empty tools when array is []', () => {
-    const out = previewSubagentFile(baseAgent({ tools: '[]' }))
+    const out = previewSubagentFile(baseAgent({ tools: '[]' }), BODY)
     const parsed = matter(out)
     // Empty array → empty string after join; YAML emits this as `tools: ''`
     expect(parsed.data.tools).toBe('')
   })
 
   it('emits the mapped model ID when non-inherit', () => {
-    expect(matter(previewSubagentFile(baseAgent({ model: 'sonnet' }))).data.model).toBe('claude-sonnet-4-6')
-    expect(matter(previewSubagentFile(baseAgent({ model: 'opus' }))).data.model).toBe('claude-opus-4-7')
-    expect(matter(previewSubagentFile(baseAgent({ model: 'haiku' }))).data.model).toBe('claude-haiku-4-5-20251001')
+    expect(matter(previewSubagentFile(baseAgent({ model: 'sonnet' }), BODY)).data.model).toBe('claude-sonnet-4-6')
+    expect(matter(previewSubagentFile(baseAgent({ model: 'opus' }), BODY)).data.model).toBe('claude-opus-4-7')
+    expect(matter(previewSubagentFile(baseAgent({ model: 'haiku' }), BODY)).data.model).toBe('claude-haiku-4-5-20251001')
   })
 
   it('falls back to deriveDescription when description is empty', () => {
-    const out = previewSubagentFile(baseAgent({ description: '', body: 'First line.\nSecond line.' }))
+    const out = previewSubagentFile(baseAgent({ description: '' }), 'First line.\nSecond line.')
     const parsed = matter(out)
     expect(typeof parsed.data.description).toBe('string')
     expect((parsed.data.description as string).length).toBeGreaterThan(0)
@@ -152,7 +156,7 @@ describe('previewSubagentFile', () => {
       model: 'sonnet',
       description: 'Multi\nline\ndesc.',
     })
-    const written = previewSubagentFile(agent)
+    const written = previewSubagentFile(agent, BODY)
     const parsed = matter(written)
     expect(parsed.data.name).toBe('my-agent')
     expect(parsed.data.description).toBe('Multi\nline\ndesc.')
@@ -164,7 +168,7 @@ describe('previewSubagentFile', () => {
 
 describe('previewSlashCommandFile', () => {
   it('writes description and body — omits argument-hint when null', () => {
-    const out = previewSlashCommandFile(baseAgent())
+    const out = previewSlashCommandFile(baseAgent(), BODY)
     const parsed = matter(out)
     expect(parsed.data.description).toBe('A test agent.')
     expect(parsed.data['argument-hint']).toBeUndefined()
@@ -172,7 +176,7 @@ describe('previewSlashCommandFile', () => {
   })
 
   it('emits argument-hint when non-empty', () => {
-    const out = previewSlashCommandFile(baseAgent({ argument_hint: '[project-name]' }))
+    const out = previewSlashCommandFile(baseAgent({ argument_hint: '[project-name]' }), BODY)
     const parsed = matter(out)
     expect(parsed.data['argument-hint']).toBe('[project-name]')
   })
@@ -181,7 +185,7 @@ describe('previewSlashCommandFile', () => {
     const out = previewSlashCommandFile(baseAgent({
       tools: '["Read"]',
       model: 'sonnet',
-    }))
+    }), BODY)
     const parsed = matter(out)
     expect(parsed.data.name).toBeUndefined()
     expect(parsed.data.tools).toBeUndefined()
@@ -194,7 +198,7 @@ describe('previewSlashCommandFile', () => {
 describe('syncAgentToDisk', () => {
   it('writes the subagent file when is_subagent=1 and file does not exist', async () => {
     const agent = baseAgent({ is_subagent: 1 })
-    const result = await syncAgentToDisk(agent)
+    const result = await syncAgentToDisk(agent, BODY)
     expect(result.subagent).toMatchObject({ status: 'written' })
     const written = await fs.readFile(subagentPath('my-agent'), 'utf-8')
     expect(written).toContain('name: my-agent')
@@ -202,7 +206,7 @@ describe('syncAgentToDisk', () => {
 
   it('writes the slash command file when is_slash_command=1', async () => {
     const agent = baseAgent({ is_slash_command: 1 })
-    const result = await syncAgentToDisk(agent)
+    const result = await syncAgentToDisk(agent, BODY)
     expect(result.slashCommand).toMatchObject({ status: 'written' })
     const written = await fs.readFile(slashCommandPath('my-agent'), 'utf-8')
     expect(written).toContain('description:')
@@ -210,7 +214,7 @@ describe('syncAgentToDisk', () => {
 
   it('writes BOTH files when both surfaces are enabled', async () => {
     const agent = baseAgent({ is_subagent: 1, is_slash_command: 1 })
-    const result = await syncAgentToDisk(agent)
+    const result = await syncAgentToDisk(agent, BODY)
     expect(result.subagent).toMatchObject({ status: 'written' })
     expect(result.slashCommand).toMatchObject({ status: 'written' })
     expect(await fileExists(subagentPath('my-agent'))).toBe(true)
@@ -218,14 +222,14 @@ describe('syncAgentToDisk', () => {
   })
 
   it('returns skipped for surfaces that are off', async () => {
-    const result = await syncAgentToDisk(baseAgent())
+    const result = await syncAgentToDisk(baseAgent(), BODY)
     expect(result.subagent).toMatchObject({ status: 'skipped' })
     expect(result.slashCommand).toMatchObject({ status: 'skipped' })
   })
 
   it('creates parent directories if missing', async () => {
     const agent = baseAgent({ is_subagent: 1 })
-    await syncAgentToDisk(agent)
+    await syncAgentToDisk(agent, BODY)
     expect(await fileExists(subagentPath('my-agent'))).toBe(true)
   })
 
@@ -233,7 +237,7 @@ describe('syncAgentToDisk', () => {
     await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
     await fs.writeFile(subagentPath('my-agent'), 'hand-authored content')
     const agent = baseAgent({ is_subagent: 1, synced_subagent_at: null })
-    const result = await syncAgentToDisk(agent)
+    const result = await syncAgentToDisk(agent, BODY)
     expect(result.subagent).toMatchObject({ status: 'conflict' })
     expect(await fs.readFile(subagentPath('my-agent'), 'utf-8')).toBe('hand-authored content')
   })
@@ -242,7 +246,7 @@ describe('syncAgentToDisk', () => {
     await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
     await fs.writeFile(subagentPath('my-agent'), 'previously synced content')
     const agent = baseAgent({ is_subagent: 1, synced_subagent_at: '2026-05-20T00:00:00.000Z' })
-    const result = await syncAgentToDisk(agent)
+    const result = await syncAgentToDisk(agent, BODY)
     expect(result.subagent).toMatchObject({ status: 'written' })
     expect(await fs.readFile(subagentPath('my-agent'), 'utf-8')).toContain('name: my-agent')
   })
@@ -251,7 +255,7 @@ describe('syncAgentToDisk', () => {
     await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
     await fs.writeFile(subagentPath('my-agent'), 'hand-authored content')
     const agent = baseAgent({ is_subagent: 1, synced_subagent_at: null })
-    const result = await syncAgentToDisk(agent, { forceOverwrite: true })
+    const result = await syncAgentToDisk(agent, BODY, { forceOverwrite: true })
     expect(result.subagent).toMatchObject({ status: 'written' })
     expect(await fs.readFile(subagentPath('my-agent'), 'utf-8')).toContain('name: my-agent')
   })
@@ -260,20 +264,20 @@ describe('syncAgentToDisk', () => {
     await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
     await fs.writeFile(subagentPath('my-agent'), 'previously synced')
     const agent = baseAgent({ is_subagent: 0, synced_subagent_at: '2026-05-20T00:00:00.000Z' })
-    const result = await syncAgentToDisk(agent)
+    const result = await syncAgentToDisk(agent, BODY)
     expect(result.subagent).toMatchObject({ status: 'deleted' })
     expect(await fileExists(subagentPath('my-agent'))).toBe(false)
   })
 
   it('treats already-missing file as deleted success when previously synced', async () => {
     const agent = baseAgent({ is_subagent: 0, synced_subagent_at: '2026-05-20T00:00:00.000Z' })
-    const result = await syncAgentToDisk(agent)
+    const result = await syncAgentToDisk(agent, BODY)
     expect(result.subagent).toMatchObject({ status: 'deleted' })
   })
 
   it('skips when surface off and never synced', async () => {
     const agent = baseAgent({ is_subagent: 0, synced_subagent_at: null })
-    const result = await syncAgentToDisk(agent)
+    const result = await syncAgentToDisk(agent, BODY)
     expect(result.subagent).toMatchObject({ status: 'skipped' })
   })
 
@@ -281,7 +285,7 @@ describe('syncAgentToDisk', () => {
     await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
     await fs.writeFile(subagentPath('old-handle'), 'previously synced')
     const agent = baseAgent({ handle: 'new-handle', is_subagent: 1, synced_subagent_at: '2026-05-20T00:00:00.000Z' })
-    await syncAgentToDisk(agent, { oldHandle: 'old-handle' })
+    await syncAgentToDisk(agent, BODY, { oldHandle: 'old-handle' })
     expect(await fileExists(subagentPath('old-handle'))).toBe(false)
     expect(await fileExists(subagentPath('new-handle'))).toBe(true)
   })
@@ -297,7 +301,7 @@ describe('syncAgentToDisk', () => {
       is_subagent: 0,
       synced_subagent_at: null,
     })
-    await syncAgentToDisk(agent, { oldHandle: 'old-handle' })
+    await syncAgentToDisk(agent, BODY, { oldHandle: 'old-handle' })
     expect(await fileExists(subagentPath('old-handle'))).toBe(true)
     expect(await fs.readFile(subagentPath('old-handle'), 'utf-8')).toBe('hand-authored, not ours')
   })
@@ -313,7 +317,7 @@ describe('syncAgentToDisk', () => {
       is_subagent: 0,
       synced_subagent_at: '2026-05-20T00:00:00.000Z',
     })
-    const result = await syncAgentToDisk(agent, { oldHandle: 'old-handle' })
+    const result = await syncAgentToDisk(agent, BODY, { oldHandle: 'old-handle' })
     expect(await fileExists(subagentPath('old-handle'))).toBe(false)
     expect(result.subagent.status).toBe('deleted')
   })
@@ -322,7 +326,7 @@ describe('syncAgentToDisk', () => {
     // Create a directory where the subagent file should go — makes write fail with EISDIR
     await fs.mkdir(subagentPath('my-agent'), { recursive: true })
     const agent = baseAgent({ is_subagent: 1, is_slash_command: 1, synced_subagent_at: '2026-05-20T00:00:00.000Z' })
-    const result = await syncAgentToDisk(agent)
+    const result = await syncAgentToDisk(agent, BODY)
     expect(result.subagent).toMatchObject({ status: 'error' })
     expect(result.slashCommand).toMatchObject({ status: 'written' })
   })
