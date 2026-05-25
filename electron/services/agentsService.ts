@@ -178,18 +178,28 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
 
   const id = randomUUID()
   const ts = nowIso()
-  db.prepare(`
-    INSERT INTO agents (
-      id, name, handle, body, folder_id, color_start, color_end, emoji, description,
-      tools, model, is_subagent, is_slash_command, argument_hint,
-      created_at, updated_at
+  const insert = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO agents (
+        id, name, handle, body, folder_id, color_start, color_end, emoji, description,
+        tools, model, is_subagent, is_slash_command, argument_hint,
+        created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, name, input.handle, input.body, input.folderId, input.colorStart, input.colorEnd, input.emoji, input.description ?? '',
+      tools, model, isSubagent, isSlashCommand, argumentHint,
+      ts, ts,
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id, name, input.handle, input.body, input.folderId, input.colorStart, input.colorEnd, input.emoji, input.description ?? '',
-    tools, model, isSubagent, isSlashCommand, argumentHint,
-    ts, ts,
-  )
+    // Primary file row — dual-write of the same content. Task 9 drops agents.body
+    // once every consumer reads from agent_files.
+    db.prepare(`
+      INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 0, ?, ?)
+    `).run(`pf-${id}`, id, `${input.handle}.md`, input.body, ts, ts)
+  })
+  insert()
+
   const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow
   recordRevision(db, id, row.body, '[]', 'create', 'Created agent')
   return row
@@ -218,11 +228,11 @@ export function updateAgent(
   patch: UpdateAgentPatch,
 ): AgentRow {
   // Read prior body if we'll need to detect a real change to snapshot. Only
-  // care when patch.body is present.
+  // care when patch.body is present. Source: the primary file row — the
+  // canonical body store going forward.
   let priorBody: string | null = null
   if (patch.body !== undefined) {
-    const prior = db.prepare('SELECT body FROM agents WHERE id = ?').get(id) as { body: string } | undefined
-    priorBody = prior?.body ?? null
+    priorBody = readPrimaryBody(db, id)
   }
   const sets: string[] = []
   const params: unknown[] = []
@@ -284,11 +294,28 @@ export function updateAgent(
     sets.push('is_slash_command = ?'); params.push(patch.isSlashCommand ? 1 : 0)
   }
 
-  if (sets.length > 0) {
-    sets.push('updated_at = ?'); params.push(nowIso())
-    params.push(id)
-    db.prepare(`UPDATE agents SET ${sets.join(', ')} WHERE id = ?`).run(...params)
-  }
+  const ts = nowIso()
+  const apply = db.transaction(() => {
+    if (sets.length > 0) {
+      sets.push('updated_at = ?'); params.push(ts)
+      params.push(id)
+      db.prepare(`UPDATE agents SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+    }
+    // Body — dual-write to the primary file row (lockstep with the agents.body
+    // UPDATE above). Task 9 drops the body column.
+    if (patch.body !== undefined) {
+      db.prepare(
+        `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+      ).run(patch.body, ts, id)
+    }
+    // Handle rename — also rename the primary file row's filename.
+    if (patch.handle !== undefined) {
+      db.prepare(
+        `UPDATE agent_files SET filename = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+      ).run(`${patch.handle}.md`, ts, id)
+    }
+  })
+  apply()
 
   const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow | undefined
   if (!row) throw new Error(`Unknown agent id: ${id}`)
@@ -323,6 +350,7 @@ export function setSyncedAt(
 export function duplicateAgent(db: Database.Database, id: string): AgentRow {
   const src = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow | undefined
   if (!src) throw new Error(`Unknown agent id: ${id}`)
+  const srcPrimary = getPrimaryFile(db, id)
   const suffix = ' (copy)'
   const baseName = src.name.length + suffix.length > AGENT_NAME_MAX
     ? src.name.slice(0, AGENT_NAME_MAX - suffix.length)
@@ -333,7 +361,7 @@ export function duplicateAgent(db: Database.Database, id: string): AgentRow {
 
   return createAgent(db, {
     name: `${baseName}${suffix}`,
-    body: src.body,
+    body: srcPrimary.content,
     folderId: src.folder_id,
     handle: dupHandle,
     colorStart: src.color_start ?? '#888888',
@@ -347,6 +375,39 @@ export function duplicateAgent(db: Database.Database, id: string): AgentRow {
     tools: parseAgentTools(src.tools),
     argumentHint: src.argument_hint,
   })
+}
+
+// ── Primary file (Phase 26 body-as-file) ────────────────────────────
+
+export interface PrimaryFile {
+  id: string
+  filename: string
+  content: string
+  updated_at: string
+}
+
+export function getPrimaryFile(db: Database.Database, agentId: string): PrimaryFile {
+  assertAgentExists(db, agentId)
+  const row = db.prepare(
+    `SELECT id, filename, content, updated_at FROM agent_files
+     WHERE agent_id = ? AND sort_order = 0`
+  ).get(agentId) as PrimaryFile | undefined
+  if (!row) throw new Error(`Agent ${agentId} has no primary file row`)
+  return row
+}
+
+function isPrimaryFile(db: Database.Database, agentId: string, fileId: string): boolean {
+  const row = db.prepare(
+    `SELECT sort_order FROM agent_files WHERE id = ? AND agent_id = ?`
+  ).get(fileId, agentId) as { sort_order: number } | undefined
+  return row?.sort_order === 0
+}
+
+function readPrimaryBody(db: Database.Database, agentId: string): string {
+  const row = db.prepare(
+    `SELECT content FROM agent_files WHERE agent_id = ? AND sort_order = 0`
+  ).get(agentId) as { content: string } | undefined
+  return row?.content ?? ''
 }
 
 // ── Aggregate read ──────────────────────────────────────────────────
@@ -428,7 +489,7 @@ export function createPreset(
   }
   writePresets(db, agentId, [...presets, preset])
   const after = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string }
-  const body = (db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agentId) as { body: string }).body
+  const body = readPrimaryBody(db, agentId)
   recordRevision(db, agentId, body, after.presets_json, 'preset_change', `Added preset "${preset.name}"`)
   return preset
 }
@@ -458,7 +519,7 @@ export function updatePreset(
   nextPresets[idx] = updated
   writePresets(db, agentId, nextPresets)
   const after = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string }
-  const body = (db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agentId) as { body: string }).body
+  const body = readPrimaryBody(db, agentId)
   const summary = patch.name !== undefined && patch.name.trim() !== current.name
     ? `Renamed preset "${current.name}" to "${nextName}"`
     : `Updated preset "${nextName}"`
@@ -474,7 +535,7 @@ export function deletePreset(db: Database.Database, agentId: string, presetId: s
   const next = presets.filter(p => p.id !== presetId)
   writePresets(db, agentId, next)
   const after = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string }
-  const body = (db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agentId) as { body: string }).body
+  const body = readPrimaryBody(db, agentId)
   recordRevision(db, agentId, body, after.presets_json, 'preset_change', `Deleted preset "${target.name}"`)
 }
 
@@ -500,7 +561,7 @@ export function duplicatePreset(
   }
   writePresets(db, agentId, [...presets, dup])
   const after = db.prepare(`SELECT presets_json FROM agents WHERE id = ?`).get(agentId) as { presets_json: string }
-  const body = (db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agentId) as { body: string }).body
+  const body = readPrimaryBody(db, agentId)
   recordRevision(db, agentId, body, after.presets_json, 'preset_change', `Duplicated preset "${src.name}"`)
   return dup
 }
@@ -597,8 +658,16 @@ export function revertToRevision(
   if (!rev) throw new Error(`Unknown revision id: ${revisionId}`)
   if (rev.agent_id !== agentId) throw new Error(`Revision ${revisionId} does not belong to agent ${agentId}`)
 
-  db.prepare(`UPDATE agents SET body = ?, presets_json = ?, updated_at = ? WHERE id = ?`)
-    .run(rev.body, rev.presets_json, nowIso(), agentId)
+  const ts = nowIso()
+  const apply = db.transaction(() => {
+    // Dual-write: agents.body + primary file row (lockstep until Task 9 drops the column)
+    db.prepare(`UPDATE agents SET body = ?, presets_json = ?, updated_at = ? WHERE id = ?`)
+      .run(rev.body, rev.presets_json, ts, agentId)
+    db.prepare(
+      `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
+    ).run(rev.body, ts, agentId)
+  })
+  apply()
 
   recordRevision(db, agentId, rev.body, rev.presets_json, 'revert', `Reverted to "${rev.summary}"`)
 
@@ -667,6 +736,9 @@ export function updateFile(
   fileId: string,
   patch: UpdateFilePatch,
 ): AgentFile {
+  if (patch.filename !== undefined && isPrimaryFile(db, agentId, fileId)) {
+    throw new Error(`Cannot rename the primary file for agent ${agentId} — filename tracks the handle`)
+  }
   const sets: string[] = []
   const params: unknown[] = []
   if (patch.filename !== undefined) {
@@ -685,5 +757,8 @@ export function updateFile(
 }
 
 export function deleteFile(db: Database.Database, agentId: string, fileId: string): void {
+  if (isPrimaryFile(db, agentId, fileId)) {
+    throw new Error(`Cannot delete the primary file for agent ${agentId}`)
+  }
   db.prepare(`DELETE FROM agent_files WHERE id = ? AND agent_id = ?`).run(fileId, agentId)
 }

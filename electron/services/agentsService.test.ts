@@ -7,6 +7,7 @@ import {
   createFolder, renameFolder, deleteFolder, updateFolder,
   listFiles, createFile, updateFile, deleteFile,
   assertValidModel, assertValidTools, setSyncedAt,
+  getPrimaryFile, listRevisions,
   AGENT_NAME_MAX, AGENT_BODY_MAX,
 } from './agentsService'
 
@@ -848,33 +849,37 @@ describe('agentsService — agent files', () => {
     agentId = a.id
   })
 
-  it('listFiles returns rows ordered by sort_order ascending', () => {
+  // Note: createAgent automatically creates a primary file row at sort_order=0
+  // named <handle>.md. These tests use sibling files at sort_order >= 1, since
+  // sort_order=0 is reserved for the primary.
+
+  it('listFiles returns rows ordered by sort_order ascending (primary first)', () => {
     db.prepare(`
       INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('f1', agentId, 'b.md', 'B', 1, '2026-05-25T00:00:00Z', '2026-05-25T00:00:00Z')
+    `).run('f1', agentId, 'b.md', 'B', 2, '2026-05-25T00:00:00Z', '2026-05-25T00:00:00Z')
     db.prepare(`
       INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('f2', agentId, 'a.md', 'A', 0, '2026-05-25T00:00:00Z', '2026-05-25T00:00:00Z')
+    `).run('f2', agentId, 'aa.md', 'AA', 1, '2026-05-25T00:00:00Z', '2026-05-25T00:00:00Z')
     const files = listFiles(db, agentId)
-    expect(files.map(f => f.filename)).toEqual(['a.md', 'b.md'])
+    expect(files.map(f => f.filename)).toEqual(['a.md', 'aa.md', 'b.md'])
   })
 
-  it('createFile inserts a file and returns the row', () => {
-    const file = createFile(db, agentId, { filename: 'notes.md', content: '# Hi', sortOrder: 0 })
+  it('createFile inserts a sibling file alongside the primary', () => {
+    const file = createFile(db, agentId, { filename: 'notes.md', content: '# Hi', sortOrder: 1 })
     expect(file.filename).toBe('notes.md')
     expect(file.content).toBe('# Hi')
-    expect(listFiles(db, agentId)).toHaveLength(1)
+    expect(listFiles(db, agentId)).toHaveLength(2)  // primary + new sibling
   })
 
   it('createFile rejects duplicate filenames within an agent', () => {
-    createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 0 })
-    expect(() => createFile(db, agentId, { filename: 'notes.md', content: 'b', sortOrder: 1 })).toThrow()
+    createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 1 })
+    expect(() => createFile(db, agentId, { filename: 'notes.md', content: 'b', sortOrder: 2 })).toThrow()
   })
 
   it('updateFile patches content and bumps updated_at', async () => {
-    const f = createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 0 })
+    const f = createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 1 })
     await new Promise(r => setTimeout(r, 5))
     const updated = updateFile(db, agentId, f.id, { content: 'b' })
     expect(updated.content).toBe('b')
@@ -882,21 +887,21 @@ describe('agentsService — agent files', () => {
   })
 
   it('updateFile can rename and rejects duplicate rename', () => {
-    const f1 = createFile(db, agentId, { filename: 'a.md', content: 'a', sortOrder: 0 })
-    createFile(db, agentId, { filename: 'b.md', content: 'b', sortOrder: 1 })
-    const renamed = updateFile(db, agentId, f1.id, { filename: 'c.md' })
-    expect(renamed.filename).toBe('c.md')
-    expect(() => updateFile(db, agentId, f1.id, { filename: 'b.md' })).toThrow()
+    const f1 = createFile(db, agentId, { filename: 'aa.md', content: 'a', sortOrder: 1 })
+    createFile(db, agentId, { filename: 'bb.md', content: 'b', sortOrder: 2 })
+    const renamed = updateFile(db, agentId, f1.id, { filename: 'cc.md' })
+    expect(renamed.filename).toBe('cc.md')
+    expect(() => updateFile(db, agentId, f1.id, { filename: 'bb.md' })).toThrow()
   })
 
-  it('deleteFile removes the row', () => {
-    const f = createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 0 })
+  it('deleteFile removes a sibling row (primary remains)', () => {
+    const f = createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 1 })
     deleteFile(db, agentId, f.id)
-    expect(listFiles(db, agentId)).toHaveLength(0)
+    expect(listFiles(db, agentId)).toHaveLength(1)  // primary still there
   })
 
-  it('deleting the agent cascade-deletes its files', () => {
-    createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 0 })
+  it('deleting the agent cascade-deletes its files (including the primary)', () => {
+    createFile(db, agentId, { filename: 'notes.md', content: 'a', sortOrder: 1 })
     deleteAgent(db, agentId)
     const rows = db.prepare(`SELECT COUNT(*) as c FROM agent_files WHERE agent_id = ?`).get(agentId) as { c: number }
     expect(rows.c).toBe(0)
@@ -1040,6 +1045,121 @@ describe('agent skill-parity fields', () => {
     expect(after6.argument_hint).toBe('[arg]')
     const after7 = updateAgent(db, agent.id, { argumentHint: null })
     expect(after7.argument_hint).toBeNull()
+  })
+})
+
+describe('agentsService — primary file routing', () => {
+  let db: Database.Database
+  beforeEach(() => { db = freshDb() })
+
+  function makeBaseInput(overrides: Partial<Parameters<typeof createAgent>[1]> = {}): Parameters<typeof createAgent>[1] {
+    return {
+      name: 'A', body: 'persona body', folderId: null,
+      handle: 'a', colorStart: '#888888', colorEnd: null, emoji: null,
+      ...overrides,
+    }
+  }
+
+  it('createAgent writes the body to the primary file row at sort_order=0', () => {
+    const agent = createAgent(db, makeBaseInput({ body: 'persona body' }))
+    const primary = db.prepare(
+      `SELECT filename, content, sort_order FROM agent_files WHERE agent_id = ? AND sort_order = 0`
+    ).get(agent.id) as { filename: string; content: string; sort_order: number }
+    expect(primary.filename).toBe(`${agent.handle}.md`)
+    expect(primary.content).toBe('persona body')
+    expect(primary.sort_order).toBe(0)
+  })
+
+  it('createAgent dual-writes to agents.body during the transition', () => {
+    const agent = createAgent(db, makeBaseInput({ body: 'persona body' }))
+    const row = db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agent.id) as { body: string }
+    expect(row.body).toBe('persona body')
+  })
+
+  it('updateAgent({ body }) writes to the primary file row', () => {
+    const agent = createAgent(db, makeBaseInput({ body: 'v1' }))
+    updateAgent(db, agent.id, { body: 'v2' })
+    const primary = db.prepare(
+      `SELECT content FROM agent_files WHERE agent_id = ? AND sort_order = 0`
+    ).get(agent.id) as { content: string }
+    expect(primary.content).toBe('v2')
+  })
+
+  it('updateAgent({ body }) dual-writes to agents.body during the transition', () => {
+    const agent = createAgent(db, makeBaseInput({ body: 'v1' }))
+    updateAgent(db, agent.id, { body: 'v2' })
+    const row = db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agent.id) as { body: string }
+    expect(row.body).toBe('v2')
+  })
+
+  it('updateAgent({ handle }) renames the primary file row', () => {
+    const agent = createAgent(db, makeBaseInput({ handle: 'old-name' }))
+    updateAgent(db, agent.id, { handle: 'new-name' })
+    const primary = db.prepare(
+      `SELECT filename FROM agent_files WHERE agent_id = ? AND sort_order = 0`
+    ).get(agent.id) as { filename: string }
+    expect(primary.filename).toBe('new-name.md')
+  })
+
+  it('deleteFile throws when called on the primary file row', () => {
+    const agent = createAgent(db, makeBaseInput())
+    const primary = db.prepare(
+      `SELECT id FROM agent_files WHERE agent_id = ? AND sort_order = 0`
+    ).get(agent.id) as { id: string }
+    expect(() => deleteFile(db, agent.id, primary.id)).toThrow(/primary/i)
+  })
+
+  it('updateFile({ filename }) throws when renaming the primary file row', () => {
+    const agent = createAgent(db, makeBaseInput())
+    const primary = db.prepare(
+      `SELECT id FROM agent_files WHERE agent_id = ? AND sort_order = 0`
+    ).get(agent.id) as { id: string }
+    expect(() => updateFile(db, agent.id, primary.id, { filename: 'something-else.md' })).toThrow(/primary/i)
+  })
+
+  it('updateFile({ content }) is allowed on the primary file row', () => {
+    const agent = createAgent(db, makeBaseInput({ body: 'v1' }))
+    const primary = db.prepare(
+      `SELECT id FROM agent_files WHERE agent_id = ? AND sort_order = 0`
+    ).get(agent.id) as { id: string }
+    updateFile(db, agent.id, primary.id, { content: 'v2' })
+    const after = db.prepare(`SELECT content FROM agent_files WHERE id = ?`).get(primary.id) as { content: string }
+    expect(after.content).toBe('v2')
+  })
+
+  it('duplicateAgent creates an independent primary file row for the duplicate', () => {
+    const a = createAgent(db, makeBaseInput({ body: 'src body', handle: 'src' }))
+    const d = duplicateAgent(db, a.id)
+    const srcPrimary = db.prepare(
+      `SELECT content FROM agent_files WHERE agent_id = ? AND sort_order = 0`
+    ).get(a.id) as { content: string }
+    const dupPrimary = db.prepare(
+      `SELECT filename, content FROM agent_files WHERE agent_id = ? AND sort_order = 0`
+    ).get(d.id) as { filename: string; content: string }
+    expect(srcPrimary.content).toBe('src body')
+    expect(dupPrimary.content).toBe('src body')
+    expect(dupPrimary.filename).toBe(`${d.handle}.md`)
+    expect(d.handle).not.toBe(a.handle)
+  })
+
+  it('getPrimaryFile returns the primary row content', () => {
+    const agent = createAgent(db, makeBaseInput({ body: 'persona' }))
+    const primary = getPrimaryFile(db, agent.id)
+    expect(primary.content).toBe('persona')
+    expect(primary.filename).toBe(`${agent.handle}.md`)
+  })
+
+  it('getPrimaryFile throws on unknown agent id', () => {
+    expect(() => getPrimaryFile(db, 'no-such-agent')).toThrow(/agent/i)
+  })
+
+  it('updateAgent({ body }) records a body_edit revision when content changes', () => {
+    const agent = createAgent(db, makeBaseInput({ body: 'v1' }))
+    const before = listRevisions(db, agent.id).length
+    updateAgent(db, agent.id, { body: 'v2' })
+    const after = listRevisions(db, agent.id).length
+    expect(after).toBe(before + 1)
+    expect(listRevisions(db, agent.id)[0].body).toBe('v2')
   })
 })
 
