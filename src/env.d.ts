@@ -51,6 +51,7 @@ declare global {
   interface Window {
     api: {
       openExternal: (url: string) => Promise<void>
+      showItemInFolder: (fullPath: string) => Promise<void>
 
       platform: 'win32' | 'darwin' | 'linux' | string
 

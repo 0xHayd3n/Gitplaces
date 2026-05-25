@@ -7,6 +7,7 @@ const callbackWrappers = new Map<Function, (...args: any[]) => void>()
 
 contextBridge.exposeInMainWorld('api', {
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
+  showItemInFolder: (fullPath: string) => ipcRenderer.invoke('shell:showItemInFolder', fullPath) as Promise<void>,
 
   platform: process.platform,
 

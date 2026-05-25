@@ -347,6 +347,7 @@ ipcMain.on('window:close', () => mainWindow?.close())
 
 // ── Shell IPC ───────────────────────────────────────────────────
 ipcMain.handle('shell:openExternal', (_event, url: string) => shell.openExternal(url))
+ipcMain.handle('shell:showItemInFolder', (_event, fullPath: string) => shell.showItemInFolder(fullPath))
 
 // ── GitHub IPC ──────────────────────────────────────────────────
 // GitHub OAuth Device Flow — no client secret required.
