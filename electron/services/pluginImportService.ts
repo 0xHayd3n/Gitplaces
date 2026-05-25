@@ -103,7 +103,7 @@ export async function parseSkill(inputPath: string): Promise<ParsedSkill> {
     description,
     body: parsed.content.trim(),
     files,
-    origin: null, // populated by importSkill caller
+    origin: null, // populated by the importTarget caller
     model,
     tools,
     argumentHint,
@@ -558,11 +558,3 @@ function createFromScratch(
   return { agentId, conflictResolved: resolution }
 }
 
-/** @deprecated Use importTarget. Retained for one-task transition. */
-export function importSkill(
-  db: Database.Database,
-  skill: ParsedSkill,
-  opts: ImportOptions,
-): ImportResult {
-  return importTarget(db, skill, opts)
-}

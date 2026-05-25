@@ -13,15 +13,6 @@ export class RepoNotAccessibleError extends Error {
   }
 }
 
-export interface RepoSkillIndex {
-  owner: string
-  name: string
-  branch: string
-  commitSha: string
-  layout: 'skills-dir' | 'bare-root'
-  skills: DiscoveredSkill[]
-}
-
 export interface DiscoveredSubagentRemote {
   name: string
   path: string           // repo-relative
@@ -51,36 +42,6 @@ interface TreeEntry { path: string; mode: string; type: 'blob' | 'tree'; sha: st
 
 const IGNORE_NAMES = new Set(['.DS_Store', '.git', 'node_modules', '__pycache__'])
 const IGNORE_SUFFIXES = ['.swp']
-
-export async function discoverSkillsInRepo(
-  owner: string,
-  name: string,
-): Promise<RepoSkillIndex> {
-  const token = getToken() ?? null
-  let repo: { default_branch: string }
-  try {
-    repo = await getRepo(token, owner, name)
-  } catch {
-    throw new RepoNotAccessibleError(owner, name)
-  }
-  const branch = repo.default_branch
-  const { commitSha, rootTreeSha } = await getBranch(token, owner, name, branch)
-  const rootEntries = await getTreeBySha(token, owner, name, rootTreeSha)
-
-  const skillsEntry = rootEntries.find(e => e.path === 'skills' && e.type === 'tree')
-  if (skillsEntry) {
-    const skills = await listSkillsUnderSkillsDir(token, owner, name, branch, skillsEntry.sha)
-    return { owner, name, branch, commitSha, layout: 'skills-dir', skills }
-  }
-
-  const rootSkillMd = rootEntries.find(e => e.path === 'SKILL.md' && e.type === 'blob')
-  if (rootSkillMd) {
-    const skill = await summarizeBareRoot(token, owner, name, branch, rootEntries)
-    return { owner, name, branch, commitSha, layout: 'bare-root', skills: skill ? [skill] : [] }
-  }
-
-  return { owner, name, branch, commitSha, layout: 'skills-dir', skills: [] }
-}
 
 export async function discoverPluginInRepo(
   owner: string,
@@ -302,7 +263,7 @@ async function countFilesRecursive(
 
 // ── Per-skill fetch ────────────────────────────────────────────────
 
-export async function readSkillFromRepo(
+async function readSkillFromRepo(
   owner: string,
   name: string,
   branch: string,

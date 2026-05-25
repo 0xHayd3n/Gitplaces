@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 import {
-  parseSkill, discoverPlugins, importSkill,
+  parseSkill, discoverPlugins,
   parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint,
   parseSubagent, COLOR_MAP, parseSlashCommand,
   readPluginManifest,
@@ -87,12 +87,12 @@ describe('discoverPlugins', () => {
   })
 })
 
-describe('importSkill', () => {
+describe('importTarget — skill', () => {
   it('creates a new agent with files when handle is unused', async () => {
     const db = openDb()
     const folder = createFolder(db, 'Test')
     const skill = await parseSkill(path.join(FIXTURES, 'with-siblings'))
-    const result = importSkill(db, skill, { folderId: folder.id, onConflict: 'rename' })
+    const result = importTarget(db, skill, { folderId: folder.id, onConflict: 'rename' })
     expect(result.conflictResolved).toBe('created')
     const agent = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(result.agentId) as any
     expect(agent.handle).toBe('with-siblings')
@@ -110,8 +110,8 @@ describe('importSkill', () => {
     const db = openDb()
     const folder = createFolder(db, 'Test')
     const skill = await parseSkill(path.join(FIXTURES, 'basic'))
-    const first = importSkill(db, skill, { folderId: folder.id, onConflict: 'rename' })
-    const second = importSkill(db, { ...skill, body: 'CHANGED BODY' }, { folderId: folder.id, onConflict: 'overwrite' })
+    const first = importTarget(db, skill, { folderId: folder.id, onConflict: 'rename' })
+    const second = importTarget(db, { ...skill, body: 'CHANGED BODY' }, { folderId: folder.id, onConflict: 'overwrite' })
     expect(second.conflictResolved).toBe('overwritten')
     expect(second.agentId).toBe(first.agentId)
     const primary = db.prepare(
@@ -124,8 +124,8 @@ describe('importSkill', () => {
     const db = openDb()
     const folder = createFolder(db, 'Test')
     const skill = await parseSkill(path.join(FIXTURES, 'basic'))
-    importSkill(db, skill, { folderId: folder.id, onConflict: 'rename' })
-    const second = importSkill(db, { ...skill, body: 'CHANGED' }, { folderId: folder.id, onConflict: 'skip' })
+    importTarget(db, skill, { folderId: folder.id, onConflict: 'rename' })
+    const second = importTarget(db, { ...skill, body: 'CHANGED' }, { folderId: folder.id, onConflict: 'skip' })
     expect(second.conflictResolved).toBe('skipped')
   })
 
@@ -133,8 +133,8 @@ describe('importSkill', () => {
     const db = openDb()
     const folder = createFolder(db, 'Test')
     const skill = await parseSkill(path.join(FIXTURES, 'basic'))
-    importSkill(db, skill, { folderId: folder.id, onConflict: 'rename' })
-    const second = importSkill(db, skill, { folderId: folder.id, onConflict: 'rename' })
+    importTarget(db, skill, { folderId: folder.id, onConflict: 'rename' })
+    const second = importTarget(db, skill, { folderId: folder.id, onConflict: 'rename' })
     expect(second.conflictResolved).toBe('renamed')
     const renamed = db.prepare(`SELECT handle FROM agents WHERE id = ?`).get(second.agentId) as any
     expect(renamed.handle).toBe('basic-skill-2')
@@ -238,12 +238,12 @@ describe('parseSkill — Phase 2 fields', () => {
   })
 })
 
-describe('importSkill — Phase 2 fields', () => {
+describe('importTarget — skill (Phase 2 fields)', () => {
   it('populates the new columns on the agent row', async () => {
     const db = openDb()
     const folder = createFolder(db, 'Test')
     const skill = await parseSkill(path.join(FIXTURES, 'with-tools'))
-    const result = importSkill(db, skill, { folderId: folder.id, onConflict: 'rename' })
+    const result = importTarget(db, skill, { folderId: folder.id, onConflict: 'rename' })
     const agent = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(result.agentId) as any
     expect(agent.model).toBe('inherit')   // with-tools.md has no model: line
     expect(agent.tools).toBe('["Read","Edit","Bash"]')
@@ -255,7 +255,7 @@ describe('importSkill — Phase 2 fields', () => {
     const db = openDb()
     const folder = createFolder(db, 'Test')
     const skill = await parseSkill(path.join(FIXTURES, 'with-tools'))
-    const result = importSkill(db, skill, { folderId: folder.id, onConflict: 'rename' })
+    const result = importTarget(db, skill, { folderId: folder.id, onConflict: 'rename' })
     const agent = db.prepare(`SELECT is_subagent FROM agents WHERE id = ?`).get(result.agentId) as any
     expect(agent.is_subagent).toBe(0)
   })
@@ -264,9 +264,9 @@ describe('importSkill — Phase 2 fields', () => {
     const db = openDb()
     const folder = createFolder(db, 'Test')
     const skill1 = await parseSkill(path.join(FIXTURES, 'basic'))
-    const first = importSkill(db, skill1, { folderId: folder.id, onConflict: 'rename' })
+    const first = importTarget(db, skill1, { folderId: folder.id, onConflict: 'rename' })
     const skill2 = await parseSkill(path.join(FIXTURES, 'with-tools'))
-    const second = importSkill(db, { ...skill2, handle: skill1.handle }, { folderId: folder.id, onConflict: 'overwrite' })
+    const second = importTarget(db, { ...skill2, handle: skill1.handle }, { folderId: folder.id, onConflict: 'overwrite' })
     expect(second.agentId).toBe(first.agentId)
     const agent = db.prepare(`SELECT tools FROM agents WHERE id = ?`).get(first.agentId) as any
     expect(agent.tools).toBe('["Read","Edit","Bash"]')

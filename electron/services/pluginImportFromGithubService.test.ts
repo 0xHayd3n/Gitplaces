@@ -6,7 +6,7 @@ vi.mock('../store')
 
 import * as github from '../github'
 import * as store from '../store'
-import { discoverSkillsInRepo, readSkillFromRepo, discoverPluginInRepo, readTargetFromRepo, RepoNotAccessibleError } from './pluginImportFromGithubService'
+import { discoverPluginInRepo, readTargetFromRepo, RepoNotAccessibleError } from './pluginImportFromGithubService'
 
 const mockedGithub = vi.mocked(github)
 const mockedStore = vi.mocked(store)
@@ -22,7 +22,7 @@ beforeEach(() => {
   mockedStore.getToken.mockReturnValue('test-token')
 })
 
-describe('discoverSkillsInRepo — skills-dir layout', () => {
+describe('discoverPluginInRepo — skills-dir layout', () => {
   it('finds skills under skills/ and reports skills-dir layout', async () => {
     mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
     mockedGithub.getBranch.mockResolvedValue({ commitSha: 'a1b2c3d4567', rootTreeSha: 'roottree' })
@@ -54,13 +54,13 @@ describe('discoverSkillsInRepo — skills-dir layout', () => {
       throw new Error(`unexpected raw fetch: ${p}`)
     })
 
-    const index = await discoverSkillsInRepo('obra', 'superpowers')
+    const index = await discoverPluginInRepo('obra', 'superpowers')
 
     expect(index.owner).toBe('obra')
     expect(index.name).toBe('superpowers')
     expect(index.branch).toBe('main')
     expect(index.commitSha).toBe('a1b2c3d4567')
-    expect(index.layout).toBe('skills-dir')
+    expect(index.layout).toBe('plugin')
     expect(index.skills).toHaveLength(2)
     expect(index.skills[0]).toMatchObject({
       name: 'brainstorming',
@@ -91,7 +91,7 @@ describe('discoverSkillsInRepo — skills-dir layout', () => {
       .mockResolvedValueOnce([{ path: 'README.md', mode: '100644', type: 'blob', sha: 'r' }])
     mockedGithub.getRawFileBytes.mockResolvedValue(Buffer.from(SKILL_MD_BODY, 'utf-8'))
 
-    const index = await discoverSkillsInRepo('o', 'r')
+    const index = await discoverPluginInRepo('o', 'r')
 
     expect(index.skills).toHaveLength(1)
     expect(index.skills[0].path).toBe('skills/valid')
@@ -106,7 +106,7 @@ describe('discoverSkillsInRepo — skills-dir layout', () => {
       .mockResolvedValueOnce([{ path: 'SKILL.md', mode: '100644', type: 'blob', sha: 'sksha' }])
     mockedGithub.getRawFileBytes.mockResolvedValue(Buffer.from(`---\ndescription: No name.\n---\nBody`, 'utf-8'))
 
-    const index = await discoverSkillsInRepo('o', 'r')
+    const index = await discoverPluginInRepo('o', 'r')
 
     expect(index.skills[0].name).toBe('unnamed')
     expect(index.skills[0].description).toBe('No name.')
@@ -130,13 +130,13 @@ describe('discoverSkillsInRepo — skills-dir layout', () => {
       ])
     mockedGithub.getRawFileBytes.mockResolvedValue(Buffer.from(SKILL_MD_BODY, 'utf-8'))
 
-    const index = await discoverSkillsInRepo('o', 'r')
+    const index = await discoverPluginInRepo('o', 'r')
 
     expect(index.skills[0].fileCount).toBe(3)  // SKILL.md + scripts/a.sh + scripts/b.sh
   })
 })
 
-describe('discoverSkillsInRepo — bare-root layout', () => {
+describe('discoverPluginInRepo — bare-root layout', () => {
   it('finds a root SKILL.md and reports bare-root layout', async () => {
     mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
     mockedGithub.getBranch.mockResolvedValue({ commitSha: 'sha', rootTreeSha: 'root' })
@@ -152,7 +152,7 @@ describe('discoverSkillsInRepo — bare-root layout', () => {
       ])
     mockedGithub.getRawFileBytes.mockResolvedValue(Buffer.from(SKILL_MD_BODY, 'utf-8'))
 
-    const index = await discoverSkillsInRepo('o', 'singleskill')
+    const index = await discoverPluginInRepo('o', 'singleskill')
 
     expect(index.layout).toBe('bare-root')
     expect(index.skills).toHaveLength(1)
@@ -170,24 +170,24 @@ describe('discoverSkillsInRepo — bare-root layout', () => {
       { path: 'src',       mode: '040000', type: 'tree', sha: 's' },
     ])
 
-    const index = await discoverSkillsInRepo('o', 'unrelated')
+    const index = await discoverPluginInRepo('o', 'unrelated')
 
     expect(index.skills).toEqual([])
   })
 })
 
-describe('discoverSkillsInRepo — errors', () => {
+describe('discoverPluginInRepo — errors', () => {
   it('throws RepoNotAccessibleError when getRepo rejects', async () => {
     mockedGithub.getRepo.mockRejectedValue(new Error('GitHub API error: 404'))
 
-    await expect(discoverSkillsInRepo('o', 'doesnotexist')).rejects.toBeInstanceOf(RepoNotAccessibleError)
+    await expect(discoverPluginInRepo('o', 'doesnotexist')).rejects.toBeInstanceOf(RepoNotAccessibleError)
   })
 
   it('throws RepoNotAccessibleError carrying owner/name', async () => {
     mockedGithub.getRepo.mockRejectedValue(new Error('GitHub API error: 401'))
 
     try {
-      await discoverSkillsInRepo('priv', 'repo')
+      await discoverPluginInRepo('priv', 'repo')
       throw new Error('should have thrown')
     } catch (err) {
       expect(err).toBeInstanceOf(RepoNotAccessibleError)
@@ -197,9 +197,9 @@ describe('discoverSkillsInRepo — errors', () => {
   })
 })
 
-describe('readSkillFromRepo — skills-dir', () => {
+describe('readTargetFromRepo — skills-dir', () => {
   it('returns ParsedSkill with body, description, files, and origin populated', async () => {
-    // readSkillFromRepo walks: getTreeBySha(commitSha) → root → skills → brainstorming
+    // readTargetFromRepo walks (for kind=skill): getTreeBySha(commitSha) → root → skills → brainstorming
     // → scripts (because scripts/ is a subdir under brainstorming/).
     // No getBranch — we pass commitSha straight to getTreeBySha (GitHub resolves
     // commit SHAs as tree refs).
@@ -225,7 +225,7 @@ describe('readSkillFromRepo — skills-dir', () => {
       throw new Error(`unexpected fetch: ${p}`)
     })
 
-    const skill = await readSkillFromRepo('obra', 'superpowers', 'main', 'a1b2c3d4567', 'skills/brainstorming')
+    const skill = await readTargetFromRepo('obra', 'superpowers', 'main', 'a1b2c3d4567', 'skills/brainstorming', 'skill')
 
     expect(skill.name).toBe('brainstorming')
     expect(skill.description).toBe('Brainstorm things.')
@@ -260,7 +260,7 @@ describe('readSkillFromRepo — skills-dir', () => {
       throw new Error(`unexpected: ${p}`)
     })
 
-    const skill = await readSkillFromRepo('o', 'r', 'main', 'sha1234', 'skills/foo')
+    const skill = await readTargetFromRepo('o', 'r', 'main', 'sha1234', 'skills/foo', 'skill')
 
     expect(skill.files.map(f => f.filename)).toContain('good.md')
     expect(skill.files.map(f => f.filename)).not.toContain('broken.md')
@@ -285,13 +285,13 @@ describe('readSkillFromRepo — skills-dir', () => {
       throw new Error(`unexpected: ${p}`)
     })
 
-    const skill = await readSkillFromRepo('o', 'r', 'main', 'sha1234', 'skills/foo')
+    const skill = await readTargetFromRepo('o', 'r', 'main', 'sha1234', 'skills/foo', 'skill')
 
     expect(skill.files.map(f => f.filename)).toEqual(['real.md'])
   })
 })
 
-describe('readSkillFromRepo — bare-root', () => {
+describe('readTargetFromRepo — bare-root', () => {
   it('excludes README.md, LICENSE, package.json from files[]', async () => {
     mockedGithub.getTreeBySha.mockResolvedValueOnce([
       { path: 'README.md',       mode: '100644', type: 'blob', sha: 'r' },
@@ -306,7 +306,7 @@ describe('readSkillFromRepo — bare-root', () => {
       throw new Error(`unexpected: ${p}`)
     })
 
-    const skill = await readSkillFromRepo('o', 'singleskill', 'main', 'sha1234', '.')
+    const skill = await readTargetFromRepo('o', 'singleskill', 'main', 'sha1234', '.', 'skill')
 
     expect(skill.files.map(f => f.filename)).toEqual(['helper.md'])
     expect(skill.origin?.path).toBe('.')
@@ -431,7 +431,7 @@ describe('readTargetFromRepo', () => {
     expect(target.origin?.path).toBe('commands/my-cmd.md')
   })
 
-  it('reads a skill by delegating to readSkillFromRepo', async () => {
+  it('reads a skill via the skill branch (delegates internally)', async () => {
     mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
     mockedGithub.getBranch.mockResolvedValue({ commitSha: 'sha', rootTreeSha: 'root' })
     mockedGithub.getTreeBySha
