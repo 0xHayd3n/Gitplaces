@@ -1,17 +1,21 @@
 // @vitest-environment node
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-const { mockGenerateText, mockAnthropic } = vi.hoisted(() => ({
-  mockGenerateText: vi.fn(),
-  mockAnthropic: vi.fn((modelId: string) => ({ __isMockedModel: true, modelId })),
-}))
+const { mockGenerateText, mockCreateAnthropic, mockModelBuilder } = vi.hoisted(() => {
+  const mockModelBuilder = vi.fn((modelId: string) => ({ __isMockedModel: true, modelId }))
+  return {
+    mockGenerateText: vi.fn(),
+    mockCreateAnthropic: vi.fn(() => mockModelBuilder),
+    mockModelBuilder,
+  }
+})
 
 vi.mock('ai', () => ({
   generateText: mockGenerateText,
 }))
 
 vi.mock('@ai-sdk/anthropic', () => ({
-  anthropic: mockAnthropic,
+  createAnthropic: mockCreateAnthropic,
 }))
 
 // Mock the store module so the adapter can read the API key without
@@ -25,7 +29,8 @@ import { LLMError } from '../types'
 
 beforeEach(() => {
   mockGenerateText.mockReset()
-  mockAnthropic.mockClear()
+  mockCreateAnthropic.mockClear()
+  mockModelBuilder.mockClear()
 })
 
 describe('AnthropicAdapter.generateText', () => {
@@ -45,7 +50,7 @@ describe('AnthropicAdapter.generateText', () => {
       },
     )
 
-    expect(mockAnthropic).toHaveBeenCalledWith('claude-sonnet-4-6')
+    expect(mockModelBuilder).toHaveBeenCalledWith('claude-sonnet-4-6')
     expect(mockGenerateText).toHaveBeenCalledWith(expect.objectContaining({
       system: 'You are helpful',
       messages: [{ role: 'user', content: 'hi' }],
@@ -57,6 +62,19 @@ describe('AnthropicAdapter.generateText', () => {
     })
   })
 
+  it('wires the stored API key into createAnthropic (regression test for missing-key bug)', async () => {
+    mockGenerateText.mockResolvedValue({ text: 'ok', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } })
+
+    const adapter = new AnthropicAdapter()
+    await adapter.generateText(
+      { provider: 'anthropic', model: 'claude-sonnet-4-6' },
+      { messages: [{ role: 'user', content: 'hi' }] },
+    )
+
+    expect(mockCreateAnthropic).toHaveBeenCalledWith({ apiKey: 'sk-test-key' })
+    expect(mockModelBuilder).toHaveBeenCalledWith('claude-sonnet-4-6')
+  })
+
   it('resolves "inherit" model to claude-sonnet-4-6 (a sensible default)', async () => {
     mockGenerateText.mockResolvedValue({ text: 'ok', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } })
     const adapter = new AnthropicAdapter()
@@ -64,7 +82,7 @@ describe('AnthropicAdapter.generateText', () => {
       { provider: 'anthropic', model: 'inherit' },
       { messages: [{ role: 'user', content: 'hi' }] },
     )
-    expect(mockAnthropic).toHaveBeenCalledWith('claude-sonnet-4-6')
+    expect(mockModelBuilder).toHaveBeenCalledWith('claude-sonnet-4-6')
   })
 
   it('throws LLMError with kind=auth_missing when no API key is configured', async () => {

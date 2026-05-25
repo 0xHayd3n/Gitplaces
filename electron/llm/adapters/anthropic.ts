@@ -1,5 +1,5 @@
 import { generateText } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
+import { createAnthropic } from '@ai-sdk/anthropic'
 import { getProviderConfig } from '../../store'
 import { LLMError } from '../types'
 import type {
@@ -11,6 +11,8 @@ import type {
   LLMErrorKind,
 } from '../types'
 
+// TODO(Phase 4): resolve 'inherit' from settings.defaults instead of hardcoding.
+// See docs/superpowers/specs/2026-05-26-multi-provider-agents-design.md
 const INHERIT_DEFAULT = 'claude-sonnet-4-6'
 
 export class AnthropicAdapter {
@@ -18,11 +20,12 @@ export class AnthropicAdapter {
     ref: ModelRef,
     opts: LLMCallOpts,
   ): Promise<{ text: string; usage: Usage }> {
-    this.assertApiKey()
+    const apiKey = this.assertApiKey()
     const modelId = ref.model === 'inherit' ? INHERIT_DEFAULT : ref.model
+    const provider = createAnthropic({ apiKey })
     try {
       const result = await generateText({
-        model: anthropic(modelId),
+        model: provider(modelId),
         system: opts.systemPrompt,
         messages: opts.messages,
         maxTokens: opts.maxTokens,
@@ -51,11 +54,12 @@ export class AnthropicAdapter {
     throw new LLMError('unknown', 'AnthropicAdapter.runAgentLoop not implemented in Phase 1')
   }
 
-  private assertApiKey(): void {
+  private assertApiKey(): string {
     const cfg = getProviderConfig('anthropic')
     if (!cfg.apiKey) {
       throw new LLMError('auth_missing', 'Anthropic API key is not configured. Set it in Settings → Providers.')
     }
+    return cfg.apiKey
   }
 }
 
