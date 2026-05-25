@@ -2211,6 +2211,17 @@ function RepoArticleActionRow({
         </button>
       </PrimaryActionSplitButton>
 
+      <button
+        type="button"
+        className={`article-action-star${starred ? ' article-action-star--starred' : ''}`}
+        onClick={onStar}
+        disabled={starWorking}
+        aria-label={starred ? 'Unstar' : 'Star'}
+        title={starred ? 'Unstar' : 'Star'}
+      >
+        {starred ? <PiStarFill size={20} /> : <PiStar size={20} />}
+      </button>
+
       {learnState === 'LEARNING' && learnProgress.state && (
         <LearnStatusInline
           phase={learnProgress.state.phase}
@@ -2247,17 +2258,6 @@ function RepoArticleActionRow({
           )}
         </div>
       )}
-
-      <button
-        type="button"
-        className={`article-action-star${starred ? ' article-action-star--starred' : ''}`}
-        onClick={onStar}
-        disabled={starWorking}
-        aria-label={starred ? 'Unstar' : 'Star'}
-        title={starred ? 'Unstar' : 'Star'}
-      >
-        {starred ? <PiStarFill size={20} /> : <PiStar size={20} />}
-      </button>
     </div>
   )
 }

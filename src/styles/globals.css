@@ -6147,28 +6147,26 @@ a {
   text-decoration: underline;
 }
 
-/* Standalone star button at the far end of the action row.
-   margin-left: auto pins it right when no translation status is rendered;
-   when translation is present its own margin-left: auto wins as the row's
-   spacer and the star sits immediately right of it (gap: 8px). Either way
-   the star anchors the right end. Height matches the split-button so the
-   row reads as a single visual band. */
+/* Standalone star button sitting immediately right of the LEARN split-button.
+   Height matches the split-button (44px) so the row reads as a single visual
+   band; outlined-secondary treatment keeps it visually distinct from the
+   filled-purple LEARN without competing for attention. */
 .article-action-star {
-  margin-left: auto;
   width: 44px;
   height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
-  background: var(--surface-1);
+  background: transparent;
   color: var(--t1);
   cursor: pointer;
-  transition: background 0.1s, color 0.1s, transform 0.05s;
+  transition: background 0.1s, border-color 0.1s, color 0.1s, transform 0.05s;
 }
 .article-action-star:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 .article-action-star:active:not(:disabled) {
   transform: scale(0.95);
@@ -6179,6 +6177,10 @@ a {
 }
 .article-action-star--starred {
   color: #facc15;
+  border-color: rgba(250, 204, 21, 0.4);
+}
+.article-action-star--starred:hover:not(:disabled) {
+  border-color: rgba(250, 204, 21, 0.6);
 }
 
 .repo-detail-header-pill {
