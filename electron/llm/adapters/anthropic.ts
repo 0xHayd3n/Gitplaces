@@ -30,6 +30,10 @@ export class AnthropicAdapter {
         messages: opts.messages,
         maxTokens: opts.maxTokens,
         abortSignal: opts.signal,
+        // TODO(Phase 5): narrow this cast. Our ChatMessage type is intentionally a
+        // subset of the SDK's CoreMessage union; when streamText/runAgentLoop land
+        // (and tools/system messages widen the call shape), replace this whole-arg
+        // cast with a typed CoreMessage[] mapping at the messages property.
       } as Parameters<typeof generateText>[0])
       return {
         text: result.text,
@@ -65,12 +69,15 @@ export class AnthropicAdapter {
 
 function normalizeError(err: unknown): LLMError {
   if (err instanceof LLMError) return err
-  const e = err as { statusCode?: number; message?: string; name?: string }
+  const e = err as { statusCode?: number; message?: string; name?: string; code?: string }
   let kind: LLMErrorKind = 'unknown'
   if (e?.name === 'AbortError') kind = 'aborted'
   else if (e?.statusCode === 401) kind = 'auth_invalid'
   else if (e?.statusCode === 429) kind = 'rate_limit'
   else if (e?.statusCode === 404) kind = 'model_unavailable'
   else if (e?.statusCode === 413) kind = 'context_overflow'
+  // TODO(Phase 4): add `network` kind detection (ECONNREFUSED, ETIMEDOUT, ENOTFOUND,
+  // fetch's NetworkError) — load-bearing once openai-compatible local endpoints
+  // land, where the most common failure is "Ollama isn't running."
   return new LLMError(kind, e?.message ?? 'Anthropic adapter failed', err)
 }

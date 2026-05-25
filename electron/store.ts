@@ -87,6 +87,18 @@ export function setApiKey(key: string): void {
 }
 
 // ── Generic per-provider config ─────────────────────────────────
+/**
+ * Read a provider's configured state.
+ *
+ * Note on `apiKey: undefined` ambiguity: this can mean either "user hasn't set
+ * one yet, prompt them" OR "this provider doesn't have a top-level key by design"
+ * (opencode reuses Claude Code's auth; openai-compatible stores per-endpoint keys
+ * in the `endpoints` array). Callers that branch on missing keys must consult
+ * PROVIDERS_WITHOUT_TOP_LEVEL_KEY (see setProviderConfig below) to disambiguate.
+ *
+ * TODO(Phase 4): split into KeyedProviderConfig | KeylessProviderConfig when the
+ * Settings UI gains real callers and the type-level distinction earns its keep.
+ */
 export function getProviderConfig(provider: ProviderId): ProviderConfig {
   return {
     enabled: apiStore.get(`providers.${provider}.enabled` as keyof ApiStoreSchema) as boolean | undefined ?? false,

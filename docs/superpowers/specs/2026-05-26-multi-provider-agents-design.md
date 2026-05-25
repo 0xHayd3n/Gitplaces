@@ -337,6 +337,13 @@ Order is enforced: 1+2 are prerequisites for everything; 3 must precede 4 (so ad
 - **OpenCode model naming.** Confirm OpenCode's accepted `model:` values during Phase 6 — they may differ slightly from Claude Code's.
 - **Vercel AI SDK MCP helper version.** Newer versions ship an `experimental_createMCPClient`. Decide in Phase 5 whether to use it or wire `@modelcontextprotocol/sdk` directly (we may want the raw SDK for tighter control over the existing subprocess).
 
+### Deferred from Phase 1 (tracked, not yet implemented)
+
+- **`defaults.*` section of the storage schema** (`chat`, `skillGen`, `tagExtract` → `ModelRef`). Phase 1 did NOT land this — there is no caller yet. The Anthropic adapter currently hardcodes `INHERIT_DEFAULT = 'claude-sonnet-4-6'` (see `electron/llm/adapters/anthropic.ts`, marked `TODO(Phase 4)`). Add the schema + helpers in Phase 3 or Phase 4 when the refactored call sites and Settings UI need to read defaults.
+- **`KeyedProviderConfig | KeylessProviderConfig` split.** `getProviderConfig` returns `apiKey: undefined` for both "user hasn't set one" and "this provider has no top-level key by design" (opencode, openai-compatible). The ambiguity is documented in JSDoc; the type split is a Phase 4 task when the Settings UI starts branching on missing keys.
+- **`network` error kind detection** in `electron/llm/adapters/anthropic.ts`'s `normalizeError`. Currently `ECONNREFUSED`/`ETIMEDOUT`/`ENOTFOUND` fall through to `unknown`. Load-bearing once openai-compatible local endpoints land in Phase 4 — the most common failure mode there is "Ollama isn't running." TODO marker in place.
+- **`Parameters<typeof generateText>[0]` whole-argument cast** in the Anthropic adapter. Acceptable Phase 1 escape hatch for the SDK's overloaded signature; replace with a typed `CoreMessage[]` mapping at the `messages` property in Phase 5 when streaming + tools widen the call shape. TODO marker in place.
+
 ## Out of scope (deferred)
 
 - External (third-party) MCP server support in Settings
