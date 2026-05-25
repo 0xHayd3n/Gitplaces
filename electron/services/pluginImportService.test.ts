@@ -7,6 +7,7 @@ import {
   parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint,
   parseSubagent, COLOR_MAP, parseSlashCommand,
   readPluginManifest,
+  importTarget,
 } from './pluginImportService'
 import { initSchema } from '../db'
 import { createFolder } from './agentsService'
@@ -434,5 +435,70 @@ describe('discoverPlugins — mixed kinds', () => {
     expect(cool!.skills.length).toBeGreaterThan(0)
     expect(cool!.subagents).toEqual([])
     expect(cool!.slashCommands).toEqual([])
+  })
+})
+
+describe('importTarget — subagent', () => {
+  it('creates an agent with is_subagent=1 and no sibling files', async () => {
+    const db = openDb()
+    const folder = createFolder(db, 'Test')
+    const sub = await parseSubagent(path.join(SUBAGENT_FIXTURES, 'full.md'))
+    const result = importTarget(db, sub, { folderId: folder.id, onConflict: 'rename' })
+    expect(result.conflictResolved).toBe('created')
+    const agent = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(result.agentId) as any
+    expect(agent.handle).toBe('code-architect')
+    expect(agent.is_subagent).toBe(1)
+    expect(agent.is_slash_command).toBe(0)
+    expect(agent.model).toBe('sonnet')
+    expect(JSON.parse(agent.tools)).toEqual(['Glob', 'Grep', 'Read'])
+    // Only the primary file (body) — no siblings
+    const files = db.prepare(`SELECT * FROM agent_files WHERE agent_id = ? AND sort_order != 0`).all(result.agentId) as any[]
+    expect(files).toEqual([])
+  })
+
+  it('maps known color names to hex in color_start', async () => {
+    const db = openDb()
+    const folder = createFolder(db, 'Test')
+    const sub = await parseSubagent(path.join(SUBAGENT_FIXTURES, 'full.md'))
+    const result = importTarget(db, sub, { folderId: folder.id, onConflict: 'rename' })
+    const agent = db.prepare(`SELECT color_start FROM agents WHERE id = ?`).get(result.agentId) as any
+    expect(agent.color_start).toBe('#22c55e')   // green
+  })
+
+  it('falls back to hash-based color when frontmatter color is missing', async () => {
+    const db = openDb()
+    const folder = createFolder(db, 'Test')
+    const sub = await parseSubagent(path.join(SUBAGENT_FIXTURES, 'minimal.md'))
+    const result = importTarget(db, sub, { folderId: folder.id, onConflict: 'rename' })
+    const agent = db.prepare(`SELECT color_start FROM agents WHERE id = ?`).get(result.agentId) as any
+    expect(agent.color_start).toMatch(/^#[0-9a-f]{6}$/i)
+  })
+})
+
+describe('importTarget — slashCommand', () => {
+  it('creates an agent with is_slash_command=1', async () => {
+    const db = openDb()
+    const folder = createFolder(db, 'Test')
+    const cmd = await parseSlashCommand(path.join(COMMAND_FIXTURES, 'full.md'))
+    const result = importTarget(db, cmd, { folderId: folder.id, onConflict: 'rename' })
+    const agent = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(result.agentId) as any
+    expect(agent.is_subagent).toBe(0)
+    expect(agent.is_slash_command).toBe(1)
+    expect(agent.argument_hint).toBe('Optional feature description')
+  })
+})
+
+describe('importTarget — skill (regression)', () => {
+  it('preserves existing skill import behavior with sibling files', async () => {
+    const db = openDb()
+    const folder = createFolder(db, 'Test')
+    const skill = await parseSkill(path.join(FIXTURES, 'with-siblings'))
+    const result = importTarget(db, skill, { folderId: folder.id, onConflict: 'rename' })
+    const agent = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(result.agentId) as any
+    expect(agent.is_subagent).toBe(0)
+    expect(agent.is_slash_command).toBe(0)
+    // primary + 2 siblings (notes.md + scripts/run.sh)
+    const files = db.prepare(`SELECT * FROM agent_files WHERE agent_id = ?`).all(result.agentId) as any[]
+    expect(files.length).toBeGreaterThanOrEqual(3)
   })
 })

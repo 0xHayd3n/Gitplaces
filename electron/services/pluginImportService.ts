@@ -443,13 +443,13 @@ export interface ImportResult {
   conflictResolved: 'created' | 'overwritten' | 'skipped' | 'renamed'
 }
 
-export function importSkill(
+export function importTarget(
   db: Database.Database,
-  skill: ParsedSkill,
+  target: ParsedImportTarget,
   opts: ImportOptions,
 ): ImportResult {
   const taken = (db.prepare(`SELECT handle FROM agents`).all() as { handle: string }[]).map(r => r.handle)
-  const existing = db.prepare(`SELECT id FROM agents WHERE handle = ?`).get(skill.handle) as { id: string } | undefined
+  const existing = db.prepare(`SELECT id FROM agents WHERE handle = ?`).get(target.handle) as { id: string } | undefined
 
   if (existing) {
     if (opts.onConflict === 'skip') {
@@ -460,73 +460,79 @@ export function importSkill(
       // in a half-imported state (body updated but files not yet replaced).
       const tx = db.transaction(() => {
         updateAgent(db, existing.id, {
-          name: skill.name,
-          body: skill.body,
-          description: skill.description,
-          model: skill.model,
-          tools: skill.tools,
-          argumentHint: skill.argumentHint,
+          name: target.name,
+          body: target.body,
+          description: target.description,
+          model: target.model,
+          tools: target.tools,
+          argumentHint: target.argumentHint,
         })
         const ts = new Date().toISOString()
         db.prepare(`
           UPDATE agents SET origin_plugin = ?, origin_path = ?, origin_version = ?, origin_imported_at = ?
           WHERE id = ?
         `).run(
-          skill.origin?.plugin ?? null,
-          skill.origin?.path ?? null,
-          skill.origin?.pluginVersion ?? null,
+          target.origin?.plugin ?? null,
+          target.origin?.path ?? null,
+          target.origin?.pluginVersion ?? null,
           ts,
           existing.id,
         )
         // Skip the primary file (sort_order=0): updateAgent has already
-        // overwritten its content via the body field, and deleteFile refuses
-        // to drop the primary. Siblings start at sort_order=1 to preserve
-        // primary-file precedence.
-        const oldFiles = listFiles(db, existing.id)
-        for (const f of oldFiles) {
-          if (f.sort_order !== 0) deleteFile(db, existing.id, f.id)
+        // overwritten its content via the body field. Siblings start at
+        // sort_order=1. Only the skill kind has siblings.
+        if (target.kind === 'skill') {
+          const oldFiles = listFiles(db, existing.id)
+          for (const f of oldFiles) {
+            if (f.sort_order !== 0) deleteFile(db, existing.id, f.id)
+          }
+          target.files.forEach((f, i) => {
+            createFile(db, existing.id, { filename: f.filename, content: f.content, sortOrder: i + 1 })
+          })
         }
-        skill.files.forEach((f, i) => {
-          createFile(db, existing.id, { filename: f.filename, content: f.content, sortOrder: i + 1 })
-        })
       })
       tx()
       return { agentId: existing.id, conflictResolved: 'overwritten' }
     }
     // rename
-    const newHandle = dedupeHandle(skill.handle, taken)
-    return createFromScratch(db, { ...skill, handle: newHandle }, opts, 'renamed')
+    const newHandle = dedupeHandle(target.handle, taken)
+    return createFromScratch(db, { ...target, handle: newHandle } as ParsedImportTarget, opts, 'renamed')
   }
 
-  return createFromScratch(db, skill, opts, 'created')
+  return createFromScratch(db, target, opts, 'created')
 }
 
 function createFromScratch(
   db: Database.Database,
-  skill: ParsedSkill,
+  target: ParsedImportTarget,
   opts: ImportOptions,
   resolution: 'created' | 'renamed',
 ): ImportResult {
-  const colorStart = hashHandleToColor(skill.handle)
+  // Sub-agents seed color_start from the frontmatter color via COLOR_MAP;
+  // skills and slash commands use the handle-hash fallback.
+  const colorStart = target.kind === 'subagent' && target.color
+    ? (COLOR_MAP[target.color] ?? hashHandleToColor(target.handle))
+    : hashHandleToColor(target.handle)
+
   let agentId = ''
-  // Transaction: agent insert, origin metadata, and file inserts must land
-  // together — a crash mid-import would otherwise create an agent with no
-  // files, which the user has to manually delete and re-import.
+  // Transaction: agent insert, origin metadata, and (for skills) sibling
+  // files must land together — a crash mid-import would otherwise leave the
+  // agent in a half-imported state.
   const tx = db.transaction(() => {
     const agent = createAgent(db, {
-      name: skill.name,
-      body: skill.body,
+      name: target.name,
+      body: target.body,
       folderId: opts.folderId,
-      handle: skill.handle,
+      handle: target.handle,
       colorStart,
       colorEnd: null,
       emoji: null,
-      description: skill.description,
-      model: skill.model,
-      tools: skill.tools,
-      argumentHint: skill.argumentHint,
-      // Deliberately leaves is_subagent / is_slash_command at default (0).
-      // Importing should not auto-create files in ~/.claude/agents/.
+      description: target.description,
+      model: target.model,
+      tools: target.tools,
+      argumentHint: target.argumentHint,
+      isSubagent: target.kind === 'subagent',
+      isSlashCommand: target.kind === 'slashCommand',
     })
     agentId = agent.id
     const ts = new Date().toISOString()
@@ -534,18 +540,29 @@ function createFromScratch(
       UPDATE agents SET origin_plugin = ?, origin_path = ?, origin_version = ?, origin_imported_at = ?
       WHERE id = ?
     `).run(
-      skill.origin?.plugin ?? null,
-      skill.origin?.path ?? null,
-      skill.origin?.pluginVersion ?? null,
+      target.origin?.plugin ?? null,
+      target.origin?.path ?? null,
+      target.origin?.pluginVersion ?? null,
       ts,
       agent.id,
     )
     // Siblings start at sort_order=1; sort_order=0 is the primary file
-    // created by createAgent holding the body content.
-    skill.files.forEach((f, i) => {
-      createFile(db, agent.id, { filename: f.filename, content: f.content, sortOrder: i + 1 })
-    })
+    // created by createAgent holding the body. Only skills carry siblings.
+    if (target.kind === 'skill') {
+      target.files.forEach((f, i) => {
+        createFile(db, agent.id, { filename: f.filename, content: f.content, sortOrder: i + 1 })
+      })
+    }
   })
   tx()
   return { agentId, conflictResolved: resolution }
+}
+
+/** @deprecated Use importTarget. Retained for one-task transition. */
+export function importSkill(
+  db: Database.Database,
+  skill: ParsedSkill,
+  opts: ImportOptions,
+): ImportResult {
+  return importTarget(db, skill, opts)
 }
