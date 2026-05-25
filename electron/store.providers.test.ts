@@ -109,6 +109,22 @@ describe('getProviderConfig / setProviderConfig', () => {
     expect(getProviderConfig('google')).toEqual({ enabled: true, apiKey: 'g-key' })
     expect(getProviderConfig('opencode')).toEqual({ enabled: true, apiKey: undefined })
   })
+
+  it('silently ignores apiKey for opencode (no top-level key by design)', () => {
+    setProviderConfig('opencode', { enabled: true, apiKey: 'should-be-ignored' })
+    // enabled was written
+    expect(mockStore.set).toHaveBeenCalledWith('providers.opencode.enabled', true)
+    // apiKey was NOT written
+    const apiKeyWrites = mockStore.set.mock.calls.filter(c => c[0] === 'providers.opencode.apiKey')
+    expect(apiKeyWrites).toHaveLength(0)
+  })
+
+  it('silently ignores apiKey for openai-compatible (per-endpoint keys instead)', () => {
+    setProviderConfig('openai-compatible', { enabled: true, apiKey: 'should-be-ignored' })
+    expect(mockStore.set).toHaveBeenCalledWith('providers.openai-compatible.enabled', true)
+    const apiKeyWrites = mockStore.set.mock.calls.filter(c => c[0] === 'providers.openai-compatible.apiKey')
+    expect(apiKeyWrites).toHaveLength(0)
+  })
 })
 
 describe('openai-compatible endpoints', () => {

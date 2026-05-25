@@ -1,4 +1,5 @@
 import Store from 'electron-store'
+import type { ProviderId } from './llm/types'
 
 interface GitHubStoreSchema {
   'github.token'?: string
@@ -37,10 +38,13 @@ export function clearGitHubUser(): void {
   githubStore.delete('github.avatarUrl')
 }
 
-import type { ProviderId } from './llm/types'
-
 type ProviderConfig = {
   enabled: boolean
+  /**
+   * Only meaningful for providers that take a top-level API key (anthropic, openai, google).
+   * Silently ignored for opencode (uses Claude Code's auth) and openai-compatible
+   * (keys live per-endpoint in the `endpoints` array).
+   */
   apiKey?: string
 }
 
@@ -90,8 +94,19 @@ export function getProviderConfig(provider: ProviderId): ProviderConfig {
   }
 }
 
+// Providers that do NOT have a top-level apiKey: opencode reuses Claude Code's auth;
+// openai-compatible stores per-endpoint keys inside the `endpoints` array instead.
+const PROVIDERS_WITHOUT_TOP_LEVEL_KEY: ReadonlySet<ProviderId> = new Set([
+  'opencode',
+  'openai-compatible',
+])
+
 export function setProviderConfig(provider: ProviderId, cfg: ProviderConfig): void {
   apiStore.set(`providers.${provider}.enabled` as keyof ApiStoreSchema, cfg.enabled as never)
+  if (PROVIDERS_WITHOUT_TOP_LEVEL_KEY.has(provider)) {
+    // apiKey is meaningless for these providers — silently ignored, never written.
+    return
+  }
   if (cfg.apiKey === undefined) {
     apiStore.delete(`providers.${provider}.apiKey` as keyof ApiStoreSchema)
   } else {
