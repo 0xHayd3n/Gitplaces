@@ -98,6 +98,22 @@ describe('AgentDetail', () => {
     expect(screen.getByText('Writing')).toBeTruthy()
   })
 
+  it('renders explicit description from agent.description in the hero', async () => {
+    const withDesc: AgentRow = { ...baseAgent, description: 'My explicit description' }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [withDesc] })
+    setup()
+    await waitForLoaded()
+    expect(screen.getByText('My explicit description')).toBeTruthy()
+  })
+
+  it('renders origin chip when agent.origin_plugin is set', async () => {
+    const imported: AgentRow = { ...baseAgent, origin_plugin: 'superpowers', origin_version: '5.1.0' }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [imported] })
+    setup()
+    await waitForLoaded()
+    expect(screen.getByText(/from superpowers v5\.1\.0/i)).toBeTruthy()
+  })
+
   it('handle copy icon copies @git-suite/<handle> to the clipboard', async () => {
     setup()
     await waitForLoaded()

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Copy, Pin, Folder, FileText, Clock, Edit3, Eye, Plug, Settings as SettingsIcon, CopyPlus, Trash2 } from 'lucide-react'
+import { Copy, Pin, Folder, FileText, Clock, Edit3, Eye, Plug, Settings as SettingsIcon, CopyPlus, Trash2, Zap } from 'lucide-react'
 import type { AgentRow, AgentFolderRow, AgentRevision, AgentPreset } from '../types/agent'
 import { parseAgentPresets } from '../types/agent'
 import { useToast } from '../contexts/Toast'
@@ -248,10 +248,20 @@ export default function AgentDetail() {
             takenHandles={takenHandles}
             onCopied={(text) => toast(`Copied ${text}`, 'success')}
           />
+          {(agent.description || deriveDescription(liveBody)) && (
+            <p className="agent-detail-description">
+              {agent.description || deriveDescription(liveBody)}
+            </p>
+          )}
           <div className="agent-detail-meta">
             <span className="agent-detail-chip"><Folder size={11} /> {currentFolderName}</span>
             <span className="agent-detail-chip"><FileText size={11} /> {(bodyChars / 1024).toFixed(1)} kb</span>
             <span className="agent-detail-chip"><Clock size={11} /> Updated {new Date(agent.updated_at).toLocaleString()}</span>
+            {agent.origin_plugin && (
+              <span className="agent-detail-chip agent-detail-chip--origin">
+                <Zap size={11} /> from {agent.origin_plugin}{agent.origin_version ? ` v${agent.origin_version}` : ''}
+              </span>
+            )}
           </div>
         </div>
         <div className="agent-detail-actions">
