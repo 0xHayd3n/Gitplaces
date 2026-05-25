@@ -37,18 +37,98 @@ export function clearGitHubUser(): void {
   githubStore.delete('github.avatarUrl')
 }
 
+import type { ProviderId } from './llm/types'
+
+type ProviderConfig = {
+  enabled: boolean
+  apiKey?: string
+}
+
+type OpenAICompatibleEndpoint = {
+  id: string
+  label: string
+  baseUrl: string
+  apiKey?: string
+}
+
 interface ApiStoreSchema {
+  // Legacy — kept as a back-compat alias. New code reads/writes via
+  // providers.anthropic.apiKey; setApiKey() writes both, getApiKey() prefers
+  // providers.* and falls back to the legacy key.
   'anthropic.apiKey'?: string
+
+  // Per-provider config introduced by Phase 1 of the multi-provider effort.
+  'providers.anthropic.apiKey'?: string
+  'providers.anthropic.enabled'?: boolean
+  'providers.openai.apiKey'?: string
+  'providers.openai.enabled'?: boolean
+  'providers.openai.organization'?: string
+  'providers.google.apiKey'?: string
+  'providers.google.enabled'?: boolean
+  'providers.opencode.enabled'?: boolean
+  'providers.openai-compatible.enabled'?: boolean
+  'providers.openai-compatible.endpoints'?: OpenAICompatibleEndpoint[]
 }
 
 const apiStore = new Store<ApiStoreSchema>({ encryptionKey: 'git-suite-api-key-v1' })
 
+// ── API key (back-compat aliases) ───────────────────────────────
 export function getApiKey(): string | undefined {
-  return apiStore.get('anthropic.apiKey')
+  return apiStore.get('providers.anthropic.apiKey') ?? apiStore.get('anthropic.apiKey')
 }
 
 export function setApiKey(key: string): void {
-  apiStore.set('anthropic.apiKey', key)
+  apiStore.set('providers.anthropic.apiKey', key)
+  apiStore.set('anthropic.apiKey', key) // keep legacy key in sync for any code that still reads it directly
+}
+
+// ── Generic per-provider config ─────────────────────────────────
+export function getProviderConfig(provider: ProviderId): ProviderConfig {
+  return {
+    enabled: apiStore.get(`providers.${provider}.enabled` as keyof ApiStoreSchema) as boolean | undefined ?? false,
+    apiKey:  apiStore.get(`providers.${provider}.apiKey`  as keyof ApiStoreSchema) as string  | undefined,
+  }
+}
+
+export function setProviderConfig(provider: ProviderId, cfg: ProviderConfig): void {
+  apiStore.set(`providers.${provider}.enabled` as keyof ApiStoreSchema, cfg.enabled as never)
+  if (cfg.apiKey === undefined) {
+    apiStore.delete(`providers.${provider}.apiKey` as keyof ApiStoreSchema)
+  } else {
+    apiStore.set(`providers.${provider}.apiKey` as keyof ApiStoreSchema, cfg.apiKey as never)
+  }
+}
+
+// ── openai-compatible endpoint list ─────────────────────────────
+export function listOpenAICompatibleEndpoints(): OpenAICompatibleEndpoint[] {
+  return apiStore.get('providers.openai-compatible.endpoints') ?? []
+}
+
+export function upsertOpenAICompatibleEndpoint(ep: OpenAICompatibleEndpoint): void {
+  const all = listOpenAICompatibleEndpoints()
+  const idx = all.findIndex(e => e.id === ep.id)
+  if (idx === -1) all.push(ep)
+  else all[idx] = ep
+  apiStore.set('providers.openai-compatible.endpoints', all)
+}
+
+export function removeOpenAICompatibleEndpoint(id: string): void {
+  const all = listOpenAICompatibleEndpoints().filter(e => e.id !== id)
+  apiStore.set('providers.openai-compatible.endpoints', all)
+}
+
+// ── Migration (called once on startup from main.ts) ─────────────
+/**
+ * Copy legacy `anthropic.apiKey` into `providers.anthropic.apiKey` if the new key
+ * is empty. Idempotent — safe to call on every startup.
+ */
+export function migrateApiStore(): void {
+  const legacy = apiStore.get('anthropic.apiKey')
+  const current = apiStore.get('providers.anthropic.apiKey')
+  if (legacy && !current) {
+    apiStore.set('providers.anthropic.apiKey', legacy)
+    apiStore.set('providers.anthropic.enabled', true)
+  }
 }
 
 interface SkillSyncStoreSchema {
