@@ -6,6 +6,7 @@ import {
   createAgent, updateAgent, deleteAgent, duplicateAgent, getAllAgents,
   createFolder, renameFolder, deleteFolder, updateFolder,
   listFiles, createFile, updateFile, deleteFile,
+  assertValidModel, assertValidTools, setSyncedAt,
   AGENT_NAME_MAX, AGENT_BODY_MAX,
 } from './agentsService'
 
@@ -930,5 +931,147 @@ describe('agentsService — description', () => {
     })
     const updated = updateAgent(db, agent.id, { description: 'New desc' })
     expect(updated.description).toBe('New desc')
+  })
+})
+
+describe('validation helpers', () => {
+  it('assertValidModel accepts the four canonical values', () => {
+    expect(() => assertValidModel('sonnet')).not.toThrow()
+    expect(() => assertValidModel('opus')).not.toThrow()
+    expect(() => assertValidModel('haiku')).not.toThrow()
+    expect(() => assertValidModel('inherit')).not.toThrow()
+  })
+
+  it('assertValidModel throws on unknown values', () => {
+    expect(() => assertValidModel('gpt-4')).toThrow(/model/i)
+    expect(() => assertValidModel('')).toThrow(/model/i)
+    expect(() => assertValidModel(null)).toThrow(/model/i)
+  })
+
+  it('assertValidTools accepts string arrays and null', () => {
+    expect(() => assertValidTools(null)).not.toThrow()
+    expect(() => assertValidTools([])).not.toThrow()
+    expect(() => assertValidTools(['Read', 'Edit'])).not.toThrow()
+  })
+
+  it('assertValidTools rejects non-array and non-string entries', () => {
+    expect(() => assertValidTools('Read, Edit')).toThrow()
+    expect(() => assertValidTools([123 as unknown as string])).toThrow()
+  })
+})
+
+describe('agent skill-parity fields', () => {
+  let db: Database.Database
+  beforeEach(() => { db = freshDb() })
+
+  function makeBaseInput(overrides: Partial<Parameters<typeof createAgent>[1]> = {}): Parameters<typeof createAgent>[1] {
+    return {
+      name: 'A', body: '# A', folderId: null,
+      handle: 'a', colorStart: '#888888', colorEnd: null, emoji: null,
+      ...overrides,
+    }
+  }
+
+  it('createAgent defaults all new fields safely', () => {
+    const agent = createAgent(db, makeBaseInput())
+    expect(agent.model).toBe('inherit')
+    expect(agent.tools).toBeNull()
+    expect(agent.argument_hint).toBeNull()
+    expect(agent.is_subagent).toBe(0)
+    expect(agent.is_slash_command).toBe(0)
+    expect(agent.synced_subagent_at).toBeNull()
+    expect(agent.synced_slash_command_at).toBeNull()
+  })
+
+  it('createAgent accepts and persists the new fields', () => {
+    const agent = createAgent(db, makeBaseInput({
+      model: 'opus',
+      tools: ['Read', 'Edit'],
+      argumentHint: '[project]',
+      isSubagent: true,
+      isSlashCommand: true,
+    }))
+    expect(agent.model).toBe('opus')
+    expect(agent.tools).toBe('["Read","Edit"]')
+    expect(agent.argument_hint).toBe('[project]')
+    expect(agent.is_subagent).toBe(1)
+    expect(agent.is_slash_command).toBe(1)
+  })
+
+  it('createAgent accepts a pre-serialized tools JSON string', () => {
+    const agent = createAgent(db, makeBaseInput({
+      tools: '["Read","Edit","Bash"]',
+    }))
+    expect(agent.tools).toBe('["Read","Edit","Bash"]')
+  })
+
+  it('createAgent rejects an invalid model value', () => {
+    expect(() => createAgent(db, makeBaseInput({ model: 'gpt-4' as any }))).toThrow(/model/i)
+  })
+
+  it('createAgent rejects non-array tools', () => {
+    expect(() => createAgent(db, makeBaseInput({ tools: 'Read, Edit' as any }))).toThrow(/tools/i)
+  })
+
+  it('updateAgent patches model, tools, argumentHint, isSubagent, isSlashCommand independently', () => {
+    const agent = createAgent(db, makeBaseInput())
+    const after1 = updateAgent(db, agent.id, { model: 'haiku' })
+    expect(after1.model).toBe('haiku')
+    const after2 = updateAgent(db, agent.id, { tools: ['Read'] })
+    expect(after2.tools).toBe('["Read"]')
+    const after3 = updateAgent(db, agent.id, { tools: null })
+    expect(after3.tools).toBeNull()
+    const after4 = updateAgent(db, agent.id, { isSubagent: true })
+    expect(after4.is_subagent).toBe(1)
+    const after5 = updateAgent(db, agent.id, { isSlashCommand: true })
+    expect(after5.is_slash_command).toBe(1)
+    const after6 = updateAgent(db, agent.id, { argumentHint: '[arg]' })
+    expect(after6.argument_hint).toBe('[arg]')
+    const after7 = updateAgent(db, agent.id, { argumentHint: null })
+    expect(after7.argument_hint).toBeNull()
+  })
+})
+
+describe('setSyncedAt', () => {
+  let db: Database.Database
+  beforeEach(() => { db = freshDb() })
+
+  function newAgent() {
+    return createAgent(db, {
+      name: 'A', body: '# A', folderId: null,
+      handle: 'a', colorStart: '#888888', colorEnd: null, emoji: null,
+    })
+  }
+
+  it('updates synced_subagent_at independently of other columns', () => {
+    const agent = newAgent()
+    setSyncedAt(db, agent.id, 'subagent', '2026-05-25T10:00:00.000Z')
+    const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agent.id) as any
+    expect(row.synced_subagent_at).toBe('2026-05-25T10:00:00.000Z')
+    expect(row.synced_slash_command_at).toBeNull()
+  })
+
+  it('clears the timestamp when passed null', () => {
+    const agent = newAgent()
+    setSyncedAt(db, agent.id, 'subagent', '2026-05-25T10:00:00.000Z')
+    setSyncedAt(db, agent.id, 'subagent', null)
+    const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agent.id) as any
+    expect(row.synced_subagent_at).toBeNull()
+  })
+
+  it('does NOT bump updated_at', () => {
+    const agent = newAgent()
+    const before = (db.prepare(`SELECT updated_at FROM agents WHERE id = ?`).get(agent.id) as any).updated_at
+    setSyncedAt(db, agent.id, 'subagent', '2026-05-25T10:00:00.000Z')
+    const after = (db.prepare(`SELECT updated_at FROM agents WHERE id = ?`).get(agent.id) as any).updated_at
+    expect(after).toBe(before)
+  })
+
+  it('handles slashCommand surface separately from subagent', () => {
+    const agent = newAgent()
+    setSyncedAt(db, agent.id, 'slashCommand', '2026-05-25T10:00:00.000Z')
+    const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agent.id) as any
+    expect(row.synced_subagent_at).toBeNull()
+    expect(row.synced_slash_command_at).toBe('2026-05-25T10:00:00.000Z')
   })
 })

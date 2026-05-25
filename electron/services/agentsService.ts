@@ -9,6 +9,23 @@ export const AGENT_BODY_MAX = 1_048_576 // 1 MiB
 
 const HEX_RE = /^#[0-9a-f]{6}$/i
 
+export const MODEL_VALUES = ['sonnet', 'opus', 'haiku', 'inherit'] as const
+export type AgentModel = typeof MODEL_VALUES[number]
+
+export function assertValidModel(value: unknown): asserts value is AgentModel {
+  if (typeof value !== 'string' || !(MODEL_VALUES as readonly string[]).includes(value)) {
+    throw new Error(`Invalid model: ${JSON.stringify(value)}`)
+  }
+}
+
+export function assertValidTools(value: unknown): asserts value is string[] | null {
+  if (value === null) return
+  if (!Array.isArray(value)) throw new Error(`tools must be an array or null, got ${typeof value}`)
+  for (const t of value) {
+    if (typeof t !== 'string') throw new Error(`tools entries must be strings, got ${typeof t}`)
+  }
+}
+
 function assertValidHandle(handle: string): void {
   if (!isValidHandle(handle)) throw new Error(`Invalid handle: ${JSON.stringify(handle)}`)
 }
@@ -130,6 +147,12 @@ export interface CreateAgentInput {
   colorEnd: string | null
   emoji: string | null
   description?: string
+  // Phase 2: skill parity
+  model?: AgentModel
+  tools?: string[] | string | null     // accepts either parsed array or pre-serialized JSON
+  argumentHint?: string | null
+  isSubagent?: boolean
+  isSlashCommand?: boolean
 }
 
 export function createAgent(db: Database.Database, input: CreateAgentInput): AgentRow {
@@ -143,12 +166,46 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
   assertValidHex('colorStart', input.colorStart)
   if (input.colorEnd !== null) assertValidHex('colorEnd', input.colorEnd)
 
+  // Phase 2 — normalise + validate the new optional fields
+  const model = input.model ?? 'inherit'
+  assertValidModel(model)
+
+  let tools: string | null = null
+  if (input.tools !== undefined && input.tools !== null) {
+    if (typeof input.tools === 'string') {
+      // Caller passed a pre-serialized JSON string — parse to validate, then re-serialize for canonical form.
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(input.tools)
+      } catch {
+        throw new Error(`tools string must be valid JSON, got: ${input.tools}`)
+      }
+      assertValidTools(parsed)
+      tools = JSON.stringify(parsed)
+    } else {
+      assertValidTools(input.tools)
+      tools = JSON.stringify(input.tools)
+    }
+  }
+
+  const argumentHint = input.argumentHint ?? null
+  const isSubagent = input.isSubagent ? 1 : 0
+  const isSlashCommand = input.isSlashCommand ? 1 : 0
+
   const id = randomUUID()
   const ts = nowIso()
   db.prepare(`
-    INSERT INTO agents (id, name, handle, body, folder_id, color_start, color_end, emoji, description, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, name, input.handle, input.body, input.folderId, input.colorStart, input.colorEnd, input.emoji, input.description ?? '', ts, ts)
+    INSERT INTO agents (
+      id, name, handle, body, folder_id, color_start, color_end, emoji, description,
+      tools, model, is_subagent, is_slash_command, argument_hint,
+      created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, name, input.handle, input.body, input.folderId, input.colorStart, input.colorEnd, input.emoji, input.description ?? '',
+    tools, model, isSubagent, isSlashCommand, argumentHint,
+    ts, ts,
+  )
   const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow
   recordRevision(db, id, row.body, '[]', 'create', 'Created agent')
   return row
@@ -164,6 +221,12 @@ export interface UpdateAgentPatch {
   emoji?: string | null
   pinned?: boolean
   description?: string
+  // Phase 2
+  model?: AgentModel
+  tools?: string[] | null              // null = inherit; [] = no tools
+  argumentHint?: string | null
+  isSubagent?: boolean
+  isSlashCommand?: boolean
 }
 
 export function updateAgent(
@@ -220,6 +283,23 @@ export function updateAgent(
   if (patch.description !== undefined) {
     sets.push('description = ?'); params.push(patch.description)
   }
+  if (patch.model !== undefined) {
+    assertValidModel(patch.model)
+    sets.push('model = ?'); params.push(patch.model)
+  }
+  if (patch.tools !== undefined) {
+    assertValidTools(patch.tools)
+    sets.push('tools = ?'); params.push(patch.tools === null ? null : JSON.stringify(patch.tools))
+  }
+  if (patch.argumentHint !== undefined) {
+    sets.push('argument_hint = ?'); params.push(patch.argumentHint)
+  }
+  if (patch.isSubagent !== undefined) {
+    sets.push('is_subagent = ?'); params.push(patch.isSubagent ? 1 : 0)
+  }
+  if (patch.isSlashCommand !== undefined) {
+    sets.push('is_slash_command = ?'); params.push(patch.isSlashCommand ? 1 : 0)
+  }
 
   if (sets.length > 0) {
     sets.push('updated_at = ?'); params.push(nowIso())
@@ -237,6 +317,24 @@ export function updateAgent(
 
 export function deleteAgent(db: Database.Database, id: string): void {
   db.prepare('DELETE FROM agents WHERE id = ?').run(id)
+}
+
+export type SyncSurface = 'subagent' | 'slashCommand'
+
+/**
+ * Updates the synced_subagent_at or synced_slash_command_at column.
+ * Kept out of UpdateAgentPatch so callers can't accidentally mutate sync
+ * state, and deliberately does NOT touch updated_at — sync state is an
+ * implementation detail, not a content edit.
+ */
+export function setSyncedAt(
+  db: Database.Database,
+  agentId: string,
+  surface: SyncSurface,
+  ts: string | null,
+): void {
+  const column = surface === 'subagent' ? 'synced_subagent_at' : 'synced_slash_command_at'
+  db.prepare(`UPDATE agents SET ${column} = ? WHERE id = ?`).run(ts, agentId)
 }
 
 export function duplicateAgent(db: Database.Database, id: string): AgentRow {
