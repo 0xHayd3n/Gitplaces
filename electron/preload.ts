@@ -247,6 +247,12 @@ contextBridge.exposeInMainWorld('api', {
         opts: { folderId: string | null; onConflict: 'overwrite' | 'skip' | 'rename' },
       ) =>
         ipcRenderer.invoke('agents:import:importSkill', skill, opts) as Promise<import('../electron/services/skillImportService').ImportResult>,
+      discoverInRepo: (url: string) =>
+        ipcRenderer.invoke('agents:import:discoverInRepo', url) as Promise<import('../electron/services/skillImportFromGithubService').RepoSkillIndex>,
+      readSkillFromRepo: (
+        owner: string, name: string, branch: string, commitSha: string, repoPath: string,
+      ) =>
+        ipcRenderer.invoke('agents:import:readSkillFromRepo', owner, name, branch, commitSha, repoPath) as Promise<import('../electron/services/skillImportService').ParsedSkill>,
     },
 
     recordUse: (agentId: string, presetId: string | null) =>

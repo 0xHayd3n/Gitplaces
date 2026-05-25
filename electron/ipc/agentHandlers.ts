@@ -4,6 +4,8 @@ import os from 'node:os'
 import fs from 'node:fs/promises'
 import { getDb } from '../db'
 import { discoverPlugins, parseSkill, importSkill, type ParsedSkill, type ImportOptions } from '../services/skillImportService'
+import { discoverSkillsInRepo, readSkillFromRepo } from '../services/skillImportFromGithubService'
+import { parseGithubRepoUrl } from '../../src/utils/parseGithubRepoUrl'
 import {
   getAllAgents,
   createAgent, updateAgent, deleteAgent, duplicateAgent,
@@ -229,6 +231,18 @@ export function registerAgentHandlers(): void {
     const result = importSkill(getDb(app.getPath('userData')), skill, opts)
     broadcastChanged()
     return result
+  })
+
+  ipcMain.handle('agents:import:discoverInRepo', async (_, url: string) => {
+    const parsed = parseGithubRepoUrl(url)
+    if (!parsed) throw new Error('Not a valid GitHub URL')
+    return discoverSkillsInRepo(parsed.owner, parsed.name)
+  })
+
+  ipcMain.handle('agents:import:readSkillFromRepo', async (
+    _, owner: string, name: string, branch: string, commitSha: string, repoPath: string,
+  ) => {
+    return readSkillFromRepo(owner, name, branch, commitSha, repoPath)
   })
 
   ipcMain.handle('agents:mcp:getConfigSnippet', async () => {

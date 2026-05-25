@@ -241,6 +241,10 @@ declare global {
             skill: import('../electron/services/skillImportService').ParsedSkill,
             opts: { folderId: string | null; onConflict: 'overwrite' | 'skip' | 'rename' },
           ): Promise<import('../electron/services/skillImportService').ImportResult>
+          discoverInRepo(url: string): Promise<import('../electron/services/skillImportFromGithubService').RepoSkillIndex>
+          readSkillFromRepo(
+            owner: string, name: string, branch: string, commitSha: string, repoPath: string,
+          ): Promise<import('../electron/services/skillImportService').ParsedSkill>
         }
         recordUse(agentId: string, presetId: string | null): Promise<void>
         mcp: {
