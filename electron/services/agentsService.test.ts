@@ -1013,6 +1013,24 @@ describe('agent skill-parity fields', () => {
     expect(() => createAgent(db, makeBaseInput({ tools: 'Read, Edit' as any }))).toThrow(/tools/i)
   })
 
+  it('duplicateAgent carries Phase 2 content fields, drops surface toggles', () => {
+    const a = createAgent(db, makeBaseInput({
+      model: 'opus',
+      tools: ['Read', 'Edit'],
+      argumentHint: '[arg]',
+      isSubagent: true,
+      isSlashCommand: true,
+    }))
+    const d = duplicateAgent(db, a.id)
+    expect(d.model).toBe('opus')
+    expect(d.tools).toBe('["Read","Edit"]')
+    expect(d.argument_hint).toBe('[arg]')
+    // Surface toggles must NOT carry across — duplicating an agent that owns
+    // ~/.claude/agents/foo.md should not auto-create another file with the new handle.
+    expect(d.is_subagent).toBe(0)
+    expect(d.is_slash_command).toBe(0)
+  })
+
   it('updateAgent patches model, tools, argumentHint, isSubagent, isSlashCommand independently', () => {
     const agent = createAgent(db, makeBaseInput())
     const after1 = updateAgent(db, agent.id, { model: 'haiku' })

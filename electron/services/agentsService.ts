@@ -356,6 +356,13 @@ export function duplicateAgent(db: Database.Database, id: string): AgentRow {
     colorStart: src.color_start ?? '#888888',
     colorEnd: src.color_end,
     emoji: src.emoji,
+    description: src.description,
+    // Phase 2: carry content-shaping fields through duplication, but deliberately
+    // do NOT copy is_subagent / is_slash_command — a duplicate should not silently
+    // create another file in ~/.claude/agents/ (handle is also different anyway).
+    model: src.model,
+    tools: src.tools,
+    argumentHint: src.argument_hint,
   })
 }
 

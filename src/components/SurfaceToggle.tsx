@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ExternalLink, RefreshCw, AlertCircle } from 'lucide-react'
 import { ConflictDialog } from './ConflictDialog'
 import { useToast } from '../contexts/Toast'
 
 interface SurfaceToggleProps {
   agentId: string
+  agentHandle: string                  // for the clickable path display
   kind: 'subagent' | 'slashCommand'
   enabled: boolean
   syncedAt: string | null
@@ -31,18 +32,41 @@ function relativeTime(iso: string): string {
   return `${days} d ago`
 }
 
-export function SurfaceToggle({ agentId, kind, enabled, syncedAt }: SurfaceToggleProps) {
+export function SurfaceToggle({ agentId, agentHandle, kind, enabled, syncedAt }: SurfaceToggleProps) {
   const { toast } = useToast()
   const [pending, setPending] = useState(false)
   const [conflict, setConflict] = useState<{ path: string } | null>(null)
   const [lastError, setLastError] = useState<string | null>(null)
+  const [syncedPath, setSyncedPath] = useState<string | null>(null)
+
+  // Fetch the on-disk path lazily — once we know we're synced, ask the IPC for
+  // the canonical path so the link reflects whatever CLAUDE_HOME the main process
+  // is using. Re-queries when handle changes (which moves the file).
+  useEffect(() => {
+    if (!enabled || syncedAt === null) {
+      setSyncedPath(null)
+      return
+    }
+    void window.api.agents.sync.checkConflict(agentId).then(info => {
+      setSyncedPath(kind === 'subagent' ? info.subagentPath : info.slashCommandPath)
+    }).catch(() => setSyncedPath(null))
+  }, [agentId, agentHandle, kind, enabled, syncedAt])
+
+  const openContainingFolder = () => {
+    if (!syncedPath) return
+    const parent = syncedPath.replace(/[^/\\]+$/, '')
+    void window.api.openExternal(`file:///${parent.replace(/\\/g, '/')}`)
+  }
 
   const applyToggle = async (next: boolean, forceOverwrite = false) => {
     setPending(true)
     try {
-      const patch = kind === 'subagent'
-        ? { isSubagent: next, forceOverwrite }
-        : { isSlashCommand: next, forceOverwrite }
+      const patch: Parameters<typeof window.api.agents.update>[1] = kind === 'subagent'
+        ? { isSubagent: next }
+        : { isSlashCommand: next }
+      // forceOverwrite is only meaningful when turning a surface ON — omit otherwise so
+      // we don't send an irrelevant field over IPC on toggle-OFF.
+      if (next && forceOverwrite) patch.forceOverwrite = true
       const result = await window.api.agents.update(agentId, patch)
       if (result.syncWarning) {
         setLastError(result.syncWarning)
@@ -118,8 +142,21 @@ export function SurfaceToggle({ agentId, kind, enabled, syncedAt }: SurfaceToggl
             <span className="agent-detail-surface-toggle-pending">Will sync on next save.</span>
           ) : (
             <span className="agent-detail-surface-toggle-synced">
-              Synced {relativeTime(syncedAt)}
-              <ExternalLink size={11} />
+              Synced to{' '}
+              {syncedPath ? (
+                <button
+                  type="button"
+                  className="agent-detail-modal-link"
+                  onClick={openContainingFolder}
+                  title="Open containing folder"
+                >
+                  {syncedPath}
+                  <ExternalLink size={11} />
+                </button>
+              ) : (
+                <span>…</span>
+              )}
+              {' · '}{relativeTime(syncedAt)}
             </span>
           )}
         </div>

@@ -52,7 +52,7 @@ export const MODEL_FRONTMATTER: Record<'sonnet' | 'opus' | 'haiku', string> = {
 
 function resolvedDescription(agent: AgentRow): string {
   const explicit = agent.description?.trim()
-  if (explicit) return agent.description
+  if (explicit) return explicit
   return deriveDescription(agent.body)
 }
 

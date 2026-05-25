@@ -559,12 +559,14 @@ function AgentSettingsTab({
       <div className="agent-detail-settings-field">
         <SurfaceToggle
           agentId={agent.id}
+          agentHandle={agent.handle}
           kind="subagent"
           enabled={agent.is_subagent === 1}
           syncedAt={agent.synced_subagent_at}
         />
         <SurfaceToggle
           agentId={agent.id}
+          agentHandle={agent.handle}
           kind="slashCommand"
           enabled={agent.is_slash_command === 1}
           syncedAt={agent.synced_slash_command_at}
