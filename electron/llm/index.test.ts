@@ -54,4 +54,30 @@ describe('createLLMService', () => {
       kind: 'unknown',
     })
   })
+
+  it('streamText surfaces resolveAdapter throws as a rejected iterable, not a sync exception', async () => {
+    const svc = createLLMService()
+    const iter = svc.streamText(
+      { provider: 'openai', model: 'gpt-4o' },
+      { messages: [{ role: 'user', content: 'hi' }] },
+    )
+    // Calling streamText must NOT throw synchronously — the call returns an iterator.
+    // The error surfaces on the first iteration.
+    await expect((async () => { for await (const _ of iter) { /* unreachable */ } })()).rejects.toMatchObject({
+      name: 'LLMError',
+      kind: 'unknown',
+    })
+  })
+
+  it('runAgentLoop surfaces resolveAdapter throws as a rejected iterable, not a sync exception', async () => {
+    const svc = createLLMService()
+    const iter = svc.runAgentLoop(
+      { provider: 'openai', model: 'gpt-4o' },
+      { messages: [{ role: 'user', content: 'hi' }] },
+    )
+    await expect((async () => { for await (const _ of iter) { /* unreachable */ } })()).rejects.toMatchObject({
+      name: 'LLMError',
+      kind: 'unknown',
+    })
+  })
 })

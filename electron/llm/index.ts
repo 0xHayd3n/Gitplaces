@@ -48,15 +48,16 @@ export function createLLMService(): LLMService {
     async generateText(ref, opts) {
       return resolveAdapter(ref).generateText(ref, opts)
     },
-    streamText(ref, opts) {
-      // resolveAdapter may throw synchronously; wrap in an async generator so the
-      // caller always gets a rejected iterable rather than a thrown exception.
+    // streamText and runAgentLoop are async generators so a synchronous throw
+    // from resolveAdapter() surfaces as a rejected iterable on the first iteration
+    // (consistent with how callers `for await` over the result).
+    async *streamText(ref, opts) {
       const adapter = resolveAdapter(ref)
-      return adapter.streamText(ref, opts)
+      yield* adapter.streamText(ref, opts)
     },
-    runAgentLoop(ref, opts) {
+    async *runAgentLoop(ref, opts) {
       const adapter = resolveAdapter(ref)
-      return adapter.runAgentLoop(ref, opts)
+      yield* adapter.runAgentLoop(ref, opts)
     },
   }
 }
