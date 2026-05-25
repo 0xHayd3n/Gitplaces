@@ -224,7 +224,8 @@
 .agent-detail-body {
   flex: 1;
   overflow: auto;
-  padding: 18px 28px;
+  /* Bottom padding clears the floating dock (fixed at bottom: 20px). */
+  padding: 18px 28px 96px;
   background: var(--bg);
   min-height: 0;
 }
