@@ -155,4 +155,43 @@ describe('ImportSkillDialog — GitHub section', () => {
     fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
     await waitFor(() => expect(window.api.agents.createFolder).toHaveBeenCalledWith('superpowers'))
   })
+
+  it('isolates per-skill failures and surfaces them in the end-of-batch alert', async () => {
+    // First skill's readSkillFromRepo throws; second succeeds. The batch must
+    // continue, call importSkill for the second, and surface the failure via
+    // window.alert without aborting onClose.
+    ;(window.api.agents.import.readSkillFromRepo as any) = vi.fn()
+      .mockRejectedValueOnce(new Error('boom for skill 1'))
+      .mockResolvedValueOnce({
+        name: 'plan-writing', handle: 'plan-writing', description: '', body: '', files: [],
+        origin: { plugin: 'obra/superpowers', pluginVersion: 'a1b2c3d', path: 'skills/plan-writing' },
+      })
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    const onClose = vi.fn()
+
+    render(<ImportSkillDialog open onClose={onClose} />)
+    await waitFor(() => screen.getByText('superpowers'))
+    fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'obra/superpowers' } })
+    fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
+    await waitFor(() => screen.getByText('plan-writing'))
+    fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
+
+    // Both readSkillFromRepo calls happen (one throws, one resolves) — failure
+    // is isolated to the first skill.
+    await waitFor(() => expect(window.api.agents.import.readSkillFromRepo).toHaveBeenCalledTimes(2))
+    // Only the successful skill makes it to importSkill.
+    await waitFor(() => expect(window.api.agents.import.importSkill).toHaveBeenCalledTimes(1))
+    // Failure surfaced in alert with the failed skill's name + error message.
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledTimes(1)
+      const msg = alertSpy.mock.calls[0][0] as string
+      expect(msg).toMatch(/1 failure/i)
+      expect(msg).toContain('brainstorming')
+      expect(msg).toContain('boom for skill 1')
+    })
+    // onClose is still called after the batch despite the failure.
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+
+    alertSpy.mockRestore()
+  })
 })

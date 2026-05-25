@@ -217,13 +217,13 @@ export default function ImportSkillDialog({ open, onClose }: Props) {
                   value={repoUrl}
                   onChange={(e) => setRepoUrl(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && repoUrlValid && !repoFetching) handleFetchRepo() }}
-                  disabled={repoFetching || repoImporting}
+                  disabled={busy || repoFetching || repoImporting}
                 />
                 <button
                   type="button"
                   className="import-skill-github-fetch-btn"
                   onClick={handleFetchRepo}
-                  disabled={!repoUrlValid || repoFetching || repoImporting}
+                  disabled={busy || !repoUrlValid || repoFetching || repoImporting}
                 >
                   {repoFetching ? 'Fetching…' : 'Fetch'}
                 </button>
@@ -273,7 +273,7 @@ export default function ImportSkillDialog({ open, onClose }: Props) {
                   type="button"
                   className="import-skill-import-btn"
                   onClick={handleImportRepo}
-                  disabled={repoImporting || repoSelected.size === 0}
+                  disabled={busy || repoImporting || repoSelected.size === 0}
                 >
                   {repoImporting ? 'Importing…' : `Import ${repoSelected.size} ${repoSelected.size === 1 ? 'skill' : 'skills'}`}
                 </button>
