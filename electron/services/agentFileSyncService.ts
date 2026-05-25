@@ -44,10 +44,28 @@ export async function checkConflict(handle: string): Promise<{
 
 // ── Frontmatter generation ──────────────────────────────────────────
 
-export const MODEL_FRONTMATTER: Record<'sonnet' | 'opus' | 'haiku', string> = {
+const LEGACY_SHORT_TO_FULL: Record<string, string> = {
   sonnet: 'claude-sonnet-4-6',
   opus:   'claude-opus-4-7',
   haiku:  'claude-haiku-4-5-20251001',
+}
+
+/**
+ * Convert an agent's stored model string into the form Claude Code expects in
+ * `.claude/agents/*.md` frontmatter:
+ *   - 'inherit' → returns null (caller omits the field entirely)
+ *   - 'sonnet'/'opus'/'haiku' → expanded to full Anthropic ID
+ *   - 'anthropic/claude-sonnet-4-6' → stripped to 'claude-sonnet-4-6'
+ *   - 'claude-sonnet-4-6' → returned as-is (already canonical)
+ *
+ * Non-Anthropic providers should never reach this function — the sync layer
+ * gates them out before previewSubagentFile is called.
+ */
+function modelForClaudeFrontmatter(model: string): string | null {
+  if (model === 'inherit') return null
+  if (LEGACY_SHORT_TO_FULL[model]) return LEGACY_SHORT_TO_FULL[model]
+  if (model.startsWith('anthropic/')) return model.slice('anthropic/'.length)
+  return model
 }
 
 function resolvedDescription(agent: AgentRow, primaryContent: string): string {
@@ -65,12 +83,9 @@ export function previewSubagentFile(agent: AgentRow, primaryContent: string): st
   if (tools !== null) {
     data.tools = tools.join(', ')
   }
-  if (agent.model !== 'inherit') {
-    // Phase 2 bridge: AgentRow.model is now `string`. Task 6 will rewrite this
-    // block to handle the full multi-provider grammar; until then, the narrow
-    // cast keeps the typecheck clean and matches today's runtime behavior
-    // (only Anthropic agents reach this write path).
-    data.model = MODEL_FRONTMATTER[agent.model as 'sonnet' | 'opus' | 'haiku']
+  const claudeModel = modelForClaudeFrontmatter(agent.model)
+  if (claudeModel !== null) {
+    data.model = claudeModel
   }
   return matter.stringify(primaryContent, data)
 }
@@ -113,7 +128,11 @@ export async function syncAgentToDisk(
 ): Promise<SyncResult> {
   const [subagent, slashCommand] = await Promise.all([
     syncOneSurface({
-      enabled: agent.is_subagent === 1,
+      // Only Anthropic agents sync to .claude/agents/. Other providers
+      // (openai, google, opencode, openai-compatible) either have no CLI
+      // runtime (openai/google/openai-compatible) or have their own sync
+      // target landing in Phase 6 (opencode → .opencode/agents/).
+      enabled: agent.is_subagent === 1 && agent.model_provider === 'anthropic',
       currentPath: subagentPath(agent.handle),
       oldPath: ctx.oldHandle ? subagentPath(ctx.oldHandle) : null,
       syncedAt: agent.synced_subagent_at,

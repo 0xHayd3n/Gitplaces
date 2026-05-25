@@ -144,6 +144,24 @@ describe('previewSubagentFile', () => {
     expect(matter(previewSubagentFile(baseAgent({ model: 'haiku' }), BODY)).data.model).toBe('claude-haiku-4-5-20251001')
   })
 
+  it('strips the anthropic/ provider prefix when writing Claude Code frontmatter', () => {
+    const agent = baseAgent({
+      model: 'anthropic/claude-sonnet-4-6',
+      model_provider: 'anthropic',
+    })
+    const out = previewSubagentFile(agent, BODY)
+    expect(matter(out).data.model).toBe('claude-sonnet-4-6')
+    expect(out).not.toMatch(/anthropic\//)
+  })
+
+  it('passes through full Anthropic IDs unchanged', () => {
+    const agent = baseAgent({
+      model: 'claude-sonnet-4-6',
+      model_provider: 'anthropic',
+    })
+    expect(matter(previewSubagentFile(agent, BODY)).data.model).toBe('claude-sonnet-4-6')
+  })
+
   it('falls back to deriveDescription when description is empty', () => {
     const out = previewSubagentFile(baseAgent({ description: '' }), 'First line.\nSecond line.')
     const parsed = matter(out)
@@ -203,6 +221,31 @@ describe('syncAgentToDisk', () => {
     expect(result.subagent).toMatchObject({ status: 'written' })
     const written = await fs.readFile(subagentPath('my-agent'), 'utf-8')
     expect(written).toContain('name: my-agent')
+  })
+
+  it('does NOT sync non-Anthropic agents to .claude/agents/', async () => {
+    // Even with is_subagent=1, an openai agent must skip the .claude/agents/ write.
+    const agent = baseAgent({
+      is_subagent: 1,
+      model: 'openai/gpt-4o',
+      model_provider: 'openai',
+    })
+    const result = await syncAgentToDisk(agent, BODY)
+    expect(result.subagent).toMatchObject({ status: 'skipped' })
+    // Confirm no file landed on disk.
+    const exists = await fs.stat(subagentPath('my-agent')).then(() => true).catch(() => false)
+    expect(exists).toBe(false)
+  })
+
+  it('does NOT sync openai-compatible agents to .claude/agents/', async () => {
+    const agent = baseAgent({
+      is_subagent: 1,
+      model: 'openai-compatible:ollama-local/llama3.1:70b',
+      model_provider: 'openai-compatible',
+      model_endpoint_id: 'ollama-local',
+    })
+    const result = await syncAgentToDisk(agent, BODY)
+    expect(result.subagent).toMatchObject({ status: 'skipped' })
   })
 
   it('writes the slash command file when is_slash_command=1', async () => {
