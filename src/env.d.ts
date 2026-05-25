@@ -205,6 +205,7 @@ declare global {
           colorEnd?: string | null
           emoji?: string | null
           pinned?: boolean
+          description?: string
         }): Promise<import('./types/agent').AgentRow>
         delete(id: string): Promise<void>
         duplicate(id: string): Promise<import('./types/agent').AgentRow>
@@ -226,6 +227,20 @@ declare global {
         revisions: {
           list(agentId: string): Promise<import('./types/agent').AgentRevision[]>
           revert(agentId: string, revisionId: string): Promise<import('./types/agent').AgentRow>
+        }
+        files: {
+          list(agentId: string): Promise<import('./types/agent').AgentFile[]>
+          create(agentId: string, input: { filename: string; content: string; sortOrder?: number }): Promise<import('./types/agent').AgentFile>
+          update(agentId: string, fileId: string, patch: { filename?: string; content?: string; sortOrder?: number }): Promise<import('./types/agent').AgentFile>
+          delete(agentId: string, fileId: string): Promise<void>
+        }
+        import: {
+          discoverPlugins(): Promise<import('../electron/services/skillImportService').DiscoveredPlugin[]>
+          readSkillFromDisk(path: string): Promise<import('../electron/services/skillImportService').ParsedSkill>
+          importSkill(
+            skill: import('../electron/services/skillImportService').ParsedSkill,
+            opts: { folderId: string | null; onConflict: 'overwrite' | 'skip' | 'rename' },
+          ): Promise<import('../electron/services/skillImportService').ImportResult>
         }
         recordUse(agentId: string, presetId: string | null): Promise<void>
         mcp: {

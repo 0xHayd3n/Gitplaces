@@ -73,7 +73,9 @@ describe('AgentFilesTab', () => {
   it('editing the main file calls api.agents.update with new body', async () => {
     render(<AgentFilesTab agent={agent} />)
     await waitFor(() => screen.getByRole('button', { name: /SKILL\.md/ }))
-    const editor = screen.getByRole('textbox', { name: /file content/i })
+    const editor = screen.getByRole('textbox', { name: /file content/i }) as HTMLTextAreaElement
+    // Wait for the body to populate from the initialising useEffect.
+    await waitFor(() => expect(editor.value).toContain('# Main'))
     fireEvent.change(editor, { target: { value: 'changed body' } })
     fireEvent.blur(editor)
     await waitFor(() => expect(window.api.agents.update).toHaveBeenCalledWith('a1', { body: 'changed body' }))

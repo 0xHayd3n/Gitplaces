@@ -41,11 +41,15 @@ export default function AgentFilesTab({ agent }: Props) {
     }
   }, [activeId, agent.body, files])
 
-  const onBlurSave = async () => {
+  const onBlurSave = async (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    // Read the latest value directly from the DOM so we never write a stale
+    // closure value (the draft state may not have propagated yet when blur
+    // fires immediately after a change event in tests).
+    const value = e.target.value
     if (activeId === 'main') {
-      await window.api.agents.update(agent.id, { body: draft })
+      await window.api.agents.update(agent.id, { body: value })
     } else {
-      await window.api.agents.files.update(agent.id, activeId, { content: draft })
+      await window.api.agents.files.update(agent.id, activeId, { content: value })
     }
   }
 
