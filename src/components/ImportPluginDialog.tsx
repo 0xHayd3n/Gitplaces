@@ -9,7 +9,7 @@ interface Props {
   onClose: () => void
 }
 
-export default function ImportSkillDialog({ open, onClose }: Props) {
+export default function ImportPluginDialog({ open, onClose }: Props) {
   const [plugins, setPlugins] = useState<DiscoveredPlugin[] | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())

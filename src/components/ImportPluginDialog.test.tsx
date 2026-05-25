@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import ImportSkillDialog from './ImportSkillDialog'
+import ImportPluginDialog from './ImportPluginDialog'
 
 beforeEach(() => {
   ;(window as any).api = {
@@ -48,9 +48,9 @@ beforeEach(() => {
   }
 })
 
-describe('ImportSkillDialog', () => {
+describe('ImportPluginDialog', () => {
   it('lists discovered plugins on open', async () => {
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     expect(screen.getByText('superpowers')).toBeTruthy()
     expect(screen.getByText('anatomy')).toBeTruthy()
@@ -60,7 +60,7 @@ describe('ImportSkillDialog', () => {
   })
 
   it('clicking a plugin expands its skill list', async () => {
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.click(screen.getByRole('button', { name: /superpowers/i }))
     expect(screen.getByText('brainstorming')).toBeTruthy()
@@ -68,7 +68,7 @@ describe('ImportSkillDialog', () => {
   })
 
   it('importing a plugin reads each selected skill and calls importTarget', async () => {
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.click(screen.getByRole('button', { name: /superpowers/i }))
     fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
@@ -76,7 +76,7 @@ describe('ImportSkillDialog', () => {
   })
 
   it('creates a folder named after the plugin when none exists', async () => {
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.click(screen.getByRole('button', { name: /superpowers/i }))
     fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
@@ -84,9 +84,9 @@ describe('ImportSkillDialog', () => {
   })
 })
 
-describe('ImportSkillDialog — GitHub section', () => {
+describe('ImportPluginDialog — GitHub section', () => {
   it('renders a URL input and a disabled Fetch button when URL is empty', async () => {
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     const input = screen.getByPlaceholderText(/owner\/repo/i)
     expect(input).toBeTruthy()
@@ -95,21 +95,21 @@ describe('ImportSkillDialog — GitHub section', () => {
   })
 
   it('enables Fetch when the URL is valid', async () => {
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'obra/superpowers' } })
     expect((screen.getByRole('button', { name: /^fetch$/i }) as HTMLButtonElement).disabled).toBe(false)
   })
 
   it('shows an inline parse error for an invalid URL', async () => {
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'not-a-valid-url' } })
     expect(screen.getByText(/not a valid github url/i)).toBeTruthy()
   })
 
   it('on Fetch, calls discoverPluginInRepo and renders the skill list', async () => {
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'obra/superpowers' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
@@ -122,7 +122,7 @@ describe('ImportSkillDialog — GitHub section', () => {
     ;(window.api.agents.import.discoverPluginInRepo as any) = vi.fn().mockResolvedValue({
       owner: 'o', name: 'r', branch: 'main', commitSha: 'sha', layout: 'skills-dir', skills: [],
     })
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'o/r' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
@@ -131,7 +131,7 @@ describe('ImportSkillDialog — GitHub section', () => {
 
   it('shows an error message when discoverPluginInRepo rejects', async () => {
     ;(window.api.agents.import.discoverPluginInRepo as any) = vi.fn().mockRejectedValue(new Error("Couldn't load priv/repo"))
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'priv/repo' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
@@ -139,7 +139,7 @@ describe('ImportSkillDialog — GitHub section', () => {
   })
 
   it('Import calls readTargetFromRepo + importTarget for each selected skill', async () => {
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'obra/superpowers' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
@@ -150,7 +150,7 @@ describe('ImportSkillDialog — GitHub section', () => {
   })
 
   it('creates a folder named after the repo on import', async () => {
-    render(<ImportSkillDialog open onClose={() => {}} />)
+    render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'obra/superpowers' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
@@ -172,7 +172,7 @@ describe('ImportSkillDialog — GitHub section', () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
     const onClose = vi.fn()
 
-    render(<ImportSkillDialog open onClose={onClose} />)
+    render(<ImportPluginDialog open onClose={onClose} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'obra/superpowers' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))

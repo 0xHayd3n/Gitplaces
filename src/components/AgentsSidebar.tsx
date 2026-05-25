@@ -4,7 +4,7 @@ import { Folder, Plus, Settings } from 'lucide-react'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
 import AgentContextMenu from './AgentContextMenu'
 import FolderKebabMenu from './FolderKebabMenu'
-import ImportSkillDialog from './ImportSkillDialog'
+import ImportPluginDialog from './ImportPluginDialog'
 
 type SidebarMenuTarget =
   | { kind: 'agent';  agentId: string }
@@ -380,7 +380,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
         />
       )}
 
-      <ImportSkillDialog open={showImport} onClose={() => setShowImport(false)} />
+      <ImportPluginDialog open={showImport} onClose={() => setShowImport(false)} />
     </div>
   )
 }
