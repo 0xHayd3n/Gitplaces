@@ -93,10 +93,14 @@ describe('importSkill', () => {
     expect(result.conflictResolved).toBe('created')
     const agent = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(result.agentId) as any
     expect(agent.handle).toBe('with-siblings')
-    expect(agent.body).toContain('# Main')
+    const primary = db.prepare(
+      `SELECT content FROM agent_files WHERE agent_id = ? AND sort_order = 0`
+    ).get(result.agentId) as { content: string }
+    expect(primary.content).toContain('# Main')
     expect(agent.description).toBe('A skill that has sibling files.')
     const files = db.prepare(`SELECT * FROM agent_files WHERE agent_id = ?`).all(result.agentId) as any[]
-    expect(files.length).toBeGreaterThanOrEqual(2) // notes.md + scripts/run.sh
+    // 1 primary (body) + 2 siblings (notes.md, scripts/run.sh)
+    expect(files.length).toBeGreaterThanOrEqual(3)
   })
 
   it('overwrites an existing agent when onConflict=overwrite', async () => {
@@ -107,8 +111,10 @@ describe('importSkill', () => {
     const second = importSkill(db, { ...skill, body: 'CHANGED BODY' }, { folderId: folder.id, onConflict: 'overwrite' })
     expect(second.conflictResolved).toBe('overwritten')
     expect(second.agentId).toBe(first.agentId)
-    const agent = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(first.agentId) as any
-    expect(agent.body).toBe('CHANGED BODY')
+    const primary = db.prepare(
+      `SELECT content FROM agent_files WHERE agent_id = ? AND sort_order = 0`
+    ).get(first.agentId) as { content: string }
+    expect(primary.content).toBe('CHANGED BODY')
   })
 
   it('skips when onConflict=skip and agent exists', async () => {

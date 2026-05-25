@@ -296,10 +296,16 @@ export function importSkill(
           ts,
           existing.id,
         )
+        // Skip the primary file (sort_order=0): updateAgent has already
+        // overwritten its content via the body field, and deleteFile refuses
+        // to drop the primary. Siblings start at sort_order=1 to preserve
+        // primary-file precedence.
         const oldFiles = listFiles(db, existing.id)
-        for (const f of oldFiles) deleteFile(db, existing.id, f.id)
+        for (const f of oldFiles) {
+          if (f.sort_order !== 0) deleteFile(db, existing.id, f.id)
+        }
         skill.files.forEach((f, i) => {
-          createFile(db, existing.id, { filename: f.filename, content: f.content, sortOrder: i })
+          createFile(db, existing.id, { filename: f.filename, content: f.content, sortOrder: i + 1 })
         })
       })
       tx()
@@ -352,8 +358,10 @@ function createFromScratch(
       ts,
       agent.id,
     )
+    // Siblings start at sort_order=1; sort_order=0 is the primary file
+    // created by createAgent holding the body content.
     skill.files.forEach((f, i) => {
-      createFile(db, agent.id, { filename: f.filename, content: f.content, sortOrder: i })
+      createFile(db, agent.id, { filename: f.filename, content: f.content, sortOrder: i + 1 })
     })
   })
   tx()
