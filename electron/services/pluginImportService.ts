@@ -58,7 +58,7 @@ export async function parseSkill(inputPath: string): Promise<ParsedSkill> {
   const dropped = Object.keys(data).filter(k => !known.has(k))
   if (dropped.length > 0) {
     // eslint-disable-next-line no-console
-    console.warn(`[skillImportService] Dropped frontmatter keys from ${skillDir}:`, dropped)
+    console.warn(`[pluginImportService] Dropped frontmatter keys from ${skillDir}:`, dropped)
   }
 
   const files = await walkSkillFiles(skillDir)

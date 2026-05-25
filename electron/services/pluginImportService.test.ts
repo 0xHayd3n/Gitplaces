@@ -5,7 +5,7 @@ import Database from 'better-sqlite3'
 import {
   parseSkill, discoverPlugins, importSkill,
   parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint,
-} from './skillImportService'
+} from './pluginImportService'
 import { initSchema } from '../db'
 import { createFolder } from './agentsService'
 

@@ -3,7 +3,7 @@ import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs/promises'
 import { getDb } from '../db'
-import { discoverPlugins, parseSkill, importSkill, type ParsedSkill, type ImportOptions } from '../services/skillImportService'
+import { discoverPlugins, parseSkill, importSkill, type ParsedSkill, type ImportOptions } from '../services/pluginImportService'
 import { discoverSkillsInRepo, readSkillFromRepo } from '../services/skillImportFromGithubService'
 import { parseGithubRepoUrl } from '../../src/utils/parseGithubRepoUrl'
 import {

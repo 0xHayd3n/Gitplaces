@@ -2,7 +2,7 @@ import matter from 'gray-matter'
 import { getRepo, getBranch, getTreeBySha, getRawFileBytes } from '../github'
 import { getToken } from '../store'
 import { slugifyName } from '../../src/utils/agentSlug'
-import type { DiscoveredSkill, ParsedSkill } from './skillImportService'
+import type { DiscoveredSkill, ParsedSkill } from './pluginImportService'
 import { parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint } from './frontmatterFields'
 
 export class RepoNotAccessibleError extends Error {

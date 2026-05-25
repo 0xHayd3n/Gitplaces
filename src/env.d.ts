@@ -249,16 +249,16 @@ declare global {
           delete(agentId: string, fileId: string): Promise<void>
         }
         import: {
-          discoverPlugins(): Promise<import('../electron/services/skillImportService').DiscoveredPlugin[]>
-          readSkillFromDisk(path: string): Promise<import('../electron/services/skillImportService').ParsedSkill>
+          discoverPlugins(): Promise<import('../electron/services/pluginImportService').DiscoveredPlugin[]>
+          readSkillFromDisk(path: string): Promise<import('../electron/services/pluginImportService').ParsedSkill>
           importSkill(
-            skill: import('../electron/services/skillImportService').ParsedSkill,
+            skill: import('../electron/services/pluginImportService').ParsedSkill,
             opts: { folderId: string | null; onConflict: 'overwrite' | 'skip' | 'rename' },
-          ): Promise<import('../electron/services/skillImportService').ImportResult>
+          ): Promise<import('../electron/services/pluginImportService').ImportResult>
           discoverInRepo(url: string): Promise<import('../electron/services/skillImportFromGithubService').RepoSkillIndex>
           readSkillFromRepo(
             owner: string, name: string, branch: string, commitSha: string, repoPath: string,
-          ): Promise<import('../electron/services/skillImportService').ParsedSkill>
+          ): Promise<import('../electron/services/pluginImportService').ParsedSkill>
         }
         sync: {
           checkConflict(agentId: string): Promise<{
