@@ -183,7 +183,7 @@ export async function readSkillFromRepo(
   const dropped = Object.keys(data).filter(k => !known.has(k))
   if (dropped.length > 0) {
     // eslint-disable-next-line no-console
-    console.warn(`[skillImportFromGithubService] Dropped frontmatter keys from ${owner}/${name} ${repoPath}:`, dropped)
+    console.warn(`[pluginImportFromGithubService] Dropped frontmatter keys from ${owner}/${name} ${repoPath}:`, dropped)
   }
 
   // Fetch sibling file contents, isolating per-file failures.
@@ -196,7 +196,7 @@ export async function readSkillFromRepo(
       files.push({ filename, content: buf.toString('utf-8') })
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.warn(`[skillImportFromGithubService] Failed to fetch ${fullPath}:`, err)
+      console.warn(`[pluginImportFromGithubService] Failed to fetch ${fullPath}:`, err)
     }
   }
   files.sort((a, b) => a.filename.localeCompare(b.filename))

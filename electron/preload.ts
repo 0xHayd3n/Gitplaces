@@ -262,7 +262,7 @@ contextBridge.exposeInMainWorld('api', {
       ) =>
         ipcRenderer.invoke('agents:import:importSkill', skill, opts) as Promise<import('../electron/services/pluginImportService').ImportResult>,
       discoverInRepo: (url: string) =>
-        ipcRenderer.invoke('agents:import:discoverInRepo', url) as Promise<import('../electron/services/skillImportFromGithubService').RepoSkillIndex>,
+        ipcRenderer.invoke('agents:import:discoverInRepo', url) as Promise<import('../electron/services/pluginImportFromGithubService').RepoSkillIndex>,
       readSkillFromRepo: (
         owner: string, name: string, branch: string, commitSha: string, repoPath: string,
       ) =>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { DiscoveredPlugin } from '../../electron/services/pluginImportService'
-import type { RepoSkillIndex } from '../../electron/services/skillImportFromGithubService'
+import type { RepoSkillIndex } from '../../electron/services/pluginImportFromGithubService'
 import type { AgentFolderRow } from '../types/agent'
 import { parseGithubRepoUrl } from '../utils/parseGithubRepoUrl'
 

@@ -255,7 +255,7 @@ declare global {
             skill: import('../electron/services/pluginImportService').ParsedSkill,
             opts: { folderId: string | null; onConflict: 'overwrite' | 'skip' | 'rename' },
           ): Promise<import('../electron/services/pluginImportService').ImportResult>
-          discoverInRepo(url: string): Promise<import('../electron/services/skillImportFromGithubService').RepoSkillIndex>
+          discoverInRepo(url: string): Promise<import('../electron/services/pluginImportFromGithubService').RepoSkillIndex>
           readSkillFromRepo(
             owner: string, name: string, branch: string, commitSha: string, repoPath: string,
           ): Promise<import('../electron/services/pluginImportService').ParsedSkill>

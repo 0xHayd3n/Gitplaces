@@ -6,7 +6,7 @@ vi.mock('../store')
 
 import * as github from '../github'
 import * as store from '../store'
-import { discoverSkillsInRepo, readSkillFromRepo, RepoNotAccessibleError } from './skillImportFromGithubService'
+import { discoverSkillsInRepo, readSkillFromRepo, RepoNotAccessibleError } from './pluginImportFromGithubService'
 
 const mockedGithub = vi.mocked(github)
 const mockedStore = vi.mocked(store)
