@@ -195,7 +195,14 @@ declare global {
           colorStart: string
           colorEnd: string | null
           emoji: string | null
-        }): Promise<import('./types/agent').AgentRow>
+          description?: string
+          model?: 'sonnet' | 'opus' | 'haiku' | 'inherit'
+          tools?: string[] | null
+          argumentHint?: string | null
+          isSubagent?: boolean
+          isSlashCommand?: boolean
+          forceOverwrite?: boolean
+        }): Promise<import('./types/agent').AgentRow & { syncWarning?: string }>
         update(id: string, patch: {
           name?: string
           body?: string
@@ -206,7 +213,13 @@ declare global {
           emoji?: string | null
           pinned?: boolean
           description?: string
-        }): Promise<import('./types/agent').AgentRow>
+          model?: 'sonnet' | 'opus' | 'haiku' | 'inherit'
+          tools?: string[] | null
+          argumentHint?: string | null
+          isSubagent?: boolean
+          isSlashCommand?: boolean
+          forceOverwrite?: boolean
+        }): Promise<import('./types/agent').AgentRow & { syncWarning?: string }>
         delete(id: string): Promise<void>
         duplicate(id: string): Promise<import('./types/agent').AgentRow>
         createFolder(name: string): Promise<import('./types/agent').AgentFolderRow>
@@ -245,6 +258,19 @@ declare global {
           readSkillFromRepo(
             owner: string, name: string, branch: string, commitSha: string, repoPath: string,
           ): Promise<import('../electron/services/skillImportService').ParsedSkill>
+        }
+        sync: {
+          checkConflict(agentId: string): Promise<{
+            subagentExists: boolean
+            slashCommandExists: boolean
+            subagentPath: string
+            slashCommandPath: string
+          }>
+          retry(agentId: string): Promise<import('../electron/services/agentFileSyncService').SyncResult>
+          preview(agentId: string): Promise<{
+            subagent: string | null
+            slashCommand: string | null
+          }>
         }
         recordUse(agentId: string, presetId: string | null): Promise<void>
         mcp: {

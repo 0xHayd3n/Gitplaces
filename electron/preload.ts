@@ -177,8 +177,15 @@ contextBridge.exposeInMainWorld('api', {
       colorStart: string
       colorEnd: string | null
       emoji: string | null
+      description?: string
+      model?: 'sonnet' | 'opus' | 'haiku' | 'inherit'
+      tools?: string[] | null
+      argumentHint?: string | null
+      isSubagent?: boolean
+      isSlashCommand?: boolean
+      forceOverwrite?: boolean
     }) =>
-      ipcRenderer.invoke('agents:create', input) as Promise<import('../src/types/agent').AgentRow>,
+      ipcRenderer.invoke('agents:create', input) as Promise<import('../src/types/agent').AgentRow & { syncWarning?: string }>,
     update: (id: string, patch: {
       name?: string
       body?: string
@@ -189,8 +196,14 @@ contextBridge.exposeInMainWorld('api', {
       emoji?: string | null
       pinned?: boolean
       description?: string
+      model?: 'sonnet' | 'opus' | 'haiku' | 'inherit'
+      tools?: string[] | null
+      argumentHint?: string | null
+      isSubagent?: boolean
+      isSlashCommand?: boolean
+      forceOverwrite?: boolean
     }) =>
-      ipcRenderer.invoke('agents:update', id, patch) as Promise<import('../src/types/agent').AgentRow>,
+      ipcRenderer.invoke('agents:update', id, patch) as Promise<import('../src/types/agent').AgentRow & { syncWarning?: string }>,
     delete: (id: string) => ipcRenderer.invoke('agents:delete', id) as Promise<void>,
     duplicate: (id: string) =>
       ipcRenderer.invoke('agents:duplicate', id) as Promise<import('../src/types/agent').AgentRow>,
@@ -253,6 +266,23 @@ contextBridge.exposeInMainWorld('api', {
         owner: string, name: string, branch: string, commitSha: string, repoPath: string,
       ) =>
         ipcRenderer.invoke('agents:import:readSkillFromRepo', owner, name, branch, commitSha, repoPath) as Promise<import('../electron/services/skillImportService').ParsedSkill>,
+    },
+
+    sync: {
+      checkConflict: (agentId: string) =>
+        ipcRenderer.invoke('agents:sync:checkConflict', agentId) as Promise<{
+          subagentExists: boolean
+          slashCommandExists: boolean
+          subagentPath: string
+          slashCommandPath: string
+        }>,
+      retry: (agentId: string) =>
+        ipcRenderer.invoke('agents:sync:retry', agentId) as Promise<import('../electron/services/agentFileSyncService').SyncResult>,
+      preview: (agentId: string) =>
+        ipcRenderer.invoke('agents:sync:preview', agentId) as Promise<{
+          subagent: string | null
+          slashCommand: string | null
+        }>,
     },
 
     recordUse: (agentId: string, presetId: string | null) =>

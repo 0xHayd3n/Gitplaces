@@ -14,9 +14,16 @@ import {
   listRevisions, revertToRevision,
   recordUse,
   listFiles, createFile, updateFile, deleteFile,
+  setSyncedAt,
   type CreateAgentInput, type UpdateAgentPatch, type UpdateFolderPatch,
   type CreateFileInput, type UpdateFilePatch,
 } from '../services/agentsService'
+import {
+  syncAgentToDisk, checkConflict, cleanupAgentFiles,
+  previewSubagentFile, previewSlashCommandFile,
+  type SyncResult,
+} from '../services/agentFileSyncService'
+import type { AgentRow } from '../../src/types/agent'
 
 function broadcastChanged(): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -68,33 +75,85 @@ async function pluginDiscoveryRoots(): Promise<string[]> {
   return roots
 }
 
+/**
+ * Sync the agent's body+frontmatter to ~/.claude/agents/ and/or
+ * ~/.claude/commands/ as governed by is_subagent / is_slash_command.
+ * Persists synced_*_at timestamps based on the SyncResult and returns the
+ * refreshed row (plus a non-fatal syncWarning when any surface errored or
+ * was blocked by a conflict).
+ */
+async function runSyncAndPersist(
+  agentId: string,
+  oldHandle: string | undefined,
+  forceOverwrite: boolean | undefined,
+): Promise<{ row: AgentRow; syncWarning?: string }> {
+  const db = getDb(app.getPath('userData'))
+  const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as AgentRow
+  const result = await syncAgentToDisk(row, { oldHandle, forceOverwrite })
+  const ts = new Date().toISOString()
+  if (result.subagent.status === 'written') setSyncedAt(db, agentId, 'subagent', ts)
+  if (result.subagent.status === 'deleted') setSyncedAt(db, agentId, 'subagent', null)
+  if (result.slashCommand.status === 'written') setSyncedAt(db, agentId, 'slashCommand', ts)
+  if (result.slashCommand.status === 'deleted') setSyncedAt(db, agentId, 'slashCommand', null)
+  const warnings: string[] = []
+  if (result.subagent.status === 'error') warnings.push(`Subagent sync failed: ${result.subagent.message}`)
+  if (result.slashCommand.status === 'error') warnings.push(`Slash-command sync failed: ${result.slashCommand.message}`)
+  if (result.subagent.status === 'conflict') warnings.push(`Subagent file exists at ${result.subagent.path}; toggle was applied but file not written.`)
+  if (result.slashCommand.status === 'conflict') warnings.push(`Slash-command file exists at ${result.slashCommand.path}; toggle was applied but file not written.`)
+  const refreshed = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as AgentRow
+  return warnings.length > 0
+    ? { row: refreshed, syncWarning: warnings.join(' ') }
+    : { row: refreshed }
+}
+
 export function registerAgentHandlers(): void {
   ipcMain.handle('agents:getAll', async () => {
     const db = getDb(app.getPath('userData'))
     return getAllAgents(db)
   })
 
-  ipcMain.handle('agents:create', async (_, input: CreateAgentInput) => {
+  ipcMain.handle('agents:create', async (_, input: CreateAgentInput & { forceOverwrite?: boolean }) => {
     const db = getDb(app.getPath('userData'))
-    const row = createAgent(db, input)
+    const { forceOverwrite, ...createInput } = input
+    const agent = createAgent(db, createInput)
+    const { row, syncWarning } = await runSyncAndPersist(agent.id, undefined, forceOverwrite)
     broadcastChanged()
     // New agent has no prior revision; createAgent always inserts a `create` snapshot.
     broadcastRevisionAddedIfNew(row.id, null)
-    return row
+    return syncWarning ? { ...row, syncWarning } : row
   })
 
-  ipcMain.handle('agents:update', async (_, id: string, patch: UpdateAgentPatch) => {
+  ipcMain.handle('agents:update', async (_, id: string, patch: UpdateAgentPatch & { forceOverwrite?: boolean }) => {
     const db = getDb(app.getPath('userData'))
     const priorRevId = latestRevisionId(id)
-    const row = updateAgent(db, id, patch)
+    const oldRow = db.prepare(`SELECT handle FROM agents WHERE id = ?`).get(id) as { handle: string } | undefined
+    const oldHandle = oldRow?.handle
+    const { forceOverwrite, ...updatePatch } = patch
+    updateAgent(db, id, updatePatch)
+    const newRow = db.prepare(`SELECT handle FROM agents WHERE id = ?`).get(id) as { handle: string }
+    const handleChanged = oldHandle !== undefined && oldHandle !== newRow.handle
+    const { row, syncWarning } = await runSyncAndPersist(
+      id,
+      handleChanged ? oldHandle : undefined,
+      forceOverwrite,
+    )
     broadcastChanged()
     broadcastRevisionAddedIfNew(id, priorRevId)
-    return row
+    return syncWarning ? { ...row, syncWarning } : row
   })
 
   ipcMain.handle('agents:delete', async (_, id: string) => {
     const db = getDb(app.getPath('userData'))
+    const row = db.prepare(
+      `SELECT handle, is_subagent, is_slash_command FROM agents WHERE id = ?`,
+    ).get(id) as { handle: string; is_subagent: 0 | 1; is_slash_command: 0 | 1 } | undefined
     deleteAgent(db, id)
+    if (row) {
+      await cleanupAgentFiles(row.handle, {
+        cleanSubagent: row.is_subagent === 1,
+        cleanSlashCommand: row.is_slash_command === 1,
+      })
+    }
     broadcastChanged()
   })
 
@@ -264,5 +323,36 @@ export function registerAgentHandlers(): void {
       },
     }
     return JSON.stringify(snippet, null, 2)
+  })
+
+  ipcMain.handle('agents:sync:checkConflict', async (_, agentId: string) => {
+    const db = getDb(app.getPath('userData'))
+    const row = db.prepare(`SELECT handle FROM agents WHERE id = ?`).get(agentId) as { handle: string } | undefined
+    if (!row) throw new Error(`Unknown agent id: ${agentId}`)
+    return checkConflict(row.handle)
+  })
+
+  ipcMain.handle('agents:sync:retry', async (_, agentId: string): Promise<SyncResult> => {
+    const db = getDb(app.getPath('userData'))
+    const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as AgentRow | undefined
+    if (!row) throw new Error(`Unknown agent id: ${agentId}`)
+    const result = await syncAgentToDisk(row)
+    const ts = new Date().toISOString()
+    if (result.subagent.status === 'written') setSyncedAt(db, agentId, 'subagent', ts)
+    if (result.subagent.status === 'deleted') setSyncedAt(db, agentId, 'subagent', null)
+    if (result.slashCommand.status === 'written') setSyncedAt(db, agentId, 'slashCommand', ts)
+    if (result.slashCommand.status === 'deleted') setSyncedAt(db, agentId, 'slashCommand', null)
+    broadcastChanged()
+    return result
+  })
+
+  ipcMain.handle('agents:sync:preview', async (_, agentId: string) => {
+    const db = getDb(app.getPath('userData'))
+    const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as AgentRow | undefined
+    if (!row) throw new Error(`Unknown agent id: ${agentId}`)
+    return {
+      subagent: row.is_subagent === 1 ? previewSubagentFile(row) : null,
+      slashCommand: row.is_slash_command === 1 ? previewSlashCommandFile(row) : null,
+    }
   })
 }

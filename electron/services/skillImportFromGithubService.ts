@@ -3,6 +3,7 @@ import { getRepo, getBranch, getTreeBySha, getRawFileBytes } from '../github'
 import { getToken } from '../store'
 import { slugifyName } from '../../src/utils/agentSlug'
 import type { DiscoveredSkill, ParsedSkill } from './skillImportService'
+import { parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint } from './skillImportService'
 
 export class RepoNotAccessibleError extends Error {
   constructor(public readonly owner: string, public readonly repoName: string) {
@@ -175,7 +176,10 @@ export async function readSkillFromRepo(
     ? data.name
     : (isBareRoot ? name : repoPath.split('/').pop()!)
   const description = typeof data.description === 'string' ? data.description : ''
-  const known = new Set(['name', 'description'])
+  const model = parseModelFrontmatter(data.model)
+  const tools = parseToolsFrontmatter(data.tools)
+  const argumentHint = parseArgumentHint(data['argument-hint'])
+  const known = new Set(['name', 'description', 'model', 'tools', 'argument-hint'])
   const dropped = Object.keys(data).filter(k => !known.has(k))
   if (dropped.length > 0) {
     // eslint-disable-next-line no-console
@@ -208,6 +212,9 @@ export async function readSkillFromRepo(
       pluginVersion: commitSha.slice(0, 7),
       path: repoPath,
     },
+    model,
+    tools,
+    argumentHint,
   }
 }
 
