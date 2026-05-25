@@ -6184,6 +6184,31 @@ a {
   border-color: rgba(250, 204, 21, 0.6);
 }
 
+/* Standalone "Import to agent library" icon button. Same 44px outlined-secondary
+   treatment as .article-action-star so LEARN | import | star reads as a single
+   visual band. Icon-only — the action is exposed via aria-label/title.
+   Only mounted when canImportAgents is true. */
+.article-action-import {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--t1);
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, color 0.1s, transform 0.05s;
+}
+.article-action-import:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.article-action-import:active {
+  transform: scale(0.95);
+}
+
 .repo-detail-header-pill {
   display: inline-flex;
   align-items: stretch;
@@ -6343,20 +6368,6 @@ a {
 .split-button-menu button.split-button-menu-item--danger:hover { background: rgba(248,113,113,0.10); }
 .split-button-cancel-icon { display: inline-flex; gap: 3px; }
 .split-button-cancel-icon span { width: 4px; height: 14px; background: currentColor; }
-
-/* Placeholder shown in the dropdown while an action's preconditions are
-   still being checked (e.g. "Scanning for agents…" while discoverPluginInRepo
-   probes the repo). Non-interactive, visually muted, with a small spinner. */
-.split-button-menu button.split-button-menu-item--scanning,
-.split-button-menu button.split-button-menu-item--scanning:hover {
-  opacity: 0.55; cursor: default; background: transparent; font-style: italic;
-}
-.split-button-scanning-spinner {
-  width: 12px; height: 12px; border-radius: 50%;
-  border: 1.5px solid currentColor; border-top-color: transparent;
-  display: inline-block; animation: split-button-spin 0.9s linear infinite;
-}
-@keyframes split-button-spin { to { transform: rotate(360deg); } }
 
 /* ── Learn status inline (RepoDetail action row) ─────────────────── */
 .learn-status-inline { display: flex; flex-direction: column; justify-content: center; min-width: 180px; }

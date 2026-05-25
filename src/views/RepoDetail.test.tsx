@@ -427,8 +427,8 @@ describe('releaseRowToFeedEvent', () => {
   })
 })
 
-describe('RepoDetail import-to-agent menu item', () => {
-  it('does not render the menu item when the repo has no importable agent content', async () => {
+describe('RepoDetail import-to-agent button', () => {
+  it('does not render the button when the repo has no importable agent content', async () => {
     setupDetail(null)
     await waitFor(() => screen.getAllByText('next.js'))
     // Wait for the deferred detection effect to actually fire (proves it ran
@@ -438,33 +438,23 @@ describe('RepoDetail import-to-agent menu item', () => {
       () => expect((window.api.agents.import.discoverPluginInRepo as ReturnType<typeof vi.fn>)).toHaveBeenCalled(),
       { timeout: 1500 },
     )
-    fireEvent.click(screen.getByLabelText('Open menu'))
-    expect(screen.queryByText('Import to agent library…')).toBeNull()
+    expect(screen.queryByLabelText('Import to agent library')).toBeNull()
   })
 
-  it('renders the menu item when discoverPluginInRepo reports importable content', async () => {
+  it('renders the standalone button when discoverPluginInRepo reports importable content', async () => {
     setupDetail(
       null, null, undefined, [], [], [], null,
       { skills: [{ name: 's', path: 'skills/s/SKILL.md', description: '', fileCount: 1 }], subagents: [], slashCommands: [] },
     )
     await waitFor(() => screen.getAllByText('next.js'))
-    // Wait for the deferred detection effect to resolve before opening the menu.
-    await waitFor(
-      () => expect((window.api.agents.import.discoverPluginInRepo as ReturnType<typeof vi.fn>)).toHaveBeenCalled(),
-      { timeout: 1500 },
-    )
-    fireEvent.click(screen.getByLabelText('Open menu'))
-    await waitFor(() => expect(screen.getByText('Import to agent library…')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByLabelText('Import to agent library')).toBeInTheDocument())
   })
 
-  it('shows a "Scanning for agents…" placeholder while detection is in-flight', async () => {
+  it('does not render the button while detection is in-flight', async () => {
     setupDetail(null, null, undefined, [], [], [], null, 'hang')
     await waitFor(() => screen.getAllByText('next.js'))
-    // Open the menu immediately — the hanging discoverPluginInRepo mock means
-    // isDetectingAgents stays true, so the scanning placeholder must appear.
-    fireEvent.click(screen.getByLabelText('Open menu'))
-    expect(screen.getByText('Scanning for agents…')).toBeInTheDocument()
-    // Real action is not yet shown.
-    expect(screen.queryByText('Import to agent library…')).toBeNull()
+    // The hanging discoverPluginInRepo mock means canImportAgents stays false,
+    // so the standalone button must not appear until detection settles.
+    expect(screen.queryByLabelText('Import to agent library')).toBeNull()
   })
 })

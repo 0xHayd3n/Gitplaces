@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue, lazy, Suspense } from 'react'
 import { useLocation } from 'react-router-dom'
-import { PiBrainFill, PiGitBranchFill, PiStarFill, PiStar, PiGitForkFill } from 'react-icons/pi'
+import { PiBrainFill, PiGitBranchFill, PiStarFill, PiStar, PiGitForkFill, PiRobot } from 'react-icons/pi'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   SiGithub, SiDiscord, SiSlack, SiTelegram, SiReddit,
@@ -2273,23 +2273,19 @@ function RepoArticleActionRow({
             {archived ? 'Unarchive' : 'Archive'}
           </button>
         )}
-        {isDetectingAgents && (
-          <button disabled className="split-button-menu-item--scanning">
-            <span className="split-button-scanning-spinner" aria-hidden="true" />
-            Scanning for agents…
-          </button>
-        )}
-        {canImportAgents && (
-          <button onClick={onImportToAgentLibrary}>
-            <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="12" rx="2" />
-              <line x1="12" y1="8" x2="12" y2="20" />
-              <polyline points="8 16 12 20 16 16" />
-            </svg>
-            Import to agent library…
-          </button>
-        )}
       </PrimaryActionSplitButton>
+
+      {canImportAgents && (
+        <button
+          type="button"
+          className="article-action-import"
+          onClick={onImportToAgentLibrary}
+          aria-label="Import to agent library"
+          title="Import to agent library"
+        >
+          <PiRobot size={22} aria-hidden="true" />
+        </button>
+      )}
 
       <button
         type="button"
