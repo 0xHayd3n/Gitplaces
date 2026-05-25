@@ -1561,3 +1561,126 @@
   padding: 12px 16px;
   border-top: 1px solid var(--border);
 }
+
+/* ── Overview tab ───────────────────────────────────────────────── */
+
+.agent-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.agent-overview-hero {
+  background: var(--surface-elev-1, #15151a);
+  border: 1px solid var(--border, #25252d);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.agent-overview-description {
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+  color: var(--text, #ddd);
+}
+.agent-overview-description--derived { color: var(--text-muted, #aaa); }
+.agent-overview-hint { font-size: 11px; color: var(--text-muted, #888); margin: 0; }
+
+.agent-overview-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.agent-overview-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--surface-elev-2, #25252d);
+  padding: 3px 8px; border-radius: 4px;
+  font-size: 11px; color: var(--text-muted, #aaa);
+}
+
+.agent-overview-preset-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding-top: 4px;
+}
+.agent-overview-preset-label { font-size: 11px; color: var(--text-muted, #888); }
+.agent-overview-preset-select {
+  background: var(--surface-elev-2, #25252d);
+  color: var(--text, #ddd);
+  border: 1px solid var(--border, #35353d);
+  border-radius: 4px;
+  padding: 3px 6px; font-size: 12px;
+}
+.agent-overview-var-chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.agent-overview-var-chip {
+  background: rgba(107, 95, 232, 0.15);
+  color: var(--accent, #6b5fe8);
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  padding: 2px 6px; border-radius: 3px;
+}
+
+.agent-overview-actions { display: flex; gap: 8px; }
+.agent-overview-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--surface-elev-2, #2a2a32);
+  color: var(--text, #ddd);
+  border: 1px solid var(--border, #35353d);
+  border-radius: 4px;
+  padding: 6px 10px; font-size: 12px;
+  cursor: pointer;
+}
+.agent-overview-btn:hover { background: var(--surface-elev-3, #35353d); }
+.agent-overview-btn--primary {
+  background: var(--accent, #6b5fe8);
+  color: #fff;
+  border-color: var(--accent, #6b5fe8);
+}
+.agent-overview-btn--primary:hover { filter: brightness(1.1); }
+
+.agent-overview-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.agent-overview-col { display: flex; flex-direction: column; gap: 12px; }
+
+.agent-overview-card {
+  background: var(--surface-elev-1, #15151a);
+  border: 1px solid var(--border, #25252d);
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.agent-overview-card h4 {
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-muted, #6a6a75);
+  margin: 0;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.agent-overview-card-meta { color: var(--text-muted, #6a6a75); font-weight: 400; }
+
+.agent-overview-empty { font-size: 12px; color: var(--text-muted, #888); margin: 0; }
+.agent-overview-synced { font-size: 12px; color: var(--success, #6ec07a); display: inline-flex; align-items: center; gap: 4px; margin: 0; }
+.agent-overview-link {
+  background: none; border: none; padding: 0;
+  color: var(--accent, #6b5fe8); font-size: 12px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 2px;
+}
+
+.agent-overview-files-preview { display: flex; flex-direction: column; gap: 4px; }
+.agent-overview-file {
+  background: none; border: none; text-align: left; padding: 4px 0;
+  color: var(--text, #ddd); font-family: ui-monospace, monospace;
+  font-size: 12px; cursor: pointer;
+}
+.agent-overview-file--primary { color: var(--accent, #6b5fe8); font-weight: 600; }
+.agent-overview-file--primary:hover { text-decoration: underline; }
+
+.agent-overview-revisions { list-style: none; padding: 0; margin: 0; }
+.agent-overview-revisions li {
+  display: flex; justify-content: space-between;
+  font-size: 12px; padding: 3px 0;
+  color: var(--text, #ddd);
+}
+.agent-overview-revision-time { color: var(--text-muted, #888); }
