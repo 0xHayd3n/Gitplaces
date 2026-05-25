@@ -23,6 +23,11 @@ const baseAgent: AgentRow = {
   presets_json: '[]',
   created_at: '2026-05-23T00:00:00Z',
   updated_at: '2026-05-23T00:00:00Z',
+  description: '',
+  origin_plugin: null,
+  origin_path: null,
+  origin_version: null,
+  origin_imported_at: null,
 }
 
 function makeApi() {
@@ -212,6 +217,11 @@ describe('AgentDetail', () => {
       presets_json: '[]',
       created_at: '2026-05-23T00:00:00Z',
       updated_at: '2026-05-23T00:00:00Z',
+      description: '',
+      origin_plugin: null,
+      origin_path: null,
+      origin_version: null,
+      origin_imported_at: null,
     }
     ;(window as any).api.agents.getAll = vi.fn()
       .mockResolvedValueOnce({ folders, agents: [baseAgent] })

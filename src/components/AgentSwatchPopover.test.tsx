@@ -19,6 +19,11 @@ const agent: AgentRow = {
   presets_json: '[]',
   created_at: '2026-05-23T00:00:00Z',
   updated_at: '2026-05-23T00:00:00Z',
+  description: '',
+  origin_plugin: null,
+  origin_path: null,
+  origin_version: null,
+  origin_imported_at: null,
 }
 
 beforeEach(() => {

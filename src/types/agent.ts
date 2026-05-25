@@ -23,6 +23,22 @@ export interface AgentRow {
   presets_json: string             // raw JSON; parse with parseAgentPresets()
   created_at: string
   updated_at: string
+  // Skill parity (Phase 1)
+  description: string              // explicit description, defaults to ''
+  origin_plugin: string | null     // populated by import; null for hand-authored
+  origin_path: string | null       // e.g., 'skills/brainstorming'
+  origin_version: string | null    // e.g., '5.1.0'
+  origin_imported_at: string | null
+}
+
+export interface AgentFile {
+  id: string
+  agent_id: string
+  filename: string                 // relative path within the skill dir, slashes allowed
+  content: string
+  sort_order: number
+  created_at: string
+  updated_at: string
 }
 
 // Phase B+ uses these. Defined now so the AgentRevision interface for Phase C

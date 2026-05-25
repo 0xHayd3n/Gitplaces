@@ -21,6 +21,12 @@ function agent(overrides: Partial<AgentRow> = {}): AgentRow {
     presets_json: '[]',
     created_at: '2026-05-25T00:00:00Z',
     updated_at: '2026-05-25T00:00:00Z',
+    description: '',
+    origin_plugin: null,
+    origin_path: null,
+    origin_version: null,
+    origin_imported_at: null,
+    ...overrides,
   }
 }
 
