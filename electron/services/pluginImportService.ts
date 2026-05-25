@@ -48,6 +48,17 @@ export interface ParsedSlashCommand extends ParsedImportTargetBase {
 
 export type ParsedImportTarget = ParsedSkill | ParsedSubagent | ParsedSlashCommand
 
+export const COLOR_MAP: Record<string, string> = {
+  red:    '#ef4444',
+  orange: '#f97316',
+  yellow: '#eab308',
+  green:  '#22c55e',
+  cyan:   '#06b6d4',
+  blue:   '#3b82f6',
+  purple: '#a855f7',
+  pink:   '#ec4899',
+}
+
 const IGNORE_NAMES = new Set(['.DS_Store', '.git', 'node_modules', '__pycache__'])
 const IGNORE_SUFFIXES = ['.swp']
 
@@ -96,6 +107,42 @@ export async function parseSkill(inputPath: string): Promise<ParsedSkill> {
     model,
     tools,
     argumentHint,
+  }
+}
+
+export async function parseSubagent(filePath: string): Promise<ParsedSubagent> {
+  const stat = await fs.stat(filePath).catch(() => null)
+  if (!stat || !stat.isFile()) throw new Error(`Sub-agent file not found: ${filePath}`)
+  const raw = await fs.readFile(filePath, 'utf-8')
+  const parsed = matter(raw)
+  const data = parsed.data as Record<string, unknown>
+
+  const filenameStem = path.basename(filePath, '.md')
+  const name = typeof data.name === 'string' && data.name.length > 0 ? data.name : filenameStem
+  const description = typeof data.description === 'string' ? data.description : ''
+  const model = parseModelFrontmatter(data.model)
+  const tools = parseToolsFrontmatter(data.tools)
+  const color = typeof data.color === 'string' ? data.color : null
+
+  const known = new Set(['name', 'description', 'tools', 'model', 'color'])
+  const dropped = Object.keys(data).filter(k => !known.has(k))
+  if (dropped.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(`[pluginImportService] Dropped sub-agent frontmatter keys from ${filePath}:`, dropped)
+  }
+
+  return {
+    kind: 'subagent',
+    name,
+    handle: slugifyName(name),
+    description,
+    body: parsed.content.trim(),
+    files: [] as never[],
+    origin: null,
+    model,
+    tools,
+    argumentHint: null,
+    color,
   }
 }
 

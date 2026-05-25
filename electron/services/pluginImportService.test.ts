@@ -5,6 +5,7 @@ import Database from 'better-sqlite3'
 import {
   parseSkill, discoverPlugins, importSkill,
   parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint,
+  parseSubagent, COLOR_MAP,
 } from './pluginImportService'
 import { initSchema } from '../db'
 import { createFolder } from './agentsService'
@@ -267,5 +268,57 @@ describe('importSkill — Phase 2 fields', () => {
     expect(second.agentId).toBe(first.agentId)
     const agent = db.prepare(`SELECT tools FROM agents WHERE id = ?`).get(first.agentId) as any
     expect(agent.tools).toBe('["Read","Edit","Bash"]')
+  })
+})
+
+const SUBAGENT_FIXTURES = path.join(__dirname, '__fixtures__/subagents')
+
+describe('parseSubagent', () => {
+  it('parses full frontmatter into a ParsedSubagent', async () => {
+    const sub = await parseSubagent(path.join(SUBAGENT_FIXTURES, 'full.md'))
+    expect(sub.kind).toBe('subagent')
+    expect(sub.name).toBe('code-architect')
+    expect(sub.handle).toBe('code-architect')
+    expect(sub.description).toBe('Designs feature architectures by analyzing existing codebase patterns.')
+    expect(sub.tools).toEqual(['Glob', 'Grep', 'Read'])
+    expect(sub.model).toBe('sonnet')
+    expect(sub.color).toBe('green')
+    expect(sub.body).toContain('senior software architect')
+    expect(sub.files).toEqual([])
+    expect(sub.argumentHint).toBeNull()
+  })
+
+  it('falls back to filename stem when name field is missing', async () => {
+    const sub = await parseSubagent(path.join(SUBAGENT_FIXTURES, 'no-frontmatter.md'))
+    expect(sub.name).toBe('no-frontmatter')
+    expect(sub.handle).toBe('no-frontmatter')
+    expect(sub.description).toBe('')
+    expect(sub.color).toBeNull()
+    expect(sub.model).toBe('inherit')
+    expect(sub.tools).toBeNull()
+  })
+
+  it('uses defaults when only name is given', async () => {
+    const sub = await parseSubagent(path.join(SUBAGENT_FIXTURES, 'minimal.md'))
+    expect(sub.name).toBe('minimal-agent')
+    expect(sub.description).toBe('')
+    expect(sub.color).toBeNull()
+  })
+
+  it('throws when the file does not exist', async () => {
+    await expect(parseSubagent(path.join(SUBAGENT_FIXTURES, 'nope.md'))).rejects.toThrow()
+  })
+})
+
+describe('COLOR_MAP', () => {
+  it('maps the canonical Anthropic palette to hex', () => {
+    expect(COLOR_MAP.red).toBe('#ef4444')
+    expect(COLOR_MAP.orange).toBe('#f97316')
+    expect(COLOR_MAP.yellow).toBe('#eab308')
+    expect(COLOR_MAP.green).toBe('#22c55e')
+    expect(COLOR_MAP.cyan).toBe('#06b6d4')
+    expect(COLOR_MAP.blue).toBe('#3b82f6')
+    expect(COLOR_MAP.purple).toBe('#a855f7')
+    expect(COLOR_MAP.pink).toBe('#ec4899')
   })
 })
