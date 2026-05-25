@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Copy, Pin, Folder, FileText, Clock, Edit3, Eye, Plug, Settings as SettingsIcon, CopyPlus, Trash2, Zap } from 'lucide-react'
+import { Copy, Pin, Folder, FileText, Clock, Eye, Plug, Settings as SettingsIcon, CopyPlus, Trash2, Zap, LayoutDashboard } from 'lucide-react'
 import type { AgentRow, AgentFolderRow, AgentRevision, AgentPreset } from '../types/agent'
 import { parseAgentPresets, parseAgentTools } from '../types/agent'
 import { useToast } from '../contexts/Toast'
@@ -10,10 +10,10 @@ import { buildPersonaPayload, deriveDescription } from '../utils/copyPayload'
 import { detectVariables } from '../utils/agentVariables'
 import { AGENT_SCOPE, formatScopedHandle } from '../utils/agentScope'
 import { isValidHandle } from '../utils/agentSlug'
-import AgentVariablePresetBar from '../components/AgentVariablePresetBar'
 import AgentHistoryTimeline from '../components/AgentHistoryTimeline'
 import AgentSwatchPopover from '../components/AgentSwatchPopover'
 import AgentFilesTab from '../components/AgentFilesTab'
+import AgentOverviewTab from '../components/AgentOverviewTab'
 import { ModelDropdown } from '../components/ModelDropdown'
 import { ToolsPicker } from '../components/ToolsPicker'
 import { SurfaceToggle } from '../components/SurfaceToggle'
@@ -29,10 +29,12 @@ export default function AgentDetail() {
   const [agent, setAgent] = useState<AgentRow | null>(null)
   const [folders, setFolders] = useState<AgentFolderRow[]>([])
   const [bodyDraft, setBodyDraft] = useState('')
+  const [primaryFileId, setPrimaryFileId] = useState<string | null>(null)
+  const [fileCount, setFileCount] = useState(1)
   const [nameDraft, setNameDraft] = useState('')
   const [nameEditing, setNameEditing] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
-  const [activeTab, setActiveTab] = useState<'prompt' | 'preview' | 'mcp' | 'history' | 'files' | 'settings'>('prompt')
+  const [activeTab, setActiveTab] = useState<'overview' | 'preview' | 'mcp' | 'history' | 'files' | 'settings'>('overview')
   const [activePresetId, setActivePresetId] = useState<string | null>(null)
   const [revisions, setRevisions] = useState<AgentRevision[]>([])
   const [revisionsLoaded, setRevisionsLoaded] = useState(false)
@@ -40,24 +42,29 @@ export default function AgentDetail() {
 
   const bodyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nameTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const bodyRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (!id) return
     let cancelled = false
     setNameEditing(false)
-    setActiveTab('prompt')
+    setActiveTab('overview')
     setRevisions([])
     setRevisionsLoaded(false)
     if (bodyTimer.current) { clearTimeout(bodyTimer.current); bodyTimer.current = null }
     if (nameTimer.current) { clearTimeout(nameTimer.current); nameTimer.current = null }
     ;(async () => {
-      const { folders, agents } = await window.api.agents.getAll()
+      const [{ folders, agents }, primary, files] = await Promise.all([
+        window.api.agents.getAll(),
+        window.api.agents.primaryContent(id),
+        window.api.agents.files.list(id),
+      ])
       if (cancelled) return
       setFolders(folders)
       const a = agents.find(x => x.id === id) ?? null
       setAgent(a)
-      setBodyDraft(a?.body ?? '')
+      setBodyDraft(primary.content)
+      setPrimaryFileId(primary.id)
+      setFileCount(files.length)
       setNameDraft(a?.name ?? '')
       setTakenHandles(agents.filter(x => x.id !== id).map(x => x.handle))
     })()
@@ -112,11 +119,17 @@ export default function AgentDetail() {
   useEffect(() => {
     if (!id) return
     const cb = async () => {
-      const { agents } = await window.api.agents.getAll()
+      const [{ agents }, primary, files] = await Promise.all([
+        window.api.agents.getAll(),
+        window.api.agents.primaryContent(id),
+        window.api.agents.files.list(id),
+      ])
       const a = agents.find(x => x.id === id) ?? null
       setAgent(a)
       // Don't clobber an in-progress draft if a save is pending.
-      if (!bodyTimer.current) setBodyDraft(a?.body ?? '')
+      if (!bodyTimer.current) setBodyDraft(primary.content)
+      setPrimaryFileId(primary.id)
+      setFileCount(files.length)
       if (!nameEditingRef.current) setNameDraft(a?.name ?? '')
       setTakenHandles(agents.filter(x => x.id !== id).map(x => x.handle))
     }
@@ -125,19 +138,19 @@ export default function AgentDetail() {
   }, [id])
 
   const scheduleSaveBody = useCallback((value: string) => {
-    if (!id) return
+    if (!id || !primaryFileId) return
     setSaveStatus('saving')
     if (bodyTimer.current) clearTimeout(bodyTimer.current)
     bodyTimer.current = setTimeout(async () => {
       try {
-        await window.api.agents.update(id, { body: value })
+        await window.api.agents.files.update(id, primaryFileId, { content: value })
         setSaveStatus('saved')
         setTimeout(() => setSaveStatus('idle'), 2000)
       } catch {
         setSaveStatus('idle')
       }
     }, 1500)
-  }, [id])
+  }, [id, primaryFileId])
 
   const scheduleSaveName = useCallback((value: string) => {
     if (!id) return
@@ -288,11 +301,11 @@ export default function AgentDetail() {
         <button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'prompt'}
+          aria-selected={activeTab === 'overview'}
           className="agent-detail-tab"
-          onClick={() => setActiveTab('prompt')}
+          onClick={() => setActiveTab('overview')}
         >
-          <Edit3 size={13} /> Prompt
+          <LayoutDashboard size={13} /> Overview
         </button>
         <button
           type="button"
@@ -344,41 +357,24 @@ export default function AgentDetail() {
       </nav>
 
       <div className="agent-detail-body">
-        {activeTab === 'prompt' && (
-          <div className="agent-detail-prompt-body">
-            {variables.length > 0 && (
-              <AgentVariablePresetBar
-                agent={agent}
-                variables={variables}
-                activePresetId={activePresetId}
-                onActivePresetChange={setActivePresetId}
-              />
-            )}
-            <textarea
-              ref={bodyRef}
-              className="agent-detail-textarea"
-              aria-label="Body"
-              placeholder="Write the markdown that defines this agent's persona. Use {{variable}} placeholders for things you'll fill in per copy."
-              value={bodyDraft}
-              onChange={e => { setBodyDraft(e.target.value); scheduleSaveBody(e.target.value) }}
-            />
-            {saveStatus !== 'idle' && (
-              <span
-                className={
-                  'agent-detail-save-pill ' +
-                  (saveStatus === 'saving'
-                    ? 'agent-detail-save-pill--saving'
-                    : 'agent-detail-save-pill--saved')
-                }
-              >
-                {saveStatus === 'saving' ? 'saving…' : 'saved ✓'}
-              </span>
-            )}
-          </div>
+        {activeTab === 'overview' && (
+          <AgentOverviewTab
+            agent={agent}
+            folders={folders}
+            liveBody={liveBody}
+            presets={presets}
+            activePresetId={activePresetId}
+            recentRevisions={revisions}
+            fileCount={fileCount}
+            onCopy={handleCopy}
+            onOpenEditor={() => setActiveTab('files')}
+            onTabChange={setActiveTab}
+            onActivePresetChange={setActivePresetId}
+          />
         )}
         {activeTab === 'preview' && (
           <div className="agent-detail-rendered">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{agent.body}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{liveBody}</ReactMarkdown>
           </div>
         )}
         {activeTab === 'mcp' && (
@@ -395,7 +391,11 @@ export default function AgentDetail() {
           )
         )}
         {activeTab === 'files' && (
-          <AgentFilesTab agent={agent} />
+          <AgentFilesTab
+            agent={agent}
+            activePresetId={activePresetId}
+            onActivePresetChange={setActivePresetId}
+          />
         )}
         {activeTab === 'settings' && (
           <AgentSettingsTab

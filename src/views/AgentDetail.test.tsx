@@ -49,6 +49,9 @@ function makeApi() {
       delete: vi.fn(),
       duplicate: vi.fn(),
       recordUse: vi.fn().mockResolvedValue(undefined),
+      primaryContent: vi.fn().mockResolvedValue({
+        id: 'pf-a1', filename: 'copy-editor.md', content: baseAgent.body, updated_at: baseAgent.updated_at,
+      }),
       mcp: {
         getConfigSnippet: vi.fn().mockResolvedValue(JSON.stringify({
           mcpServers: { 'git-suite-agents': { command: 'node', args: ['/path/to/mcp-launcher.cjs', '/path/to/db'] } },
@@ -77,6 +80,9 @@ function makeApi() {
       },
       files: {
         list: vi.fn().mockResolvedValue([]),
+        update: vi.fn().mockResolvedValue(undefined),
+        create: vi.fn(),
+        delete: vi.fn(),
       },
     },
   }
@@ -119,8 +125,8 @@ describe('AgentDetail', () => {
     expect(screen.getByText('copy-editor')).toBeTruthy()
     // Swatch is now a button with aria-label "Edit appearance"
     expect(screen.getByRole('button', { name: /edit appearance/i })).toBeTruthy()
-    // Folder chip
-    expect(screen.getByText('Writing')).toBeTruthy()
+    // Folder name appears in both the header chip and the Overview chip — at least one matches
+    expect(screen.getAllByText('Writing').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders explicit description from agent.description in the hero', async () => {
@@ -128,7 +134,8 @@ describe('AgentDetail', () => {
     ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [withDesc] })
     setup()
     await waitForLoaded()
-    expect(screen.getByText('My explicit description')).toBeTruthy()
+    // Description renders in the header AND on the Overview tab — both ok
+    expect(screen.getAllByText('My explicit description').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders origin chip when agent.origin_plugin is set', async () => {
@@ -151,7 +158,7 @@ describe('AgentDetail', () => {
   it('shows the folder name as a meta chip', async () => {
     setup()
     await waitForLoaded()
-    expect(screen.getByText('Writing')).toBeTruthy()  // f1 folder name
+    expect(screen.getAllByText('Writing').length).toBeGreaterThanOrEqual(1)  // f1 folder name
   })
 
   it('double-clicking the title enters rename mode', async () => {
@@ -209,38 +216,15 @@ describe('AgentDetail', () => {
     expect(window.api.agents.update).not.toHaveBeenCalledWith('a1', { handle: 'something-else' })
   })
 
-  it('tab bar includes Prompt, Preview, MCP, History, Files, Settings', async () => {
+  it('tab bar includes Overview, Preview, MCP, History, Files, Settings', async () => {
     setup()
     await waitForLoaded()
-    expect(screen.getByRole('tab', { name: /prompt/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /overview/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /preview/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /mcp/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /history/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /files/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /settings/i })).toBeTruthy()
-  })
-
-  it('Prompt tab textarea is always present (no Edit toggle)', async () => {
-    setup()
-    await waitForLoaded()
-    // No Edit button anywhere
-    expect(screen.queryByRole('button', { name: /^Edit$/ })).toBeNull()
-    // Textarea is present immediately on load (even though body is non-empty)
-    const ta = screen.getByRole('textbox', { name: /Body/ }) as HTMLTextAreaElement
-    expect(ta.value).toContain('Copy editor')
-  })
-
-  it('debounced auto-save calls api.agents.update 1500ms after last keystroke', async () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    setup()
-    await act(async () => { await new Promise<void>(resolve => setImmediate(resolve)) })
-    await act(async () => { await new Promise<void>(resolve => setImmediate(resolve)) })
-    expect(screen.getByRole('heading', { level: 2, name: 'Copy editor' })).toBeTruthy()
-    const ta = screen.getByRole('textbox', { name: /Body/ })
-    fireEvent.change(ta, { target: { value: 'changed body' } })
-    expect(window.api.agents.update).not.toHaveBeenCalled()
-    await act(async () => { vi.advanceTimersByTime(1500) })
-    expect(window.api.agents.update).toHaveBeenCalledWith('a1', { body: 'changed body' })
   })
 
   it('switches the rendered body when navigating between agents', async () => {
@@ -275,6 +259,10 @@ describe('AgentDetail', () => {
     ;(window as any).api.agents.getAll = vi.fn()
       .mockResolvedValueOnce({ folders, agents: [baseAgent] })
       .mockResolvedValueOnce({ folders, agents: [otherAgent] })
+    ;(window as any).api.agents.primaryContent = vi.fn().mockImplementation((id: string) =>
+      Promise.resolve(id === 'a2'
+        ? { id: 'pf-a2', filename: 'other-agent.md', content: otherAgent.body, updated_at: otherAgent.updated_at }
+        : { id: 'pf-a1', filename: 'copy-editor.md', content: baseAgent.body, updated_at: baseAgent.updated_at }))
 
     function NavButton() {
       const navigate = useNavigate()
@@ -292,8 +280,9 @@ describe('AgentDetail', () => {
     await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Copy editor' }))
     fireEvent.click(screen.getByText('Go to a2'))
     await waitFor(() => screen.getByRole('heading', { level: 2, name: 'Other agent' }))
-    const ta = screen.getByRole('textbox', { name: /Body/ }) as HTMLTextAreaElement
-    expect(ta.value).toContain('other body.')
+    // Body lives in the Preview tab now (markdown render). Click Preview to inspect.
+    fireEvent.click(screen.getByRole('tab', { name: /preview/i }))
+    await waitFor(() => expect(screen.getAllByText(/other body\./).length).toBeGreaterThan(0))
   })
 
   it('shows nameDraft in header after inline name edit even before save resolves', async () => {
@@ -310,30 +299,15 @@ describe('AgentDetail', () => {
 })
 
 describe('AgentDetail — tabs', () => {
-  it('renders the five tab buttons with Prompt active by default', async () => {
+  it('renders the six tab buttons with Overview active by default', async () => {
     setup()
     await waitForLoaded()
-    expect(screen.getByRole('tab', { name: /prompt/i }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: /overview/i }).getAttribute('aria-selected')).toBe('true')
     expect(screen.getByRole('tab', { name: /preview/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /mcp/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /history/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /files/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /settings/i })).toBeTruthy()
-  })
-
-  it('clicking Preview hides the editor textarea', async () => {
-    setup()
-    await waitForLoaded()
-    fireEvent.click(screen.getByRole('tab', { name: /preview/i }))
-    expect(screen.getByRole('tab', { name: /preview/i }).getAttribute('aria-selected')).toBe('true')
-    expect(screen.queryByRole('textbox', { name: /Body/ })).toBeNull()
-  })
-
-  it('clicking back on Prompt restores the body editor', async () => {
-    setup()
-    await waitForLoaded()
-    fireEvent.click(screen.getByRole('tab', { name: /preview/i }))
-    fireEvent.click(screen.getByRole('tab', { name: /prompt/i }))
-    expect(screen.getByRole('textbox', { name: /Body/ })).toBeTruthy()
   })
 
   it('Preview tab renders markdown of agent.body', async () => {
@@ -368,16 +342,19 @@ describe('AgentDetail — tabs', () => {
     expect(payload).toContain('Hello body.')
   })
 
-  it('Settings tab "Copy entire prompt" reflects unsaved textarea edits', async () => {
+  it('Settings tab "Copy entire prompt" reflects the latest primary file content', async () => {
+    // Body now lives in agent_files; the renderer fetches it via primaryContent
+    // on agent load. Override the mock to simulate a different stored body.
+    ;(window as any).api.agents.primaryContent = vi.fn().mockResolvedValue({
+      id: 'pf-a1', filename: 'copy-editor.md', content: 'updated body content', updated_at: '2026-05-23T00:00:00Z',
+    })
     setup()
     await waitForLoaded()
-    const ta = screen.getByRole('textbox', { name: /Body/ })
-    fireEvent.change(ta, { target: { value: 'unsaved draft body' } })
     fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
     fireEvent.click(screen.getByRole('button', { name: /copy entire prompt/i }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
     const payload = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
-    expect(payload).toContain('unsaved draft body')
+    expect(payload).toContain('updated body content')
   })
 
   it('Settings tab Duplicate button calls api.agents.duplicate', async () => {
@@ -409,30 +386,19 @@ describe('AgentDetail — variable/preset bar integration', () => {
     expect(screen.queryByText('PRESETS')).toBeNull()
   })
 
-  it('renders the bar on the Prompt tab when variables are present', async () => {
+  it('renders variable chips on the Overview hero when variables are present', async () => {
     const agentWithVars: AgentRow = {
       ...baseAgent,
       body: 'Look at {{focus}} for {{language}}.',
     }
     ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithVars] })
+    ;(window as any).api.agents.primaryContent = vi.fn().mockResolvedValue({
+      id: 'pf-a1', filename: 'copy-editor.md', content: 'Look at {{focus}} for {{language}}.', updated_at: '2026-05-23T00:00:00Z',
+    })
     setup()
     await waitForLoaded()
-    expect(screen.getByText('PRESETS')).toBeTruthy()
-    expect(screen.getByText('{{focus}}')).toBeTruthy()
-    expect(screen.getByText('{{language}}')).toBeTruthy()
-  })
-
-  it('hides the bar on tabs other than Prompt even when variables are present', async () => {
-    const agentWithVars: AgentRow = {
-      ...baseAgent,
-      body: 'Look at {{focus}}.',
-    }
-    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithVars] })
-    setup()
-    await waitForLoaded()
-    expect(screen.getByText('PRESETS')).toBeTruthy()
-    fireEvent.click(screen.getByRole('tab', { name: /^Preview$/ }))
-    expect(screen.queryByText('PRESETS')).toBeNull()
+    expect(screen.getAllByText('{{focus}}').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('{{language}}').length).toBeGreaterThan(0)
   })
 
   it('Settings Copy entire prompt uses preset sub-handle and substitutes variables when a preset is active', async () => {
@@ -445,6 +411,9 @@ describe('AgentDetail — variable/preset bar integration', () => {
       ]),
     }
     ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithPreset] })
+    ;(window as any).api.agents.primaryContent = vi.fn().mockResolvedValue({
+      id: 'pf-a1', filename: 'copy-editor.md', content: 'Look at {{focus}} for {{language}}.', updated_at: '2026-05-23T00:00:00Z',
+    })
     setup()
     await waitForLoaded()
     fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
@@ -462,6 +431,9 @@ describe('AgentDetail — variable/preset bar integration', () => {
       presets_json: '[]',
     }
     ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithVars] })
+    ;(window as any).api.agents.primaryContent = vi.fn().mockResolvedValue({
+      id: 'pf-a1', filename: 'copy-editor.md', content: 'Look at {{focus}}.', updated_at: '2026-05-23T00:00:00Z',
+    })
     setup()
     await waitForLoaded()
     fireEvent.click(screen.getByRole('tab', { name: /settings/i }))

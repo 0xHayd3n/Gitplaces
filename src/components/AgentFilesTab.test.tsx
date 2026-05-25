@@ -33,10 +33,20 @@ const agent: AgentRow = {
   synced_slash_command_at: null,
 }
 
-const files: AgentFile[] = [
-  { id: 'f1', agent_id: 'a1', filename: 'notes.md', content: '# Notes', sort_order: 0, created_at: 't', updated_at: 't' },
-  { id: 'f2', agent_id: 'a1', filename: 'scripts/run.sh', content: '#!/bin/bash', sort_order: 1, created_at: 't', updated_at: 't' },
-]
+// Post-Phase-26 layout: primary file row at sort_order=0, siblings at >= 1.
+const primaryFile: AgentFile = {
+  id: 'pf-a1', agent_id: 'a1', filename: 'test.md',
+  content: '# Main\n\nSee notes.md', sort_order: 0, created_at: 't', updated_at: 't',
+}
+const siblingNotes: AgentFile = {
+  id: 'f1', agent_id: 'a1', filename: 'notes.md', content: '# Notes',
+  sort_order: 1, created_at: 't', updated_at: 't',
+}
+const siblingScript: AgentFile = {
+  id: 'f2', agent_id: 'a1', filename: 'scripts/run.sh', content: '#!/bin/bash',
+  sort_order: 2, created_at: 't', updated_at: 't',
+}
+const files: AgentFile[] = [primaryFile, siblingNotes, siblingScript]
 
 beforeEach(() => {
   ;(window as any).api = {
@@ -53,39 +63,40 @@ beforeEach(() => {
 })
 
 describe('AgentFilesTab', () => {
-  it('renders the main SKILL.md entry plus the sibling files', async () => {
+  it('renders the primary file plus the sibling files', async () => {
     render(<AgentFilesTab agent={agent} />)
-    await waitFor(() => screen.getByRole('button', { name: /SKILL\.md/ }))
-    expect(screen.getByRole('button', { name: /SKILL\.md/ })).toBeTruthy()
+    await waitFor(() => screen.getByRole('button', { name: /test\.md/ }))
+    expect(screen.getByRole('button', { name: /test\.md/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /^notes\.md$/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /scripts\/run\.sh/ })).toBeTruthy()
   })
 
-  it('groups files into Main / References / Scripts sections', async () => {
+  it('groups files into Persona / References / Scripts sections', async () => {
     render(<AgentFilesTab agent={agent} />)
-    await waitFor(() => screen.getByRole('button', { name: /SKILL\.md/ }))
-    expect(screen.getByText(/^Main$/i)).toBeTruthy()
+    await waitFor(() => screen.getByRole('button', { name: /test\.md/ }))
+    expect(screen.getByText(/^Persona$/i)).toBeTruthy()
     expect(screen.getByText(/^References$/i)).toBeTruthy()
     expect(screen.getByText(/^Scripts$/i)).toBeTruthy()
   })
 
-  it('selecting SKILL.md shows the agent.body in the editor', async () => {
+  it('selecting the primary file shows its content in the editor (default on mount)', async () => {
     render(<AgentFilesTab agent={agent} />)
-    await waitFor(() => screen.getByRole('button', { name: /SKILL\.md/ }))
-    // SKILL.md is the default active selection on mount; the editor should already show the body
+    await waitFor(() => screen.getByRole('button', { name: /test\.md/ }))
     const editor = screen.getByRole('textbox', { name: /file content/i }) as HTMLTextAreaElement
-    expect(editor.value).toContain('# Main')
+    await waitFor(() => expect(editor.value).toContain('# Main'))
   })
 
-  it('editing the main file calls api.agents.update with new body', async () => {
+  it('editing the primary file calls files.update on the primary row', async () => {
     render(<AgentFilesTab agent={agent} />)
-    await waitFor(() => screen.getByRole('button', { name: /SKILL\.md/ }))
+    await waitFor(() => screen.getByRole('button', { name: /test\.md/ }))
     const editor = screen.getByRole('textbox', { name: /file content/i }) as HTMLTextAreaElement
-    // Wait for the body to populate from the initialising useEffect.
     await waitFor(() => expect(editor.value).toContain('# Main'))
     fireEvent.change(editor, { target: { value: 'changed body' } })
     fireEvent.blur(editor)
-    await waitFor(() => expect(window.api.agents.update).toHaveBeenCalledWith('a1', { body: 'changed body' }))
+    await waitFor(() =>
+      expect(window.api.agents.files.update)
+        .toHaveBeenCalledWith('a1', 'pf-a1', { content: 'changed body' }),
+    )
   })
 
   it('selecting a sibling file shows its content and edits call files.update', async () => {
@@ -99,15 +110,15 @@ describe('AgentFilesTab', () => {
     await waitFor(() => expect(window.api.agents.files.update).toHaveBeenCalledWith('a1', 'f1', { content: 'new content' }))
   })
 
-  it('Add file button creates a new empty file', async () => {
-    const created: AgentFile = { id: 'f3', agent_id: 'a1', filename: 'new.md', content: '', sort_order: 2, created_at: 't', updated_at: 't' }
+  it('Add file button creates a new sibling file with sortOrder past existing siblings', async () => {
+    const created: AgentFile = { id: 'f3', agent_id: 'a1', filename: 'new.md', content: '', sort_order: 3, created_at: 't', updated_at: 't' }
     ;(window as any).api.agents.files.create = vi.fn().mockResolvedValue(created)
     ;(window as any).api.agents.files.list = vi.fn()
       .mockResolvedValueOnce(files)
       .mockResolvedValueOnce([...files, created])
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('new.md')
     render(<AgentFilesTab agent={agent} />)
-    await waitFor(() => screen.getByRole('button', { name: /SKILL\.md/ }))
+    await waitFor(() => screen.getByRole('button', { name: /test\.md/ }))
     fireEvent.click(screen.getByRole('button', { name: /add file/i }))
     await waitFor(() => expect(window.api.agents.files.create).toHaveBeenCalledWith('a1', expect.objectContaining({ filename: 'new.md' })))
     promptSpy.mockRestore()
@@ -124,4 +135,11 @@ describe('AgentFilesTab', () => {
     confirmSpy.mockRestore()
   })
 
+  it('Delete/Rename buttons are hidden when the primary file is active', async () => {
+    render(<AgentFilesTab agent={agent} />)
+    await waitFor(() => screen.getByRole('button', { name: /test\.md/ }))
+    // Primary is the default active selection — actions shouldn't show
+    expect(screen.queryByRole('button', { name: /delete file/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /rename file/i })).toBeNull()
+  })
 })
