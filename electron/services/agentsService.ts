@@ -405,7 +405,10 @@ export function duplicateAgent(db: Database.Database, id: string): AgentRow {
     // Carry content-shaping fields through duplication, but deliberately do NOT
     // copy is_subagent / is_slash_command — a duplicate should not silently
     // create another file in ~/.claude/agents/ (handle is also different anyway).
-    model: src.model,
+    // Phase 2 bridge: AgentRow.model is now `string`, createAgent still takes
+    // the narrow enum until Task 4 widens it. Existing duplicated agents are
+    // always one of the legacy values, so the cast is safe in practice.
+    model: src.model as 'sonnet' | 'opus' | 'haiku' | 'inherit',
     tools: parseAgentTools(src.tools),
     argumentHint: src.argument_hint,
   })

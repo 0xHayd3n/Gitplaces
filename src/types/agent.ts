@@ -30,7 +30,21 @@ export interface AgentRow {
   origin_imported_at: string | null
   // Skill parity (Phase 2)
   tools: string | null             // JSON-serialized string[]; NULL = inherit all
-  model: 'sonnet' | 'opus' | 'haiku' | 'inherit'
+  /**
+   * Raw `model:` string from frontmatter. Phase 2 widened this from the
+   * legacy 4-value enum ('sonnet'|'opus'|'haiku'|'inherit') to free-form
+   * string so non-Anthropic models can be stored verbatim:
+   *   - Legacy short names: 'sonnet', 'opus', 'haiku', 'inherit'
+   *   - Full Anthropic IDs: 'claude-sonnet-4-6'
+   *   - Multi-provider form: 'openai/gpt-4o', 'openai-compatible:ollama-local/llama3.1:70b'
+   * Always paired with the denormalized `model_provider` + `model_endpoint_id`
+   * columns; consumers that need structured data should read those.
+   */
+  model: string
+  /** Denormalized from `model`. Defaults to 'anthropic'. One of the 5 ProviderId values. */
+  model_provider: string
+  /** Denormalized from `model`. Only set when provider === 'openai-compatible'. */
+  model_endpoint_id: string | null
   is_subagent: 0 | 1
   is_slash_command: 0 | 1
   argument_hint: string | null

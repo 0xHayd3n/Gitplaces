@@ -16,7 +16,7 @@ const agents: AgentRow[] = [
     pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
     created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z',
     description: '', origin_plugin: null, origin_path: null, origin_version: null, origin_imported_at: null,
-    tools: null, model: 'inherit', is_subagent: 0, is_slash_command: 0, argument_hint: null,
+    tools: null, model: 'inherit', model_provider: 'anthropic', model_endpoint_id: null, is_subagent: 0, is_slash_command: 0, argument_hint: null,
     synced_subagent_at: null, synced_slash_command_at: null },
   { id: 'a2', name: 'Lit reviewer',  handle: 'lit-reviewer',
     folder_id: 'f2',
@@ -24,7 +24,7 @@ const agents: AgentRow[] = [
     pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
     created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z',
     description: '', origin_plugin: null, origin_path: null, origin_version: null, origin_imported_at: null,
-    tools: null, model: 'inherit', is_subagent: 0, is_slash_command: 0, argument_hint: null,
+    tools: null, model: 'inherit', model_provider: 'anthropic', model_endpoint_id: null, is_subagent: 0, is_slash_command: 0, argument_hint: null,
     synced_subagent_at: null, synced_slash_command_at: null },
   { id: 'a3', name: 'Untagged note', handle: 'untagged-note',
     folder_id: null,
@@ -32,7 +32,7 @@ const agents: AgentRow[] = [
     pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
     created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z',
     description: '', origin_plugin: null, origin_path: null, origin_version: null, origin_imported_at: null,
-    tools: null, model: 'inherit', is_subagent: 0, is_slash_command: 0, argument_hint: null,
+    tools: null, model: 'inherit', model_provider: 'anthropic', model_endpoint_id: null, is_subagent: 0, is_slash_command: 0, argument_hint: null,
     synced_subagent_at: null, synced_slash_command_at: null },
 ]
 

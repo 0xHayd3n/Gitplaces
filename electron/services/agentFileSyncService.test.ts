@@ -52,6 +52,8 @@ function baseAgent(overrides: Partial<AgentRow> = {}): AgentRow {
     origin_version: null,
     origin_imported_at: null,
     tools: null,
+    model_provider: 'anthropic',
+    model_endpoint_id: null,
     model: 'inherit',
     is_subagent: 0,
     is_slash_command: 0,

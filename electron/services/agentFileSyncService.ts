@@ -66,7 +66,11 @@ export function previewSubagentFile(agent: AgentRow, primaryContent: string): st
     data.tools = tools.join(', ')
   }
   if (agent.model !== 'inherit') {
-    data.model = MODEL_FRONTMATTER[agent.model]
+    // Phase 2 bridge: AgentRow.model is now `string`. Task 6 will rewrite this
+    // block to handle the full multi-provider grammar; until then, the narrow
+    // cast keeps the typecheck clean and matches today's runtime behavior
+    // (only Anthropic agents reach this write path).
+    data.model = MODEL_FRONTMATTER[agent.model as 'sonnet' | 'opus' | 'haiku']
   }
   return matter.stringify(primaryContent, data)
 }

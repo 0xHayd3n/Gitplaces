@@ -613,7 +613,11 @@ function AgentSettingsTab({
       <div className="agent-detail-settings-divider">Model &amp; tools</div>
       <label className="agent-detail-settings-label" htmlFor="agent-settings-model">Model</label>
       <div className="agent-detail-settings-field">
-        <ModelDropdown id="agent-settings-model" value={agent.model} onChange={onModelChange} />
+        {/* Phase 2 bridge: AgentRow.model is now `string` but ModelDropdown
+            still expects the legacy narrow enum. Phase 4 will replace
+            ModelDropdown with a multi-provider picker; until then the cast
+            is safe because today only Anthropic agents exist. */}
+        <ModelDropdown id="agent-settings-model" value={agent.model as 'sonnet' | 'opus' | 'haiku' | 'inherit'} onChange={onModelChange} />
         <div className="agent-detail-settings-hint">
           Written to frontmatter when non-inherit.
         </div>

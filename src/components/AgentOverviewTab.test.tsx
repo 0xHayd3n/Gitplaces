@@ -12,6 +12,7 @@ const baseAgent: AgentRow = {
   description: 'A test agent.',
   origin_plugin: null, origin_path: null, origin_version: null, origin_imported_at: null,
   tools: null, model: 'inherit',
+  model_provider: 'anthropic', model_endpoint_id: null,
   is_subagent: 0, is_slash_command: 0, argument_hint: null,
   synced_subagent_at: null, synced_slash_command_at: null,
 }

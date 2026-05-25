@@ -25,6 +25,8 @@ const agent: AgentRow = {
   origin_imported_at: null,
   tools: null,
   model: 'inherit',
+  model_provider: 'anthropic',
+  model_endpoint_id: null,
   is_subagent: 0,
   is_slash_command: 0,
   argument_hint: null,
