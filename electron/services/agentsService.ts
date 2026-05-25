@@ -181,18 +181,17 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
   const insert = db.transaction(() => {
     db.prepare(`
       INSERT INTO agents (
-        id, name, handle, body, folder_id, color_start, color_end, emoji, description,
+        id, name, handle, folder_id, color_start, color_end, emoji, description,
         tools, model, is_subagent, is_slash_command, argument_hint,
         created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id, name, input.handle, input.body, input.folderId, input.colorStart, input.colorEnd, input.emoji, input.description ?? '',
+      id, name, input.handle, input.folderId, input.colorStart, input.colorEnd, input.emoji, input.description ?? '',
       tools, model, isSubagent, isSlashCommand, argumentHint,
       ts, ts,
     )
-    // Primary file row — dual-write of the same content. Task 9 drops agents.body
-    // once every consumer reads from agent_files.
+    // Primary file row — sole source of truth for body content.
     db.prepare(`
       INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
       VALUES (?, ?, ?, ?, 0, ?, ?)
@@ -201,7 +200,7 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
   insert()
 
   const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow
-  recordRevision(db, id, row.body, '[]', 'create', 'Created agent')
+  recordRevision(db, id, input.body, '[]', 'create', 'Created agent')
   return row
 }
 
@@ -244,7 +243,8 @@ export function updateAgent(
   }
   if (patch.body !== undefined) {
     assertBodyLen(patch.body)
-    sets.push('body = ?'); params.push(patch.body)
+    // Body lives in the primary agent_files row — see the UPDATE inside the
+    // transaction below. Validation happens here so it errors before the txn.
   }
   if (patch.folderId !== undefined) {
     if (patch.folderId !== null) assertFolderExists(db, patch.folderId)
@@ -296,13 +296,18 @@ export function updateAgent(
 
   const ts = nowIso()
   const apply = db.transaction(() => {
-    if (sets.length > 0) {
+    // Always bump updated_at when any content-affecting change happens — including
+    // body, which now lives in agent_files. Without this, a body-only patch would
+    // leave agents.updated_at stale and the sidebar wouldn't re-sort.
+    if (sets.length > 0 || patch.body !== undefined) {
       sets.push('updated_at = ?'); params.push(ts)
       params.push(id)
-      db.prepare(`UPDATE agents SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+      const setsClause = sets.length === 1
+        ? sets[0]  // just 'updated_at = ?'
+        : sets.join(', ')
+      db.prepare(`UPDATE agents SET ${setsClause} WHERE id = ?`).run(...params)
     }
-    // Body — dual-write to the primary file row (lockstep with the agents.body
-    // UPDATE above). Task 9 drops the body column.
+    // Body — write to the primary file row.
     if (patch.body !== undefined) {
       db.prepare(
         `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
@@ -320,7 +325,7 @@ export function updateAgent(
   const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow | undefined
   if (!row) throw new Error(`Unknown agent id: ${id}`)
   if (patch.body !== undefined && priorBody !== null && priorBody !== patch.body) {
-    recordRevision(db, id, row.body, row.presets_json, 'body_edit', 'Edited body')
+    recordRevision(db, id, patch.body, row.presets_json, 'body_edit', 'Edited body')
   }
   return row
 }
@@ -660,9 +665,8 @@ export function revertToRevision(
 
   const ts = nowIso()
   const apply = db.transaction(() => {
-    // Dual-write: agents.body + primary file row (lockstep until Task 9 drops the column)
-    db.prepare(`UPDATE agents SET body = ?, presets_json = ?, updated_at = ? WHERE id = ?`)
-      .run(rev.body, rev.presets_json, ts, agentId)
+    db.prepare(`UPDATE agents SET presets_json = ?, updated_at = ? WHERE id = ?`)
+      .run(rev.presets_json, ts, agentId)
     db.prepare(
       `UPDATE agent_files SET content = ?, updated_at = ? WHERE agent_id = ? AND sort_order = 0`
     ).run(rev.body, ts, agentId)

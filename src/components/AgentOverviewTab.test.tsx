@@ -6,7 +6,6 @@ import type { AgentRow, AgentFolderRow, AgentRevision, AgentPreset } from '../ty
 
 const baseAgent: AgentRow = {
   id: 'a-1', name: 'My Agent', handle: 'my-agent',
-  body: 'persona body',
   folder_id: null, color_start: '#888', color_end: null, emoji: null,
   pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
   created_at: '2026-05-20T00:00:00Z', updated_at: '2026-05-25T00:00:00Z',

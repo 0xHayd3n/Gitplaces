@@ -44,7 +44,7 @@ describe('agents redesign — schema migration', () => {
   })
 
   it('presets_json defaults to "[]" on new rows', () => {
-    db.prepare(`INSERT INTO agents (id, name, body, created_at, updated_at) VALUES ('a1','A','b','t','t')`).run()
+    db.prepare(`INSERT INTO agents (id, name, created_at, updated_at) VALUES ('a1','A','t','t')`).run()
     const row = db.prepare(`SELECT presets_json, pinned FROM agents WHERE id='a1'`).get() as any
     expect(row.presets_json).toBe('[]')
     expect(row.pinned).toBe(0)
@@ -56,9 +56,14 @@ describe('agents redesign — schema migration', () => {
 })
 
 describe('agents redesign — backfill', () => {
+  // The agents-redesign backfill in db.ts reads agents.body to seed the initial
+  // revision snapshot. Phase 26 drops that column after backfill, so we re-add
+  // it to simulate the pre-Phase-26 schema state that the redesign backfill was
+  // written to handle.
   function dbWithPreRedesignRow(): Database.Database {
     const db = new Database(':memory:')
     initSchema(db)
+    db.exec(`ALTER TABLE agents ADD COLUMN body TEXT NOT NULL DEFAULT ''`)
     db.prepare(`INSERT INTO agents (id, name, body, created_at, updated_at)
                 VALUES (?,?,?,?,?)`).run('a1', 'Agent 1', '# A1', 't', 't')
     db.prepare(`UPDATE agents SET handle = '' WHERE id = 'a1'`).run()
@@ -92,6 +97,7 @@ describe('agents redesign — backfill', () => {
   it('backfill dedupes collisions across multiple rows', () => {
     const db = new Database(':memory:')
     initSchema(db)
+    db.exec(`ALTER TABLE agents ADD COLUMN body TEXT NOT NULL DEFAULT ''`)
     db.prepare(`INSERT INTO agents (id, name, body, created_at, updated_at)
                 VALUES (?,?,?,?,?)`).run('a1', 'Hello', '#', 't', 't')
     db.prepare(`INSERT INTO agents (id, name, body, created_at, updated_at)

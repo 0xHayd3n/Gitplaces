@@ -98,7 +98,9 @@ function PinnedCard({ agent }: { agent: AgentRow }) {
       ? `linear-gradient(135deg, ${agent.color_start ?? '#888'}, ${agent.color_end})`
       : (agent.color_start ?? '#888'),
   }
-  const snippet = firstLine(agent.body)
+  // Body now lives in agent_files; description is the closest at-a-glance snippet
+  // that's still on the agent row. Empty when the user hasn't set one.
+  const snippet = firstLine(agent.description)
   return (
     <Link
       to={`/library/agent/${agent.id}`}

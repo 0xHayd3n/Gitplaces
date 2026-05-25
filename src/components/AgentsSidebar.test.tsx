@@ -10,7 +10,7 @@ const folders: AgentFolderRow[] = [
   { id: 'f2', name: 'Research', color_start: null, color_end: null, description: null, emoji: null, created_at: '2026-05-23T00:00:00Z' },
 ]
 const agents: AgentRow[] = [
-  { id: 'a1', name: 'Copy editor',   handle: 'copy-editor',   body: '# Copy editor\nbody',
+  { id: 'a1', name: 'Copy editor',   handle: 'copy-editor',
     folder_id: 'f1',
     color_start: '#10b981', color_end: '#34d399', emoji: '✏️',
     pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
@@ -18,7 +18,7 @@ const agents: AgentRow[] = [
     description: '', origin_plugin: null, origin_path: null, origin_version: null, origin_imported_at: null,
     tools: null, model: 'inherit', is_subagent: 0, is_slash_command: 0, argument_hint: null,
     synced_subagent_at: null, synced_slash_command_at: null },
-  { id: 'a2', name: 'Lit reviewer',  handle: 'lit-reviewer',  body: '# Lit reviewer\nbody',
+  { id: 'a2', name: 'Lit reviewer',  handle: 'lit-reviewer',
     folder_id: 'f2',
     color_start: '#6366f1', color_end: null, emoji: null,
     pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
@@ -26,7 +26,7 @@ const agents: AgentRow[] = [
     description: '', origin_plugin: null, origin_path: null, origin_version: null, origin_imported_at: null,
     tools: null, model: 'inherit', is_subagent: 0, is_slash_command: 0, argument_hint: null,
     synced_subagent_at: null, synced_slash_command_at: null },
-  { id: 'a3', name: 'Untagged note', handle: 'untagged-note', body: '# Untagged\nbody',
+  { id: 'a3', name: 'Untagged note', handle: 'untagged-note',
     folder_id: null,
     color_start: '#ec4899', color_end: null, emoji: null,
     pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
@@ -46,7 +46,6 @@ beforeEach(() => {
       create: vi.fn().mockImplementation(async (input: any) => ({
         id: 'new-id',
         name: input.name,
-        body: input.body,
         folder_id: input.folderId,
         created_at: '2026-05-23T00:00:00Z',
         updated_at: '2026-05-23T00:00:00Z',

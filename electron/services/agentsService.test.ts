@@ -137,7 +137,7 @@ describe('agentsService — agents', () => {
   it('createAgent inserts and returns the row', () => {
     const a = createAgent(db, { name: 'Editor', body: '# Editor\nbody', folderId: null, handle: 'editor', colorStart: '#888888', colorEnd: null, emoji: null })
     expect(a.name).toBe('Editor')
-    expect(a.body).toBe('# Editor\nbody')
+    expect(getPrimaryFile(db, a.id).content).toBe('# Editor\nbody')
     expect(a.folder_id).toBeNull()
     expect(a.id).toMatch(/^[0-9a-f-]{36}$/)
     expect(a.created_at).toBe(a.updated_at)
@@ -169,7 +169,7 @@ describe('agentsService — agents', () => {
     const a = createAgent(db, { name: 'A', body: 'b', folderId: null, handle: 'patch-bumps', colorStart: '#888888', colorEnd: null, emoji: null })
     await new Promise(r => setTimeout(r, 5))
     const u = updateAgent(db, a.id, { body: 'b2' })
-    expect(u.body).toBe('b2')
+    expect(getPrimaryFile(db, u.id).content).toBe('b2')
     expect(u.name).toBe('A')
     expect(u.updated_at > a.updated_at).toBe(true)
   })
@@ -197,7 +197,7 @@ describe('agentsService — agents', () => {
     const a = createAgent(db, { name: 'A', body: 'b', folderId: null, handle: 'empty-patch', colorStart: '#888888', colorEnd: null, emoji: null })
     const u = updateAgent(db, a.id, {})
     expect(u.name).toBe('A')
-    expect(u.body).toBe('b')
+    expect(getPrimaryFile(db, u.id).content).toBe('b')
     expect(u.updated_at).toBe(a.updated_at)
   })
 
@@ -224,7 +224,7 @@ describe('agentsService — agents', () => {
     const d = duplicateAgent(db, a.id)
     expect(d.id).not.toBe(a.id)
     expect(d.name).toBe('Original (copy)')
-    expect(d.body).toBe('body')
+    expect(getPrimaryFile(db, d.id).content).toBe('body')
     expect(d.folder_id).toBe(f.id)
     expect(d.created_at >= a.created_at).toBe(true)
   })
@@ -587,8 +587,8 @@ describe('agentsService — listRevisions', () => {
     const freshDbInner = new Database(':memory:')
     initSchema(freshDbInner)
     freshDbInner.prepare(`
-      INSERT INTO agents (id, name, handle, body, folder_id, color_start, color_end, emoji, created_at, updated_at)
-      VALUES ('bare', 'bare', 'bare', '', NULL, '#000000', NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
+      INSERT INTO agents (id, name, handle, folder_id, color_start, color_end, emoji, created_at, updated_at)
+      VALUES ('bare', 'bare', 'bare', NULL, '#000000', NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')
     `).run()
     expect(listRevisions(freshDbInner, 'bare')).toEqual([])
   })
@@ -753,7 +753,7 @@ describe('agentsService — revertToRevision', () => {
     expect(v1.kind).toBe('create')
     expect(v1.body).toBe('v1')
     const restored = revertToRevision(db, agentId, v1.id)
-    expect(restored.body).toBe('v1')
+    expect(getPrimaryFile(db, restored.id).content).toBe('v1')
   })
 
   it('inserts a new "revert" revision snapshot', () => {
@@ -1070,12 +1070,6 @@ describe('agentsService — primary file routing', () => {
     expect(primary.sort_order).toBe(0)
   })
 
-  it('createAgent dual-writes to agents.body during the transition', () => {
-    const agent = createAgent(db, makeBaseInput({ body: 'persona body' }))
-    const row = db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agent.id) as { body: string }
-    expect(row.body).toBe('persona body')
-  })
-
   it('updateAgent({ body }) writes to the primary file row', () => {
     const agent = createAgent(db, makeBaseInput({ body: 'v1' }))
     updateAgent(db, agent.id, { body: 'v2' })
@@ -1083,13 +1077,6 @@ describe('agentsService — primary file routing', () => {
       `SELECT content FROM agent_files WHERE agent_id = ? AND sort_order = 0`
     ).get(agent.id) as { content: string }
     expect(primary.content).toBe('v2')
-  })
-
-  it('updateAgent({ body }) dual-writes to agents.body during the transition', () => {
-    const agent = createAgent(db, makeBaseInput({ body: 'v1' }))
-    updateAgent(db, agent.id, { body: 'v2' })
-    const row = db.prepare(`SELECT body FROM agents WHERE id = ?`).get(agent.id) as { body: string }
-    expect(row.body).toBe('v2')
   })
 
   it('updateAgent({ handle }) renames the primary file row', () => {

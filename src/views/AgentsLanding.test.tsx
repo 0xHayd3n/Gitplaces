@@ -10,7 +10,6 @@ function agent(overrides: Partial<AgentRow> = {}): AgentRow {
     id: overrides.id ?? `a-${Math.random()}`,
     name: overrides.name ?? 'Agent',
     handle: overrides.handle ?? 'agent',
-    body: overrides.body ?? '# Body',
     folder_id: null,
     color_start: '#6366f1',
     color_end: null,

@@ -21,10 +21,10 @@ function seedAgent(
 ): void {
   const presets = JSON.stringify(args.presets ?? [])
   db.prepare(`
-    INSERT INTO agents (id, name, handle, body, folder_id, color_start, color_end, emoji, presets_json, created_at, updated_at)
-    VALUES (?, ?, ?, ?, NULL, '#000000', NULL, NULL, ?, 't', 't')
-  `).run(args.id, args.name, args.handle, args.body, presets)
-  // Phase 26 — primary file row (the launcher now reads body from agent_files).
+    INSERT INTO agents (id, name, handle, folder_id, color_start, color_end, emoji, presets_json, created_at, updated_at)
+    VALUES (?, ?, ?, NULL, '#000000', NULL, NULL, ?, 't', 't')
+  `).run(args.id, args.name, args.handle, presets)
+  // Post-Phase-26 — body lives in agent_files (the launcher reads body from there).
   db.prepare(`
     INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
     VALUES (?, ?, ?, ?, 0, 't', 't')

@@ -168,7 +168,7 @@ export function initSchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS agents (
       id          TEXT PRIMARY KEY,
       name        TEXT NOT NULL,
-      body        TEXT NOT NULL,
+      body        TEXT NOT NULL DEFAULT '',
       folder_id   TEXT REFERENCES agent_folders(id) ON DELETE SET NULL,
       created_at  TEXT NOT NULL,
       updated_at  TEXT NOT NULL
@@ -370,11 +370,20 @@ export function initSchema(db: Database.Database): void {
   )`)
 
   // Agents redesign — backfill pass for rows that pre-existed the redesign.
-  // Idempotent: only touches rows where handle = ''.
+  // Idempotent: only touches rows where handle = ''. Body column may have
+  // been dropped by Phase 26 on a previous init — in that case nothing here
+  // needs to run (post-Phase-26 agents always have a primary file row, not a
+  // body column).
   {
-    const needsBackfill = db
-      .prepare(`SELECT id, name, body FROM agents WHERE handle = ''`)
-      .all() as { id: string; name: string; body: string }[]
+    const needsBackfill = (() => {
+      try {
+        return db
+          .prepare(`SELECT id, name, body FROM agents WHERE handle = ''`)
+          .all() as { id: string; name: string; body: string }[]
+      } catch {
+        return []  // body column already dropped — no pre-redesign rows to backfill
+      }
+    })()
 
     if (needsBackfill.length > 0) {
       // Existing taken handles (across the whole table — not just the needs-backfill subset)
@@ -420,11 +429,18 @@ export function initSchema(db: Database.Database): void {
   // to keep the column and the primary row in sync. Idempotent on re-run: agents
   // that already have a <handle>.md file are skipped (and promoted to
   // sort_order=0 if needed).
-  const agentsForPhase26 = db.prepare(
-    `SELECT id, handle, body, created_at, updated_at FROM agents`
-  ).all() as Array<{
-    id: string; handle: string; body: string; created_at: string; updated_at: string;
-  }>
+  const agentsForPhase26 = (() => {
+    try {
+      return db.prepare(
+        `SELECT id, handle, body, created_at, updated_at FROM agents`
+      ).all() as Array<{
+        id: string; handle: string; body: string; created_at: string; updated_at: string;
+      }>
+    } catch {
+      // body column already dropped by a prior Phase 26 run — nothing to backfill.
+      return []
+    }
+  })()
   for (const a of agentsForPhase26) {
     const existing = db.prepare(
       `SELECT id, sort_order FROM agent_files WHERE agent_id = ? AND filename = ?`
@@ -446,6 +462,9 @@ export function initSchema(db: Database.Database): void {
       console.warn(`[phase 26] skip backfill for agent ${a.id}:`, err)
     }
   }
+  // Phase 26 (cont.) — drop agents.body once every agent has its primary file row.
+  // Idempotent across re-runs (try/catch ignores "no such column" on second pass).
+  try { db.exec(`ALTER TABLE agents DROP COLUMN body`) } catch {}
 
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`

@@ -12,7 +12,6 @@ const baseAgent: AgentRow = {
   id: 'a1',
   name: 'Copy editor',
   handle: 'copy-editor',
-  body: '# Copy editor\n\nHello body.',
   folder_id: 'f1',
   color_start: '#10b981',
   color_end: null,
@@ -50,7 +49,7 @@ function makeApi() {
       duplicate: vi.fn(),
       recordUse: vi.fn().mockResolvedValue(undefined),
       primaryContent: vi.fn().mockResolvedValue({
-        id: 'pf-a1', filename: 'copy-editor.md', content: baseAgent.body, updated_at: baseAgent.updated_at,
+        id: 'pf-a1', filename: 'copy-editor.md', content: '# Copy editor\n\nHello body.', updated_at: baseAgent.updated_at,
       }),
       mcp: {
         getConfigSnippet: vi.fn().mockResolvedValue(JSON.stringify({
@@ -232,7 +231,6 @@ describe('AgentDetail', () => {
       id: 'a2',
       name: 'Other agent',
       handle: 'other-agent',
-      body: '# Other\n\nother body.',
       folder_id: null,
       color_start: '#6366f1',
       color_end: null,
@@ -261,8 +259,8 @@ describe('AgentDetail', () => {
       .mockResolvedValueOnce({ folders, agents: [otherAgent] })
     ;(window as any).api.agents.primaryContent = vi.fn().mockImplementation((id: string) =>
       Promise.resolve(id === 'a2'
-        ? { id: 'pf-a2', filename: 'other-agent.md', content: otherAgent.body, updated_at: otherAgent.updated_at }
-        : { id: 'pf-a1', filename: 'copy-editor.md', content: baseAgent.body, updated_at: baseAgent.updated_at }))
+        ? { id: 'pf-a2', filename: 'other-agent.md', content: '# Other\n\nother body.', updated_at: otherAgent.updated_at }
+        : { id: 'pf-a1', filename: 'copy-editor.md', content: '# Copy editor\n\nHello body.', updated_at: baseAgent.updated_at }))
 
     function NavButton() {
       const navigate = useNavigate()
@@ -387,11 +385,7 @@ describe('AgentDetail — variable/preset bar integration', () => {
   })
 
   it('renders variable chips on the Overview hero when variables are present', async () => {
-    const agentWithVars: AgentRow = {
-      ...baseAgent,
-      body: 'Look at {{focus}} for {{language}}.',
-    }
-    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithVars] })
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [baseAgent] })
     ;(window as any).api.agents.primaryContent = vi.fn().mockResolvedValue({
       id: 'pf-a1', filename: 'copy-editor.md', content: 'Look at {{focus}} for {{language}}.', updated_at: '2026-05-23T00:00:00Z',
     })
@@ -404,7 +398,6 @@ describe('AgentDetail — variable/preset bar integration', () => {
   it('Settings Copy entire prompt uses preset sub-handle and substitutes variables when a preset is active', async () => {
     const agentWithPreset: AgentRow = {
       ...baseAgent,
-      body: 'Look at {{focus}} for {{language}}.',
       presets_json: JSON.stringify([
         { id: 'p1', name: 'Security review', slug: 'security-review',
           values: { focus: 'auth', language: 'TS' } },
@@ -425,12 +418,7 @@ describe('AgentDetail — variable/preset bar integration', () => {
   })
 
   it('Settings Copy entire prompt leaves variables raw when no preset is active', async () => {
-    const agentWithVars: AgentRow = {
-      ...baseAgent,
-      body: 'Look at {{focus}}.',
-      presets_json: '[]',
-    }
-    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [agentWithVars] })
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [baseAgent] })
     ;(window as any).api.agents.primaryContent = vi.fn().mockResolvedValue({
       id: 'pf-a1', filename: 'copy-editor.md', content: 'Look at {{focus}}.', updated_at: '2026-05-23T00:00:00Z',
     })
@@ -462,7 +450,7 @@ describe('AgentDetail — History tab', () => {
   beforeEach(() => {
     ;(window as any).api.agents.revisions = {
       list: vi.fn().mockResolvedValue(revisionsFixture),
-      revert: vi.fn().mockResolvedValue({ ...baseAgent, body: 'v1' }),
+      revert: vi.fn().mockResolvedValue({ ...baseAgent }),
     }
     ;(window as any).api.agents.onRevisionAdded = vi.fn()
     ;(window as any).api.agents.offRevisionAdded = vi.fn()
@@ -545,7 +533,6 @@ describe('AgentDetail — recordUse on Copy entire prompt', () => {
   it('passes the active preset id when one is selected', async () => {
     const agentWithPreset: AgentRow = {
       ...baseAgent,
-      body: 'Look at {{focus}}.',
       presets_json: JSON.stringify([
         { id: 'p-sec', name: 'Security review', slug: 'security-review', values: { focus: 'auth' } },
       ]),

@@ -17,7 +17,6 @@ function makeApi() {
         id: 'new-id',
         name: input.name,
         handle: input.handle,
-        body: input.body ?? '',
         folder_id: input.folderId,
         color_start: input.colorStart,
         color_end: input.colorEnd,

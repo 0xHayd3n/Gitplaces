@@ -8,7 +8,6 @@ const agent: AgentRow = {
   id: 'a1',
   name: 'Copy editor',
   handle: 'copy-editor',
-  body: '',
   folder_id: null,
   color_start: '#10b981',
   color_end: null,

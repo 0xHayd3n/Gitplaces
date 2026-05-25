@@ -158,10 +158,13 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
 
   const groups: FolderGroup[] = useMemo(() => {
     const q = searchTerm.trim().toLowerCase()
+    // Sidebar search matches name + description (body now lives in agent_files;
+    // searching it would require an N+1 join we don't want for a sidebar render).
     const match = (a: AgentRow) =>
       !q ||
       a.name.toLowerCase().includes(q) ||
-      a.body.toLowerCase().includes(q)
+      a.handle.toLowerCase().includes(q) ||
+      (a.description ?? '').toLowerCase().includes(q)
 
     const byFolder = new Map<string, AgentRow[]>()
     const unfiled: AgentRow[] = []

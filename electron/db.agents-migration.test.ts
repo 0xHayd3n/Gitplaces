@@ -21,9 +21,12 @@ describe('db migration — agent markdown section', () => {
     const db = getDb(dir)
     const cols = db.prepare("PRAGMA table_info('agents')").all() as { name: string }[]
     const names = cols.map(c => c.name)
+    // body column is dropped by Phase 26; the persona content lives in
+    // agent_files (sort_order=0, filename=<handle>.md) instead.
     expect(names).toEqual(expect.arrayContaining([
-      'id', 'name', 'body', 'folder_id', 'created_at', 'updated_at',
+      'id', 'name', 'folder_id', 'created_at', 'updated_at',
     ]))
+    expect(names).not.toContain('body')
   })
 
   it('creates idx_agents_folder and idx_agents_updated indexes', () => {
@@ -39,8 +42,8 @@ describe('db migration — agent markdown section', () => {
     const db = getDb(dir)
     db.prepare(`INSERT INTO agent_folders (id, name, created_at) VALUES ('f1', 'Writing', '2026-05-23T00:00:00Z')`).run()
     db.prepare(`
-      INSERT INTO agents (id, name, body, folder_id, created_at, updated_at)
-      VALUES ('a1', 'Test', '# Test', 'f1', '2026-05-23T00:00:00Z', '2026-05-23T00:00:00Z')
+      INSERT INTO agents (id, name, folder_id, created_at, updated_at)
+      VALUES ('a1', 'Test', 'f1', '2026-05-23T00:00:00Z', '2026-05-23T00:00:00Z')
     `).run()
     db.prepare(`DELETE FROM agent_folders WHERE id = 'f1'`).run()
     const row = db.prepare(`SELECT folder_id FROM agents WHERE id = 'a1'`).get() as { folder_id: string | null }

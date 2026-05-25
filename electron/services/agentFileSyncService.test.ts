@@ -36,7 +36,6 @@ function baseAgent(overrides: Partial<AgentRow> = {}): AgentRow {
     id: 'agent-1',
     name: 'My Agent',
     handle: 'my-agent',
-    body: BODY,
     folder_id: null,
     color_start: '#888888',
     color_end: null,

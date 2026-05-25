@@ -171,6 +171,7 @@ export default function AgentFilesTab({ agent, activePresetId, onActivePresetCha
         {isPrimaryActive && presets.length > 0 && onActivePresetChange && (
           <AgentVariablePresetBar
             agent={agent}
+            body={draft}
             variables={variables}
             activePresetId={activePresetId ?? null}
             onActivePresetChange={onActivePresetChange}

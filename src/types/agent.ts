@@ -12,7 +12,6 @@ export interface AgentRow {
   id: string
   name: string
   handle: string                   // unique, kebab-case, no leading '@'
-  body: string
   folder_id: string | null
   color_start: string | null       // e.g. '#6366f1'
   color_end:   string | null       // null = solid swatch

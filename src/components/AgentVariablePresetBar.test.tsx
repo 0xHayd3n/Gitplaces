@@ -8,7 +8,6 @@ const baseAgent: AgentRow = {
   id: 'a1',
   name: 'Reviewer',
   handle: 'reviewer',
-  body: 'Focus on {{focus}} for {{language}}.',
   folder_id: null,
   color_start: '#6366f1',
   color_end: null,
@@ -65,6 +64,7 @@ describe('AgentVariablePresetBar', () => {
     render(
       <AgentVariablePresetBar
         agent={baseAgent}
+        body=""
         variables={['focus', 'language']}
         activePresetId={null}
         onActivePresetChange={() => {}}
@@ -82,6 +82,7 @@ describe('AgentVariablePresetBar', () => {
     render(
       <AgentVariablePresetBar
         agent={agent}
+        body=""
         variables={['focus']}
         activePresetId="p1"
         onActivePresetChange={() => {}}
@@ -102,6 +103,7 @@ describe('AgentVariablePresetBar', () => {
     render(
       <AgentVariablePresetBar
         agent={agent}
+        body=""
         variables={['focus']}
         activePresetId="p1"
         onActivePresetChange={onActivePresetChange}
@@ -118,6 +120,7 @@ describe('AgentVariablePresetBar', () => {
     render(
       <AgentVariablePresetBar
         agent={agent}
+        body=""
         variables={['focus', 'language']}
         activePresetId="p1"
         onActivePresetChange={() => {}}
@@ -135,6 +138,7 @@ describe('AgentVariablePresetBar', () => {
     render(
       <AgentVariablePresetBar
         agent={agent}
+        body=""
         variables={['focus']}
         activePresetId="p1"
         onActivePresetChange={() => {}}
@@ -153,6 +157,7 @@ describe('AgentVariablePresetBar', () => {
     render(
       <AgentVariablePresetBar
         agent={baseAgent}
+        body=""
         variables={['focus']}
         activePresetId={null}
         onActivePresetChange={onActivePresetChange}
@@ -172,6 +177,7 @@ describe('AgentVariablePresetBar', () => {
     render(
       <AgentVariablePresetBar
         agent={baseAgent}
+        body="Focus on {{focus}}."
         variables={['focus']}
         activePresetId={null}
         onActivePresetChange={() => {}}
@@ -195,6 +201,7 @@ describe('AgentVariablePresetBar', () => {
     render(
       <AgentVariablePresetBar
         agent={agent}
+        body="Focus on {{focus}} for {{language}}."
         variables={['focus', 'language']}
         activePresetId="p1"
         onActivePresetChange={() => {}}
@@ -210,6 +217,7 @@ describe('AgentVariablePresetBar', () => {
     render(
       <AgentVariablePresetBar
         agent={agent}
+        body="Focus on {{focus}} for {{language}}."
         variables={['focus', 'language']}
         activePresetId="p1"
         onActivePresetChange={() => {}}

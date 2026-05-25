@@ -5,6 +5,7 @@ import { buildPersonaPayload, deriveDescription } from '../utils/copyPayload'
 
 interface Props {
   agent: AgentRow
+  body: string                                  // primary file content — drives the preview payload
   variables: string[]
   activePresetId: string | null
   onActivePresetChange: (id: string | null) => void
@@ -14,6 +15,7 @@ const SAVE_DEBOUNCE_MS = 500
 
 export default function AgentVariablePresetBar({
   agent,
+  body,
   variables,
   activePresetId,
   onActivePresetChange,
@@ -90,15 +92,15 @@ export default function AgentVariablePresetBar({
   }
 
   const previewPayload = useMemo(() => {
-    const description = deriveDescription(agent.body)
+    const description = deriveDescription(body)
     return buildPersonaPayload({
       handle: agent.handle,
       description,
-      body: agent.body,
+      body,
       presetSlug: activePreset?.slug ?? null,
       presetValues: activePreset ? localValues : undefined,
     })
-  }, [agent.body, agent.handle, activePreset, localValues])
+  }, [body, agent.handle, activePreset, localValues])
 
   return (
     <div className="agent-bar">

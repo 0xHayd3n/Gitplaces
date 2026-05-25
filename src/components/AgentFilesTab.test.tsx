@@ -8,7 +8,6 @@ const agent: AgentRow = {
   id: 'a1',
   name: 'Test',
   handle: 'test',
-  body: '# Main\n\nSee notes.md',
   folder_id: null,
   color_start: '#10b981',
   color_end: null,
