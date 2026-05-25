@@ -80,3 +80,108 @@ async function walkRecursive(
     }
   }
 }
+
+// ── Plugin discovery ────────────────────────────────────────────────
+
+export interface DiscoveredSkill {
+  name: string
+  path: string
+  description: string | null
+  fileCount: number
+}
+
+export interface DiscoveredPlugin {
+  id: string         // hash of root path
+  name: string
+  version: string | null
+  root: string
+  skills: DiscoveredSkill[]
+}
+
+export async function discoverPlugins(roots: string[]): Promise<DiscoveredPlugin[]> {
+  const out: DiscoveredPlugin[] = []
+  for (const root of roots) {
+    const exists = await fs.stat(root).catch(() => null)
+    if (!exists || !exists.isDirectory()) continue
+    const entries = await fs.readdir(root, { withFileTypes: true })
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const pluginDir = path.join(root, entry.name)
+      const skillsDir = path.join(pluginDir, 'skills')
+      const skillsStat = await fs.stat(skillsDir).catch(() => null)
+      if (!skillsStat?.isDirectory()) continue
+      const skills = await listSkillsInPluginDir(skillsDir)
+      if (skills.length === 0) continue
+
+      let name = entry.name
+      let version: string | null = null
+      const pkgPath = path.join(pluginDir, 'package.json')
+      const pkgRaw = await fs.readFile(pkgPath, 'utf-8').catch(() => null)
+      if (pkgRaw) {
+        try {
+          const pkg = JSON.parse(pkgRaw)
+          if (typeof pkg.name === 'string') name = pkg.name
+          if (typeof pkg.version === 'string') version = pkg.version
+        } catch {
+          // Malformed package.json — fall back to dir name
+        }
+      }
+      out.push({
+        id: simpleHash(pluginDir),
+        name,
+        version,
+        root: pluginDir,
+        skills,
+      })
+    }
+  }
+  return out
+}
+
+async function listSkillsInPluginDir(skillsDir: string): Promise<DiscoveredSkill[]> {
+  const out: DiscoveredSkill[] = []
+  const entries = await fs.readdir(skillsDir, { withFileTypes: true })
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const skillDir = path.join(skillsDir, entry.name)
+    const skillMdPath = path.join(skillDir, 'SKILL.md')
+    const skillMd = await fs.readFile(skillMdPath, 'utf-8').catch(() => null)
+    if (skillMd === null) continue
+    let name = entry.name
+    let description: string | null = null
+    try {
+      const parsed = matter(skillMd)
+      const data = parsed.data as Record<string, unknown>
+      if (typeof data.name === 'string') name = data.name
+      if (typeof data.description === 'string') description = data.description
+    } catch {
+      // Bad frontmatter — keep defaults
+    }
+    const fileCount = await countSkillFiles(skillDir)
+    out.push({ name, path: skillDir, description, fileCount })
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+async function countSkillFiles(dir: string): Promise<number> {
+  let n = 0
+  async function walk(d: string): Promise<void> {
+    const entries = await fs.readdir(d, { withFileTypes: true })
+    for (const e of entries) {
+      if (IGNORE_NAMES.has(e.name)) continue
+      if (e.isDirectory()) await walk(path.join(d, e.name))
+      else if (e.isFile()) n++
+    }
+  }
+  await walk(dir)
+  return n
+}
+
+function simpleHash(s: string): string {
+  let h = 0
+  for (let i = 0; i < s.length; i++) {
+    h = (h << 5) - h + s.charCodeAt(i)
+    h |= 0
+  }
+  return Math.abs(h).toString(36)
+}
