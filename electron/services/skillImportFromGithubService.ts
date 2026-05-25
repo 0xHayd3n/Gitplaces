@@ -45,8 +45,44 @@ export async function discoverSkillsInRepo(
     return { owner, name, branch, commitSha, layout: 'skills-dir', skills }
   }
 
-  // No skills-dir found; bare-root not handled in this task — added in Task 3.
+  const rootSkillMd = rootEntries.find(e => e.path === 'SKILL.md' && e.type === 'blob')
+  if (rootSkillMd) {
+    const skill = await summarizeBareRoot(token, owner, name, branch, rootEntries)
+    return { owner, name, branch, commitSha, layout: 'bare-root', skills: skill ? [skill] : [] }
+  }
+
   return { owner, name, branch, commitSha, layout: 'skills-dir', skills: [] }
+}
+
+const BARE_ROOT_EXTRA_EXCLUDES = new Set([
+  'README.md', 'LICENSE', 'LICENSE.md', 'LICENSE.txt',
+  '.gitignore', '.gitattributes',
+  'package.json', 'package-lock.json',
+])
+
+async function summarizeBareRoot(
+  token: string | null,
+  owner: string,
+  name: string,
+  branch: string,
+  rootEntries: TreeEntry[],
+): Promise<DiscoveredSkill | null> {
+  const filtered = rootEntries.filter(e => !BARE_ROOT_EXTRA_EXCLUDES.has(e.path))
+  const fileCount = await countFilesRecursive(token, owner, name, filtered)
+
+  let displayName = name   // repo name as default
+  let description: string | null = null
+  try {
+    const buf = await getRawFileBytes(token, owner, name, branch, 'SKILL.md')
+    const parsed = matter(buf.toString('utf-8'))
+    const data = parsed.data as Record<string, unknown>
+    if (typeof data.name === 'string' && data.name.length > 0) displayName = data.name
+    if (typeof data.description === 'string') description = data.description
+  } catch {
+    // SKILL.md frontmatter unreadable — fall back to repo name
+  }
+
+  return { name: displayName, path: '.', description, fileCount }
 }
 
 async function listSkillsUnderSkillsDir(

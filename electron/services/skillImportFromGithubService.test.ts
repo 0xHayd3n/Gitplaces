@@ -135,3 +135,43 @@ describe('discoverSkillsInRepo — skills-dir layout', () => {
     expect(index.skills[0].fileCount).toBe(3)  // SKILL.md + scripts/a.sh + scripts/b.sh
   })
 })
+
+describe('discoverSkillsInRepo — bare-root layout', () => {
+  it('finds a root SKILL.md and reports bare-root layout', async () => {
+    mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
+    mockedGithub.getBranch.mockResolvedValue({ commitSha: 'sha', rootTreeSha: 'root' })
+    mockedGithub.getTreeBySha
+      .mockResolvedValueOnce([
+        { path: 'README.md', mode: '100644', type: 'blob', sha: 'r' },
+        { path: 'SKILL.md',  mode: '100644', type: 'blob', sha: 'sk' },
+        { path: 'scripts',   mode: '040000', type: 'tree', sha: 'scr' },
+      ])
+      // For fileCount we recurse into scripts/
+      .mockResolvedValueOnce([
+        { path: 'run.sh', mode: '100755', type: 'blob', sha: 'rsh' },
+      ])
+    mockedGithub.getRawFileBytes.mockResolvedValue(Buffer.from(SKILL_MD_BODY, 'utf-8'))
+
+    const index = await discoverSkillsInRepo('o', 'singleskill')
+
+    expect(index.layout).toBe('bare-root')
+    expect(index.skills).toHaveLength(1)
+    expect(index.skills[0].path).toBe('.')
+    expect(index.skills[0].name).toBe('brainstorming')   // from SKILL.md frontmatter
+    // README.md excluded, SKILL.md + scripts/run.sh counted = 2
+    expect(index.skills[0].fileCount).toBe(2)
+  })
+
+  it('returns empty skills[] when no skills/ and no root SKILL.md', async () => {
+    mockedGithub.getRepo.mockResolvedValue({ default_branch: 'main' } as any)
+    mockedGithub.getBranch.mockResolvedValue({ commitSha: 'sha', rootTreeSha: 'root' })
+    mockedGithub.getTreeBySha.mockResolvedValueOnce([
+      { path: 'README.md', mode: '100644', type: 'blob', sha: 'r' },
+      { path: 'src',       mode: '040000', type: 'tree', sha: 's' },
+    ])
+
+    const index = await discoverSkillsInRepo('o', 'unrelated')
+
+    expect(index.skills).toEqual([])
+  })
+})
