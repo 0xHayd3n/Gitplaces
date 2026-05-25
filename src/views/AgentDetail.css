@@ -781,7 +781,9 @@
   border-bottom: 2px solid transparent;
   color: var(--t3);
   font-size: 12px;
-  padding: 10px 14px;
+  /* Slightly more top padding so the label sits optically centred against
+     the 2px underline at the bottom. */
+  padding: 13px 14px 9px;
   cursor: pointer;
   transition: color 120ms, border-color 120ms;
   font-family: inherit;
