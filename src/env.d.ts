@@ -274,6 +274,12 @@ declare global {
           }>
         }
         recordUse(agentId: string, presetId: string | null): Promise<void>
+        primaryContent(agentId: string): Promise<{
+          id: string
+          filename: string
+          content: string
+          updated_at: string
+        }>
         mcp: {
           getConfigSnippet(): Promise<string>
         }

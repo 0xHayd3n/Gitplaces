@@ -289,6 +289,14 @@ contextBridge.exposeInMainWorld('api', {
     recordUse: (agentId: string, presetId: string | null) =>
       ipcRenderer.invoke('agents:recordUse', agentId, presetId) as Promise<void>,
 
+    primaryContent: (agentId: string) =>
+      ipcRenderer.invoke('agents:primaryContent', agentId) as Promise<{
+        id: string
+        filename: string
+        content: string
+        updated_at: string
+      }>,
+
     mcp: {
       getConfigSnippet: () => ipcRenderer.invoke('agents:mcp:getConfigSnippet') as Promise<string>,
     },

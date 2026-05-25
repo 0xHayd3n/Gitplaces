@@ -15,6 +15,7 @@ import {
   recordUse,
   listFiles, createFile, updateFile, deleteFile,
   setSyncedAt,
+  getPrimaryFile,
   type CreateAgentInput, type UpdateAgentPatch, type UpdateFolderPatch,
   type CreateFileInput, type UpdateFilePatch,
 } from '../services/agentsService'
@@ -119,7 +120,8 @@ async function runSyncAndPersist(
   forceOverwrite: boolean | undefined,
 ): Promise<{ row: AgentRow; syncWarning?: string }> {
   const db = getDb(app.getPath('userData'))
-  const result = await syncAgentToDisk(row, { oldHandle, forceOverwrite })
+  const primary = getPrimaryFile(db, row.id)
+  const result = await syncAgentToDisk(row, primary.content, { oldHandle, forceOverwrite })
   const ts = result.subagent.status === 'written' || result.slashCommand.status === 'written'
     ? new Date().toISOString()
     : ''
@@ -384,7 +386,8 @@ export function registerAgentHandlers(): void {
     const db = getDb(app.getPath('userData'))
     const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as AgentRow | undefined
     if (!row) throw new Error(`Unknown agent id: ${agentId}`)
-    const result = await syncAgentToDisk(row)
+    const primary = getPrimaryFile(db, agentId)
+    const result = await syncAgentToDisk(row, primary.content)
     persistSyncResult(db, agentId, result, new Date().toISOString())
     broadcastChanged()
     return result
@@ -394,9 +397,15 @@ export function registerAgentHandlers(): void {
     const db = getDb(app.getPath('userData'))
     const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as AgentRow | undefined
     if (!row) throw new Error(`Unknown agent id: ${agentId}`)
+    const primary = getPrimaryFile(db, agentId)
     return {
-      subagent: row.is_subagent === 1 ? previewSubagentFile(row) : null,
-      slashCommand: row.is_slash_command === 1 ? previewSlashCommandFile(row) : null,
+      subagent: row.is_subagent === 1 ? previewSubagentFile(row, primary.content) : null,
+      slashCommand: row.is_slash_command === 1 ? previewSlashCommandFile(row, primary.content) : null,
     }
+  })
+
+  ipcMain.handle('agents:primaryContent', async (_, agentId: string) => {
+    const db = getDb(app.getPath('userData'))
+    return getPrimaryFile(db, agentId)
   })
 }
