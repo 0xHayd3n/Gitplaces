@@ -3,6 +3,7 @@ import { spawn, execFile } from 'child_process'
 import { existsSync } from 'fs'
 import * as path from 'path'
 import { stripAnsi, detectManualFallback } from './login-helpers'
+import { createLLMService } from '../llm'
 
 export interface SkillGenInput {
   owner: string
@@ -809,26 +810,26 @@ export async function generateComponentsSkillViaLocalCLI(input: SkillGenInput): 
 
 // ── Anthropic API key fallback ────────────────────────────────────
 
-export async function generateSkill(input: SkillGenInput, apiKey: string): Promise<string> {
-  const client = new Anthropic({ apiKey })
-
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 2048,
-    messages: [{ role: 'user', content: buildPrompt(input) }],
-  })
-
-  const raw = response.content[0].type === 'text' ? response.content[0].text : ''
-  return stripHallucinatedUrls(raw, input.readme)
+export async function generateSkill(input: SkillGenInput): Promise<string> {
+  const llm = createLLMService()
+  const result = await llm.generateText(
+    { provider: 'anthropic', model: 'claude-haiku-4-5' },
+    {
+      messages: [{ role: 'user', content: buildPrompt(input) }],
+      maxTokens: 2048,
+    },
+  )
+  return stripHallucinatedUrls(result.text, input.readme)
 }
 
-export async function generateComponentsSkill(input: SkillGenInput, apiKey: string): Promise<string> {
-  const client = new Anthropic({ apiKey })
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5',
-    max_tokens: 4096,
-    messages: [{ role: 'user', content: buildComponentsPrompt(input) }],
-  })
-  const raw = response.content[0].type === 'text' ? response.content[0].text : ''
-  return stripHallucinatedUrls(raw, input.readme)
+export async function generateComponentsSkill(input: SkillGenInput): Promise<string> {
+  const llm = createLLMService()
+  const result = await llm.generateText(
+    { provider: 'anthropic', model: 'claude-haiku-4-5' },
+    {
+      messages: [{ role: 'user', content: buildComponentsPrompt(input) }],
+      maxTokens: 4096,
+    },
+  )
+  return stripHallucinatedUrls(result.text, input.readme)
 }

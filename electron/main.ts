@@ -1387,7 +1387,7 @@ ipcMain.handle('skill:generate', async (event, owner: string, name: string, opti
               : 'Claude Code unavailable and no API key set. Run `claude login` in a terminal or add an API key in Settings.'
           )
         }
-        content = await generateSkill(skillInput, apiKey)
+        content = await generateSkill(skillInput)
       }
     } else {
       const rt = resolveAnatomyRuntime({
@@ -1462,7 +1462,7 @@ ipcMain.handle('skill:generate', async (event, owner: string, name: string, opti
         componentsContent = await generateComponentsSkillViaLocalCLI(skillInput)
       } catch {
         if (apiKey) {
-          try { componentsContent = await generateComponentsSkill(skillInput, apiKey) } catch (e) {
+          try { componentsContent = await generateComponentsSkill(skillInput) } catch (e) {
             console.error('[skill-gen] Components API fallback error:', e)
           }
         }
