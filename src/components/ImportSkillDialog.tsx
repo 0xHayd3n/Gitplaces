@@ -45,6 +45,7 @@ export default function ImportSkillDialog({ open, onClose }: Props) {
   const handleImport = async () => {
     if (!expanded) return
     setBusy(true)
+    const failures: { name: string; error: string }[] = []
     try {
       const { folders } = await window.api.agents.getAll()
       let folder: AgentFolderRow | undefined = folders.find((f: AgentFolderRow) => f.name === expanded.name)
@@ -53,9 +54,19 @@ export default function ImportSkillDialog({ open, onClose }: Props) {
 
       for (const skill of expanded.skills) {
         if (!selected.has(skill.path)) continue
-        const parsed = await window.api.agents.import.readSkillFromDisk(skill.path)
-        parsed.origin = { plugin: expanded.name, pluginVersion: expanded.version, path: skill.path }
-        await window.api.agents.import.importSkill(parsed, { folderId, onConflict: 'rename' })
+        try {
+          const parsed = await window.api.agents.import.readSkillFromDisk(skill.path)
+          parsed.origin = { plugin: expanded.name, pluginVersion: expanded.version, path: skill.path }
+          await window.api.agents.import.importSkill(parsed, { folderId, onConflict: 'rename' })
+        } catch (err) {
+          // Isolate failures so one bad skill doesn't abort the whole batch.
+          failures.push({ name: skill.name, error: (err as Error).message })
+        }
+      }
+      if (failures.length > 0) {
+        const msg = `Imported with ${failures.length} failure${failures.length === 1 ? '' : 's'}:\n\n`
+          + failures.map(f => `· ${f.name}: ${f.error}`).join('\n')
+        window.alert(msg)
       }
       onClose()
     } finally {

@@ -72,13 +72,21 @@ async function walkRecursive(
   for (const entry of entries) {
     if (IGNORE_NAMES.has(entry.name)) continue
     if (IGNORE_SUFFIXES.some(s => entry.name.endsWith(s))) continue
+    // Skip symlinks entirely — they can cycle, and a symlink-to-directory
+    // throws EISDIR when read as a file.
+    if (entry.isSymbolicLink()) continue
     const abs = path.join(current, entry.name)
     if (entry.isDirectory()) {
       await walkRecursive(root, abs, out)
     } else if (entry.isFile()) {
       const rel = path.relative(root, abs).split(path.sep).join('/')
       if (rel === 'SKILL.md') continue
-      const content = await fs.readFile(abs, 'utf-8')
+      // NOTE: we decode as UTF-8 unconditionally. Skills are conventionally
+      // text — markdown, shell, JS, Python. A genuinely binary file in a skill
+      // directory will be silently corrupted by this decode, which we accept
+      // as a v1 limitation given how unusual that would be in practice.
+      const content = await fs.readFile(abs, 'utf-8').catch(() => null)
+      if (content === null) continue   // unreadable file (permissions, etc.) — skip
       out.push({ filename: rel, content })
     }
   }
@@ -214,27 +222,32 @@ export function importSkill(
       return { agentId: existing.id, conflictResolved: 'skipped' }
     }
     if (opts.onConflict === 'overwrite') {
-      updateAgent(db, existing.id, {
-        name: skill.name,
-        body: skill.body,
-        description: skill.description,
+      // Wrap the whole overwrite in a transaction so we never leave the agent
+      // in a half-imported state (body updated but files not yet replaced).
+      const tx = db.transaction(() => {
+        updateAgent(db, existing.id, {
+          name: skill.name,
+          body: skill.body,
+          description: skill.description,
+        })
+        const ts = new Date().toISOString()
+        db.prepare(`
+          UPDATE agents SET origin_plugin = ?, origin_path = ?, origin_version = ?, origin_imported_at = ?
+          WHERE id = ?
+        `).run(
+          skill.origin?.plugin ?? null,
+          skill.origin?.path ?? null,
+          skill.origin?.pluginVersion ?? null,
+          ts,
+          existing.id,
+        )
+        const oldFiles = listFiles(db, existing.id)
+        for (const f of oldFiles) deleteFile(db, existing.id, f.id)
+        skill.files.forEach((f, i) => {
+          createFile(db, existing.id, { filename: f.filename, content: f.content, sortOrder: i })
+        })
       })
-      const ts = new Date().toISOString()
-      db.prepare(`
-        UPDATE agents SET origin_plugin = ?, origin_path = ?, origin_version = ?, origin_imported_at = ?
-        WHERE id = ?
-      `).run(
-        skill.origin?.plugin ?? null,
-        skill.origin?.path ?? null,
-        skill.origin?.pluginVersion ?? null,
-        ts,
-        existing.id,
-      )
-      const oldFiles = listFiles(db, existing.id)
-      for (const f of oldFiles) deleteFile(db, existing.id, f.id)
-      skill.files.forEach((f, i) => {
-        createFile(db, existing.id, { filename: f.filename, content: f.content, sortOrder: i })
-      })
+      tx()
       return { agentId: existing.id, conflictResolved: 'overwritten' }
     }
     // rename
@@ -252,29 +265,37 @@ function createFromScratch(
   resolution: 'created' | 'renamed',
 ): ImportResult {
   const colorStart = hashHandleToColor(skill.handle)
-  const agent = createAgent(db, {
-    name: skill.name,
-    body: skill.body,
-    folderId: opts.folderId,
-    handle: skill.handle,
-    colorStart,
-    colorEnd: null,
-    emoji: null,
-    description: skill.description,
+  let agentId = ''
+  // Transaction: agent insert, origin metadata, and file inserts must land
+  // together — a crash mid-import would otherwise create an agent with no
+  // files, which the user has to manually delete and re-import.
+  const tx = db.transaction(() => {
+    const agent = createAgent(db, {
+      name: skill.name,
+      body: skill.body,
+      folderId: opts.folderId,
+      handle: skill.handle,
+      colorStart,
+      colorEnd: null,
+      emoji: null,
+      description: skill.description,
+    })
+    agentId = agent.id
+    const ts = new Date().toISOString()
+    db.prepare(`
+      UPDATE agents SET origin_plugin = ?, origin_path = ?, origin_version = ?, origin_imported_at = ?
+      WHERE id = ?
+    `).run(
+      skill.origin?.plugin ?? null,
+      skill.origin?.path ?? null,
+      skill.origin?.pluginVersion ?? null,
+      ts,
+      agent.id,
+    )
+    skill.files.forEach((f, i) => {
+      createFile(db, agent.id, { filename: f.filename, content: f.content, sortOrder: i })
+    })
   })
-  const ts = new Date().toISOString()
-  db.prepare(`
-    UPDATE agents SET origin_plugin = ?, origin_path = ?, origin_version = ?, origin_imported_at = ?
-    WHERE id = ?
-  `).run(
-    skill.origin?.plugin ?? null,
-    skill.origin?.path ?? null,
-    skill.origin?.pluginVersion ?? null,
-    ts,
-    agent.id,
-  )
-  skill.files.forEach((f, i) => {
-    createFile(db, agent.id, { filename: f.filename, content: f.content, sortOrder: i })
-  })
-  return { agentId: agent.id, conflictResolved: resolution }
+  tx()
+  return { agentId, conflictResolved: resolution }
 }

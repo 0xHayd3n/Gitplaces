@@ -155,7 +155,12 @@ export default function AgentDetail() {
   }, [agent, folders])
 
   const liveBody = bodyDraft
-  const description = useMemo(() => deriveDescription(liveBody), [liveBody])
+  // Prefer the explicit description field; fall back to deriving from the body
+  // (for hand-authored agents that never set an explicit description).
+  const description = useMemo(
+    () => agent?.description || deriveDescription(liveBody),
+    [agent?.description, liveBody],
+  )
   const bodyChars = liveBody.length
 
   const variables = useMemo(() => detectVariables(liveBody), [liveBody])
