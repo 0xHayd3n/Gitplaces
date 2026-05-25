@@ -81,6 +81,10 @@ describe('parseModelRef', () => {
   it('rejects empty model segment', () => {
     expect(() => parseModelRef('openai/')).toThrow(/model.*empty/i)
   })
+
+  it('rejects endpoint id containing a colon (URL accidentally used as id)', () => {
+    expect(() => parseModelRef('openai-compatible:http://localhost:11434/llama3.1:70b')).toThrow(/endpoint id.*colon/i)
+  })
 })
 
 describe('formatModelRef', () => {
