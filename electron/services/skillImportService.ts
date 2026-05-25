@@ -1,7 +1,10 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import matter from 'gray-matter'
-import { slugifyName } from '../../src/utils/agentSlug'
+import type Database from 'better-sqlite3'
+import { slugifyName, dedupeHandle } from '../../src/utils/agentSlug'
+import { createAgent, updateAgent, createFile, deleteFile, listFiles } from './agentsService'
+import { hashHandleToColor } from '../../src/utils/colorHarmony'
 
 export interface ParsedSkill {
   name: string
@@ -184,4 +187,94 @@ function simpleHash(s: string): string {
     h |= 0
   }
   return Math.abs(h).toString(36)
+}
+
+// ── Import ──────────────────────────────────────────────────────────
+
+export interface ImportOptions {
+  folderId: string | null
+  onConflict: 'overwrite' | 'skip' | 'rename'
+}
+
+export interface ImportResult {
+  agentId: string
+  conflictResolved: 'created' | 'overwritten' | 'skipped' | 'renamed'
+}
+
+export function importSkill(
+  db: Database.Database,
+  skill: ParsedSkill,
+  opts: ImportOptions,
+): ImportResult {
+  const taken = (db.prepare(`SELECT handle FROM agents`).all() as { handle: string }[]).map(r => r.handle)
+  const existing = db.prepare(`SELECT id FROM agents WHERE handle = ?`).get(skill.handle) as { id: string } | undefined
+
+  if (existing) {
+    if (opts.onConflict === 'skip') {
+      return { agentId: existing.id, conflictResolved: 'skipped' }
+    }
+    if (opts.onConflict === 'overwrite') {
+      updateAgent(db, existing.id, {
+        name: skill.name,
+        body: skill.body,
+        description: skill.description,
+      })
+      const ts = new Date().toISOString()
+      db.prepare(`
+        UPDATE agents SET origin_plugin = ?, origin_path = ?, origin_version = ?, origin_imported_at = ?
+        WHERE id = ?
+      `).run(
+        skill.origin?.plugin ?? null,
+        skill.origin?.path ?? null,
+        skill.origin?.pluginVersion ?? null,
+        ts,
+        existing.id,
+      )
+      const oldFiles = listFiles(db, existing.id)
+      for (const f of oldFiles) deleteFile(db, existing.id, f.id)
+      skill.files.forEach((f, i) => {
+        createFile(db, existing.id, { filename: f.filename, content: f.content, sortOrder: i })
+      })
+      return { agentId: existing.id, conflictResolved: 'overwritten' }
+    }
+    // rename
+    const newHandle = dedupeHandle(skill.handle, taken)
+    return createFromScratch(db, { ...skill, handle: newHandle }, opts, 'renamed')
+  }
+
+  return createFromScratch(db, skill, opts, 'created')
+}
+
+function createFromScratch(
+  db: Database.Database,
+  skill: ParsedSkill,
+  opts: ImportOptions,
+  resolution: 'created' | 'renamed',
+): ImportResult {
+  const colorStart = hashHandleToColor(skill.handle)
+  const agent = createAgent(db, {
+    name: skill.name,
+    body: skill.body,
+    folderId: opts.folderId,
+    handle: skill.handle,
+    colorStart,
+    colorEnd: null,
+    emoji: null,
+    description: skill.description,
+  })
+  const ts = new Date().toISOString()
+  db.prepare(`
+    UPDATE agents SET origin_plugin = ?, origin_path = ?, origin_version = ?, origin_imported_at = ?
+    WHERE id = ?
+  `).run(
+    skill.origin?.plugin ?? null,
+    skill.origin?.path ?? null,
+    skill.origin?.pluginVersion ?? null,
+    ts,
+    agent.id,
+  )
+  skill.files.forEach((f, i) => {
+    createFile(db, agent.id, { filename: f.filename, content: f.content, sortOrder: i })
+  })
+  return { agentId: agent.id, conflictResolved: resolution }
 }
