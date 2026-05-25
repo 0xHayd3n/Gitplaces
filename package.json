@@ -19,9 +19,11 @@
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.87",
     "@anthropic-ai/sdk": "^0.80.0",
+    "@ai-sdk/anthropic": "^1.0.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.1.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "ai": "^4.0.0",
     "better-sqlite3": "^12.9.0",
     "electron-store": "^8.2.0",
     "epub-gen-memory": "^1.1.2",
