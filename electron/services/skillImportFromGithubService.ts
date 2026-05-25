@@ -3,7 +3,7 @@ import { getRepo, getBranch, getTreeBySha, getRawFileBytes } from '../github'
 import { getToken } from '../store'
 import { slugifyName } from '../../src/utils/agentSlug'
 import type { DiscoveredSkill, ParsedSkill } from './skillImportService'
-import { parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint } from './skillImportService'
+import { parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint } from './frontmatterFields'
 
 export class RepoNotAccessibleError extends Error {
   constructor(public readonly owner: string, public readonly repoName: string) {
