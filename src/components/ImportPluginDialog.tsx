@@ -26,9 +26,12 @@ function KindBadge({ kind }: { kind: ImportKind }) {
 interface Props {
   open: boolean
   onClose: () => void
+  /** Pre-fill the GitHub URL pane and trigger fetch on open. Used by the
+   * "Import to agent library…" shortcut from a Discover-side repo detail page. */
+  initialRepoUrl?: string
 }
 
-export default function ImportPluginDialog({ open, onClose }: Props) {
+export default function ImportPluginDialog({ open, onClose, initialRepoUrl }: Props) {
   const [plugins, setPlugins] = useState<DiscoveredPlugin[] | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<SelectionKey>>(new Set())
@@ -124,12 +127,12 @@ export default function ImportPluginDialog({ open, onClose }: Props) {
     }
   }
 
-  const handleFetchRepo = async () => {
-    if (!repoUrlValid) return
+  const fetchRepo = async (url: string) => {
+    if (!parseGithubRepoUrl(url)) return
     setRepoFetching(true)
     setRepoFetchError(null)
     try {
-      const index = await window.api.agents.import.discoverPluginInRepo(repoUrl)
+      const index = await window.api.agents.import.discoverPluginInRepo(url)
       setRepoIndex(index)
       const all = new Set<SelectionKey>()
       index.skills.forEach(s        => all.add(keyOf('skill',        s.path)))
@@ -142,6 +145,20 @@ export default function ImportPluginDialog({ open, onClose }: Props) {
       setRepoFetching(false)
     }
   }
+
+  const handleFetchRepo = () => fetchRepo(repoUrl)
+
+  // When opened with a pre-filled URL (e.g. from the Discover-side repo
+  // detail's "Import to agent library…" menu item), populate the input and
+  // kick off the fetch automatically.
+  useEffect(() => {
+    if (!open || !initialRepoUrl) return
+    setRepoUrl(initialRepoUrl)
+    void fetchRepo(initialRepoUrl)
+    // fetchRepo is recreated each render but the dependency list only triggers
+    // on open / initialRepoUrl change, which is the intended behavior.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialRepoUrl])
 
   const handleClearRepo = () => {
     setRepoIndex(null)

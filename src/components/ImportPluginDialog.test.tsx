@@ -261,3 +261,26 @@ describe('ImportPluginDialog — mixed kinds', () => {
     expect(screen.getByText(/~\/\.claude\/commands/)).toBeTruthy()
   })
 })
+
+describe('ImportPluginDialog — initialRepoUrl prefill', () => {
+  it('auto-fills the GitHub input and triggers discoverPluginInRepo on open', async () => {
+    render(<ImportPluginDialog open onClose={() => {}} initialRepoUrl="obra/superpowers" />)
+    await waitFor(() => expect(window.api.agents.import.discoverPluginInRepo).toHaveBeenCalledWith('obra/superpowers'))
+    // The input should reflect the pre-filled URL.
+    const input = screen.getByPlaceholderText(/owner\/repo/i) as HTMLInputElement
+    expect(input.value).toBe('obra/superpowers')
+  })
+
+  it('does not auto-fetch when initialRepoUrl is omitted', async () => {
+    render(<ImportPluginDialog open onClose={() => {}} />)
+    await waitFor(() => screen.getByText('superpowers'))
+    expect(window.api.agents.import.discoverPluginInRepo).not.toHaveBeenCalled()
+  })
+
+  it('does not auto-fetch while closed', async () => {
+    render(<ImportPluginDialog open={false} onClose={() => {}} initialRepoUrl="obra/superpowers" />)
+    // Give effects a tick to run if they were going to.
+    await new Promise(r => setTimeout(r, 10))
+    expect(window.api.agents.import.discoverPluginInRepo).not.toHaveBeenCalled()
+  })
+})
