@@ -4,7 +4,7 @@ import { getRepo, getBranch, getTreeBySha, getRawFileBytes } from '../github'
 import { getToken } from '../store'
 import { slugifyName } from '../../src/utils/agentSlug'
 import type { DiscoveredSkill, ParsedSkill, ParsedImportTarget, ParsedSubagent, ParsedSlashCommand } from './pluginImportService'
-import { parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint } from './frontmatterFields'
+import { parseModelFrontmatter, parseAgentModel, parseToolsFrontmatter, parseArgumentHint } from './frontmatterFields'
 
 export class RepoNotAccessibleError extends Error {
   constructor(public readonly owner: string, public readonly repoName: string) {
@@ -403,7 +403,7 @@ export async function readTargetFromRepo(
   if (kind === 'subagent') {
     const targetName = typeof data.name === 'string' && data.name.length > 0 ? data.name : filenameStem
     const description = typeof data.description === 'string' ? data.description : ''
-    const model = parseModelFrontmatter(data.model)
+    const model = parseAgentModel(data.model).model
     const tools = parseToolsFrontmatter(data.tools)
     const color = typeof data.color === 'string' ? data.color : null
     const sub: ParsedSubagent = {

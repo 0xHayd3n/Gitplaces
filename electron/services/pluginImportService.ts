@@ -9,12 +9,13 @@ import { COLOR_MAP } from '../../src/utils/anthropicColors'
 export { COLOR_MAP } from '../../src/utils/anthropicColors'
 import {
   parseModelFrontmatter,
+  parseAgentModel,
   parseToolsFrontmatter,
   parseArgumentHint,
   type ImportedModel,
 } from './frontmatterFields'
 
-export { parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint, type ImportedModel }
+export { parseModelFrontmatter, parseAgentModel, parseToolsFrontmatter, parseArgumentHint, type ImportedModel }
 
 export type ImportKind = 'skill' | 'subagent' | 'slashCommand'
 
@@ -25,7 +26,13 @@ export interface ParsedImportTargetBase {
   description: string
   body: string
   origin: { plugin: string; pluginVersion: string | null; path: string } | null
-  model: ImportedModel
+  /**
+   * Raw `model:` string from frontmatter, preserved lossless.
+   * For subagents this may be any provider/model form (Phase 2 widening);
+   * for slash commands and skills it's typically 'inherit'. Downstream
+   * `createAgent` derives the structured ModelRef when persisting.
+   */
+  model: string
   tools: string[] | null
 }
 
@@ -111,7 +118,11 @@ export async function parseSubagent(filePath: string): Promise<ParsedSubagent> {
   const filenameStem = path.basename(filePath, '.md')
   const name = typeof data.name === 'string' && data.name.length > 0 ? data.name : filenameStem
   const description = typeof data.description === 'string' ? data.description : ''
-  const model = parseModelFrontmatter(data.model)
+  // Phase 2: use parseAgentModel to preserve multi-provider model strings
+  // (openai/gpt-4o, openai-compatible:.../..., etc.) verbatim. The legacy
+  // parseModelFrontmatter clamps non-anthropic values to 'inherit' which
+  // would silently strip provider information.
+  const model = parseAgentModel(data.model).model
   const tools = parseToolsFrontmatter(data.tools)
   const color = typeof data.color === 'string' ? data.color : null
 
