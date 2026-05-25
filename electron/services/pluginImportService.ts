@@ -14,18 +14,39 @@ import {
 
 export { parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint, type ImportedModel }
 
-export interface ParsedSkill {
+export type ImportKind = 'skill' | 'subagent' | 'slashCommand'
+
+export interface ParsedImportTargetBase {
+  kind: ImportKind
   name: string
   handle: string
   description: string
   body: string
-  files: { filename: string; content: string }[]
   origin: { plugin: string; pluginVersion: string | null; path: string } | null
-  // Phase 2
   model: ImportedModel
   tools: string[] | null
+}
+
+export interface ParsedSkill extends ParsedImportTargetBase {
+  kind: 'skill'
+  files: { filename: string; content: string }[]
   argumentHint: string | null
 }
+
+export interface ParsedSubagent extends ParsedImportTargetBase {
+  kind: 'subagent'
+  files: never[]
+  argumentHint: null
+  color: string | null
+}
+
+export interface ParsedSlashCommand extends ParsedImportTargetBase {
+  kind: 'slashCommand'
+  files: never[]
+  argumentHint: string | null
+}
+
+export type ParsedImportTarget = ParsedSkill | ParsedSubagent | ParsedSlashCommand
 
 const IGNORE_NAMES = new Set(['.DS_Store', '.git', 'node_modules', '__pycache__'])
 const IGNORE_SUFFIXES = ['.swp']
@@ -65,6 +86,7 @@ export async function parseSkill(inputPath: string): Promise<ParsedSkill> {
   const handle = slugifyName(name)
 
   return {
+    kind: 'skill',
     name,
     handle,
     description,

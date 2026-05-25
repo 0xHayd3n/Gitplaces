@@ -202,6 +202,7 @@ export async function readSkillFromRepo(
   files.sort((a, b) => a.filename.localeCompare(b.filename))
 
   return {
+    kind: 'skill',
     name: skillName,
     handle: slugifyName(skillName),
     description,
