@@ -412,6 +412,41 @@ export function initSchema(db: Database.Database): void {
   // tripping the constraint before backfill runs.
   try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_handle ON agents(handle) WHERE handle <> ''`) } catch {}
 
+  // Phase 26 — Body-as-file: backfill a primary agent_files row per agent.
+  // Placed AFTER the handle-backfill block above so every agent has a valid
+  // handle to name its primary file with. The agents.body column is intentionally
+  // kept for the duration of this branch; Task 9 drops it once every consumer
+  // has switched to reading the primary file. Writers in the meantime dual-write
+  // to keep the column and the primary row in sync. Idempotent on re-run: agents
+  // that already have a <handle>.md file are skipped (and promoted to
+  // sort_order=0 if needed).
+  const agentsForPhase26 = db.prepare(
+    `SELECT id, handle, body, created_at, updated_at FROM agents`
+  ).all() as Array<{
+    id: string; handle: string; body: string; created_at: string; updated_at: string;
+  }>
+  for (const a of agentsForPhase26) {
+    const existing = db.prepare(
+      `SELECT id, sort_order FROM agent_files WHERE agent_id = ? AND filename = ?`
+    ).get(a.id, `${a.handle}.md`) as { id: string; sort_order: number } | undefined
+    if (existing) {
+      if (existing.sort_order !== 0) {
+        db.prepare(`UPDATE agent_files SET sort_order = 1 WHERE agent_id = ? AND sort_order = 0`).run(a.id)
+        db.prepare(`UPDATE agent_files SET sort_order = 0 WHERE id = ?`).run(existing.id)
+      }
+      continue
+    }
+    db.prepare(`UPDATE agent_files SET sort_order = 1 WHERE agent_id = ? AND sort_order = 0`).run(a.id)
+    try {
+      db.prepare(`
+        INSERT INTO agent_files (id, agent_id, filename, content, sort_order, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 0, ?, ?)
+      `).run(`pf-${a.id}`, a.id, `${a.handle}.md`, a.body ?? '', a.created_at, a.updated_at)
+    } catch (err) {
+      console.warn(`[phase 26] skip backfill for agent ${a.id}:`, err)
+    }
+  }
+
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`
     CREATE INDEX IF NOT EXISTS repos_starred_at      ON repos(starred_at);
