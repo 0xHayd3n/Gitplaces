@@ -250,15 +250,19 @@ declare global {
         }
         import: {
           discoverPlugins(): Promise<import('../electron/services/pluginImportService').DiscoveredPlugin[]>
-          readSkillFromDisk(path: string): Promise<import('../electron/services/pluginImportService').ParsedSkill>
-          importSkill(
-            skill: import('../electron/services/pluginImportService').ParsedSkill,
+          readTargetFromDisk(
+            filePath: string,
+            kind: 'skill' | 'subagent' | 'slashCommand',
+          ): Promise<import('../electron/services/pluginImportService').ParsedImportTarget>
+          importTarget(
+            target: import('../electron/services/pluginImportService').ParsedImportTarget,
             opts: { folderId: string | null; onConflict: 'overwrite' | 'skip' | 'rename' },
-          ): Promise<import('../electron/services/pluginImportService').ImportResult>
-          discoverInRepo(url: string): Promise<import('../electron/services/pluginImportFromGithubService').RepoSkillIndex>
-          readSkillFromRepo(
+          ): Promise<import('../electron/services/pluginImportService').ImportResult & { syncWarning?: string }>
+          discoverPluginInRepo(url: string): Promise<import('../electron/services/pluginImportFromGithubService').RepoPluginIndex>
+          readTargetFromRepo(
             owner: string, name: string, branch: string, commitSha: string, repoPath: string,
-          ): Promise<import('../electron/services/pluginImportService').ParsedSkill>
+            kind: 'skill' | 'subagent' | 'slashCommand',
+          ): Promise<import('../electron/services/pluginImportService').ParsedImportTarget>
         }
         sync: {
           checkConflict(agentId: string): Promise<{

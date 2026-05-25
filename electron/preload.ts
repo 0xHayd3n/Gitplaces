@@ -254,19 +254,33 @@ contextBridge.exposeInMainWorld('api', {
     import: {
       discoverPlugins: () =>
         ipcRenderer.invoke('agents:import:discoverPlugins') as Promise<import('../electron/services/pluginImportService').DiscoveredPlugin[]>,
-      readSkillFromDisk: (skillPath: string) =>
-        ipcRenderer.invoke('agents:import:readSkillFromDisk', skillPath) as Promise<import('../electron/services/pluginImportService').ParsedSkill>,
-      importSkill: (
-        skill: import('../electron/services/pluginImportService').ParsedSkill,
+
+      readTargetFromDisk: (
+        filePath: string,
+        kind: 'skill' | 'subagent' | 'slashCommand',
+      ) =>
+        ipcRenderer.invoke('agents:import:readTargetFromDisk', filePath, kind) as Promise<import('../electron/services/pluginImportService').ParsedImportTarget>,
+
+      importTarget: (
+        target: import('../electron/services/pluginImportService').ParsedImportTarget,
         opts: { folderId: string | null; onConflict: 'overwrite' | 'skip' | 'rename' },
       ) =>
-        ipcRenderer.invoke('agents:import:importSkill', skill, opts) as Promise<import('../electron/services/pluginImportService').ImportResult>,
-      discoverInRepo: (url: string) =>
-        ipcRenderer.invoke('agents:import:discoverInRepo', url) as Promise<import('../electron/services/pluginImportFromGithubService').RepoSkillIndex>,
-      readSkillFromRepo: (
-        owner: string, name: string, branch: string, commitSha: string, repoPath: string,
+        ipcRenderer.invoke('agents:import:importTarget', target, opts) as Promise<
+          import('../electron/services/pluginImportService').ImportResult & { syncWarning?: string }
+        >,
+
+      discoverPluginInRepo: (url: string) =>
+        ipcRenderer.invoke('agents:import:discoverPluginInRepo', url) as Promise<import('../electron/services/pluginImportFromGithubService').RepoPluginIndex>,
+
+      readTargetFromRepo: (
+        owner: string,
+        name: string,
+        branch: string,
+        commitSha: string,
+        repoPath: string,
+        kind: 'skill' | 'subagent' | 'slashCommand',
       ) =>
-        ipcRenderer.invoke('agents:import:readSkillFromRepo', owner, name, branch, commitSha, repoPath) as Promise<import('../electron/services/pluginImportService').ParsedSkill>,
+        ipcRenderer.invoke('agents:import:readTargetFromRepo', owner, name, branch, commitSha, repoPath, kind) as Promise<import('../electron/services/pluginImportService').ParsedImportTarget>,
     },
 
     sync: {

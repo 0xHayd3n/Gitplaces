@@ -10,29 +10,32 @@ beforeEach(() => {
       createFolder: vi.fn().mockResolvedValue({ id: 'newFolder', name: 'superpowers', color_start: null, color_end: null, description: null, emoji: null, created_at: 't' }),
       import: {
         discoverPlugins: vi.fn().mockResolvedValue([
-          { id: 'p1', name: 'superpowers', version: '5.1.0', root: '/p1', skills: [
+          { id: 'p1', name: 'superpowers', version: '5.1.0', root: '/p1', subagents: [], slashCommands: [], skills: [
             { name: 'brainstorming', path: '/p1/skills/brainstorming', description: 'Brainstorm things', fileCount: 4 },
             { name: 'writing-plans', path: '/p1/skills/writing-plans', description: 'Plan things', fileCount: 2 },
           ]},
-          { id: 'p2', name: 'anatomy', version: null, root: '/p2', skills: [
+          { id: 'p2', name: 'anatomy', version: null, root: '/p2', subagents: [], slashCommands: [], skills: [
             { name: 'foo', path: '/p2/skills/foo', description: null, fileCount: 1 },
           ]},
         ]),
-        readSkillFromDisk: vi.fn().mockImplementation(async (p: string) => ({
-          name: p.split('/').pop(), handle: p.split('/').pop(), description: '', body: '', files: [], origin: null,
+        readTargetFromDisk: vi.fn().mockImplementation(async (p: string, _kind: string) => ({
+          kind: 'skill', name: p.split('/').pop(), handle: p.split('/').pop(), description: '', body: '', files: [], origin: null,
         })),
-        importSkill: vi.fn().mockResolvedValue({ agentId: 'new', conflictResolved: 'created' }),
-        discoverInRepo: vi.fn().mockResolvedValue({
+        importTarget: vi.fn().mockResolvedValue({ agentId: 'new', conflictResolved: 'created' }),
+        discoverPluginInRepo: vi.fn().mockResolvedValue({
           owner: 'obra', name: 'superpowers', branch: 'main', commitSha: 'a1b2c3d4567',
-          layout: 'skills-dir',
+          layout: 'plugin',
+          subagents: [],
+          slashCommands: [],
           skills: [
             { name: 'brainstorming', path: 'skills/brainstorming', description: 'Brainstorm', fileCount: 3 },
             { name: 'plan-writing',  path: 'skills/plan-writing',  description: 'Plan',       fileCount: 2 },
           ],
         }),
-        readSkillFromRepo: vi.fn().mockImplementation(async (
-          owner: string, name: string, _branch: string, sha: string, repoPath: string,
+        readTargetFromRepo: vi.fn().mockImplementation(async (
+          owner: string, name: string, _branch: string, sha: string, repoPath: string, _kind: string,
         ) => ({
+          kind: 'skill',
           name: repoPath.split('/').pop(),
           handle: repoPath.split('/').pop(),
           description: '',
@@ -64,12 +67,12 @@ describe('ImportSkillDialog', () => {
     expect(screen.getByText('writing-plans')).toBeTruthy()
   })
 
-  it('importing a plugin reads each selected skill and calls importSkill', async () => {
+  it('importing a plugin reads each selected skill and calls importTarget', async () => {
     render(<ImportSkillDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.click(screen.getByRole('button', { name: /superpowers/i }))
     fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
-    await waitFor(() => expect(window.api.agents.import.importSkill).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(window.api.agents.import.importTarget).toHaveBeenCalledTimes(2))
   })
 
   it('creates a folder named after the plugin when none exists', async () => {
@@ -105,18 +108,18 @@ describe('ImportSkillDialog — GitHub section', () => {
     expect(screen.getByText(/not a valid github url/i)).toBeTruthy()
   })
 
-  it('on Fetch, calls discoverInRepo and renders the skill list', async () => {
+  it('on Fetch, calls discoverPluginInRepo and renders the skill list', async () => {
     render(<ImportSkillDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'obra/superpowers' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
-    await waitFor(() => expect(window.api.agents.import.discoverInRepo).toHaveBeenCalledWith('obra/superpowers'))
+    await waitFor(() => expect(window.api.agents.import.discoverPluginInRepo).toHaveBeenCalledWith('obra/superpowers'))
     await waitFor(() => screen.getByText('plan-writing'))
     expect(screen.getByText('brainstorming')).toBeTruthy()
   })
 
-  it('shows "No skills found" when discoverInRepo returns empty skills', async () => {
-    ;(window.api.agents.import.discoverInRepo as any) = vi.fn().mockResolvedValue({
+  it('shows "No skills found" when discoverPluginInRepo returns empty skills', async () => {
+    ;(window.api.agents.import.discoverPluginInRepo as any) = vi.fn().mockResolvedValue({
       owner: 'o', name: 'r', branch: 'main', commitSha: 'sha', layout: 'skills-dir', skills: [],
     })
     render(<ImportSkillDialog open onClose={() => {}} />)
@@ -126,8 +129,8 @@ describe('ImportSkillDialog — GitHub section', () => {
     await waitFor(() => screen.getByText(/no skills found/i))
   })
 
-  it('shows an error message when discoverInRepo rejects', async () => {
-    ;(window.api.agents.import.discoverInRepo as any) = vi.fn().mockRejectedValue(new Error("Couldn't load priv/repo"))
+  it('shows an error message when discoverPluginInRepo rejects', async () => {
+    ;(window.api.agents.import.discoverPluginInRepo as any) = vi.fn().mockRejectedValue(new Error("Couldn't load priv/repo"))
     render(<ImportSkillDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'priv/repo' } })
@@ -135,15 +138,15 @@ describe('ImportSkillDialog — GitHub section', () => {
     await waitFor(() => screen.getByText(/couldn't load/i))
   })
 
-  it('Import calls readSkillFromRepo + importSkill for each selected skill', async () => {
+  it('Import calls readTargetFromRepo + importTarget for each selected skill', async () => {
     render(<ImportSkillDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'obra/superpowers' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
     await waitFor(() => screen.getByText('plan-writing'))
     fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
-    await waitFor(() => expect(window.api.agents.import.readSkillFromRepo).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(window.api.agents.import.importSkill).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(window.api.agents.import.readTargetFromRepo).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(window.api.agents.import.importTarget).toHaveBeenCalledTimes(2))
   })
 
   it('creates a folder named after the repo on import', async () => {
@@ -157,10 +160,10 @@ describe('ImportSkillDialog — GitHub section', () => {
   })
 
   it('isolates per-skill failures and surfaces them in the end-of-batch alert', async () => {
-    // First skill's readSkillFromRepo throws; second succeeds. The batch must
-    // continue, call importSkill for the second, and surface the failure via
+    // First skill's readTargetFromRepo throws; second succeeds. The batch must
+    // continue, call importTarget for the second, and surface the failure via
     // window.alert without aborting onClose.
-    ;(window.api.agents.import.readSkillFromRepo as any) = vi.fn()
+    ;(window.api.agents.import.readTargetFromRepo as any) = vi.fn()
       .mockRejectedValueOnce(new Error('boom for skill 1'))
       .mockResolvedValueOnce({
         name: 'plan-writing', handle: 'plan-writing', description: '', body: '', files: [],
@@ -176,11 +179,11 @@ describe('ImportSkillDialog — GitHub section', () => {
     await waitFor(() => screen.getByText('plan-writing'))
     fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
 
-    // Both readSkillFromRepo calls happen (one throws, one resolves) — failure
+    // Both readTargetFromRepo calls happen (one throws, one resolves) — failure
     // is isolated to the first skill.
-    await waitFor(() => expect(window.api.agents.import.readSkillFromRepo).toHaveBeenCalledTimes(2))
-    // Only the successful skill makes it to importSkill.
-    await waitFor(() => expect(window.api.agents.import.importSkill).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(window.api.agents.import.readTargetFromRepo).toHaveBeenCalledTimes(2))
+    // Only the successful skill makes it to importTarget.
+    await waitFor(() => expect(window.api.agents.import.importTarget).toHaveBeenCalledTimes(1))
     // Failure surfaced in alert with the failed skill's name + error message.
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledTimes(1)

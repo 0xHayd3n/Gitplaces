@@ -3,8 +3,12 @@ import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs/promises'
 import { getDb } from '../db'
-import { discoverPlugins, parseSkill, importSkill, type ParsedSkill, type ImportOptions } from '../services/pluginImportService'
-import { discoverSkillsInRepo, readSkillFromRepo } from '../services/pluginImportFromGithubService'
+import {
+  discoverPlugins, parseSkill, parseSubagent, parseSlashCommand,
+  importTarget,
+  type ParsedImportTarget, type ImportOptions,
+} from '../services/pluginImportService'
+import { discoverPluginInRepo, readTargetFromRepo } from '../services/pluginImportFromGithubService'
 import { parseGithubRepoUrl } from '../../src/utils/parseGithubRepoUrl'
 import {
   getAllAgents,
@@ -350,26 +354,52 @@ export function registerAgentHandlers(): void {
     return discoverPlugins(roots)
   })
 
-  ipcMain.handle('agents:import:readSkillFromDisk', async (_, skillPath: string) => {
-    return parseSkill(skillPath)
+  ipcMain.handle('agents:import:readTargetFromDisk', async (
+    _,
+    filePath: string,
+    kind: 'skill' | 'subagent' | 'slashCommand',
+  ) => {
+    if (kind === 'skill') return parseSkill(filePath)
+    if (kind === 'subagent') return parseSubagent(filePath)
+    return parseSlashCommand(filePath)
   })
 
-  ipcMain.handle('agents:import:importSkill', async (_, skill: ParsedSkill, opts: ImportOptions) => {
-    const result = importSkill(getDb(app.getPath('userData')), skill, opts)
+  ipcMain.handle('agents:import:importTarget', async (
+    _,
+    target: ParsedImportTarget,
+    opts: ImportOptions,
+  ) => {
+    const db = getDb(app.getPath('userData'))
+    const result = importTarget(db, target, opts)
+    // Sub-agents and slash commands auto-sync to ~/.claude/agents/ and
+    // ~/.claude/commands/ since they came from those surfaces. Skills stay
+    // in the library only — same behavior as before.
+    let syncWarning: string | undefined
+    if (target.kind !== 'skill' && result.conflictResolved !== 'skipped') {
+      const row = db.prepare('SELECT * FROM agents WHERE id = ?').get(result.agentId) as AgentRow
+      const synced = await runSyncAndPersist(row, undefined, /* forceOverwrite */ false)
+      syncWarning = synced.syncWarning
+    }
     broadcastChanged()
-    return result
+    return syncWarning ? { ...result, syncWarning } : result
   })
 
-  ipcMain.handle('agents:import:discoverInRepo', async (_, url: string) => {
+  ipcMain.handle('agents:import:discoverPluginInRepo', async (_, url: string) => {
     const parsed = parseGithubRepoUrl(url)
     if (!parsed) throw new Error('Not a valid GitHub URL')
-    return discoverSkillsInRepo(parsed.owner, parsed.name)
+    return discoverPluginInRepo(parsed.owner, parsed.name)
   })
 
-  ipcMain.handle('agents:import:readSkillFromRepo', async (
-    _, owner: string, name: string, branch: string, commitSha: string, repoPath: string,
+  ipcMain.handle('agents:import:readTargetFromRepo', async (
+    _,
+    owner: string,
+    name: string,
+    branch: string,
+    commitSha: string,
+    repoPath: string,
+    kind: 'skill' | 'subagent' | 'slashCommand',
   ) => {
-    return readSkillFromRepo(owner, name, branch, commitSha, repoPath)
+    return readTargetFromRepo(owner, name, branch, commitSha, repoPath, kind)
   })
 
   ipcMain.handle('agents:mcp:getConfigSnippet', async () => {

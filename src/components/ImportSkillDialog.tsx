@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { DiscoveredPlugin } from '../../electron/services/pluginImportService'
-import type { RepoSkillIndex } from '../../electron/services/pluginImportFromGithubService'
+import type { RepoPluginIndex } from '../../electron/services/pluginImportFromGithubService'
 import type { AgentFolderRow } from '../types/agent'
 import { parseGithubRepoUrl } from '../utils/parseGithubRepoUrl'
 
@@ -16,7 +16,7 @@ export default function ImportSkillDialog({ open, onClose }: Props) {
   const [busy, setBusy] = useState(false)
 
   const [repoUrl, setRepoUrl] = useState('')
-  const [repoIndex, setRepoIndex] = useState<RepoSkillIndex | null>(null)
+  const [repoIndex, setRepoIndex] = useState<RepoPluginIndex | null>(null)
   const [repoFetching, setRepoFetching] = useState(false)
   const [repoFetchError, setRepoFetchError] = useState<string | null>(null)
   const [repoSelected, setRepoSelected] = useState<Set<string>>(new Set())
@@ -67,9 +67,9 @@ export default function ImportSkillDialog({ open, onClose }: Props) {
       for (const skill of expanded.skills) {
         if (!selected.has(skill.path)) continue
         try {
-          const parsed = await window.api.agents.import.readSkillFromDisk(skill.path)
+          const parsed = await window.api.agents.import.readTargetFromDisk(skill.path, 'skill')
           parsed.origin = { plugin: expanded.name, pluginVersion: expanded.version, path: skill.path }
-          await window.api.agents.import.importSkill(parsed, { folderId, onConflict: 'rename' })
+          await window.api.agents.import.importTarget(parsed, { folderId, onConflict: 'rename' })
         } catch (err) {
           // Isolate failures so one bad skill doesn't abort the whole batch.
           failures.push({ name: skill.name, error: (err as Error).message })
@@ -91,7 +91,7 @@ export default function ImportSkillDialog({ open, onClose }: Props) {
     setRepoFetching(true)
     setRepoFetchError(null)
     try {
-      const index = await window.api.agents.import.discoverInRepo(repoUrl)
+      const index = await window.api.agents.import.discoverPluginInRepo(repoUrl)
       setRepoIndex(index)
       setRepoSelected(new Set(index.skills.map(s => s.path)))
     } catch (err) {
@@ -129,10 +129,10 @@ export default function ImportSkillDialog({ open, onClose }: Props) {
       for (const skill of repoIndex.skills) {
         if (!repoSelected.has(skill.path)) continue
         try {
-          const parsed = await window.api.agents.import.readSkillFromRepo(
-            repoIndex.owner, repoIndex.name, repoIndex.branch, repoIndex.commitSha, skill.path,
+          const parsed = await window.api.agents.import.readTargetFromRepo(
+            repoIndex.owner, repoIndex.name, repoIndex.branch, repoIndex.commitSha, skill.path, 'skill',
           )
-          await window.api.agents.import.importSkill(parsed, { folderId, onConflict: 'rename' })
+          await window.api.agents.import.importTarget(parsed, { folderId, onConflict: 'rename' })
         } catch (err) {
           failures.push({ name: skill.name, error: (err as Error).message })
         }
