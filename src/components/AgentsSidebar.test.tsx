@@ -14,17 +14,20 @@ const agents: AgentRow[] = [
     folder_id: 'f1',
     color_start: '#10b981', color_end: '#34d399', emoji: '✏️',
     pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
-    created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z' },
+    created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z',
+    description: '', origin_plugin: null, origin_path: null, origin_version: null, origin_imported_at: null },
   { id: 'a2', name: 'Lit reviewer',  handle: 'lit-reviewer',  body: '# Lit reviewer\nbody',
     folder_id: 'f2',
     color_start: '#6366f1', color_end: null, emoji: null,
     pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
-    created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z' },
+    created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z',
+    description: '', origin_plugin: null, origin_path: null, origin_version: null, origin_imported_at: null },
   { id: 'a3', name: 'Untagged note', handle: 'untagged-note', body: '# Untagged\nbody',
     folder_id: null,
     color_start: '#ec4899', color_end: null, emoji: null,
     pinned: 0, pinned_at: null, last_used_at: null, presets_json: '[]',
-    created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z' },
+    created_at: '2026-05-23T00:00:00Z', updated_at: '2026-05-23T00:00:00Z',
+    description: '', origin_plugin: null, origin_path: null, origin_version: null, origin_imported_at: null },
 ]
 
 beforeEach(() => {

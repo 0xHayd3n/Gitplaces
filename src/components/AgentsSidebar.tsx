@@ -198,8 +198,12 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
     navigate('/library/agent/new')
   }
 
-  const currentMenuFolder = menu?.target.kind === 'folder' && menu.target.folderId !== null
-    ? folders.find(f => f.id === menu.target.folderId) ?? null
+  // Narrow the discriminated union to a local first; TypeScript can't follow
+  // the narrowing across `menu?.target.kind === 'folder' && menu.target.folderId`
+  // because the optional-chain breaks the discriminant flow.
+  const folderTarget = menu && menu.target.kind === 'folder' ? menu.target : null
+  const currentMenuFolder = folderTarget && folderTarget.folderId !== null
+    ? folders.find(f => f.id === folderTarget.folderId) ?? null
     : null
 
   return (
