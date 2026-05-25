@@ -3,19 +3,35 @@ import { randomUUID } from 'node:crypto'
 import type { AgentRow, AgentFolderRow, AgentPreset, AgentRevision, AgentFile } from '../../src/types/agent'
 import { parseAgentPresets, parseAgentTools } from '../../src/types/agent'
 import { isValidHandle, dedupeHandle, slugifyName } from '../../src/utils/agentSlug'
+import { parseAgentModel } from './frontmatterFields'
 
 export const AGENT_NAME_MAX = 200
 export const AGENT_BODY_MAX = 1_048_576 // 1 MiB
 
 const HEX_RE = /^#[0-9a-f]{6}$/i
 
-export const MODEL_VALUES = ['sonnet', 'opus', 'haiku', 'inherit'] as const
-export type AgentModel = typeof MODEL_VALUES[number]
-
-export function assertValidModel(value: unknown): asserts value is AgentModel {
-  if (typeof value !== 'string' || !(MODEL_VALUES as readonly string[]).includes(value)) {
-    throw new Error(`Invalid model: ${JSON.stringify(value)}`)
+/**
+ * Validate a model string by attempting to parse it. Throws if the string
+ * is non-parseable; on success, returns the structured form (caller can
+ * destructure into the three DB columns).
+ *
+ * Phase 2: replaces the legacy `assertValidModel` (which only accepted the
+ * 4-value short-name enum) with a parser-backed validator that accepts the
+ * full multi-provider grammar from `parseModelRef`.
+ */
+export function parseAndValidateModel(value: unknown): ReturnType<typeof parseAgentModel> {
+  if (typeof value !== 'string') {
+    throw new Error(`Invalid model: expected string, got ${typeof value}`)
   }
+  const parsed = parseAgentModel(value)
+  // parseAgentModel falls back to inherit + warning for unknown — that's the
+  // right default for frontmatter from external files but NOT for user input.
+  // If the input wasn't recognized AND didn't legitimately mean inherit,
+  // reject it here.
+  if (parsed.model === 'inherit' && value !== 'inherit') {
+    throw new Error(`Invalid model: ${JSON.stringify(value)} is not a recognized model reference`)
+  }
+  return parsed
 }
 
 export function assertValidTools(value: unknown): asserts value is string[] | null {
@@ -147,7 +163,7 @@ export interface CreateAgentInput {
   colorEnd: string | null
   emoji: string | null
   description?: string
-  model?: AgentModel
+  model?: string                      // any value accepted by parseAgentModel
   tools?: string[] | null
   argumentHint?: string | null
   isSubagent?: boolean
@@ -165,8 +181,8 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
   assertValidHex('colorStart', input.colorStart)
   if (input.colorEnd !== null) assertValidHex('colorEnd', input.colorEnd)
 
-  const model = input.model ?? 'inherit'
-  assertValidModel(model)
+  const rawModel = input.model ?? 'inherit'
+  const parsedModel = parseAndValidateModel(rawModel)
 
   const toolsInput = input.tools ?? null
   assertValidTools(toolsInput)
@@ -182,13 +198,15 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
     db.prepare(`
       INSERT INTO agents (
         id, name, handle, folder_id, color_start, color_end, emoji, description,
-        tools, model, is_subagent, is_slash_command, argument_hint,
+        tools, model, model_provider, model_endpoint_id,
+        is_subagent, is_slash_command, argument_hint,
         created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, name, input.handle, input.folderId, input.colorStart, input.colorEnd, input.emoji, input.description ?? '',
-      tools, model, isSubagent, isSlashCommand, argumentHint,
+      tools, parsedModel.model, parsedModel.provider, parsedModel.endpoint,
+      isSubagent, isSlashCommand, argumentHint,
       ts, ts,
     )
     // Primary file row — sole source of truth for body content.
@@ -214,7 +232,7 @@ export interface UpdateAgentPatch {
   emoji?: string | null
   pinned?: boolean
   description?: string
-  model?: AgentModel
+  model?: string                       // any value accepted by parseAgentModel
   tools?: string[] | null              // null = inherit; [] = no tools
   argumentHint?: string | null
   isSubagent?: boolean
@@ -277,8 +295,12 @@ export function updateAgent(
     sets.push('description = ?'); params.push(patch.description)
   }
   if (patch.model !== undefined) {
-    assertValidModel(patch.model)
-    sets.push('model = ?'); params.push(patch.model)
+    const parsed = parseAndValidateModel(patch.model)
+    sets.push('model = ?'); params.push(parsed.model)
+    // Always update the denormalized columns alongside model — they must stay
+    // in sync with the parsed form of `model`.
+    sets.push('model_provider = ?'); params.push(parsed.provider)
+    sets.push('model_endpoint_id = ?'); params.push(parsed.endpoint)
   }
   if (patch.tools !== undefined) {
     assertValidTools(patch.tools)
@@ -405,10 +427,7 @@ export function duplicateAgent(db: Database.Database, id: string): AgentRow {
     // Carry content-shaping fields through duplication, but deliberately do NOT
     // copy is_subagent / is_slash_command — a duplicate should not silently
     // create another file in ~/.claude/agents/ (handle is also different anyway).
-    // Phase 2 bridge: AgentRow.model is now `string`, createAgent still takes
-    // the narrow enum until Task 4 widens it. Existing duplicated agents are
-    // always one of the legacy values, so the cast is safe in practice.
-    model: src.model as 'sonnet' | 'opus' | 'haiku' | 'inherit',
+    model: src.model,
     tools: parseAgentTools(src.tools),
     argumentHint: src.argument_hint,
   })

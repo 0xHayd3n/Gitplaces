@@ -6,7 +6,7 @@ import {
   createAgent, updateAgent, deleteAgent, duplicateAgent, getAllAgents,
   createFolder, renameFolder, deleteFolder, updateFolder,
   listFiles, createFile, updateFile, deleteFile,
-  assertValidModel, assertValidTools, setSyncedAt,
+  parseAndValidateModel, assertValidTools, setSyncedAt,
   getPrimaryFile, listRevisions,
   AGENT_NAME_MAX, AGENT_BODY_MAX,
 } from './agentsService'
@@ -940,17 +940,28 @@ describe('agentsService — description', () => {
 })
 
 describe('validation helpers', () => {
-  it('assertValidModel accepts the four canonical values', () => {
-    expect(() => assertValidModel('sonnet')).not.toThrow()
-    expect(() => assertValidModel('opus')).not.toThrow()
-    expect(() => assertValidModel('haiku')).not.toThrow()
-    expect(() => assertValidModel('inherit')).not.toThrow()
+  it('parseAndValidateModel accepts the four canonical values', () => {
+    expect(() => parseAndValidateModel('sonnet')).not.toThrow()
+    expect(() => parseAndValidateModel('opus')).not.toThrow()
+    expect(() => parseAndValidateModel('haiku')).not.toThrow()
+    expect(() => parseAndValidateModel('inherit')).not.toThrow()
   })
 
-  it('assertValidModel throws on unknown values', () => {
-    expect(() => assertValidModel('gpt-4')).toThrow(/model/i)
-    expect(() => assertValidModel('')).toThrow(/model/i)
-    expect(() => assertValidModel(null)).toThrow(/model/i)
+  it('parseAndValidateModel throws on unknown values', () => {
+    expect(() => parseAndValidateModel('gpt-4')).toThrow(/model/i)
+    expect(() => parseAndValidateModel('')).toThrow(/model/i)
+    expect(() => parseAndValidateModel(null)).toThrow(/model/i)
+  })
+
+  it('parseAndValidateModel returns structured ref for multi-provider format', () => {
+    expect(parseAndValidateModel('openai/gpt-4o')).toEqual({
+      model: 'openai/gpt-4o', provider: 'openai', endpoint: null,
+    })
+    expect(parseAndValidateModel('openai-compatible:ollama-local/llama3.1:70b')).toEqual({
+      model: 'openai-compatible:ollama-local/llama3.1:70b',
+      provider: 'openai-compatible',
+      endpoint: 'ollama-local',
+    })
   })
 
   it('assertValidTools accepts string arrays and null', () => {
@@ -1005,6 +1016,45 @@ describe('agent skill-parity fields', () => {
 
   it('createAgent rejects an invalid model value', () => {
     expect(() => createAgent(db, makeBaseInput({ model: 'gpt-4' as any }))).toThrow(/model/i)
+  })
+
+  it('createAgent stores model_provider=anthropic and model_endpoint_id=null for legacy short names', () => {
+    const agent = createAgent(db, makeBaseInput({ model: 'sonnet' }))
+    expect(agent.model).toBe('sonnet')
+    expect(agent.model_provider).toBe('anthropic')
+    expect(agent.model_endpoint_id).toBeNull()
+  })
+
+  it('createAgent stores model_provider=openai for an openai/gpt-4o model', () => {
+    const agent = createAgent(db, makeBaseInput({ handle: 'oa-1', model: 'openai/gpt-4o' }))
+    expect(agent.model).toBe('openai/gpt-4o')
+    expect(agent.model_provider).toBe('openai')
+    expect(agent.model_endpoint_id).toBeNull()
+  })
+
+  it('createAgent captures the endpoint for an openai-compatible model', () => {
+    const agent = createAgent(db, makeBaseInput({
+      handle: 'oc-1',
+      model: 'openai-compatible:ollama-local/llama3.1:70b',
+    }))
+    expect(agent.model).toBe('openai-compatible:ollama-local/llama3.1:70b')
+    expect(agent.model_provider).toBe('openai-compatible')
+    expect(agent.model_endpoint_id).toBe('ollama-local')
+  })
+
+  it('updateAgent re-derives model_provider when model changes from sonnet to openai/gpt-4o', () => {
+    const agent = createAgent(db, makeBaseInput({ handle: 'u-1', model: 'sonnet' }))
+    const updated = updateAgent(db, agent.id, { model: 'openai/gpt-4o' })
+    expect(updated.model).toBe('openai/gpt-4o')
+    expect(updated.model_provider).toBe('openai')
+    expect(updated.model_endpoint_id).toBeNull()
+  })
+
+  it('updateAgent re-derives endpoint when switching to openai-compatible', () => {
+    const agent = createAgent(db, makeBaseInput({ handle: 'u-2', model: 'sonnet' }))
+    const updated = updateAgent(db, agent.id, { model: 'openai-compatible:lm/qwen-7b' })
+    expect(updated.model_provider).toBe('openai-compatible')
+    expect(updated.model_endpoint_id).toBe('lm')
   })
 
   it('createAgent rejects non-array tools', () => {
