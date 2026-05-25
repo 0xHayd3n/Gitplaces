@@ -263,12 +263,28 @@ export interface DiscoveredSkill {
   fileCount: number
 }
 
+export interface DiscoveredSubagent {
+  name: string
+  path: string
+  description: string | null
+  color: string | null
+}
+
+export interface DiscoveredSlashCommand {
+  name: string
+  path: string
+  description: string | null
+  argumentHint: string | null
+}
+
 export interface DiscoveredPlugin {
   id: string         // hash of root path
   name: string
   version: string | null
   root: string
   skills: DiscoveredSkill[]
+  subagents: DiscoveredSubagent[]
+  slashCommands: DiscoveredSlashCommand[]
 }
 
 export async function discoverPlugins(roots: string[]): Promise<DiscoveredPlugin[]> {
@@ -280,35 +296,91 @@ export async function discoverPlugins(roots: string[]): Promise<DiscoveredPlugin
     for (const entry of entries) {
       if (!entry.isDirectory()) continue
       const pluginDir = path.join(root, entry.name)
-      const skillsDir = path.join(pluginDir, 'skills')
-      const skillsStat = await fs.stat(skillsDir).catch(() => null)
-      if (!skillsStat?.isDirectory()) continue
-      const skills = await listSkillsInPluginDir(skillsDir)
-      if (skills.length === 0) continue
 
-      let name = entry.name
-      let version: string | null = null
-      const pkgPath = path.join(pluginDir, 'package.json')
-      const pkgRaw = await fs.readFile(pkgPath, 'utf-8').catch(() => null)
-      if (pkgRaw) {
-        try {
-          const pkg = JSON.parse(pkgRaw)
-          if (typeof pkg.name === 'string') name = pkg.name
-          if (typeof pkg.version === 'string') version = pkg.version
-        } catch {
-          // Malformed package.json — fall back to dir name
-        }
-      }
+      const skillsDir = path.join(pluginDir, 'skills')
+      const agentsDir = path.join(pluginDir, 'agents')
+      const commandsDir = path.join(pluginDir, 'commands')
+
+      const [skillsStat, agentsStat, commandsStat] = await Promise.all([
+        fs.stat(skillsDir).catch(() => null),
+        fs.stat(agentsDir).catch(() => null),
+        fs.stat(commandsDir).catch(() => null),
+      ])
+
+      const skills = skillsStat?.isDirectory() ? await listSkillsInPluginDir(skillsDir) : []
+      const subagents = agentsStat?.isDirectory() ? await listSubagentsInPluginDir(agentsDir) : []
+      const slashCommands = commandsStat?.isDirectory() ? await listSlashCommandsInPluginDir(commandsDir) : []
+
+      // Plugin gate: must have at least one populated kind.
+      if (skills.length === 0 && subagents.length === 0 && slashCommands.length === 0) continue
+
+      const manifest = await readPluginManifest(pluginDir)
       out.push({
         id: simpleHash(pluginDir),
-        name,
-        version,
+        name: manifest.name,
+        version: manifest.version,
         root: pluginDir,
         skills,
+        subagents,
+        slashCommands,
       })
     }
   }
   return out
+}
+
+async function listSubagentsInPluginDir(agentsDir: string): Promise<DiscoveredSubagent[]> {
+  const out: DiscoveredSubagent[] = []
+  const entries = await fs.readdir(agentsDir, { withFileTypes: true })
+  for (const entry of entries) {
+    if (!entry.isFile()) continue
+    if (!entry.name.endsWith('.md')) continue
+    if (IGNORE_NAMES.has(entry.name)) continue
+    const filePath = path.join(agentsDir, entry.name)
+    const raw = await fs.readFile(filePath, 'utf-8').catch(() => null)
+    if (raw === null) continue
+    const filenameStem = path.basename(entry.name, '.md')
+    let name = filenameStem
+    let description: string | null = null
+    let color: string | null = null
+    try {
+      const parsed = matter(raw)
+      const data = parsed.data as Record<string, unknown>
+      if (typeof data.name === 'string' && data.name.length > 0) name = data.name
+      if (typeof data.description === 'string') description = data.description
+      if (typeof data.color === 'string') color = data.color
+    } catch {
+      // Bad frontmatter — keep defaults
+    }
+    out.push({ name, path: filePath, description, color })
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+async function listSlashCommandsInPluginDir(commandsDir: string): Promise<DiscoveredSlashCommand[]> {
+  const out: DiscoveredSlashCommand[] = []
+  const entries = await fs.readdir(commandsDir, { withFileTypes: true })
+  for (const entry of entries) {
+    if (!entry.isFile()) continue
+    if (!entry.name.endsWith('.md')) continue
+    if (IGNORE_NAMES.has(entry.name)) continue
+    const filePath = path.join(commandsDir, entry.name)
+    const raw = await fs.readFile(filePath, 'utf-8').catch(() => null)
+    if (raw === null) continue
+    const name = path.basename(entry.name, '.md')
+    let description: string | null = null
+    let argumentHint: string | null = null
+    try {
+      const parsed = matter(raw)
+      const data = parsed.data as Record<string, unknown>
+      if (typeof data.description === 'string') description = data.description
+      argumentHint = parseArgumentHint(data['argument-hint'])
+    } catch {
+      // Bad frontmatter — keep defaults
+    }
+    out.push({ name, path: filePath, description, argumentHint })
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 async function listSkillsInPluginDir(skillsDir: string): Promise<DiscoveredSkill[]> {

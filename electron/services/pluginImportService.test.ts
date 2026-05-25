@@ -382,3 +382,57 @@ describe('readPluginManifest', () => {
     expect(manifest.version).toBeNull()
   })
 })
+
+describe('discoverPlugins — mixed kinds', () => {
+  it('returns subagents and slashCommands alongside skills for a mixed plugin', async () => {
+    const plugins = await discoverPlugins([PLUGIN_FIXTURES])
+    const mixed = plugins.find(p => p.name === 'mixed-plugin')
+    expect(mixed).toBeDefined()
+    expect(mixed!.skills.map(s => s.name).sort()).toEqual(['some-skill'])
+    expect(mixed!.subagents.map(s => s.name).sort()).toEqual(['agent-one', 'agent-two'])
+    expect(mixed!.slashCommands.map(c => c.name).sort()).toEqual(['cmd-one'])
+  })
+
+  it('includes plugins that have only agents/', async () => {
+    const plugins = await discoverPlugins([PLUGIN_FIXTURES])
+    const agentsOnly = plugins.find(p => p.name === 'agents-only')
+    expect(agentsOnly).toBeDefined()
+    expect(agentsOnly!.skills).toEqual([])
+    expect(agentsOnly!.subagents.map(s => s.name)).toEqual(['lonely'])
+    expect(agentsOnly!.slashCommands).toEqual([])
+  })
+
+  it('includes plugins that have only commands/', async () => {
+    const plugins = await discoverPlugins([PLUGIN_FIXTURES])
+    const cmdOnly = plugins.find(p => p.name === 'commands-only')
+    expect(cmdOnly).toBeDefined()
+    expect(cmdOnly!.slashCommands.map(c => c.name)).toEqual(['solo'])
+  })
+
+  it('subagent discovery surface carries description and color', async () => {
+    const plugins = await discoverPlugins([PLUGIN_FIXTURES])
+    const mixed = plugins.find(p => p.name === 'mixed-plugin')!
+    const a1 = mixed.subagents.find(s => s.name === 'agent-one')!
+    expect(a1.description).toBe('First agent.')
+    expect(a1.color).toBe('blue')
+    const a2 = mixed.subagents.find(s => s.name === 'agent-two')!
+    expect(a2.color).toBeNull()
+  })
+
+  it('slash command discovery carries description and argumentHint', async () => {
+    const plugins = await discoverPlugins([PLUGIN_FIXTURES])
+    const mixed = plugins.find(p => p.name === 'mixed-plugin')!
+    const c = mixed.slashCommands.find(s => s.name === 'cmd-one')!
+    expect(c.description).toBe('A command.')
+    expect(c.argumentHint).toBe('[target]')
+  })
+
+  it('preserves existing skills-only plugins with empty subagent/command arrays', async () => {
+    const plugins = await discoverPlugins([PLUGIN_FIXTURES])
+    const cool = plugins.find(p => p.name === 'cool-plugin')
+    expect(cool).toBeDefined()
+    expect(cool!.skills.length).toBeGreaterThan(0)
+    expect(cool!.subagents).toEqual([])
+    expect(cool!.slashCommands).toEqual([])
+  })
+})
