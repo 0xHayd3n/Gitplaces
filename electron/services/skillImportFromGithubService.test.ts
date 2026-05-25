@@ -6,7 +6,7 @@ vi.mock('../store')
 
 import * as github from '../github'
 import * as store from '../store'
-import { discoverSkillsInRepo, RepoNotAccessibleError } from './skillImportFromGithubService'
+import { discoverSkillsInRepo, readSkillFromRepo, RepoNotAccessibleError } from './skillImportFromGithubService'
 
 const mockedGithub = vi.mocked(github)
 const mockedStore = vi.mocked(store)
@@ -194,5 +194,122 @@ describe('discoverSkillsInRepo — errors', () => {
       expect((err as RepoNotAccessibleError).owner).toBe('priv')
       expect((err as RepoNotAccessibleError).repoName).toBe('repo')
     }
+  })
+})
+
+describe('readSkillFromRepo — skills-dir', () => {
+  it('returns ParsedSkill with body, description, files, and origin populated', async () => {
+    // readSkillFromRepo walks: getTreeBySha(commitSha) → root → skills → brainstorming
+    // → scripts (because scripts/ is a subdir under brainstorming/).
+    // No getBranch — we pass commitSha straight to getTreeBySha (GitHub resolves
+    // commit SHAs as tree refs).
+    mockedGithub.getTreeBySha
+      .mockResolvedValueOnce([   // root tree (from commitSha)
+        { path: 'skills', mode: '040000', type: 'tree', sha: 'skillssha' },
+      ])
+      .mockResolvedValueOnce([   // skills/ tree
+        { path: 'brainstorming', mode: '040000', type: 'tree', sha: 'brainsha' },
+      ])
+      .mockResolvedValueOnce([   // skills/brainstorming/ tree
+        { path: 'SKILL.md', mode: '100644', type: 'blob', sha: 'sksha' },
+        { path: 'notes.md', mode: '100644', type: 'blob', sha: 'notesha' },
+        { path: 'scripts',  mode: '040000', type: 'tree', sha: 'scrsha' },
+      ])
+      .mockResolvedValueOnce([   // skills/brainstorming/scripts/ tree
+        { path: 'run.sh', mode: '100755', type: 'blob', sha: 'rsh' },
+      ])
+    mockedGithub.getRawFileBytes.mockImplementation(async (_t, _o, _n, _b, p) => {
+      if (p === 'skills/brainstorming/SKILL.md') return Buffer.from(SKILL_MD_BODY, 'utf-8')
+      if (p === 'skills/brainstorming/notes.md') return Buffer.from('# Notes', 'utf-8')
+      if (p === 'skills/brainstorming/scripts/run.sh') return Buffer.from('#!/bin/bash', 'utf-8')
+      throw new Error(`unexpected fetch: ${p}`)
+    })
+
+    const skill = await readSkillFromRepo('obra', 'superpowers', 'main', 'a1b2c3d4567', 'skills/brainstorming')
+
+    expect(skill.name).toBe('brainstorming')
+    expect(skill.description).toBe('Brainstorm things.')
+    expect(skill.body).toContain('# Brainstorming body')
+    expect(skill.handle).toBe('brainstorming')
+    expect(skill.files.map(f => f.filename).sort()).toEqual(['notes.md', 'scripts/run.sh'])
+    expect(skill.files.find(f => f.filename === 'notes.md')?.content).toBe('# Notes')
+    expect(skill.origin).toEqual({
+      plugin: 'obra/superpowers',
+      pluginVersion: 'a1b2c3d',
+      path: 'skills/brainstorming',
+    })
+  })
+
+  it('continues with remaining files when one file fetch fails', async () => {
+    mockedGithub.getTreeBySha
+      .mockResolvedValueOnce([   // root
+        { path: 'skills', mode: '040000', type: 'tree', sha: 'skillssha' },
+      ])
+      .mockResolvedValueOnce([   // skills/
+        { path: 'foo', mode: '040000', type: 'tree', sha: 'foosha' },
+      ])
+      .mockResolvedValueOnce([   // skills/foo/
+        { path: 'SKILL.md',  mode: '100644', type: 'blob', sha: 'sksha' },
+        { path: 'good.md',   mode: '100644', type: 'blob', sha: 'goodsha' },
+        { path: 'broken.md', mode: '100644', type: 'blob', sha: 'brokensha' },
+      ])
+    mockedGithub.getRawFileBytes.mockImplementation(async (_t, _o, _n, _b, p) => {
+      if (p.endsWith('SKILL.md')) return Buffer.from(SKILL_MD_BODY, 'utf-8')
+      if (p.endsWith('good.md')) return Buffer.from('good', 'utf-8')
+      if (p.endsWith('broken.md')) throw new Error('fetch error')
+      throw new Error(`unexpected: ${p}`)
+    })
+
+    const skill = await readSkillFromRepo('o', 'r', 'main', 'sha1234', 'skills/foo')
+
+    expect(skill.files.map(f => f.filename)).toContain('good.md')
+    expect(skill.files.map(f => f.filename)).not.toContain('broken.md')
+  })
+
+  it('skips ignored files', async () => {
+    mockedGithub.getTreeBySha
+      .mockResolvedValueOnce([   // root
+        { path: 'skills', mode: '040000', type: 'tree', sha: 'skillssha' },
+      ])
+      .mockResolvedValueOnce([   // skills/
+        { path: 'foo', mode: '040000', type: 'tree', sha: 'foosha' },
+      ])
+      .mockResolvedValueOnce([   // skills/foo/
+        { path: 'SKILL.md',   mode: '100644', type: 'blob', sha: 'sksha' },
+        { path: '.DS_Store',  mode: '100644', type: 'blob', sha: 'dssha' },
+        { path: 'real.md',    mode: '100644', type: 'blob', sha: 'rsha' },
+      ])
+    mockedGithub.getRawFileBytes.mockImplementation(async (_t, _o, _n, _b, p) => {
+      if (p.endsWith('SKILL.md')) return Buffer.from(SKILL_MD_BODY, 'utf-8')
+      if (p.endsWith('real.md')) return Buffer.from('r', 'utf-8')
+      throw new Error(`unexpected: ${p}`)
+    })
+
+    const skill = await readSkillFromRepo('o', 'r', 'main', 'sha1234', 'skills/foo')
+
+    expect(skill.files.map(f => f.filename)).toEqual(['real.md'])
+  })
+})
+
+describe('readSkillFromRepo — bare-root', () => {
+  it('excludes README.md, LICENSE, package.json from files[]', async () => {
+    mockedGithub.getTreeBySha.mockResolvedValueOnce([
+      { path: 'README.md',       mode: '100644', type: 'blob', sha: 'r' },
+      { path: 'LICENSE',         mode: '100644', type: 'blob', sha: 'l' },
+      { path: 'package.json',    mode: '100644', type: 'blob', sha: 'p' },
+      { path: 'SKILL.md',        mode: '100644', type: 'blob', sha: 'sk' },
+      { path: 'helper.md',       mode: '100644', type: 'blob', sha: 'h' },
+    ])
+    mockedGithub.getRawFileBytes.mockImplementation(async (_t, _o, _n, _b, p) => {
+      if (p === 'SKILL.md') return Buffer.from(SKILL_MD_BODY, 'utf-8')
+      if (p === 'helper.md') return Buffer.from('helper', 'utf-8')
+      throw new Error(`unexpected: ${p}`)
+    })
+
+    const skill = await readSkillFromRepo('o', 'singleskill', 'main', 'sha1234', '.')
+
+    expect(skill.files.map(f => f.filename)).toEqual(['helper.md'])
+    expect(skill.origin?.path).toBe('.')
+    expect(skill.origin?.plugin).toBe('o/singleskill')
   })
 })

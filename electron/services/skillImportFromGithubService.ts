@@ -1,7 +1,8 @@
 import matter from 'gray-matter'
 import { getRepo, getBranch, getTreeBySha, getRawFileBytes } from '../github'
 import { getToken } from '../store'
-import type { DiscoveredSkill } from './skillImportService'
+import { slugifyName } from '../../src/utils/agentSlug'
+import type { DiscoveredSkill, ParsedSkill } from './skillImportService'
 
 export class RepoNotAccessibleError extends Error {
   constructor(public readonly owner: string, public readonly repoName: string) {
@@ -150,4 +151,116 @@ async function countFilesRecursive(
     }
   }
   return count
+}
+
+// ── Per-skill fetch ────────────────────────────────────────────────
+
+export async function readSkillFromRepo(
+  owner: string,
+  name: string,
+  branch: string,
+  commitSha: string,
+  repoPath: string,
+): Promise<ParsedSkill> {
+  const token = getToken() ?? null
+  const fileIndex = await listFilesUnderRepoPath(token, owner, name, commitSha, repoPath)
+  const isBareRoot = repoPath === '.'
+  const skillMdPath = isBareRoot ? 'SKILL.md' : `${repoPath}/SKILL.md`
+
+  // Fetch and parse SKILL.md (the body)
+  const skillBuf = await getRawFileBytes(token, owner, name, branch, skillMdPath)
+  const parsed = matter(skillBuf.toString('utf-8'))
+  const data = parsed.data as Record<string, unknown>
+  const skillName = typeof data.name === 'string' && data.name.length > 0
+    ? data.name
+    : (isBareRoot ? name : repoPath.split('/').pop()!)
+  const description = typeof data.description === 'string' ? data.description : ''
+  const known = new Set(['name', 'description'])
+  const dropped = Object.keys(data).filter(k => !known.has(k))
+  if (dropped.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(`[skillImportFromGithubService] Dropped frontmatter keys from ${owner}/${name} ${repoPath}:`, dropped)
+  }
+
+  // Fetch sibling file contents, isolating per-file failures.
+  const files: { filename: string; content: string }[] = []
+  for (const filename of fileIndex) {
+    if (filename === 'SKILL.md') continue   // already fetched as the body
+    const fullPath = isBareRoot ? filename : `${repoPath}/${filename}`
+    try {
+      const buf = await getRawFileBytes(token, owner, name, branch, fullPath)
+      files.push({ filename, content: buf.toString('utf-8') })
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(`[skillImportFromGithubService] Failed to fetch ${fullPath}:`, err)
+    }
+  }
+  files.sort((a, b) => a.filename.localeCompare(b.filename))
+
+  return {
+    name: skillName,
+    handle: slugifyName(skillName),
+    description,
+    body: parsed.content.trim(),
+    files,
+    origin: {
+      plugin: `${owner}/${name}`,
+      pluginVersion: commitSha.slice(0, 7),
+      path: repoPath,
+    },
+  }
+}
+
+/**
+ * Returns relative paths (relative to repoPath, or to repo root for '.') of all
+ * files under the given subtree, excluding ignored names and (for bare-root)
+ * the extra-excluded files.
+ *
+ * Note: we pass `commitSha` directly to getTreeBySha as the root ref. GitHub's
+ * Git Trees API accepts either tree SHAs or commit SHAs (it resolves the commit
+ * to its root tree). This saves a getBranch call per read.
+ */
+async function listFilesUnderRepoPath(
+  token: string | null,
+  owner: string,
+  name: string,
+  commitSha: string,
+  repoPath: string,
+): Promise<string[]> {
+  const isBareRoot = repoPath === '.'
+  let entries = await getTreeBySha(token, owner, name, commitSha)
+  if (!isBareRoot) {
+    const segments = repoPath.split('/')
+    for (const seg of segments) {
+      const next = entries.find(e => e.path === seg && e.type === 'tree')
+      if (!next) throw new Error(`Path not found in repo: ${repoPath}`)
+      entries = await getTreeBySha(token, owner, name, next.sha)
+    }
+  }
+
+  const out: string[] = []
+  await collectFilesRecursive(token, owner, name, entries, '', isBareRoot, out)
+  return out
+}
+
+async function collectFilesRecursive(
+  token: string | null,
+  owner: string,
+  name: string,
+  entries: TreeEntry[],
+  prefix: string,
+  isBareRoot: boolean,
+  out: string[],
+): Promise<void> {
+  for (const e of entries) {
+    if (IGNORE_NAMES.has(e.path)) continue
+    if (IGNORE_SUFFIXES.some(s => e.path.endsWith(s))) continue
+    if (isBareRoot && prefix === '' && BARE_ROOT_EXTRA_EXCLUDES.has(e.path)) continue
+    const rel = prefix ? `${prefix}/${e.path}` : e.path
+    if (e.type === 'blob') out.push(rel)
+    else if (e.type === 'tree') {
+      const sub = await getTreeBySha(token, owner, name, e.sha)
+      await collectFilesRecursive(token, owner, name, sub, rel, isBareRoot, out)
+    }
+  }
 }
