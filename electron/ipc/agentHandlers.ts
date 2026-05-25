@@ -8,7 +8,9 @@ import {
   createPreset, updatePreset, deletePreset, duplicatePreset,
   listRevisions, revertToRevision,
   recordUse,
+  listFiles, createFile, updateFile, deleteFile,
   type CreateAgentInput, type UpdateAgentPatch, type UpdateFolderPatch,
+  type CreateFileInput, type UpdateFilePatch,
 } from '../services/agentsService'
 
 function broadcastChanged(): void {
@@ -159,6 +161,27 @@ export function registerAgentHandlers(): void {
   ipcMain.handle('agents:recordUse', async (_, agentId: string, presetId: string | null) => {
     const db = getDb(app.getPath('userData'))
     recordUse(db, agentId, presetId)
+    broadcastChanged()
+  })
+
+  ipcMain.handle('agents:files:list', async (_, agentId: string) => {
+    return listFiles(getDb(app.getPath('userData')), agentId)
+  })
+
+  ipcMain.handle('agents:files:create', async (_, agentId: string, input: CreateFileInput) => {
+    const file = createFile(getDb(app.getPath('userData')), agentId, input)
+    broadcastChanged()
+    return file
+  })
+
+  ipcMain.handle('agents:files:update', async (_, agentId: string, fileId: string, patch: UpdateFilePatch) => {
+    const file = updateFile(getDb(app.getPath('userData')), agentId, fileId, patch)
+    broadcastChanged()
+    return file
+  })
+
+  ipcMain.handle('agents:files:delete', async (_, agentId: string, fileId: string) => {
+    deleteFile(getDb(app.getPath('userData')), agentId, fileId)
     broadcastChanged()
   })
 

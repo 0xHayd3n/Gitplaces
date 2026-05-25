@@ -188,6 +188,7 @@ contextBridge.exposeInMainWorld('api', {
       colorEnd?: string | null
       emoji?: string | null
       pinned?: boolean
+      description?: string
     }) =>
       ipcRenderer.invoke('agents:update', id, patch) as Promise<import('../src/types/agent').AgentRow>,
     delete: (id: string) => ipcRenderer.invoke('agents:delete', id) as Promise<void>,
@@ -223,6 +224,17 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.invoke('agents:revisions:list', agentId) as Promise<import('../src/types/agent').AgentRevision[]>,
       revert: (agentId: string, revisionId: string) =>
         ipcRenderer.invoke('agents:revisions:revert', agentId, revisionId) as Promise<import('../src/types/agent').AgentRow>,
+    },
+
+    files: {
+      list: (agentId: string) =>
+        ipcRenderer.invoke('agents:files:list', agentId) as Promise<import('../src/types/agent').AgentFile[]>,
+      create: (agentId: string, input: { filename: string; content: string; sortOrder?: number }) =>
+        ipcRenderer.invoke('agents:files:create', agentId, input) as Promise<import('../src/types/agent').AgentFile>,
+      update: (agentId: string, fileId: string, patch: { filename?: string; content?: string; sortOrder?: number }) =>
+        ipcRenderer.invoke('agents:files:update', agentId, fileId, patch) as Promise<import('../src/types/agent').AgentFile>,
+      delete: (agentId: string, fileId: string) =>
+        ipcRenderer.invoke('agents:files:delete', agentId, fileId) as Promise<void>,
     },
 
     recordUse: (agentId: string, presetId: string | null) =>
