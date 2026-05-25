@@ -137,14 +137,25 @@ interface SurfaceParams {
 }
 
 async function syncOneSurface(p: SurfaceParams): Promise<SyncOutcome> {
-  // Step 1: clean up the old-handle file if the handle changed.
-  if (p.oldPath && p.oldPath !== p.currentPath) {
-    await fs.rm(p.oldPath, { force: true })
+  const renamed = p.oldPath !== null && p.oldPath !== p.currentPath
+  const owned = p.syncedAt !== null
+
+  // Step 1: clean up the old-handle file if the handle changed AND we
+  // previously owned a file at it. Skipping the delete when syncedAt is null
+  // is critical — otherwise a rename clobbers a hand-authored file that
+  // happens to share the old handle.
+  if (renamed && owned) {
+    try {
+      await fs.rm(p.oldPath!, { force: true })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      return { status: 'error', path: p.oldPath!, message }
+    }
   }
 
   // Step 2: surface disabled — delete (or skip if never owned).
   if (!p.enabled) {
-    if (p.syncedAt === null && !(p.oldPath && p.oldPath !== p.currentPath)) {
+    if (!owned && !renamed) {
       return { status: 'skipped' }
     }
     try {

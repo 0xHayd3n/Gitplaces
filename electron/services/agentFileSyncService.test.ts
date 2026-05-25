@@ -286,6 +286,38 @@ describe('syncAgentToDisk', () => {
     expect(await fileExists(subagentPath('new-handle'))).toBe(true)
   })
 
+  it('rename does NOT delete a hand-authored file at the old path when the surface was never synced', async () => {
+    // User hand-authored ~/.claude/agents/old-handle.md outside of Git-Suite.
+    // Surface has never been synced (syncedAt is null). A rename in Git-Suite
+    // must NOT delete that file — we don't own it.
+    await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(subagentPath('old-handle'), 'hand-authored, not ours')
+    const agent = baseAgent({
+      handle: 'new-handle',
+      is_subagent: 0,
+      synced_subagent_at: null,
+    })
+    await syncAgentToDisk(agent, { oldHandle: 'old-handle' })
+    expect(await fileExists(subagentPath('old-handle'))).toBe(true)
+    expect(await fs.readFile(subagentPath('old-handle'), 'utf-8')).toBe('hand-authored, not ours')
+  })
+
+  it('rename does delete the old file when the surface was previously synced, even if currently disabled', async () => {
+    // is_subagent flipped off in the same update that also renames the handle.
+    // The previously-synced old-handle file should still be cleaned up because
+    // we owned it.
+    await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(subagentPath('old-handle'), 'previously synced by us')
+    const agent = baseAgent({
+      handle: 'new-handle',
+      is_subagent: 0,
+      synced_subagent_at: '2026-05-20T00:00:00.000Z',
+    })
+    const result = await syncAgentToDisk(agent, { oldHandle: 'old-handle' })
+    expect(await fileExists(subagentPath('old-handle'))).toBe(false)
+    expect(result.subagent.status).toBe('deleted')
+  })
+
   it('subagent error does not block slash command success', async () => {
     // Create a directory where the subagent file should go — makes write fail with EISDIR
     await fs.mkdir(subagentPath('my-agent'), { recursive: true })
