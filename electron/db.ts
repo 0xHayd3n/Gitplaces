@@ -277,6 +277,15 @@ export function initSchema(db: Database.Database): void {
   )`)
   db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_files_agent ON agent_files(agent_id)`)
 
+  // Phase 25 — Skill parity Phase 2: tools/model + subagent/slash-command surfaces
+  try { db.exec(`ALTER TABLE agents ADD COLUMN tools TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN model TEXT NOT NULL DEFAULT 'inherit'`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN is_subagent INTEGER NOT NULL DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN is_slash_command INTEGER NOT NULL DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN argument_hint TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN synced_subagent_at TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN synced_slash_command_at TEXT`) } catch {}
+
   // Phase 20 – AI chat history
   db.exec(`CREATE TABLE IF NOT EXISTS ai_chats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
