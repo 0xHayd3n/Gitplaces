@@ -788,6 +788,29 @@ describe('AgentDetail — Settings tab Phase 2', () => {
     expect(screen.queryByText(/subagent file exists/i)).toBeNull()
   })
 
+  // --- Argument hint ---
+
+  it('argument_hint input is hidden when is_slash_command=0', async () => {
+    setup() // baseAgent.is_slash_command === 0
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    expect(screen.queryByLabelText(/argument hint/i)).toBeNull()
+  })
+
+  it('argument_hint input is visible and pre-filled when is_slash_command=1', async () => {
+    const slashAgent: AgentRow = {
+      ...baseAgent,
+      is_slash_command: 1,
+      argument_hint: '[project-name]',
+    }
+    ;(window as any).api.agents.getAll = vi.fn().mockResolvedValue({ folders, agents: [slashAgent] })
+    setup()
+    await waitForLoaded()
+    fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
+    const input = screen.getByLabelText(/argument hint/i) as HTMLInputElement
+    expect(input.value).toBe('[project-name]')
+  })
+
   // --- Sibling files info chip ---
 
   it('Sibling-files info chip appears when is_subagent=1 AND the agent has files', async () => {
