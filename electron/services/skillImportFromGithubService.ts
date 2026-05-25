@@ -4,8 +4,8 @@ import { getToken } from '../store'
 import type { DiscoveredSkill } from './skillImportService'
 
 export class RepoNotAccessibleError extends Error {
-  constructor(public readonly owner: string, public readonly name: string) {
-    super(`Couldn't load ${owner}/${name}`)
+  constructor(public readonly owner: string, public readonly repoName: string) {
+    super(`Couldn't load ${owner}/${repoName}`)
     this.name = 'RepoNotAccessibleError'
   }
 }

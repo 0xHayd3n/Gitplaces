@@ -175,3 +175,24 @@ describe('discoverSkillsInRepo — bare-root layout', () => {
     expect(index.skills).toEqual([])
   })
 })
+
+describe('discoverSkillsInRepo — errors', () => {
+  it('throws RepoNotAccessibleError when getRepo rejects', async () => {
+    mockedGithub.getRepo.mockRejectedValue(new Error('GitHub API error: 404'))
+
+    await expect(discoverSkillsInRepo('o', 'doesnotexist')).rejects.toBeInstanceOf(RepoNotAccessibleError)
+  })
+
+  it('throws RepoNotAccessibleError carrying owner/name', async () => {
+    mockedGithub.getRepo.mockRejectedValue(new Error('GitHub API error: 401'))
+
+    try {
+      await discoverSkillsInRepo('priv', 'repo')
+      throw new Error('should have thrown')
+    } catch (err) {
+      expect(err).toBeInstanceOf(RepoNotAccessibleError)
+      expect((err as RepoNotAccessibleError).owner).toBe('priv')
+      expect((err as RepoNotAccessibleError).repoName).toBe('repo')
+    }
+  })
+})
