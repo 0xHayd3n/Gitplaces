@@ -66,12 +66,12 @@ export type LLMErrorKind =
 
 export class LLMError extends Error {
   kind: LLMErrorKind
-  cause?: unknown
   constructor(kind: LLMErrorKind, message: string, cause?: unknown) {
-    super(message)
+    // Pass cause through the native Error options so DevTools and observability
+    // tools that walk Error.cause see the chain.
+    super(message, { cause })
     this.name = 'LLMError'
     this.kind = kind
-    this.cause = cause
   }
 }
 
