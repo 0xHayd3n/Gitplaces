@@ -991,6 +991,127 @@
   overflow-x: auto;
 }
 
+/* ── Files tab ──────────────────────────────────────────── */
+
+.agent-detail-files {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100%;
+  min-height: 480px;
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.agent-detail-files-list {
+  border-right: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
+  padding: 8px 0;
+  overflow-y: auto;
+}
+
+.agent-detail-files-section {
+  padding: 6px 14px 4px;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t3);
+}
+
+.agent-detail-files-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: var(--t2);
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+}
+.agent-detail-files-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--t1);
+}
+.agent-detail-files-item--active {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+  color: var(--t1);
+}
+.agent-detail-files-item--main { font-weight: 500; }
+
+.agent-detail-files-add {
+  display: flex; align-items: center; gap: 6px;
+  margin: 8px 14px 0;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: var(--t3);
+  background: transparent;
+  border: 1px dashed var(--border2);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.agent-detail-files-add:hover { color: var(--accent-text); border-color: var(--accent-border); }
+
+.agent-detail-files-editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.agent-detail-files-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.agent-detail-files-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--t1);
+}
+
+.agent-detail-files-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.agent-detail-files-btn {
+  width: 28px; height: 28px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--t3);
+  border: 1px solid var(--border);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.agent-detail-files-btn:hover {
+  color: var(--t1);
+  background: rgba(255, 255, 255, 0.08);
+}
+.agent-detail-files-btn--danger:hover {
+  color: var(--red-text);
+  border-color: var(--red-border);
+  background: var(--red-soft);
+}
+
+.agent-detail-files-textarea {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--t1);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  padding: 16px 20px;
+  border: none;
+  outline: none;
+  resize: none;
+}
+
 /* ── Settings tab ───────────────────────────────────────── */
 
 .agent-detail-settings-grid {
