@@ -286,6 +286,10 @@ export function initSchema(db: Database.Database): void {
   try { db.exec(`ALTER TABLE agents ADD COLUMN synced_subagent_at TEXT`) } catch {}
   try { db.exec(`ALTER TABLE agents ADD COLUMN synced_slash_command_at TEXT`) } catch {}
 
+  // Phase 27 — Multi-provider agent support (see docs/superpowers/specs/2026-05-26-multi-provider-agents-design.md)
+  try { db.exec(`ALTER TABLE agents ADD COLUMN model_provider TEXT NOT NULL DEFAULT 'anthropic'`) } catch {}
+  try { db.exec(`ALTER TABLE agents ADD COLUMN model_endpoint_id TEXT`) } catch {}
+
   // Phase 20 – AI chat history
   db.exec(`CREATE TABLE IF NOT EXISTS ai_chats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
