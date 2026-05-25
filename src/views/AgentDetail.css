@@ -1203,6 +1203,83 @@
 }
 .import-skill-import-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.import-skill-github-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  margin-top: 4px;
+}
+.import-skill-github-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--t1);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  outline: none;
+}
+.import-skill-github-input:focus {
+  border-color: var(--accent-border);
+  background: rgba(255, 255, 255, 0.06);
+}
+.import-skill-github-fetch-btn {
+  background: rgba(139, 92, 246, 0.18);
+  color: var(--accent-text);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 6px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.import-skill-github-fetch-btn:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.28);
+}
+.import-skill-github-fetch-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.import-skill-github-error {
+  margin-top: 6px;
+  color: #f87171;
+  font-size: 11px;
+}
+.import-skill-github-skills {
+  margin-top: 6px;
+}
+.import-skill-github-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(139, 92, 246, 0.12);
+  color: var(--accent-text);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 999px;
+  padding: 4px 10px 4px 12px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.import-skill-github-chip-clear {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.import-skill-github-chip-clear:hover:not(:disabled) {
+  color: #f87171;
+}
+.import-skill-github-chip-clear:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ── Settings tab ───────────────────────────────────────── */
 
 .agent-detail-settings-grid {
