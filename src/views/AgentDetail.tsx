@@ -28,7 +28,7 @@ export default function AgentDetail() {
   const [nameDraft, setNameDraft] = useState('')
   const [nameEditing, setNameEditing] = useState(false)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
-  const [activeTab, setActiveTab] = useState<'prompt' | 'preview' | 'mcp' | 'history' | 'settings'>('prompt')
+  const [activeTab, setActiveTab] = useState<'prompt' | 'preview' | 'mcp' | 'history' | 'files' | 'settings'>('prompt')
   const [activePresetId, setActivePresetId] = useState<string | null>(null)
   const [revisions, setRevisions] = useState<AgentRevision[]>([])
   const [revisionsLoaded, setRevisionsLoaded] = useState(false)
@@ -313,6 +313,15 @@ export default function AgentDetail() {
           onClick={() => setActiveTab('history')}
         >
           <Clock size={13} /> History
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'files'}
+          className="agent-detail-tab"
+          onClick={() => setActiveTab('files')}
+        >
+          <FileText size={13} /> Files
         </button>
         <span className="agent-detail-tabs-spacer" />
         <span className="agent-detail-tabs-sep" aria-hidden="true" />

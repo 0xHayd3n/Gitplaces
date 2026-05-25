@@ -184,13 +184,14 @@ describe('AgentDetail', () => {
     expect(window.api.agents.update).not.toHaveBeenCalledWith('a1', { handle: 'something-else' })
   })
 
-  it('tab bar includes Prompt, Preview, MCP, History, Settings', async () => {
+  it('tab bar includes Prompt, Preview, MCP, History, Files, Settings', async () => {
     setup()
     await waitForLoaded()
     expect(screen.getByRole('tab', { name: /prompt/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /preview/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /mcp/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /history/i })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: /files/i })).toBeTruthy()
     expect(screen.getByRole('tab', { name: /settings/i })).toBeTruthy()
   })
 
