@@ -40,6 +40,7 @@ const baseAgent: AgentRow = {
 function makeApi() {
   return {
     openExternal: vi.fn().mockResolvedValue(undefined),
+    showItemInFolder: vi.fn().mockResolvedValue(undefined),
     agents: {
       getAll: vi.fn().mockResolvedValue({ folders, agents: [baseAgent] }),
       update: vi.fn().mockImplementation(async (_id: string, patch: any) => ({
@@ -826,7 +827,7 @@ describe('AgentDetail — Settings tab Phase 2', () => {
     expect(screen.getByText(/will sync on next save/i)).toBeTruthy()
   })
 
-  it('Sync status renders "Synced to <path> · X min ago" when synced_subagent_at is set', async () => {
+  it('Sync status renders "Synced to <path> · Xm ago" when synced_subagent_at is set', async () => {
     const tenMinAgoIso = new Date(Date.now() - 10 * 60 * 1000).toISOString()
     const enabledAgent: AgentRow = {
       ...baseAgent,
@@ -839,7 +840,7 @@ describe('AgentDetail — Settings tab Phase 2', () => {
     fireEvent.click(screen.getByRole('tab', { name: /settings/i }))
     // "Synced to" and the relative time render synchronously from props
     expect(screen.getByText(/Synced to/)).toBeTruthy()
-    expect(screen.getByText(/10 min ago/)).toBeTruthy()
+    expect(screen.getByText(/10m ago/)).toBeTruthy()
     // The clickable path appears after sync.checkConflict resolves
     await waitFor(() => expect(screen.getByText(/copy-editor\.md/)).toBeTruthy())
   })

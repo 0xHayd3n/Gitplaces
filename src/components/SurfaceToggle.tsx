@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { ExternalLink, RefreshCw, AlertCircle } from 'lucide-react'
 import { ConflictDialog } from './ConflictDialog'
 import { useToast } from '../contexts/Toast'
+import { relativeTime } from '../utils/relativeTime'
 
 interface SurfaceToggleProps {
   agentId: string
@@ -21,17 +22,6 @@ const KIND_FOR_DIALOG: Record<SurfaceToggleProps['kind'], 'subagent' | 'slash co
   slashCommand: 'slash command',
 }
 
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins} min ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs} h ago`
-  const days = Math.floor(hrs / 24)
-  return `${days} d ago`
-}
-
 export function SurfaceToggle({ agentId, agentHandle, kind, enabled, syncedAt }: SurfaceToggleProps) {
   const { toast } = useToast()
   const [pending, setPending] = useState(false)
@@ -41,21 +31,23 @@ export function SurfaceToggle({ agentId, agentHandle, kind, enabled, syncedAt }:
 
   // Fetch the on-disk path lazily — once we know we're synced, ask the IPC for
   // the canonical path so the link reflects whatever CLAUDE_HOME the main process
-  // is using. Re-queries when handle changes (which moves the file).
+  // is using. Re-queries when the handle moves the file or the synced/unsynced
+  // state flips — not on every syncedAt timestamp bump (the path is stable
+  // across re-syncs of the same handle).
+  const isSynced = syncedAt !== null
   useEffect(() => {
-    if (!enabled || syncedAt === null) {
+    if (!enabled || !isSynced) {
       setSyncedPath(null)
       return
     }
     void window.api.agents.sync.checkConflict(agentId).then(info => {
       setSyncedPath(kind === 'subagent' ? info.subagentPath : info.slashCommandPath)
     }).catch(() => setSyncedPath(null))
-  }, [agentId, agentHandle, kind, enabled, syncedAt])
+  }, [agentId, agentHandle, kind, enabled, isSynced])
 
   const openContainingFolder = () => {
     if (!syncedPath) return
-    const parent = syncedPath.replace(/[^/\\]+$/, '')
-    void window.api.openExternal(`file:///${parent.replace(/\\/g, '/')}`)
+    void window.api.showItemInFolder(syncedPath)
   }
 
   const applyToggle = async (next: boolean, forceOverwrite = false) => {

@@ -12,9 +12,7 @@ interface ConflictDialogProps {
 export function ConflictDialog({ open, surface, path, onCancel, onOverwrite }: ConflictDialogProps) {
   if (!open) return null
   const openContainingFolder = () => {
-    // Open the parent directory in the OS file browser
-    const parent = path.replace(/[^/\\]+$/, '')
-    void window.api.openExternal(`file:///${parent.replace(/\\/g, '/')}`)
+    void window.api.showItemInFolder(path)
   }
   return (
     <div className="agent-detail-modal-backdrop" onClick={onCancel}>
