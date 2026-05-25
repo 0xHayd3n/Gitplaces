@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
 import type { AgentRow, AgentFolderRow, AgentPreset, AgentRevision, AgentFile } from '../../src/types/agent'
-import { parseAgentPresets } from '../../src/types/agent'
+import { parseAgentPresets, parseAgentTools } from '../../src/types/agent'
 import { isValidHandle, dedupeHandle, slugifyName } from '../../src/utils/agentSlug'
 
 export const AGENT_NAME_MAX = 200
@@ -147,9 +147,8 @@ export interface CreateAgentInput {
   colorEnd: string | null
   emoji: string | null
   description?: string
-  // Phase 2: skill parity
   model?: AgentModel
-  tools?: string[] | string | null     // accepts either parsed array or pre-serialized JSON
+  tools?: string[] | null
   argumentHint?: string | null
   isSubagent?: boolean
   isSlashCommand?: boolean
@@ -166,27 +165,12 @@ export function createAgent(db: Database.Database, input: CreateAgentInput): Age
   assertValidHex('colorStart', input.colorStart)
   if (input.colorEnd !== null) assertValidHex('colorEnd', input.colorEnd)
 
-  // Phase 2 — normalise + validate the new optional fields
   const model = input.model ?? 'inherit'
   assertValidModel(model)
 
-  let tools: string | null = null
-  if (input.tools !== undefined && input.tools !== null) {
-    if (typeof input.tools === 'string') {
-      // Caller passed a pre-serialized JSON string — parse to validate, then re-serialize for canonical form.
-      let parsed: unknown
-      try {
-        parsed = JSON.parse(input.tools)
-      } catch {
-        throw new Error(`tools string must be valid JSON, got: ${input.tools}`)
-      }
-      assertValidTools(parsed)
-      tools = JSON.stringify(parsed)
-    } else {
-      assertValidTools(input.tools)
-      tools = JSON.stringify(input.tools)
-    }
-  }
+  const toolsInput = input.tools ?? null
+  assertValidTools(toolsInput)
+  const tools = toolsInput === null ? null : JSON.stringify(toolsInput)
 
   const argumentHint = input.argumentHint ?? null
   const isSubagent = input.isSubagent ? 1 : 0
@@ -221,7 +205,6 @@ export interface UpdateAgentPatch {
   emoji?: string | null
   pinned?: boolean
   description?: string
-  // Phase 2
   model?: AgentModel
   tools?: string[] | null              // null = inherit; [] = no tools
   argumentHint?: string | null
@@ -357,11 +340,11 @@ export function duplicateAgent(db: Database.Database, id: string): AgentRow {
     colorEnd: src.color_end,
     emoji: src.emoji,
     description: src.description,
-    // Phase 2: carry content-shaping fields through duplication, but deliberately
-    // do NOT copy is_subagent / is_slash_command — a duplicate should not silently
+    // Carry content-shaping fields through duplication, but deliberately do NOT
+    // copy is_subagent / is_slash_command — a duplicate should not silently
     // create another file in ~/.claude/agents/ (handle is also different anyway).
     model: src.model,
-    tools: src.tools,
+    tools: parseAgentTools(src.tools),
     argumentHint: src.argument_hint,
   })
 }

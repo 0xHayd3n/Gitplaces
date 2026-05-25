@@ -998,13 +998,6 @@ describe('agent skill-parity fields', () => {
     expect(agent.is_slash_command).toBe(1)
   })
 
-  it('createAgent accepts a pre-serialized tools JSON string', () => {
-    const agent = createAgent(db, makeBaseInput({
-      tools: '["Read","Edit","Bash"]',
-    }))
-    expect(agent.tools).toBe('["Read","Edit","Bash"]')
-  })
-
   it('createAgent rejects an invalid model value', () => {
     expect(() => createAgent(db, makeBaseInput({ model: 'gpt-4' as any }))).toThrow(/model/i)
   })

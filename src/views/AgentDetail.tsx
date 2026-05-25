@@ -257,10 +257,8 @@ export default function AgentDetail() {
             takenHandles={takenHandles}
             onCopied={(text) => toast(`Copied ${text}`, 'success')}
           />
-          {(agent.description || deriveDescription(liveBody)) && (
-            <p className="agent-detail-description">
-              {agent.description || deriveDescription(liveBody)}
-            </p>
+          {description && (
+            <p className="agent-detail-description">{description}</p>
           )}
           <div className="agent-detail-meta">
             <span className="agent-detail-chip"><Folder size={11} /> {currentFolderName}</span>

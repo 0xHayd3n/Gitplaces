@@ -335,7 +335,7 @@ function createFromScratch(
       emoji: null,
       description: skill.description,
       model: skill.model,
-      tools: skill.tools,                  // CreateAgentInput accepts string[] | string | null
+      tools: skill.tools,
       argumentHint: skill.argumentHint,
       // Deliberately leaves is_subagent / is_slash_command at default (0).
       // Importing should not auto-create files in ~/.claude/agents/.
