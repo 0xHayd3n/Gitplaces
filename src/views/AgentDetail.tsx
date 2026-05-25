@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Copy, Pin, Folder, FileText, Clock, Edit3, Eye, Plug, Settings as SettingsIcon, CopyPlus, Trash2, Zap } from 'lucide-react'
 import type { AgentRow, AgentFolderRow, AgentRevision, AgentPreset } from '../types/agent'
-import { parseAgentPresets } from '../types/agent'
+import { parseAgentPresets, parseAgentTools } from '../types/agent'
 import { useToast } from '../contexts/Toast'
 import { buildPersonaPayload, deriveDescription } from '../utils/copyPayload'
 import { detectVariables } from '../utils/agentVariables'
@@ -14,6 +14,9 @@ import AgentVariablePresetBar from '../components/AgentVariablePresetBar'
 import AgentHistoryTimeline from '../components/AgentHistoryTimeline'
 import AgentSwatchPopover from '../components/AgentSwatchPopover'
 import AgentFilesTab from '../components/AgentFilesTab'
+import { ModelDropdown } from '../components/ModelDropdown'
+import { ToolsPicker } from '../components/ToolsPicker'
+import { SurfaceToggle } from '../components/SurfaceToggle'
 import './AgentDetail.css'
 
 type SaveStatus = 'idle' | 'saving' | 'saved'
@@ -518,6 +521,22 @@ function AgentSettingsTab({
       folderId: value === '__unfiled' ? null : value,
     })
   }
+
+  const onModelChange = (next: 'sonnet' | 'opus' | 'haiku' | 'inherit') => {
+    window.api.agents.update(agent.id, { model: next })
+  }
+
+  const onToolsChange = (next: string[] | null) => {
+    window.api.agents.update(agent.id, { tools: next })
+  }
+
+  const onArgumentHintChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value
+    window.api.agents.update(agent.id, { argumentHint: v.length === 0 ? null : v })
+  }
+
+  const tools = parseAgentTools(agent.tools)
+
   return (
     <div className="agent-detail-settings-grid">
       <label className="agent-detail-settings-label" htmlFor="agent-settings-folder">Folder</label>
@@ -533,6 +552,61 @@ function AgentSettingsTab({
           ))}
         </select>
         <div className="agent-detail-settings-hint">Move this agent into a folder in the sidebar.</div>
+      </div>
+
+      <div className="agent-detail-settings-divider">Claude Code surfaces</div>
+      <div className="agent-detail-settings-label">Surface</div>
+      <div className="agent-detail-settings-field">
+        <SurfaceToggle
+          agentId={agent.id}
+          kind="subagent"
+          enabled={agent.is_subagent === 1}
+          syncedAt={agent.synced_subagent_at}
+        />
+        <SurfaceToggle
+          agentId={agent.id}
+          kind="slashCommand"
+          enabled={agent.is_slash_command === 1}
+          syncedAt={agent.synced_slash_command_at}
+        />
+      </div>
+
+      {agent.is_slash_command === 1 && (
+        <>
+          <label className="agent-detail-settings-label" htmlFor="agent-settings-argument-hint">
+            Argument hint
+          </label>
+          <div className="agent-detail-settings-field">
+            <input
+              id="agent-settings-argument-hint"
+              type="text"
+              value={agent.argument_hint ?? ''}
+              onChange={onArgumentHintChange}
+              placeholder="[project-name]"
+              className="agent-detail-settings-input"
+            />
+            <div className="agent-detail-settings-hint">
+              Shown after /{agent.handle} in the slash menu.
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="agent-detail-settings-divider">Model &amp; tools</div>
+      <label className="agent-detail-settings-label" htmlFor="agent-settings-model">Model</label>
+      <div className="agent-detail-settings-field">
+        <ModelDropdown id="agent-settings-model" value={agent.model} onChange={onModelChange} />
+        <div className="agent-detail-settings-hint">
+          Written to frontmatter when non-inherit.
+        </div>
+      </div>
+
+      <div className="agent-detail-settings-label">Tools</div>
+      <div className="agent-detail-settings-field">
+        <ToolsPicker value={tools} onChange={onToolsChange} />
+        <div className="agent-detail-settings-hint">
+          Restrict the agent to a specific subset of Claude Code's tools.
+        </div>
       </div>
 
       <div className="agent-detail-settings-label">Export prompt</div>

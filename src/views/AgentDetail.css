@@ -1352,3 +1352,212 @@
 .agent-detail-settings-btn--danger:hover {
   background: rgba(248, 113, 113, 0.12);
 }
+
+/* ──────────────────────────────────────────────────────────────
+   Phase 2: Settings tab additions — surface toggles, tools picker,
+   model dropdown, conflict-resolution modal.
+   ────────────────────────────────────────────────────────────── */
+
+.agent-detail-settings-divider {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.agent-detail-settings-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--t1);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  width: 240px;
+}
+
+.agent-detail-settings-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--t1);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.agent-detail-surface-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.agent-detail-surface-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--t1);
+  cursor: pointer;
+}
+
+.agent-detail-surface-toggle-status {
+  font-size: 11px;
+  color: var(--t3);
+  padding-left: 22px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-detail-surface-toggle-pending {
+  color: var(--t3);
+  font-style: italic;
+}
+
+.agent-detail-surface-toggle-synced {
+  color: var(--t3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agent-detail-surface-toggle-error {
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-detail-tools-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agent-detail-tools-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--t1);
+  cursor: pointer;
+}
+
+.agent-detail-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 4px 12px;
+  padding: 8px 22px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.agent-detail-tools-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--t1);
+  cursor: pointer;
+}
+
+.agent-detail-tools-custom {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.agent-detail-tools-custom-label {
+  font-size: 11px;
+  color: var(--t3);
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+.agent-detail-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agent-detail-modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 420px;
+  max-width: 540px;
+  padding: 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.agent-detail-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-detail-modal-header h3 {
+  font-size: 14px;
+  margin: 0;
+  color: var(--t1);
+  font-weight: 600;
+}
+
+.agent-detail-modal-body {
+  padding: 16px;
+  font-size: 13px;
+  color: var(--t2);
+  line-height: 1.5;
+}
+
+.agent-detail-modal-body p {
+  margin: 0 0 10px;
+}
+
+.agent-detail-modal-path {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  word-break: break-all;
+  margin: 8px 0;
+}
+
+.agent-detail-modal-link {
+  background: none;
+  border: none;
+  color: var(--accent-text);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.agent-detail-modal-link:hover {
+  text-decoration: underline;
+}
+
+.agent-detail-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
