@@ -25,6 +25,7 @@
     "better-sqlite3": "^12.9.0",
     "electron-store": "^8.2.0",
     "epub-gen-memory": "^1.1.2",
+    "gray-matter": "^4.0.3",
     "html-docx-js": "^0.3.1",
     "isomorphic-git": "1.38.0",
     "jszip": "^3.10.1",
