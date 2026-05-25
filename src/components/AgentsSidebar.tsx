@@ -4,6 +4,7 @@ import { Folder, Plus, Settings } from 'lucide-react'
 import type { AgentRow, AgentFolderRow } from '../types/agent'
 import AgentContextMenu from './AgentContextMenu'
 import FolderKebabMenu from './FolderKebabMenu'
+import ImportSkillDialog from './ImportSkillDialog'
 
 type SidebarMenuTarget =
   | { kind: 'agent';  agentId: string }
@@ -34,6 +35,7 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
   const [renameDraft, setRenameDraft] = useState('')
   const renameInputRef = useRef<HTMLInputElement | null>(null)
   const [showNewMenu, setShowNewMenu] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const newMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -325,6 +327,11 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
             <button
               role="menuitem"
               type="button"
+              onClick={() => { setShowNewMenu(false); setShowImport(true) }}
+            >Import skill…</button>
+            <button
+              role="menuitem"
+              type="button"
               onClick={() => { setShowNewMenu(false); handleNewFolder() }}
             >New folder</button>
           </div>
@@ -365,6 +372,8 @@ export default function AgentsSidebar({ searchTerm = '' }: Props) {
           onDelete={handleDeleteFolder}
         />
       )}
+
+      <ImportSkillDialog open={showImport} onClose={() => setShowImport(false)} />
     </div>
   )
 }
