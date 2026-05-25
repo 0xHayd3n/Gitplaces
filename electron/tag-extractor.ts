@@ -1,19 +1,15 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { createLLMService } from './llm'
+
+const TAG_MODEL = { provider: 'anthropic' as const, model: 'claude-haiku-4-5-20251001' }
 
 export async function extractTags(
   query: string,
   knownTopics: string[],
-  apiKey: string
 ): Promise<string[]> {
-  const client = new Anthropic({ apiKey })
+  const llm = createLLMService()
   const topicSample = knownTopics.slice(0, 300).join(', ')
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 256,
-    messages: [{
-      role: 'user',
-      content: `You are a GitHub repository search assistant. Extract search tags from the user's query.
+  const prompt = `You are a GitHub repository search assistant. Extract search tags from the user's query.
 
 Known GitHub topics (use these when they match): ${topicSample}
 
@@ -26,14 +22,18 @@ Examples:
 "render markdown in terminal" → ["markdown", "terminal", "cli", "renderer", "ansi"]
 "small library to parse CSV files" → ["csv", "parser", "lightweight", "data"]
 
-Return only the JSON array, nothing else.`,
-    }],
-  })
+Return only the JSON array, nothing else.`
 
   try {
-    const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
-    return JSON.parse(text.trim())
+    const result = await llm.generateText(TAG_MODEL, {
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 256,
+    })
+    return JSON.parse(result.text.trim())
   } catch {
+    // Either the LLM call failed (auth, network, etc.) OR the response was
+    // unparseable JSON. Fall back to a simple word-split — the IPC handler
+    // treats an empty/incomplete list as "no smart tags, do raw search."
     return query.toLowerCase().split(/\s+/).filter(w => w.length > 2).slice(0, 5)
   }
 }

@@ -2006,7 +2006,7 @@ ipcMain.handle('search:extractTags', async (_, query: string) => {
   const db = getDb(app.getPath('userData'))
   const rows = db.prepare('SELECT topic FROM topic_cache').all() as { topic: string }[]
   const topics = rows.map(r => r.topic)
-  return extractTags(query, topics, apiKey)
+  return extractTags(query, topics)
 })
 
 // Shared helper: upsert raw GitHub results to DB and return RepoRows in original order
