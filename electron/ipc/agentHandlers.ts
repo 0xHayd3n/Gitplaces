@@ -75,6 +75,37 @@ async function pluginDiscoveryRoots(): Promise<string[]> {
   return roots
 }
 
+// Persists synced_*_at timestamps based on a SyncResult and returns the
+// updated synced_*_at values so callers can patch their in-memory row without
+// a re-SELECT. Shared by the create/update flow (runSyncAndPersist) and the
+// retry handler.
+function persistSyncResult(
+  db: ReturnType<typeof getDb>,
+  agentId: string,
+  result: SyncResult,
+  ts: string,
+): { synced_subagent_at: string | null | undefined; synced_slash_command_at: string | null | undefined } {
+  let subagentTs: string | null | undefined = undefined
+  let slashTs: string | null | undefined = undefined
+  if (result.subagent.status === 'written')     { setSyncedAt(db, agentId, 'subagent',     ts);   subagentTs = ts }
+  if (result.subagent.status === 'deleted')     { setSyncedAt(db, agentId, 'subagent',     null); subagentTs = null }
+  if (result.slashCommand.status === 'written') { setSyncedAt(db, agentId, 'slashCommand', ts);   slashTs = ts }
+  if (result.slashCommand.status === 'deleted') { setSyncedAt(db, agentId, 'slashCommand', null); slashTs = null }
+  return { synced_subagent_at: subagentTs, synced_slash_command_at: slashTs }
+}
+
+// Patch keys that change the rendered file content. Updates whose patch
+// contains none of these (e.g. {pinned}, {folderId}, {colorStart}) don't
+// need to touch the disk — the synced files would be byte-identical.
+const CONTENT_AFFECTING_KEYS: readonly (keyof UpdateAgentPatch)[] = [
+  'body', 'description', 'handle', 'tools', 'model', 'argumentHint',
+  'isSubagent', 'isSlashCommand',
+]
+
+function patchAffectsSyncedContent(patch: UpdateAgentPatch): boolean {
+  return CONTENT_AFFECTING_KEYS.some(k => patch[k] !== undefined)
+}
+
 /**
  * Sync the agent's body+frontmatter to ~/.claude/agents/ and/or
  * ~/.claude/commands/ as governed by is_subagent / is_slash_command.
@@ -83,26 +114,28 @@ async function pluginDiscoveryRoots(): Promise<string[]> {
  * was blocked by a conflict).
  */
 async function runSyncAndPersist(
-  agentId: string,
+  row: AgentRow,
   oldHandle: string | undefined,
   forceOverwrite: boolean | undefined,
 ): Promise<{ row: AgentRow; syncWarning?: string }> {
   const db = getDb(app.getPath('userData'))
-  const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as AgentRow
   const result = await syncAgentToDisk(row, { oldHandle, forceOverwrite })
-  const ts = new Date().toISOString()
-  if (result.subagent.status === 'written') setSyncedAt(db, agentId, 'subagent', ts)
-  if (result.subagent.status === 'deleted') setSyncedAt(db, agentId, 'subagent', null)
-  if (result.slashCommand.status === 'written') setSyncedAt(db, agentId, 'slashCommand', ts)
-  if (result.slashCommand.status === 'deleted') setSyncedAt(db, agentId, 'slashCommand', null)
+  const ts = result.subagent.status === 'written' || result.slashCommand.status === 'written'
+    ? new Date().toISOString()
+    : ''
+  const changes = persistSyncResult(db, row.id, result, ts)
   const warnings: string[] = []
   if (result.subagent.status === 'error') warnings.push(`Subagent sync failed: ${result.subagent.message}`)
   if (result.slashCommand.status === 'error') warnings.push(`Slash-command sync failed: ${result.slashCommand.message}`)
   if (result.subagent.status === 'conflict') warnings.push(`Subagent file exists at ${result.subagent.path}; toggle was applied but file not written.`)
   if (result.slashCommand.status === 'conflict') warnings.push(`Slash-command file exists at ${result.slashCommand.path}; toggle was applied but file not written.`)
-  const refreshed = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as AgentRow
+  const refreshed: AgentRow = {
+    ...row,
+    ...(changes.synced_subagent_at !== undefined && { synced_subagent_at: changes.synced_subagent_at }),
+    ...(changes.synced_slash_command_at !== undefined && { synced_slash_command_at: changes.synced_slash_command_at }),
+  }
   return warnings.length > 0
-    ? { row: refreshed, syncWarning: warnings.join(' ') }
+    ? { row: refreshed, syncWarning: warnings.join(' · ') }
     : { row: refreshed }
 }
 
@@ -116,7 +149,7 @@ export function registerAgentHandlers(): void {
     const db = getDb(app.getPath('userData'))
     const { forceOverwrite, ...createInput } = input
     const agent = createAgent(db, createInput)
-    const { row, syncWarning } = await runSyncAndPersist(agent.id, undefined, forceOverwrite)
+    const { row, syncWarning } = await runSyncAndPersist(agent, undefined, forceOverwrite)
     broadcastChanged()
     // New agent has no prior revision; createAgent always inserts a `create` snapshot.
     broadcastRevisionAddedIfNew(row.id, null)
@@ -126,17 +159,32 @@ export function registerAgentHandlers(): void {
   ipcMain.handle('agents:update', async (_, id: string, patch: UpdateAgentPatch & { forceOverwrite?: boolean }) => {
     const db = getDb(app.getPath('userData'))
     const priorRevId = latestRevisionId(id)
-    const oldRow = db.prepare(`SELECT handle FROM agents WHERE id = ?`).get(id) as { handle: string } | undefined
-    const oldHandle = oldRow?.handle
     const { forceOverwrite, ...updatePatch } = patch
-    updateAgent(db, id, updatePatch)
-    const newRow = db.prepare(`SELECT handle FROM agents WHERE id = ?`).get(id) as { handle: string }
-    const handleChanged = oldHandle !== undefined && oldHandle !== newRow.handle
-    const { row, syncWarning } = await runSyncAndPersist(
-      id,
-      handleChanged ? oldHandle : undefined,
-      forceOverwrite,
-    )
+
+    // Read the old handle only when the patch might rename the synced file.
+    // Skipped for non-handle updates so the common case (body keystrokes,
+    // folder reassignment) doesn't pay an extra SELECT.
+    let oldHandle: string | undefined
+    if (updatePatch.handle !== undefined) {
+      const oldRow = db.prepare(`SELECT handle FROM agents WHERE id = ?`).get(id) as { handle: string } | undefined
+      oldHandle = oldRow?.handle
+    }
+
+    const updated = updateAgent(db, id, updatePatch)
+
+    let row: AgentRow = updated
+    let syncWarning: string | undefined
+    if (patchAffectsSyncedContent(updatePatch)) {
+      const handleChanged = oldHandle !== undefined && oldHandle !== updated.handle
+      const synced = await runSyncAndPersist(
+        updated,
+        handleChanged ? oldHandle : undefined,
+        forceOverwrite,
+      )
+      row = synced.row
+      syncWarning = synced.syncWarning
+    }
+
     broadcastChanged()
     broadcastRevisionAddedIfNew(id, priorRevId)
     return syncWarning ? { ...row, syncWarning } : row
@@ -337,11 +385,7 @@ export function registerAgentHandlers(): void {
     const row = db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as AgentRow | undefined
     if (!row) throw new Error(`Unknown agent id: ${agentId}`)
     const result = await syncAgentToDisk(row)
-    const ts = new Date().toISOString()
-    if (result.subagent.status === 'written') setSyncedAt(db, agentId, 'subagent', ts)
-    if (result.subagent.status === 'deleted') setSyncedAt(db, agentId, 'subagent', null)
-    if (result.slashCommand.status === 'written') setSyncedAt(db, agentId, 'slashCommand', ts)
-    if (result.slashCommand.status === 'deleted') setSyncedAt(db, agentId, 'slashCommand', null)
+    persistSyncResult(db, agentId, result, new Date().toISOString())
     broadcastChanged()
     return result
   })
