@@ -33,10 +33,11 @@
   --glass-bg:     rgba(20, 20, 20, 0.85);
   --glass-border: rgba(255, 255, 255, 0.08);
 
-  /* Solid equivalent of --glass-bg blended over app-shell's --bg2.
+  /* Solid equivalent of --glass-bg blended over the body bg (--bg).
      Use for surfaces that must opaquely match the glass-rendered color
-     (e.g. sticky tabs over scrolling content, gradient stops). */
-  --surface-1:    #151516;
+     (e.g. sticky tabs over scrolling content, gradient stops).
+     Math: 0.85*20 + 0.15*18 ≈ 19.7 → 20 per channel = #141414. */
+  --surface-1:    #141414;
 
   /* Borders */
   --border:  rgba(255,255,255,0.07);
