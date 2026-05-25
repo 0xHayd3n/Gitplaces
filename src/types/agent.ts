@@ -29,6 +29,14 @@ export interface AgentRow {
   origin_path: string | null       // e.g., 'skills/brainstorming'
   origin_version: string | null    // e.g., '5.1.0'
   origin_imported_at: string | null
+  // Skill parity (Phase 2)
+  tools: string | null             // JSON-serialized string[]; NULL = inherit all
+  model: 'sonnet' | 'opus' | 'haiku' | 'inherit'
+  is_subagent: 0 | 1
+  is_slash_command: 0 | 1
+  argument_hint: string | null
+  synced_subagent_at: string | null
+  synced_slash_command_at: string | null
 }
 
 export interface AgentFile {
@@ -67,4 +75,19 @@ export function parseAgentPresets(json: string): AgentPreset[] {
   } catch {
     return []
   }
+}
+
+export function parseAgentTools(json: string | null): string[] | null {
+  if (json === null) return null
+  try {
+    const parsed = JSON.parse(json)
+    return Array.isArray(parsed) ? parsed.filter((t): t is string => typeof t === 'string') : null
+  } catch {
+    return null
+  }
+}
+
+export function serializeAgentTools(arr: string[] | null): string | null {
+  if (arr === null) return null
+  return JSON.stringify(arr)
 }

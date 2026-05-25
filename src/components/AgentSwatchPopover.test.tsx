@@ -24,6 +24,13 @@ const agent: AgentRow = {
   origin_path: null,
   origin_version: null,
   origin_imported_at: null,
+  tools: null,
+  model: 'inherit',
+  is_subagent: 0,
+  is_slash_command: 0,
+  argument_hint: null,
+  synced_subagent_at: null,
+  synced_slash_command_at: null,
 }
 
 beforeEach(() => {
