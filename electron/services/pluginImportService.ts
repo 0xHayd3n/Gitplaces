@@ -215,6 +215,47 @@ async function walkRecursive(
 
 // ── Plugin discovery ────────────────────────────────────────────────
 
+export interface PluginManifest {
+  name: string
+  version: string | null
+}
+
+export async function readPluginManifest(pluginDir: string): Promise<PluginManifest> {
+  const dirname = path.basename(pluginDir)
+
+  // Prefer .claude-plugin/plugin.json (Anthropic canonical format).
+  const claudeManifestPath = path.join(pluginDir, '.claude-plugin', 'plugin.json')
+  const claudeRaw = await fs.readFile(claudeManifestPath, 'utf-8').catch(() => null)
+  if (claudeRaw !== null) {
+    try {
+      const m = JSON.parse(claudeRaw)
+      return {
+        name: typeof m.name === 'string' && m.name.length > 0 ? m.name : dirname,
+        version: typeof m.version === 'string' ? m.version : null,
+      }
+    } catch {
+      // Malformed — fall through to package.json
+    }
+  }
+
+  // Fall back to package.json (legacy plugin layouts).
+  const pkgPath = path.join(pluginDir, 'package.json')
+  const pkgRaw = await fs.readFile(pkgPath, 'utf-8').catch(() => null)
+  if (pkgRaw !== null) {
+    try {
+      const p = JSON.parse(pkgRaw)
+      return {
+        name: typeof p.name === 'string' && p.name.length > 0 ? p.name : dirname,
+        version: typeof p.version === 'string' ? p.version : null,
+      }
+    } catch {
+      // Malformed — fall through to dirname
+    }
+  }
+
+  return { name: dirname, version: null }
+}
+
 export interface DiscoveredSkill {
   name: string
   path: string

@@ -6,6 +6,7 @@ import {
   parseSkill, discoverPlugins, importSkill,
   parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint,
   parseSubagent, COLOR_MAP, parseSlashCommand,
+  readPluginManifest,
 } from './pluginImportService'
 import { initSchema } from '../db'
 import { createFolder } from './agentsService'
@@ -353,5 +354,31 @@ describe('parseSlashCommand', () => {
 
   it('throws when the file does not exist', async () => {
     await expect(parseSlashCommand(path.join(COMMAND_FIXTURES, 'nope.md'))).rejects.toThrow()
+  })
+})
+
+describe('readPluginManifest', () => {
+  it('prefers .claude-plugin/plugin.json over package.json when both exist', async () => {
+    const manifest = await readPluginManifest(path.join(PLUGIN_FIXTURES, 'both-manifests'))
+    expect(manifest.name).toBe('from-claude')
+    expect(manifest.version).toBe('2.0.0')
+  })
+
+  it('reads .claude-plugin/plugin.json when only that exists', async () => {
+    const manifest = await readPluginManifest(path.join(PLUGIN_FIXTURES, 'with-claude-manifest'))
+    expect(manifest.name).toBe('claude-manifest-plugin')
+    expect(manifest.version).toBe('0.9.0')
+  })
+
+  it('falls back to package.json when .claude-plugin/plugin.json is absent', async () => {
+    const manifest = await readPluginManifest(path.join(PLUGIN_FIXTURES, 'cool-plugin'))
+    expect(manifest.name).toBe('cool-plugin')
+    expect(manifest.version).toBe('1.2.3')
+  })
+
+  it('falls back to dirname with null version when neither manifest exists', async () => {
+    const manifest = await readPluginManifest(path.join(PLUGIN_FIXTURES, 'no-package'))
+    expect(manifest.name).toBe('no-package')
+    expect(manifest.version).toBeNull()
   })
 })
