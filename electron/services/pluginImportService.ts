@@ -146,6 +146,38 @@ export async function parseSubagent(filePath: string): Promise<ParsedSubagent> {
   }
 }
 
+export async function parseSlashCommand(filePath: string): Promise<ParsedSlashCommand> {
+  const stat = await fs.stat(filePath).catch(() => null)
+  if (!stat || !stat.isFile()) throw new Error(`Slash-command file not found: ${filePath}`)
+  const raw = await fs.readFile(filePath, 'utf-8')
+  const parsed = matter(raw)
+  const data = parsed.data as Record<string, unknown>
+
+  const name = path.basename(filePath, '.md')
+  const description = typeof data.description === 'string' ? data.description : ''
+  const argumentHint = parseArgumentHint(data['argument-hint'])
+
+  const known = new Set(['description', 'argument-hint'])
+  const dropped = Object.keys(data).filter(k => !known.has(k))
+  if (dropped.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(`[pluginImportService] Dropped slash-command frontmatter keys from ${filePath}:`, dropped)
+  }
+
+  return {
+    kind: 'slashCommand',
+    name,
+    handle: slugifyName(name),
+    description,
+    body: parsed.content.trim(),
+    files: [] as never[],
+    origin: null,
+    model: 'inherit',
+    tools: null,
+    argumentHint,
+  }
+}
+
 async function walkSkillFiles(skillDir: string): Promise<{ filename: string; content: string }[]> {
   const collected: { filename: string; content: string }[] = []
   await walkRecursive(skillDir, skillDir, collected)

@@ -5,7 +5,7 @@ import Database from 'better-sqlite3'
 import {
   parseSkill, discoverPlugins, importSkill,
   parseModelFrontmatter, parseToolsFrontmatter, parseArgumentHint,
-  parseSubagent, COLOR_MAP,
+  parseSubagent, COLOR_MAP, parseSlashCommand,
 } from './pluginImportService'
 import { initSchema } from '../db'
 import { createFolder } from './agentsService'
@@ -320,5 +320,38 @@ describe('COLOR_MAP', () => {
     expect(COLOR_MAP.blue).toBe('#3b82f6')
     expect(COLOR_MAP.purple).toBe('#a855f7')
     expect(COLOR_MAP.pink).toBe('#ec4899')
+  })
+})
+
+const COMMAND_FIXTURES = path.join(__dirname, '__fixtures__/commands')
+
+describe('parseSlashCommand', () => {
+  it('parses full frontmatter into a ParsedSlashCommand', async () => {
+    const cmd = await parseSlashCommand(path.join(COMMAND_FIXTURES, 'full.md'))
+    expect(cmd.kind).toBe('slashCommand')
+    expect(cmd.name).toBe('full')                 // from filename stem
+    expect(cmd.handle).toBe('full')
+    expect(cmd.description).toBe('Guided feature development with codebase understanding.')
+    expect(cmd.argumentHint).toBe('Optional feature description')
+    expect(cmd.body).toContain('Feature Development')
+    expect(cmd.model).toBe('inherit')
+    expect(cmd.tools).toBeNull()
+    expect(cmd.files).toEqual([])
+  })
+
+  it('falls back to filename stem and empty description when no frontmatter', async () => {
+    const cmd = await parseSlashCommand(path.join(COMMAND_FIXTURES, 'no-frontmatter.md'))
+    expect(cmd.name).toBe('no-frontmatter')
+    expect(cmd.description).toBe('')
+    expect(cmd.argumentHint).toBeNull()
+  })
+
+  it('preserves bracket form of argument-hint when YAML parses it as an array', async () => {
+    const cmd = await parseSlashCommand(path.join(COMMAND_FIXTURES, 'argument-hint-array.md'))
+    expect(cmd.argumentHint).toBe('[project-name]')
+  })
+
+  it('throws when the file does not exist', async () => {
+    await expect(parseSlashCommand(path.join(COMMAND_FIXTURES, 'nope.md'))).rejects.toThrow()
   })
 })
