@@ -55,8 +55,8 @@ describe('ImportPluginDialog', () => {
     expect(screen.getByText('superpowers')).toBeTruthy()
     expect(screen.getByText('anatomy')).toBeTruthy()
     expect(screen.getByText(/v5\.1\.0/)).toBeTruthy()
-    expect(screen.getByText(/2 skills/)).toBeTruthy()
-    expect(screen.getByText(/1 skill$/)).toBeTruthy()
+    expect(screen.getByText(/2 items/)).toBeTruthy()
+    expect(screen.getByText(/1 item$/)).toBeTruthy()
   })
 
   it('clicking a plugin expands its skill list', async () => {
@@ -71,7 +71,7 @@ describe('ImportPluginDialog', () => {
     render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.click(screen.getByRole('button', { name: /superpowers/i }))
-    fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
+    fireEvent.click(screen.getByRole('button', { name: /import 2 items/i }))
     await waitFor(() => expect(window.api.agents.import.importTarget).toHaveBeenCalledTimes(2))
   })
 
@@ -79,7 +79,7 @@ describe('ImportPluginDialog', () => {
     render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.click(screen.getByRole('button', { name: /superpowers/i }))
-    fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
+    fireEvent.click(screen.getByRole('button', { name: /import 2 items/i }))
     await waitFor(() => expect(window.api.agents.createFolder).toHaveBeenCalledWith('superpowers'))
   })
 })
@@ -118,15 +118,15 @@ describe('ImportPluginDialog — GitHub section', () => {
     expect(screen.getByText('brainstorming')).toBeTruthy()
   })
 
-  it('shows "No skills found" when discoverPluginInRepo returns empty skills', async () => {
+  it('shows empty-state message when discoverPluginInRepo returns no targets', async () => {
     ;(window.api.agents.import.discoverPluginInRepo as any) = vi.fn().mockResolvedValue({
-      owner: 'o', name: 'r', branch: 'main', commitSha: 'sha', layout: 'skills-dir', skills: [],
+      owner: 'o', name: 'r', branch: 'main', commitSha: 'sha', layout: 'plugin', skills: [], subagents: [], slashCommands: [],
     })
     render(<ImportPluginDialog open onClose={() => {}} />)
     await waitFor(() => screen.getByText('superpowers'))
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'o/r' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
-    await waitFor(() => screen.getByText(/no skills found/i))
+    await waitFor(() => screen.getByText(/no skills, sub-agents, or slash commands found/i))
   })
 
   it('shows an error message when discoverPluginInRepo rejects', async () => {
@@ -144,7 +144,7 @@ describe('ImportPluginDialog — GitHub section', () => {
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'obra/superpowers' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
     await waitFor(() => screen.getByText('plan-writing'))
-    fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
+    fireEvent.click(screen.getByRole('button', { name: /import 2 items/i }))
     await waitFor(() => expect(window.api.agents.import.readTargetFromRepo).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(window.api.agents.import.importTarget).toHaveBeenCalledTimes(2))
   })
@@ -155,7 +155,7 @@ describe('ImportPluginDialog — GitHub section', () => {
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'obra/superpowers' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
     await waitFor(() => screen.getByText('plan-writing'))
-    fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
+    fireEvent.click(screen.getByRole('button', { name: /import 2 items/i }))
     await waitFor(() => expect(window.api.agents.createFolder).toHaveBeenCalledWith('superpowers'))
   })
 
@@ -166,7 +166,7 @@ describe('ImportPluginDialog — GitHub section', () => {
     ;(window.api.agents.import.readTargetFromRepo as any) = vi.fn()
       .mockRejectedValueOnce(new Error('boom for skill 1'))
       .mockResolvedValueOnce({
-        name: 'plan-writing', handle: 'plan-writing', description: '', body: '', files: [],
+        kind: 'skill', name: 'plan-writing', handle: 'plan-writing', description: '', body: '', files: [],
         origin: { plugin: 'obra/superpowers', pluginVersion: 'a1b2c3d', path: 'skills/plan-writing' },
       })
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
@@ -177,7 +177,7 @@ describe('ImportPluginDialog — GitHub section', () => {
     fireEvent.change(screen.getByPlaceholderText(/owner\/repo/i), { target: { value: 'obra/superpowers' } })
     fireEvent.click(screen.getByRole('button', { name: /^fetch$/i }))
     await waitFor(() => screen.getByText('plan-writing'))
-    fireEvent.click(screen.getByRole('button', { name: /import 2 skills/i }))
+    fireEvent.click(screen.getByRole('button', { name: /import 2 items/i }))
 
     // Both readTargetFromRepo calls happen (one throws, one resolves) — failure
     // is isolated to the first skill.
@@ -188,7 +188,7 @@ describe('ImportPluginDialog — GitHub section', () => {
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledTimes(1)
       const msg = alertSpy.mock.calls[0][0] as string
-      expect(msg).toMatch(/1 failure/i)
+      expect(msg).toMatch(/1 issue/i)
       expect(msg).toContain('brainstorming')
       expect(msg).toContain('boom for skill 1')
     })
@@ -196,5 +196,68 @@ describe('ImportPluginDialog — GitHub section', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled())
 
     alertSpy.mockRestore()
+  })
+})
+
+describe('ImportPluginDialog — mixed kinds', () => {
+  beforeEach(() => {
+    ;(window.api.agents.import.discoverPlugins as any) = vi.fn().mockResolvedValue([
+      {
+        id: 'mixed', name: 'mixed-plugin', version: '1.0.0', root: '/m',
+        skills:        [{ name: 'a-skill',  path: '/m/skills/a-skill', description: 'A',     fileCount: 1 }],
+        subagents:     [{ name: 'agent-1',  path: '/m/agents/agent-1.md',  description: 'AG',  color: 'green' }],
+        slashCommands: [{ name: 'cmd-1',    path: '/m/commands/cmd-1.md',  description: 'CMD', argumentHint: '[x]' }],
+      },
+    ])
+    ;(window.api.agents.import.readTargetFromDisk as any) = vi.fn().mockImplementation(async (p: string, kind: string) => ({
+      kind, name: p.split('/').pop(), handle: p.split('/').pop(),
+      description: '', body: '', files: [], origin: null,
+    }))
+  })
+
+  it('renders three grouped sections with per-kind counts when expanded', async () => {
+    render(<ImportPluginDialog open onClose={() => {}} />)
+    await waitFor(() => screen.getByText('mixed-plugin'))
+    fireEvent.click(screen.getByRole('button', { name: /mixed-plugin/i }))
+    expect(screen.getByText(/Skills \(1\)/)).toBeTruthy()
+    expect(screen.getByText(/Sub-agents \(1\)/)).toBeTruthy()
+    expect(screen.getByText(/Slash commands \(1\)/)).toBeTruthy()
+  })
+
+  it('the plugin row count badge sums all three kinds', async () => {
+    render(<ImportPluginDialog open onClose={() => {}} />)
+    await waitFor(() => screen.getByText('mixed-plugin'))
+    expect(screen.getByText(/3 items/)).toBeTruthy()
+  })
+
+  it('import dispatches readTargetFromDisk per kind for each selected target', async () => {
+    render(<ImportPluginDialog open onClose={() => {}} />)
+    await waitFor(() => screen.getByText('mixed-plugin'))
+    fireEvent.click(screen.getByRole('button', { name: /mixed-plugin/i }))
+    fireEvent.click(screen.getByRole('button', { name: /import 3 items/i }))
+    await waitFor(() => expect(window.api.agents.import.readTargetFromDisk).toHaveBeenCalledTimes(3))
+    const calls = (window.api.agents.import.readTargetFromDisk as any).mock.calls
+    const kinds = calls.map((c: unknown[]) => c[1])
+    expect(kinds).toContain('skill')
+    expect(kinds).toContain('subagent')
+    expect(kinds).toContain('slashCommand')
+    await waitFor(() => expect(window.api.agents.import.importTarget).toHaveBeenCalledTimes(3))
+  })
+
+  it('toggling one kind off does not affect the others (kind:path keying)', async () => {
+    render(<ImportPluginDialog open onClose={() => {}} />)
+    await waitFor(() => screen.getByText('mixed-plugin'))
+    fireEvent.click(screen.getByRole('button', { name: /mixed-plugin/i }))
+    // Default-selected: 3 items. Uncheck just the skill.
+    const skillCheckboxes = screen.getAllByRole('checkbox')
+    // First checkbox is the skill row (skills group renders first).
+    fireEvent.click(skillCheckboxes[0])
+    expect(screen.getByRole('button', { name: /import 2 items/i })).toBeTruthy()
+  })
+
+  it('renders the sync-surface subtitle', () => {
+    render(<ImportPluginDialog open onClose={() => {}} />)
+    expect(screen.getByText(/~\/\.claude\/agents/)).toBeTruthy()
+    expect(screen.getByText(/~\/\.claude\/commands/)).toBeTruthy()
   })
 })
