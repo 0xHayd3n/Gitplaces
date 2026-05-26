@@ -141,20 +141,6 @@ function FileTreeRow({
           <span className="file-row__age">{lastCommit ? relativeAge(lastCommit.committed_at) : ''}</span>
         </>
       )}
-      {variant === 'tree' && row.size != null && !isDir && (
-        <span className="file-row__size">{formatBytes(row.size)}</span>
-      )}
-      {variant === 'tree' && showMessage && lastCommit && (
-        <span className="file-row__message" title={lastCommit.message}>
-          {lastCommit.message}
-        </span>
-      )}
-      {variant === 'tree' && showAuthor && lastCommit?.author_avatar && (
-        <img className="file-row__avatar" src={lastCommit.author_avatar} alt={lastCommit.author_login ?? ''} />
-      )}
-      {variant === 'tree' && lastCommit && (
-        <span className="file-row__age">{relativeAge(lastCommit.committed_at)}</span>
-      )}
     </div>
   )
 }
