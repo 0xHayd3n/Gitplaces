@@ -9,7 +9,7 @@ import IconOllama from '~icons/simple-icons/ollama'
 
 type SetupPhase = 'idle' | 'checking' | 'installing' | 'auth' | 'done' | 'error'
 type LoginPhase = 'idle' | 'logging-in' | 'done' | 'error'
-type CategoryId = 'providers' | 'claude-desktop' | 'appearance' | 'language' | 'downloads' | 'projects' | 'connectors' | 'updates'
+type CategoryId = 'providers' | 'claude-opencode' | 'appearance' | 'language' | 'downloads' | 'projects' | 'connectors' | 'updates'
 
 type CustomConnector = { id: string; name: string; url: string; oauthClientId: string; oauthClientSecret: string }
 
@@ -145,7 +145,7 @@ const InfoIcon = ({ title }: { title: string }) => (
 
 const CATEGORIES: { id: CategoryId; label: string; icon: ReactNode }[] = [
   { id: 'providers', label: 'Providers', icon: <ProvidersIcon /> },
-  { id: 'claude-desktop', label: 'Claude Desktop', icon: <DesktopIcon /> },
+  { id: 'claude-opencode', label: 'Claude Code & OpenCode', icon: <DesktopIcon /> },
   { id: 'appearance', label: 'Appearance', icon: <PaletteIcon /> },
   { id: 'language', label: 'Language & Speech', icon: <GlobeIcon /> },
   { id: 'downloads', label: 'Downloads', icon: <DownloadIcon /> },
@@ -621,6 +621,14 @@ export default function Settings() {
   const [autoConfigIsError, setAutoConfigIsError] = useState(false)
   const [testResult, setTestResult] = useState<string | null>(null)
 
+  // OpenCode state
+  const [opencodeInstalled, setOpencodeInstalled] = useState<boolean | null>(null)
+  const [opencodeLoggedIn, setOpencodeLoggedIn] = useState<boolean | null>(null)
+  const [opencodeSetupPhase, setOpencodeSetupPhase] = useState<SetupPhase>('idle')
+  const [opencodeSetupLines, setOpencodeSetupLines] = useState<string[]>([])
+  const [opencodeLoginPhase, setOpencodeLoginPhase] = useState<LoginPhase>('idle')
+  const [opencodeLoginLines, setOpencodeLoginLines] = useState<string[]>([])
+
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   useEffect(() => () => { timers.current.forEach(clearTimeout) }, [])
 
@@ -640,6 +648,8 @@ export default function Settings() {
       if (installed) window.api.skill.checkAuthStatus().then(setClaudeCodeLoggedIn)
       else setClaudeCodeLoggedIn(false)
     })
+    window.api.opencode.detect().then(setOpencodeInstalled).catch(() => setOpencodeInstalled(false))
+    window.api.opencode.checkAuthStatus().then(setOpencodeLoggedIn).catch(() => setOpencodeLoggedIn(false))
     loadMcpStatus()
     window.api.settings.getPreferredLanguage().then(setPreferredLanguage).catch(() => {})
     window.api.download.getDefaultFolder().then((val: string) => {
@@ -988,6 +998,37 @@ export default function Settings() {
 
             {/* OpenAI-compatible card */}
             <OpenAICompatibleSection endpoints={endpoints} setEndpoints={setEndpoints} testProvider={testProvider} renderStatus={renderStatus} />
+
+            {/* OpenCode card */}
+            <div className="connector-row">
+              <div className="connector-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text)' }} aria-hidden="true">
+                  <polyline points="8 6 2 12 8 18" />
+                  <polyline points="16 6 22 12 16 18" />
+                </svg>
+              </div>
+              <div className="connector-info">
+                <div className="connector-name" style={{ display: 'flex', alignItems: 'center' }}>
+                  OpenCode
+                  <InfoIcon title="Subscription-based CLI agent runner. Supports Claude, GPT, Gemini, and local models via a single OAuth login." />
+                </div>
+                <div className="connector-desc" style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span className={`status-dot ${opencodeInstalled ? 'active' : 'inactive'}`} />
+                    {opencodeInstalled === null ? 'Checking…' : opencodeInstalled ? 'Installed' : 'Not installed'}
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <span className={`status-dot ${opencodeLoggedIn ? 'active' : 'inactive'}`} />
+                    {opencodeLoggedIn === null ? 'Checking…' : opencodeLoggedIn ? 'Logged in' : 'Not logged in'}
+                  </span>
+                </div>
+              </div>
+              <div className="connector-actions">
+                <button className="settings-btn" onClick={() => setActiveCategory('claude-opencode')}>
+                  {opencodeInstalled && opencodeLoggedIn ? 'Manage' : 'Set up'}
+                </button>
+              </div>
+            </div>
 
           </div>
         </div>
@@ -1361,63 +1402,171 @@ export default function Settings() {
     </>
   )
 
-  const renderClaudeDesktop = () => (
-    <div className="settings-group">
-      <div className="settings-group-title">Claude Desktop integration</div>
-      <div className="settings-group-body">
-        <div className="settings-group-row">
-          <div className="settings-group-row-main">
-            <div className="settings-group-row-label">Status</div>
-            <div className="settings-group-row-sub">
-              <span className={`status-dot ${mcpConfigured ? 'active' : 'inactive'}`} />
-              {mcpConfigured ? 'Configured' : 'Not configured'}
+  const handleOpencodeSetup = async () => {
+    setOpencodeSetupPhase('installing')
+    setOpencodeSetupLines([])
+    const cb = (payload: { phase: string; line?: string }) => {
+      if (payload.line) setOpencodeSetupLines(prev => [...prev, payload.line!])
+      if (payload.phase === 'done') setOpencodeSetupPhase('done')
+      if (payload.phase === 'error') setOpencodeSetupPhase('error')
+    }
+    window.api.opencode.onSetupProgress(cb)
+    try {
+      const result = await window.api.opencode.setup()
+      if (result.ok) {
+        setOpencodeInstalled(true)
+        setOpencodeSetupPhase('done')
+      } else {
+        setOpencodeSetupPhase('error')
+      }
+    } finally {
+      window.api.opencode.offSetupProgress(cb)
+    }
+  }
+
+  const handleOpencodeLogin = async () => {
+    setOpencodeLoginPhase('logging-in')
+    setOpencodeLoginLines([])
+    const cb = (payload: { message: string; isError?: boolean; done?: boolean }) => {
+      setOpencodeLoginLines(prev => [...prev, payload.message])
+      if (payload.done) setOpencodeLoginPhase(payload.isError ? 'error' : 'done')
+    }
+    window.api.opencode.onLoginProgress(cb)
+    try {
+      const result = await window.api.opencode.loginOpenCode()
+      if (result.ok) {
+        setOpencodeLoggedIn(true)
+        setOpencodeLoginPhase('done')
+      } else if (opencodeLoginPhase !== 'error') {
+        setOpencodeLoginPhase('error')
+      }
+    } finally {
+      window.api.opencode.offLoginProgress(cb)
+    }
+  }
+
+  const handleOpencodeLogout = async () => {
+    await window.api.opencode.logoutOpenCode()
+    setOpencodeLoggedIn(false)
+  }
+
+  const renderClaudeOpenCode = () => (
+    <>
+      <div className="settings-group">
+        <div className="settings-group-title">Claude Code</div>
+        <div className="settings-group-body">
+          <div className="settings-group-row">
+            <div className="settings-group-row-main">
+              <div className="settings-group-row-label">Status</div>
+              <div className="settings-group-row-sub">
+                <span className={`status-dot ${mcpConfigured ? 'active' : 'inactive'}`} />
+                {mcpConfigured ? 'Configured' : 'Not configured'}
+              </div>
+            </div>
+            <button className="settings-btn" onClick={handleAutoConfigure}>
+              Auto-configure
+            </button>
+          </div>
+
+          {mcpConfigPath && (
+            <div className="settings-group-row settings-group-row--full">
+              <p className="settings-hint settings-mcp-path">
+                Config file: {mcpConfigPath}
+              </p>
+            </div>
+          )}
+
+          {autoConfigStatus && (
+            <div className="settings-group-row settings-group-row--full">
+              <p className={`settings-hint${autoConfigIsError ? ' error' : ' success'}`}>{autoConfigStatus}</p>
+            </div>
+          )}
+
+          <div className="settings-group-row settings-group-row--full">
+            <div className="settings-group-row-label">Manual configuration</div>
+            <p className="settings-hint" style={{ marginTop: 4 }}>
+              Add this to <code>claude_desktop_config.json</code>:
+            </p>
+            <div className="settings-mcp-snippet-row">
+              <pre className="settings-mcp-snippet">{configSnippet}</pre>
+              <button className="settings-btn settings-mcp-copy-btn" onClick={handleCopy}>
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
             </div>
           </div>
-          <button className="settings-btn" onClick={handleAutoConfigure}>
-            Auto-configure
-          </button>
-        </div>
 
-        {mcpConfigPath && (
-          <div className="settings-group-row settings-group-row--full">
-            <p className="settings-hint settings-mcp-path">
-              Config file: {mcpConfigPath}
-            </p>
-          </div>
-        )}
-
-        {autoConfigStatus && (
-          <div className="settings-group-row settings-group-row--full">
-            <p className={`settings-hint${autoConfigIsError ? ' error' : ' success'}`}>{autoConfigStatus}</p>
-          </div>
-        )}
-
-        <div className="settings-group-row settings-group-row--full">
-          <div className="settings-group-row-label">Manual configuration</div>
-          <p className="settings-hint" style={{ marginTop: 4 }}>
-            Add this to <code>claude_desktop_config.json</code>:
-          </p>
-          <div className="settings-mcp-snippet-row">
-            <pre className="settings-mcp-snippet">{configSnippet}</pre>
-            <button className="settings-btn settings-mcp-copy-btn" onClick={handleCopy}>
-              {copied ? 'Copied!' : 'Copy'}
+          <div className="settings-group-row">
+            <div className="settings-group-row-main">
+              <div className="settings-group-row-label">Test connection</div>
+              <div className="settings-group-row-sub">
+                {testResult ?? 'Verify the MCP server is reachable.'}
+              </div>
+            </div>
+            <button className="settings-btn" onClick={handleTestConnection}>
+              Test
             </button>
           </div>
         </div>
+      </div>
 
-        <div className="settings-group-row">
-          <div className="settings-group-row-main">
-            <div className="settings-group-row-label">Test connection</div>
-            <div className="settings-group-row-sub">
-              {testResult ?? 'Verify the MCP server is reachable.'}
+      <div className="settings-group">
+        <div className="settings-group-title">OpenCode</div>
+        <div className="settings-group-body">
+          <div className="settings-group-row">
+            <div className="settings-group-row-main">
+              <div className="settings-group-row-label">Install status</div>
+              <div className="settings-group-row-sub">
+                <span className={`status-dot ${opencodeInstalled ? 'active' : 'inactive'}`} />
+                {opencodeInstalled === null ? 'Checking…' : opencodeInstalled ? 'Installed' : 'Not installed'}
+              </div>
             </div>
+            {opencodeInstalled === false && (
+              <button
+                className="settings-btn"
+                disabled={opencodeSetupPhase === 'installing' || opencodeSetupPhase === 'checking'}
+                onClick={handleOpencodeSetup}
+              >
+                {opencodeSetupPhase === 'installing' || opencodeSetupPhase === 'checking' ? 'Installing…' : 'Install OpenCode'}
+              </button>
+            )}
           </div>
-          <button className="settings-btn" onClick={handleTestConnection}>
-            Test
-          </button>
+
+          <div className="settings-group-row">
+            <div className="settings-group-row-main">
+              <div className="settings-group-row-label">Authentication</div>
+              <div className="settings-group-row-sub">
+                <span className={`status-dot ${opencodeLoggedIn ? 'active' : 'inactive'}`} />
+                {opencodeLoggedIn === null ? 'Checking…' : opencodeLoggedIn ? 'Logged in' : 'Not logged in'}
+              </div>
+            </div>
+            {opencodeInstalled && opencodeLoggedIn === false && (
+              <button
+                className="settings-btn"
+                disabled={opencodeLoginPhase === 'logging-in'}
+                onClick={handleOpencodeLogin}
+              >
+                {opencodeLoginPhase === 'logging-in' ? 'Waiting for browser…' : 'Login to OpenCode'}
+              </button>
+            )}
+            {opencodeInstalled && opencodeLoggedIn === true && (
+              <button className="settings-btn settings-btn--link" onClick={handleOpencodeLogout}>
+                Logout
+              </button>
+            )}
+          </div>
+
+          {(opencodeSetupLines.length > 0 || opencodeLoginLines.length > 0) && (
+            <div className="settings-group-row settings-group-row--full">
+              <div className="settings-setup-log" style={{ width: '100%' }}>
+                {[...opencodeSetupLines, ...opencodeLoginLines].map((line, i) => (
+                  <div key={i} className="settings-setup-line">{line}</div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </div>
+    </>
   )
 
   const renderAppearance = () => (
@@ -1703,7 +1852,7 @@ export default function Settings() {
         <div key={activeCategory} className="settings-pane">
           <h2 className="settings-pane-title">{activeLabel}</h2>
           {activeCategory === 'providers' && renderProviders()}
-          {activeCategory === 'claude-desktop' && renderClaudeDesktop()}
+          {activeCategory === 'claude-opencode' && renderClaudeOpenCode()}
           {activeCategory === 'appearance' && renderAppearance()}
           {activeCategory === 'language' && renderLanguage()}
           {activeCategory === 'downloads' && renderDownloads()}
