@@ -544,9 +544,8 @@ export default function RepoDetail() {
 
   const [repo, setRepo] = useState<RepoRow | null>(null)
   const [repoError, setRepoError] = useState(false)
-  const [activeTab, setActiveTab] = useState<Tab>('activities')
+  const [activeTab, setActiveTab] = useState<Tab>('readme')
   const [filesTargetPath, setFilesTargetPath] = useState<string | null>(null)
-  const fellBackRef = useRef(false)
   const [selectedReleaseId, setSelectedReleaseId] = useState<string | null>(null)
 
   // TOC panel state + refs (shared with ArticleLayout, ReadmeRenderer, and TocNav)
@@ -680,18 +679,6 @@ export default function RepoDetail() {
       }))
       .filter(g => g.items.length > 0)
   }, [repoActivityGroups, featuredActivityItem])
-  // First-resolve fallback: if BOTH releases and user events come back empty/error,
-  // drop from the optimistic 'activities' default to README. The ref ensures we
-  // only apply the fallback once — subsequent navigations to Activities by the
-  // user stick.
-  useEffect(() => {
-    if (fellBackRef.current) return
-    if (releases === 'loading' || userEvents === 'loading') return
-    fellBackRef.current = true
-    const hasActivity = (Array.isArray(releases) && (releases as ReleaseRow[]).length > 0)
-                     || (Array.isArray(userEvents) && userEvents.length > 0)
-    if (!hasActivity && activeTab === 'activities') setActiveTab('readme')
-  }, [releases, userEvents, activeTab])
   const [repoCols, setRepoCols] = useState<{ id: string; name: string }[]>([])
 
   // Learn state
@@ -834,11 +821,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     setSkillRow(null)
     setComponentsSkillRow(null)
     setSelectedSkillFile('master')
-    // Default to 'activities' (shows release feed); fellBackRef effect will
-    // demote to 'readme' if releases resolves empty/error. Reset the ref so
-    // the demotion runs again for the new repo.
-    fellBackRef.current = false
-    setActiveTab('activities')
+    setActiveTab('readme')
 
     // Phase 4H — bundled GraphQL fetch. One round-trip replaces the separate
     // getRepo + getReleases + isStarred REST calls. On failure we degrade
@@ -1406,8 +1389,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
 
   const visibleTabs = ALL_TABS.filter(t =>
     // 'activities' is always visible — the empty-state placeholder handles
-    // repos with no releases. README is still the default landing tab when
-    // releases resolves empty/error (fellBackRef effect demotes activeTab).
+    // repos with no releases. README is the default landing tab.
     (t.id !== 'related'    || related.length > 0) &&
     (t.id !== 'videos'     || videoLinks.length > 0) &&
     (t.id !== 'posts'      || socialPosts.length > 0) &&
