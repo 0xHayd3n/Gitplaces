@@ -79,6 +79,7 @@
 .filter-dd__option {
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 6px 10px;
   background: transparent;
   border: none;
@@ -90,6 +91,25 @@
   border-radius: 4px;
   outline: none;
   width: 100%;
+}
+.filter-dd__option-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--t3);
+}
+.filter-dd__option--selected .filter-dd__option-icon,
+.filter-dd__option:hover .filter-dd__option-icon {
+  color: var(--t1);
+}
+.filter-dd__option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .filter-dd__option:hover {
   background: rgba(255,255,255,0.08);

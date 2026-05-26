@@ -5,6 +5,7 @@ import './FilterDropdown.css'
 interface Option<T extends string> {
   value: T
   label: string
+  icon?: React.ReactNode
 }
 
 interface Props<T extends string> {
@@ -16,10 +17,11 @@ interface Props<T extends string> {
   /** When true, a "None" option is rendered at the top that emits null. */
   allowNone?: boolean
   noneLabel?: string
+  noneIcon?: React.ReactNode
 }
 
 export default function FilterDropdown<T extends string>({
-  icon, value, options, placeholder, onChange, allowNone, noneLabel = 'None',
+  icon, value, options, placeholder, onChange, allowNone, noneLabel = 'None', noneIcon,
 }: Props<T>) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -65,7 +67,8 @@ export default function FilterDropdown<T extends string>({
               className={'filter-dd__option' + (value == null ? ' filter-dd__option--selected' : '')}
               onClick={() => { onChange(null); setOpen(false) }}
             >
-              {noneLabel}
+              <span className="filter-dd__option-icon">{noneIcon}</span>
+              <span className="filter-dd__option-label">{noneLabel}</span>
             </button>
           )}
           {options.map(o => (
@@ -77,7 +80,8 @@ export default function FilterDropdown<T extends string>({
               className={'filter-dd__option' + (o.value === value ? ' filter-dd__option--selected' : '')}
               onClick={() => { onChange(o.value); setOpen(false) }}
             >
-              {o.label}
+              <span className="filter-dd__option-icon">{o.icon}</span>
+              <span className="filter-dd__option-label">{o.label}</span>
             </button>
           ))}
         </div>
