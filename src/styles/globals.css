@@ -593,14 +593,24 @@ a {
   border: none;
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: flex-start;
+  gap: 6px;
   min-width: 0;
   width: 100%;
+}
+/* In the dock, the controls (back arrow) live inline with the URL —
+   not absolutely-positioned floating over a centered title-bar zone. */
+.dock-navbar-slot .app-navbar-controls {
+  position: static;
+  transform: none;
+  left: auto;
+  top: auto;
+  flex-shrink: 0;
 }
 .dock-navbar-slot .app-navbar-url {
   background: transparent;
   border: none;
-  padding: 0 8px;
+  padding: 0 4px;
   height: auto;
   min-width: 0;
   overflow: hidden;
