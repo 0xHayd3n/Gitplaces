@@ -14,7 +14,6 @@
   position: relative;
 }
 .file-row:hover { background: var(--hover-bg, rgba(255,255,255,0.08)); }
-.file-row--focused { outline: 1px solid var(--accent, #38bdf8); outline-offset: -1px; }
 .file-row--selected { background: var(--hover-bg, rgba(255,255,255,0.08)); }
 .file-row--selected:hover { background: rgba(255,255,255,0.14); }
 
@@ -104,16 +103,11 @@
 }
 
 /* ── Listing variant: CSS grid aligned with DirectoryPane header ── */
+/* --dp-grid is set by .directory-pane; fallback for standalone use. */
 .file-row[data-variant='listing'] {
   display: grid;
-  grid-template-columns:
-    minmax(160px, 2fr)
-    minmax(140px, 1.4fr)
-    72px
-    72px
-    minmax(80px, 140px)
-    64px;
-  gap: 12px;
+  grid-template-columns: var(--dp-grid, 260px 320px 60px 72px 130px 72px 1fr);
+  gap: 6px;
   padding-left: 12px;
   padding-right: 12px;
 }

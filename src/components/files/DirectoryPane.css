@@ -17,14 +17,8 @@
 
 .directory-pane__header {
   display: grid;
-  grid-template-columns:
-    minmax(160px, 2fr)
-    minmax(140px, 1.4fr)
-    72px
-    72px
-    minmax(80px, 140px)
-    64px;
-  gap: 12px;
+  grid-template-columns: var(--dp-grid);
+  gap: 6px;
   padding: 6px 12px;
   border-bottom: 1px solid var(--border);
   font-size: 10px;
@@ -34,10 +28,36 @@
   font-weight: 600;
   position: sticky;
   top: 0;
-  background: var(--bg);
+  background: transparent;
   z-index: 2;
+}
+
+.directory-pane__h-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .directory-pane__h-size,
 .directory-pane__h-age {
+  justify-content: flex-end;
   text-align: right;
+}
+
+.directory-pane__resize {
+  position: absolute;
+  right: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 3;
+  touch-action: none;
+}
+.directory-pane__resize:hover,
+.directory-pane__resize:active {
+  background: var(--border);
 }
