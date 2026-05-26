@@ -1,4 +1,6 @@
 import { spawn } from 'child_process'
+import type { ModelRef } from '../llm/types'
+import { findOpenCodeBinary } from '../skill-gen/opencode'
 
 export interface AiChatMessage {
   role: 'user' | 'assistant'
@@ -102,10 +104,21 @@ export async function sendMessageStream(
   starredRepos: string[],
   installedSkills: string[],
   pageContext: string | undefined,
+  modelRef: ModelRef,
   callbacks: StreamCallbacks
 ): Promise<void> {
   const { detectClaudeCode, checkAuthStatus, findNode, findLocalCli, buildEnv } =
     await import('../skill-gen/legacy')
+
+  // Branch on provider to pick the right CLI.
+  if (modelRef.provider === 'opencode') {
+    const bin = findOpenCodeBinary()
+    if (!bin) {
+      callbacks.onError('OpenCode CLI not found. Install via Settings → Claude Code & OpenCode.')
+      return
+    }
+    return spawnOpenCodeChat(bin, messages, starredRepos, installedSkills, pageContext, modelRef, callbacks)
+  }
 
   const detected = await detectClaudeCode()
   if (!detected) {
@@ -192,6 +205,61 @@ export async function sendMessageStream(
     const result = stdout.trim()
     callbacks.onToken(result)
     callbacks.onDone(result)
+  })
+
+  proc.stdin.write(prompt, 'utf8')
+  proc.stdin.end()
+}
+
+async function spawnOpenCodeChat(
+  bin: string,
+  messages: AiChatMessage[],
+  starredRepos: string[],
+  installedSkills: string[],
+  pageContext: string | undefined,
+  modelRef: ModelRef,
+  callbacks: StreamCallbacks
+): Promise<void> {
+  const { buildEnv } = await import('../skill-gen/legacy')
+  const systemPrompt = buildSystemPrompt(starredRepos, installedSkills, pageContext)
+  const prompt = `${systemPrompt}\n\n${messages.map(m => `${m.role}: ${m.content}`).join('\n')}`
+
+  console.log('[ai-chat] Spawning OpenCode CLI, bin:', bin, 'model:', modelRef.model)
+
+  // OpenCode CLI args: `opencode run --print --model <model>` reading prompt from stdin.
+  const proc = spawn(bin, ['run', '--print', '--model', modelRef.model], {
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: buildEnv(true),
+    shell: process.platform === 'win32',
+  })
+
+  const chunks: Buffer[] = []
+  let errOutput = ''
+
+  proc.stdout.on('data', (chunk: Buffer) => {
+    chunks.push(chunk)
+    // OpenCode may stream incrementally — forward each chunk as a token.
+    callbacks.onToken(chunk.toString('utf8'))
+  })
+
+  proc.stderr.on('data', (chunk: Buffer) => {
+    errOutput += chunk.toString('utf8')
+  })
+
+  proc.on('error', (err) => {
+    console.error('[ai-chat] Failed to spawn OpenCode CLI:', err.message)
+    callbacks.onError(`Failed to start OpenCode CLI: ${err.message}`)
+  })
+
+  proc.on('close', (code) => {
+    const stdout = Buffer.concat(chunks).toString('utf8')
+    if (code !== 0) {
+      const detail = errOutput || stdout || '(no output)'
+      console.error('[ai-chat] OpenCode exited with code', code, ':', detail.slice(0, 500))
+      callbacks.onError(`OpenCode CLI error (code ${code}): ${detail.slice(0, 300)}`)
+      return
+    }
+    callbacks.onDone(stdout.trim())
   })
 
   proc.stdin.write(prompt, 'utf8')

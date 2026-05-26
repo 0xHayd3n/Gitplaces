@@ -81,6 +81,7 @@ export function registerCreateHandlers(): void {
         [],
         [],
         systemPrompt,
+        { provider: 'anthropic', model: 'claude-sonnet-4-6' },
         {
           onToken: (token) => {
             const { BrowserWindow } = require('electron') as typeof import('electron')

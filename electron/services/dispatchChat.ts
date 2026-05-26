@@ -49,6 +49,7 @@ export async function runChat(req: RunChatRequest, callbacks: RunChatCallbacks):
       req.starredRepos,
       req.installedSkills,
       req.pageContext,
+      ref,
       {
         onToken: callbacks.onToken,
         onDone:  callbacks.onDone,

@@ -45,7 +45,7 @@ describe('runChat — dispatcher', () => {
     expect(mockLLMRunAgentLoop).not.toHaveBeenCalled()
   })
 
-  it('routes opencode to the CLI path', async () => {
+  it('routes opencode to the CLI path and passes the modelRef through', async () => {
     const callbacks = { onToken: vi.fn(), onEvent: vi.fn(), onDone: vi.fn(), onError: vi.fn() }
     await runChat({
       messages: [{ role: 'user', content: 'hi', timestamp: 0 }],
@@ -54,6 +54,9 @@ describe('runChat — dispatcher', () => {
       modelRef: { provider: 'opencode', model: 'claude-sonnet-4-6' },
     }, callbacks)
     expect(mockSendMessageStream).toHaveBeenCalledTimes(1)
+    // sendMessageStream(messages, starredRepos, installedSkills, pageContext, modelRef, callbacks)
+    const args = mockSendMessageStream.mock.calls[0]
+    expect(args[4]).toEqual({ provider: 'opencode', model: 'claude-sonnet-4-6' })
   })
 
   it('routes openai to the in-app runner (llm.runAgentLoop)', async () => {
