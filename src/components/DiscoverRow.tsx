@@ -73,7 +73,7 @@ function DiscoverRowCardItem({
 
   const typeConfig = getSubTypeConfig(repo.type_sub)
   const pillAccent = typeConfig?.accentColor ?? (repo.type_bucket ? getBucketColor(repo.type_bucket) : null)
-  const gradient = getBucketGradient(typeConfig?.accentColor ?? getBucketColor(repo.type))
+  const gradient = getBucketGradient(typeConfig?.accentColor ?? getBucketColor(repo.type_bucket))
   const isPeek = posIndex < 0 || posIndex >= visible
   const isActive = posIndex === 0
   const GAP = 16
