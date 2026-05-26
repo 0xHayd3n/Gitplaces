@@ -13,10 +13,9 @@ export interface BuildVisibleRowsInput {
 }
 
 function sortEntries(entries: readonly TreeEntry[]): TreeEntry[] {
-  // Stable sort: directories before files, preserve original order within each group.
   return [...entries].sort((a, b) => {
     if (a.type !== b.type) return a.type === 'tree' ? -1 : 1
-    return 0
+    return a.path.localeCompare(b.path)
   })
 }
 

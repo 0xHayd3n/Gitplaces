@@ -619,7 +619,7 @@ describe('buildVisibleRows', () => {
       flattenEmpty: false,
     })
     // 'docs' is in expanded, but it has no matching descendants — collapsed.
-    expect(rows.map(r => r.path)).toEqual(['src', 'src/Button.tsx', 'docs'])
+    expect(rows.map(r => r.path)).toEqual(['docs', 'src', 'src/Button.tsx'])
     expect(rows.find(r => r.path === 'docs')?.isExpanded).toBe(false)
   })
 
