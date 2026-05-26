@@ -40,7 +40,23 @@ const REPO_BUNDLE_QUERY = /* GraphQL */ `
       licenseInfo { spdxId }
       repositoryTopics(first: 30) { nodes { topic { name } } }
       owner { login avatarUrl }
-      defaultBranchRef { name }
+      defaultBranchRef {
+        name
+        target {
+          ... on Commit {
+            tree {
+              oid
+              entries {
+                name
+                type
+                oid
+                mode
+                object { ... on Blob { byteSize } }
+              }
+            }
+          }
+        }
+      }
       updatedAt
       pushedAt
       createdAt
@@ -134,7 +150,21 @@ interface GqlRepository {
   licenseInfo: { spdxId: string } | null
   repositoryTopics: { nodes: { topic: { name: string } }[] }
   owner: { login: string; avatarUrl: string }
-  defaultBranchRef: { name: string } | null
+  defaultBranchRef: {
+    name: string
+    target: {
+      tree: {
+        oid: string
+        entries: Array<{
+          name: string
+          type: 'blob' | 'tree' | 'commit'
+          oid: string
+          mode: number
+          object: { byteSize: number } | null
+        }>
+      } | null
+    } | null
+  } | null
   updatedAt: string
   pushedAt: string
   createdAt: string
@@ -196,6 +226,19 @@ export interface RepoBundle {
     open: SecurityAlert[]
     dismissedBySeverity: { critical: number; high: number; moderate: number; low: number }
   }
+  /** Default-branch root tree, prefetched alongside the bundle. Lets the
+   *  Files tab skip its initial getBranch + getTree calls. May be null if
+   *  the repo has no default branch or no commits. */
+  rootTree: {
+    sha: string
+    entries: Array<{
+      path: string   // 'name' from GraphQL, renamed to match TreeEntry shape
+      mode: string   // stringified from numeric for consistency with REST
+      type: 'blob' | 'tree' | 'commit'
+      sha: string
+      size?: number
+    }>
+  } | null
 }
 
 // ── Public ──────────────────────────────────────────────────────────────────
@@ -304,5 +347,17 @@ function mapRepository(r: GqlRepository, owner: string): RepoBundle {
       open: r.openVulns.nodes.map(mapAlert),
       dismissedBySeverity,
     },
+    rootTree: r.defaultBranchRef?.target?.tree
+      ? {
+          sha: r.defaultBranchRef.target.tree.oid,
+          entries: r.defaultBranchRef.target.tree.entries.map(e => ({
+            path: e.name,
+            mode: String(e.mode),
+            type: e.type,
+            sha: e.oid,
+            size: e.object?.byteSize,
+          })),
+        }
+      : null,
   }
 }
