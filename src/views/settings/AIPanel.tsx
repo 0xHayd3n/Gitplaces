@@ -19,6 +19,7 @@ const OpenCodeIcon = () => (
 
 type ProviderConfig = { enabled: boolean; apiKey?: string; organization?: string }
 type OpenAICompatibleEndpoint = { id: string; label: string; baseUrl: string; apiKey?: string }
+type CustomConnector = { id: string; name: string; url: string; oauthClientId: string; oauthClientSecret: string }
 
 const KNOWN_MODELS_BY_PROVIDER: Record<'anthropic' | 'openai' | 'google', { id: string; label: string }[]> = {
   anthropic: [
@@ -335,7 +336,6 @@ export default function AIPanel() {
   }
 
   // Custom MCP state
-  type CustomConnector = { id: string; name: string; url: string; oauthClientId: string; oauthClientSecret: string }
   const [connectorStatus, setConnectorStatus] = useState<Record<string, 'checking' | 'ok' | 'error'>>({})
   const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>([])
   const [showAddConnector, setShowAddConnector] = useState(false)
