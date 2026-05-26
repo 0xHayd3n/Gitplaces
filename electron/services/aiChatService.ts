@@ -231,3 +231,7 @@ export function parseAssistantMessage(content: string): AiChatMessage {
     timestamp: Date.now(),
   }
 }
+
+export { buildSystemPrompt }
+export { runChat } from './dispatchChat'
+export type { RunChatRequest, RunChatCallbacks } from './dispatchChat'
