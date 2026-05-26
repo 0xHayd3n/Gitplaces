@@ -7,7 +7,7 @@ function getHighlighter() {
   if (!highlighterPromise) {
     highlighterPromise = import('shiki').then(({ createHighlighter }) =>
       createHighlighter({
-        themes: ['github-dark'],
+        themes: ['vitesse-dark'],
         langs: [],  // load on demand
       })
     )
@@ -53,7 +53,7 @@ export default function CodeViewer({ content, filename, wordWrap, onLineCountRea
         if (cancelled) return
         const result = highlighter.codeToHtml(content, {
           lang,
-          theme: 'github-dark',
+          theme: 'vitesse-dark',
         })
         setHtml(result)
       } catch {
