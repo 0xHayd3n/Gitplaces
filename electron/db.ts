@@ -192,7 +192,7 @@ export function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS repos_saved_at         ON repos(saved_at);
 
     CREATE TABLE IF NOT EXISTS last_commits (
-      repo_id        INTEGER NOT NULL,
+      repo_id        TEXT    NOT NULL REFERENCES repos(id),
       tree_sha       TEXT    NOT NULL,
       path           TEXT    NOT NULL,
       message        TEXT    NOT NULL,
@@ -204,7 +204,7 @@ export function initSchema(db: Database.Database): void {
     );
 
     CREATE TABLE IF NOT EXISTS compare_diffs (
-      repo_id     INTEGER NOT NULL,
+      repo_id     TEXT    NOT NULL REFERENCES repos(id),
       base_ref    TEXT    NOT NULL,
       head_ref    TEXT    NOT NULL,
       files_json  TEXT    NOT NULL,

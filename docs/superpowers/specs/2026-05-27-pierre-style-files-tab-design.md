@@ -140,12 +140,12 @@ treeData:       Map<treeSha, TreeEntry[]>    // existing IPC cache, unchanged
 ### SQLite (new tables)
 
 **`last_commits`**
-- Schema: `(repo_id INTEGER, tree_sha TEXT, path TEXT, message TEXT, author_login TEXT, author_avatar TEXT, committed_at TEXT, sha TEXT, PRIMARY KEY (repo_id, tree_sha, path))`
+- Schema: `(repo_id TEXT REFERENCES repos(id), tree_sha TEXT, path TEXT, message TEXT, author_login TEXT, author_avatar TEXT, committed_at TEXT, sha TEXT, PRIMARY KEY (repo_id, tree_sha, path))`
 - Content-addressed by `tree_sha` so entries never go stale for unchanged files
 - No TTL; entries are invalidated implicitly when the file's SHA changes
 
 **`compare_diffs`**
-- Schema: `(repo_id INTEGER, base_ref TEXT, head_ref TEXT, files_json TEXT, fetched_at INTEGER, PRIMARY KEY (repo_id, base_ref, head_ref))`
+- Schema: `(repo_id TEXT REFERENCES repos(id), base_ref TEXT, head_ref TEXT, files_json TEXT, fetched_at INTEGER, PRIMARY KEY (repo_id, base_ref, head_ref))`
 - TTL: 1 hour (HEAD can move)
 
 ### LocalStorage (per-user)

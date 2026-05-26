@@ -81,7 +81,7 @@ Find the `CREATE TABLE IF NOT EXISTS http_etag_cache` block in `electron/db.ts` 
 
 ```ts
     CREATE TABLE IF NOT EXISTS last_commits (
-      repo_id        INTEGER NOT NULL,
+      repo_id        TEXT    NOT NULL REFERENCES repos(id),
       tree_sha       TEXT    NOT NULL,
       path           TEXT    NOT NULL,
       message        TEXT    NOT NULL,
@@ -93,7 +93,7 @@ Find the `CREATE TABLE IF NOT EXISTS http_etag_cache` block in `electron/db.ts` 
     );
 
     CREATE TABLE IF NOT EXISTS compare_diffs (
-      repo_id     INTEGER NOT NULL,
+      repo_id     TEXT    NOT NULL REFERENCES repos(id),
       base_ref    TEXT    NOT NULL,
       head_ref    TEXT    NOT NULL,
       files_json  TEXT    NOT NULL,
@@ -903,7 +903,7 @@ Find the existing `ipcMain.handle('github:getBlob', ...)` registration (around l
 ```ts
 ipcMain.handle('github:getLastCommitForPath', async (
   _event,
-  repoId: number,
+  repoId: string,
   owner: string,
   name: string,
   ref: string,
@@ -926,7 +926,7 @@ ipcMain.handle('github:getLastCommitForPath', async (
 
 ipcMain.handle('github:compareRefs', async (
   _event,
-  repoId: number,
+  repoId: string,
   owner: string,
   name: string,
   base: string,
@@ -953,7 +953,7 @@ Append to `electron/db-helpers.ts`:
 import type { LastCommitInfo } from './github'
 import type { CompareFile } from './github'
 
-export function readLastCommitCache(repoId: number, treeSha: string, path: string): LastCommitInfo | null {
+export function readLastCommitCache(repoId: string, treeSha: string, path: string): LastCommitInfo | null {
   const row = db.prepare(`
     SELECT message, author_login, author_avatar, committed_at, commit_sha
     FROM last_commits
@@ -963,7 +963,7 @@ export function readLastCommitCache(repoId: number, treeSha: string, path: strin
 }
 
 export function writeLastCommitCache(
-  repoId: number,
+  repoId: string,
   treeSha: string,
   path: string,
   info: LastCommitInfo,
@@ -977,7 +977,7 @@ export function writeLastCommitCache(
 
 const COMPARE_TTL_MS = 60 * 60 * 1000  // 1 hour
 
-export function readCompareCache(repoId: number, baseRef: string, headRef: string): CompareFile[] | null {
+export function readCompareCache(repoId: string, baseRef: string, headRef: string): CompareFile[] | null {
   const row = db.prepare(`
     SELECT files_json, fetched_at FROM compare_diffs
     WHERE repo_id = ? AND base_ref = ? AND head_ref = ?
@@ -991,7 +991,7 @@ export function readCompareCache(repoId: number, baseRef: string, headRef: strin
 }
 
 export function writeCompareCache(
-  repoId: number,
+  repoId: string,
   baseRef: string,
   headRef: string,
   files: CompareFile[],
@@ -1008,7 +1008,7 @@ export function writeCompareCache(
  * has changed (i.e. the file changed), the cache misses and we refetch.
  * Returns null if we don't have that path's tree sha cached.
  */
-export function getCachedTreeShaForPath(repoId: number, ref: string, path: string): string | null {
+export function getCachedTreeShaForPath(repoId: string, ref: string, path: string): string | null {
   // Cheap approximation: trust the most recently fetched last_commits row for
   // this path. We only invalidate when the file's blob sha changes — which we
   // can't directly observe without a fresh tree fetch. Acceptable: cache hits
@@ -1049,9 +1049,9 @@ import {
 Find the existing `getBlob` entry in the github section of preload (around line 66) and add immediately after:
 
 ```ts
-    getLastCommitForPath: (repoId: number, owner: string, name: string, ref: string, path: string) =>
+    getLastCommitForPath: (repoId: string, owner: string, name: string, ref: string, path: string) =>
       ipcRenderer.invoke('github:getLastCommitForPath', repoId, owner, name, ref, path),
-    compareRefs: (repoId: number, owner: string, name: string, base: string, head: string) =>
+    compareRefs: (repoId: string, owner: string, name: string, base: string, head: string) =>
       ipcRenderer.invoke('github:compareRefs', repoId, owner, name, base, head),
 ```
 
@@ -1061,7 +1061,7 @@ Find the `window.api.github` type definition (likely in `src/types/window.d.ts` 
 
 ```ts
     getLastCommitForPath: (
-      repoId: number, owner: string, name: string, ref: string, path: string,
+      repoId: string, owner: string, name: string, ref: string, path: string,
     ) => Promise<{
       message: string
       author_login: string | null
@@ -1070,7 +1070,7 @@ Find the `window.api.github` type definition (likely in `src/types/window.d.ts` 
       commit_sha: string
     } | null>
     compareRefs: (
-      repoId: number, owner: string, name: string, base: string, head: string,
+      repoId: string, owner: string, name: string, base: string, head: string,
     ) => Promise<{ path: string; status: 'added' | 'modified' | 'removed' | 'renamed' }[] | null>
 ```
 
@@ -1182,7 +1182,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { LastCommitInfo } from '../lib/fileTree/types'
 
 interface UseLastCommitsInput {
-  repoId: number | null
+  repoId: string | null
   owner: string
   name: string
   ref: string
@@ -1359,7 +1359,7 @@ import { useEffect, useState } from 'react'
 import type { GitFileStatus } from '../lib/fileTree/types'
 
 interface UseGitStatusInput {
-  repoId: number | null
+  repoId: string | null
   owner: string
   name: string
   baseRef: string | null
