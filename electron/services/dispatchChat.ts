@@ -33,7 +33,7 @@ function resolveChatModel(req: RunChatRequest): ModelRef {
 
 /**
  * Top-level chat dispatcher. Branches on the resolved model's provider:
- *   - anthropic / opencode → Claude Code (or OpenCode in Phase 6) CLI subprocess
+ *   - anthropic / opencode → Claude Code or OpenCode CLI subprocess (sendMessageStream branches on provider)
  *   - openai / google / openai-compatible → in-app runner via electron/llm/
  *
  * Callbacks bridge the unified surface to whichever path runs. Token + done
