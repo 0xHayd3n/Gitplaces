@@ -2,6 +2,7 @@ import { AnthropicAdapter } from './adapters/anthropic'
 import { OpenAIAdapter } from './adapters/openai'
 import { GoogleAdapter } from './adapters/google'
 import { OpenAICompatibleAdapter } from './adapters/openai-compatible'
+import { runAgentLoop as runnerRunAgentLoop } from './runner'
 import { LLMError } from './types'
 import type {
   AgentEvent,
@@ -62,7 +63,7 @@ export function createLLMService(): LLMService {
     },
     async *runAgentLoop(ref, opts) {
       const adapter = resolveAdapter(ref)
-      yield* adapter.runAgentLoop(ref, opts)
+      yield* runnerRunAgentLoop(adapter, ref, opts)
     },
   }
 }

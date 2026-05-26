@@ -40,6 +40,12 @@ vi.mock('./adapters/openai-compatible', () => ({
   })),
 }))
 
+vi.mock('./runner', () => ({
+  runAgentLoop: vi.fn(async function* (adapter, ref, opts) {
+    yield* adapter.runAgentLoop(ref, opts)
+  }),
+}))
+
 import { createLLMService } from './index'
 import { LLMError } from './types'
 
