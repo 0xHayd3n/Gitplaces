@@ -9935,7 +9935,7 @@ a {
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px;
   line-height: 1.5;
-  background: transparent;
+  background: #0a0a0c;
   min-height: 100%;
 }
 .code-viewer__highlighted {
@@ -9983,7 +9983,7 @@ a {
   min-width: 48px;
   width: auto;
   padding: 16px 0;
-  background: transparent;
+  background: #0a0a0c;
   text-align: right;
   user-select: none;
   -webkit-user-select: none;
@@ -10118,8 +10118,8 @@ a {
   justify-content: space-between;
   height: 34px;
   padding: 0 12px;
-  background: #0d1117;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: #0a0a0c;
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 .code-toolbar__left {
