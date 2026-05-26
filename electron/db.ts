@@ -190,6 +190,29 @@ export function initSchema(db: Database.Database): void {
 
     CREATE UNIQUE INDEX IF NOT EXISTS repos_owner_name ON repos (owner, name);
     CREATE INDEX IF NOT EXISTS repos_saved_at         ON repos(saved_at);
+
+    CREATE TABLE IF NOT EXISTS last_commits (
+      repo_id        INTEGER NOT NULL,
+      tree_sha       TEXT    NOT NULL,
+      path           TEXT    NOT NULL,
+      message        TEXT    NOT NULL,
+      author_login   TEXT,
+      author_avatar  TEXT,
+      committed_at   TEXT    NOT NULL,
+      commit_sha     TEXT    NOT NULL,
+      PRIMARY KEY (repo_id, tree_sha, path)
+    );
+
+    CREATE TABLE IF NOT EXISTS compare_diffs (
+      repo_id     INTEGER NOT NULL,
+      base_ref    TEXT    NOT NULL,
+      head_ref    TEXT    NOT NULL,
+      files_json  TEXT    NOT NULL,
+      fetched_at  INTEGER NOT NULL,
+      PRIMARY KEY (repo_id, base_ref, head_ref)
+    );
+
+    CREATE INDEX IF NOT EXISTS last_commits_by_tree ON last_commits (repo_id, tree_sha);
   `)
 
   // Phase 3 migrations — idempotent via try/catch (SQLite has no ALTER TABLE ... IF NOT EXISTS)
