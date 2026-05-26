@@ -77,7 +77,7 @@ export default function DiscoverGrid({
       >
         {Array.from({ length: effectiveCols * 3 }).map((_, i) => (
           <div key={i} className="repo-card-skeleton">
-            <div className="repo-card-skeleton-dither shimmer" />
+            <div className="repo-card-skeleton-image shimmer" />
             <div className="repo-card-skeleton-info">
               <div className="shimmer" style={{ width: '60%', height: 10, borderRadius: 4 }} />
               <div className="shimmer" style={{ width: '80%', height: 8, borderRadius: 4, marginTop: 6 }} />
@@ -175,26 +175,19 @@ export default function DiscoverGrid({
           >
             <RepoCard
               repo={repo}
-              viewMode={viewMode}
               onNavigate={onNavigate}
-              onTagClick={onTagClick}
               onOwnerClick={onOwnerClick}
               typeSub={repo.type_sub}
               typeBucket={repo.type_bucket}
-              verificationTier={verification.getTier(repo.id)}
-              verificationSignals={verification.getSignals(repo.id)}
-              verificationResolving={verification.isResolving(repo.id)}
               focused={i === focusIndex}
-              onStar={onStar}
               onLanguageClick={onLanguageClick}
               onSubtypeClick={onSubtypeClick}
-              anchors={anchorsByRepoId?.get(repo.id)}
             />
           </ViewportWindow>
         ))}
         {loadingMore && Array.from({ length: effectiveCols }).map((_, i) => (
           <div key={`skel-${i}`} className="repo-card-skeleton">
-            <div className="repo-card-skeleton-dither shimmer" />
+            <div className="repo-card-skeleton-image shimmer" />
             <div className="repo-card-skeleton-info">
               <div className="shimmer" style={{ width: '60%', height: 10, borderRadius: 4 }} />
               <div className="shimmer" style={{ width: '80%', height: 8, borderRadius: 4, marginTop: 6 }} />
