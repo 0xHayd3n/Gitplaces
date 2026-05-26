@@ -1,4 +1,4 @@
-import { generateText } from 'ai'
+import { generateText, streamText } from 'ai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { getProviderConfig } from '../../store'
 import { LLMError } from '../types'
@@ -9,6 +9,7 @@ import type {
   AgentEvent,
   Usage,
   LLMErrorKind,
+  McpTool,
 } from '../types'
 
 export class GoogleAdapter {
@@ -39,12 +40,63 @@ export class GoogleAdapter {
     }
   }
 
-  async *streamText(_ref: ModelRef, _opts: LLMCallOpts): AsyncIterable<TextChunk> {
-    throw new LLMError('unknown', 'GoogleAdapter.streamText not implemented (Phase 5)')
+  async *streamText(ref: ModelRef, opts: LLMCallOpts): AsyncIterable<TextChunk> {
+    for await (const ev of this.runAgentLoop(ref, opts)) {
+      if (ev.type === 'text-delta') yield { type: 'text-delta', delta: ev.delta }
+      if (ev.type === 'error') throw ev.error
+    }
   }
 
-  async *runAgentLoop(_ref: ModelRef, _opts: LLMCallOpts): AsyncIterable<AgentEvent> {
-    throw new LLMError('unknown', 'GoogleAdapter.runAgentLoop not implemented (Phase 5)')
+  async *runAgentLoop(ref: ModelRef, opts: LLMCallOpts): AsyncIterable<AgentEvent> {
+    const apiKey = this.assertApiKey()
+    const provider = createGoogleGenerativeAI({ apiKey })
+
+    let stream: { fullStream: AsyncIterable<any> }
+    try {
+      stream = streamText({
+        model: provider(ref.model),
+        system: opts.systemPrompt,
+        messages: opts.messages,
+        tools: toolsForSDK(opts.tools),
+        maxTokens: opts.maxTokens,
+        abortSignal: opts.signal,
+        maxSteps: opts.tools && opts.tools.length > 0 ? 5 : 1,
+      } as Parameters<typeof streamText>[0])
+    } catch (err) {
+      yield { type: 'error', error: normalizeError(err) }
+      return
+    }
+
+    try {
+      for await (const chunk of stream.fullStream) {
+        switch (chunk.type) {
+          case 'text-delta':
+            yield { type: 'text-delta', delta: chunk.textDelta }
+            break
+          case 'tool-call':
+            yield { type: 'tool-call', id: chunk.toolCallId, name: chunk.toolName, args: chunk.args as Record<string, unknown> }
+            break
+          case 'tool-result':
+            yield { type: 'tool-result', id: chunk.toolCallId, result: chunk.result, isError: false }
+            break
+          case 'finish':
+            yield {
+              type: 'done',
+              usage: {
+                promptTokens:     chunk.usage?.promptTokens     ?? 0,
+                completionTokens: chunk.usage?.completionTokens ?? 0,
+                totalTokens:      chunk.usage?.totalTokens      ?? 0,
+              },
+            }
+            break
+          case 'error':
+            yield { type: 'error', error: normalizeError(chunk.error) }
+            break
+        }
+      }
+    } catch (err) {
+      yield { type: 'error', error: normalizeError(err) }
+    }
   }
 
   private assertApiKey(): string {
@@ -67,4 +119,17 @@ function normalizeError(err: unknown): LLMError {
   else if (e?.statusCode === 413) kind = 'context_overflow'
   else if (e?.code === 'ECONNREFUSED' || e?.code === 'ETIMEDOUT' || e?.code === 'ENOTFOUND') kind = 'network'
   return new LLMError(kind, e?.message ?? 'Google adapter failed', err)
+}
+
+function toolsForSDK(tools: McpTool[] | undefined): Record<string, unknown> | undefined {
+  if (!tools || tools.length === 0) return undefined
+  const out: Record<string, { description: string; parameters: unknown; execute: (args: Record<string, unknown>) => Promise<unknown> }> = {}
+  for (const t of tools) {
+    out[t.name] = {
+      description: t.description,
+      parameters: t.inputSchema,
+      execute: t.execute,
+    }
+  }
+  return out
 }
