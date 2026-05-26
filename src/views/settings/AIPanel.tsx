@@ -334,6 +334,73 @@ export default function AIPanel() {
     timers.current.push(setTimeout(() => setTestResult(null), 4000))
   }
 
+  // Custom MCP state
+  type CustomConnector = { id: string; name: string; url: string; oauthClientId: string; oauthClientSecret: string }
+  const [connectorStatus, setConnectorStatus] = useState<Record<string, 'checking' | 'ok' | 'error'>>({})
+  const [customConnectors, setCustomConnectors] = useState<CustomConnector[]>([])
+  const [showAddConnector, setShowAddConnector] = useState(false)
+  const [newConnectorName, setNewConnectorName] = useState('')
+  const [newConnectorUrl, setNewConnectorUrl] = useState('')
+  const [newConnectorAdvanced, setNewConnectorAdvanced] = useState(false)
+  const [newConnectorOAuthId, setNewConnectorOAuthId] = useState('')
+  const [newConnectorOAuthSecret, setNewConnectorOAuthSecret] = useState('')
+
+  useEffect(() => {
+    window.api.settings.get('customConnectors').then((raw: string | null) => {
+      try { if (raw) setCustomConnectors(JSON.parse(raw)) } catch { /* ignore */ }
+    })
+  }, [])
+
+  const saveCustomConnectors = async (list: CustomConnector[]) => {
+    setCustomConnectors(list)
+    await window.api.settings.set('customConnectors', JSON.stringify(list))
+  }
+
+  const testConnector = async (id: string, url: string) => {
+    if (!url) return
+    try { new URL(url) } catch { return }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) return
+    setConnectorStatus(prev => ({ ...prev, [id]: 'checking' }))
+    try {
+      const result = await window.api.connectors.test(url)
+      setConnectorStatus(prev => ({ ...prev, [id]: result.ok ? 'ok' : 'error' }))
+    } catch {
+      setConnectorStatus(prev => ({ ...prev, [id]: 'error' }))
+    }
+  }
+
+  const resetAddForm = () => {
+    setNewConnectorName('')
+    setNewConnectorUrl('')
+    setNewConnectorAdvanced(false)
+    setNewConnectorOAuthId('')
+    setNewConnectorOAuthSecret('')
+    setShowAddConnector(false)
+  }
+
+  const handleAddConnector = async () => {
+    if (!newConnectorName.trim()) return
+    const connector: CustomConnector = {
+      id: Date.now().toString(),
+      name: newConnectorName.trim(),
+      url: newConnectorUrl.trim(),
+      oauthClientId: newConnectorOAuthId.trim(),
+      oauthClientSecret: newConnectorOAuthSecret.trim(),
+    }
+    await saveCustomConnectors([...customConnectors, connector])
+    resetAddForm()
+    testConnector(connector.id, connector.url)
+  }
+
+  const handleRemoveConnector = async (id: string) => {
+    await saveCustomConnectors(customConnectors.filter(c => c.id !== id))
+    setConnectorStatus(prev => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -661,8 +728,87 @@ export default function AIPanel() {
         </SectionBlock>
       )}
 
-      <SectionBlock title="Custom MCP" badge="BETA" defaultExpanded={false}>
-        <div style={{ opacity: 0.5, fontSize: 12 }}>Custom MCP coming in Task 9.</div>
+      <SectionBlock title="Custom MCP" count={customConnectors.length} badge="BETA" defaultExpanded={false}>
+        <div className="section-block-body-desc">
+          Third-party MCP servers Git Suite can call as tool sources.
+        </div>
+
+        {customConnectors.map(c => (
+          <div key={c.id} className="connector-row">
+            <div className="connector-icon connector-icon--custom">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
+              </svg>
+            </div>
+            <div className="connector-info">
+              <div className="connector-name">{c.name}</div>
+              {c.url && <div className="connector-desc">{c.url}</div>}
+            </div>
+            <div className="connector-actions">
+              {connectorStatus[c.id] === 'checking' ? (
+                <span className="connector-status-text">Checking…</span>
+              ) : connectorStatus[c.id] === 'ok' ? (
+                <span className="connector-badge connected">Connected</span>
+              ) : connectorStatus[c.id] === 'error' ? (
+                <span className="connector-badge error">Error</span>
+              ) : null}
+              <button
+                className="settings-btn settings-btn--link connector-disconnect-btn"
+                disabled={connectorStatus[c.id] === 'checking'}
+                onClick={() => testConnector(c.id, c.url)}
+              >
+                Retest
+              </button>
+              <button
+                className="settings-btn settings-btn--link connector-disconnect-btn"
+                disabled={connectorStatus[c.id] === 'checking'}
+                onClick={() => handleRemoveConnector(c.id)}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {showAddConnector ? (
+          <div className="connector-add-modal" style={{ marginTop: 10 }}>
+            <div className="connector-modal-header">
+              <span className="connector-modal-title">Add custom connector</span>
+              <span className="connector-modal-beta">BETA</span>
+            </div>
+            <p className="connector-modal-desc">
+              Connect Git Suite to your data and tools via a remote MCP server.
+            </p>
+            <div className="connector-modal-fields">
+              <input className="settings-input connector-modal-input" type="text" placeholder="Name" value={newConnectorName} onChange={e => setNewConnectorName(e.target.value)} autoFocus />
+              <input className="settings-input connector-modal-input" type="url" placeholder="Remote MCP server URL" value={newConnectorUrl} onChange={e => setNewConnectorUrl(e.target.value)} />
+            </div>
+            <button className="connector-advanced-toggle" onClick={() => setNewConnectorAdvanced(v => !v)} type="button">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: newConnectorAdvanced ? 'rotate(180deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
+                <path d="M2 4l4 4 4-4"/>
+              </svg>
+              Advanced settings
+            </button>
+            {newConnectorAdvanced && (
+              <div className="connector-modal-fields">
+                <input className="settings-input connector-modal-input" type="text" placeholder="OAuth Client ID (optional)" value={newConnectorOAuthId} onChange={e => setNewConnectorOAuthId(e.target.value)} />
+                <input className="settings-input connector-modal-input" type="password" placeholder="OAuth Client Secret (optional)" value={newConnectorOAuthSecret} onChange={e => setNewConnectorOAuthSecret(e.target.value)} />
+              </div>
+            )}
+            <p className="connector-modal-warning">
+              Only use connectors from developers you trust. Git Suite cannot verify that connectors will work as intended or that they won&rsquo;t change.
+            </p>
+            <div className="connector-modal-actions">
+              <button className="settings-btn settings-btn--ghost" onClick={resetAddForm}>Cancel</button>
+              <button className="settings-btn" onClick={handleAddConnector} disabled={!newConnectorName.trim()}>Add</button>
+            </div>
+          </div>
+        ) : (
+          <button className="connector-add-btn" onClick={() => setShowAddConnector(true)}>
+            + Add custom connector
+          </button>
+        )}
       </SectionBlock>
 
       <SectionBlock title="Defaults" defaultExpanded={false}>
