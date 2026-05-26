@@ -41,8 +41,11 @@ export function createLLMService(): LLMService {
       case 'openai-compatible':
         return (openaiCompatibleAdapter ??= new OpenAICompatibleAdapter())
       case 'opencode':
-        // OpenCode adapter lands in Phase 6 alongside its sync target.
-        throw new LLMError('unknown', 'Provider "opencode" has no adapter yet — scheduled for Phase 6.')
+        // OpenCode runs through the CLI subprocess path (see runChat in
+        // electron/services/dispatchChat.ts). The in-app runner doesn't support
+        // it — reaching this branch means a caller bypassed runChat with an
+        // opencode ModelRef, which is a bug.
+        throw new LLMError('unknown', 'OpenCode runs via the CLI subprocess path; the in-app runner does not support it. Use runChat() instead of createLLMService() for opencode models.')
       default: {
         const exhaustive: never = ref.provider
         throw new LLMError('unknown', `Unknown provider: ${String(exhaustive)}`)

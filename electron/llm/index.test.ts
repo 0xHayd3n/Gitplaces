@@ -111,12 +111,16 @@ describe('createLLMService', () => {
     expect(mockOpenAICompatGen).toHaveBeenCalledTimes(1)
   })
 
-  it('still throws LLMError kind=unknown for opencode (Phase 6)', async () => {
+  it('throws a clear error if opencode reaches the in-app runner (it should use CLI dispatch instead)', async () => {
     const svc = createLLMService()
     await expect(svc.generateText(
       { provider: 'opencode', model: 'claude-sonnet-4-6' },
       { messages: [{ role: 'user', content: 'hi' }] },
-    )).rejects.toMatchObject({ name: 'LLMError', kind: 'unknown' })
+    )).rejects.toMatchObject({
+      name: 'LLMError',
+      kind: 'unknown',
+      message: expect.stringContaining('CLI subprocess'),
+    })
   })
 
   it('streamText surfaces resolveAdapter throws as a rejected iterable, not a sync exception', async () => {
