@@ -183,6 +183,17 @@ declare global {
         getContent(owner: string, name: string): Promise<{ filename: string; content: string } | undefined>
         getAnatomy(owner: string, name: string): Promise<AnatomyPayload | null>
       }
+      opencode: {
+        detect(): Promise<boolean>
+        checkAuthStatus(): Promise<boolean>
+        setup(): Promise<{ ok: boolean; error?: string }>
+        loginOpenCode(): Promise<{ ok: boolean; error?: string }>
+        logoutOpenCode(): Promise<void>
+        onSetupProgress(cb: (event: { phase: string; line?: string }) => void): void
+        offSetupProgress(cb: (event: { phase: string; line?: string }) => void): void
+        onLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
+        offLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
+      }
       library: {
         getAll(): Promise<LibraryRow[]>
         getCollections(repoId: string): Promise<{ id: string; name: string }[]>

@@ -23,6 +23,13 @@ import {
   triggerClaudeAuth, invalidateClaudePathCache, loginClaude,
   type SkillGenInput
 } from './skill-gen/legacy'
+import {
+  detectOpenCode,
+  checkOpenCodeAuthStatus,
+  installOpenCodeCLI,
+  loginOpenCode,
+  logoutOpenCode,
+} from './skill-gen/opencode'
 import { generateComponents as generateComponentsSlim } from './skill-gen/components'
 import { prepareWrite } from './skill-gen/regeneration'
 import { extractionCache } from './skill-gen/extraction-cache'
@@ -1301,6 +1308,49 @@ ipcMain.handle('skill:loginClaude', async (event) => {
 ipcMain.handle('skill:logoutClaude', async () => {
   const { logoutClaude } = await import('./skill-gen/legacy')
   await logoutClaude()
+})
+
+ipcMain.handle('opencode:detect', async () => detectOpenCode())
+ipcMain.handle('opencode:checkAuthStatus', async () => checkOpenCodeAuthStatus())
+
+ipcMain.handle('opencode:setup', async (event) => {
+  const send = (phase: string, line?: string) => {
+    if (!event.sender.isDestroyed()) {
+      event.sender.send('opencode:setup-progress', { phase, line })
+    }
+  }
+  send('checking')
+  if (await detectOpenCode()) {
+    send('done')
+    return { ok: true }
+  }
+  send('installing')
+  try {
+    await installOpenCodeCLI((line) => send('installing', line))
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    send('error', msg)
+    return { ok: false, error: msg }
+  }
+  send('auth')
+  send('done')
+  return { ok: true }
+})
+
+ipcMain.handle('opencode:loginOpenCode', async (event) => {
+  const send = (message: string, opts?: { isError?: boolean; done?: boolean }) => {
+    if (!event.sender.isDestroyed()) {
+      event.sender.send('opencode:login-progress', { message, ...opts })
+    }
+  }
+  const result = await loginOpenCode((line) => send(line))
+  if (result.ok) send('Login successful', { done: true })
+  else send(result.error ?? 'Login failed', { isError: true, done: true })
+  return result
+})
+
+ipcMain.handle('opencode:logoutOpenCode', async () => {
+  await logoutOpenCode()
 })
 
 ipcMain.handle('skill:cancelLearn', (_event, owner: string, name: string) => {

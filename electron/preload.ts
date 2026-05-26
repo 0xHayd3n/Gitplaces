@@ -162,6 +162,38 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('skill:getAnatomy', owner, name),
   },
 
+  opencode: {
+    detect: () => ipcRenderer.invoke('opencode:detect') as Promise<boolean>,
+    checkAuthStatus: () => ipcRenderer.invoke('opencode:checkAuthStatus') as Promise<boolean>,
+    setup: () => ipcRenderer.invoke('opencode:setup') as Promise<{ ok: boolean; error?: string }>,
+    loginOpenCode: () => ipcRenderer.invoke('opencode:loginOpenCode') as Promise<{ ok: boolean; error?: string }>,
+    logoutOpenCode: () => ipcRenderer.invoke('opencode:logoutOpenCode') as Promise<void>,
+    onSetupProgress: (cb: (event: { phase: string; line?: string }) => void) => {
+      const wrapper = (_: unknown, data: { phase: string; line?: string }) => cb(data)
+      callbackWrappers.set(cb, wrapper)
+      ipcRenderer.on('opencode:setup-progress', wrapper)
+    },
+    offSetupProgress: (cb: (event: { phase: string; line?: string }) => void) => {
+      const wrapper = callbackWrappers.get(cb)
+      if (wrapper) {
+        ipcRenderer.removeListener('opencode:setup-progress', wrapper)
+        callbackWrappers.delete(cb)
+      }
+    },
+    onLoginProgress: (cb: (event: { message: string; isError?: boolean; done?: boolean }) => void) => {
+      const wrapper = (_: unknown, data: { message: string; isError?: boolean; done?: boolean }) => cb(data)
+      callbackWrappers.set(cb, wrapper)
+      ipcRenderer.on('opencode:login-progress', wrapper)
+    },
+    offLoginProgress: (cb: (event: { message: string; isError?: boolean; done?: boolean }) => void) => {
+      const wrapper = callbackWrappers.get(cb)
+      if (wrapper) {
+        ipcRenderer.removeListener('opencode:login-progress', wrapper)
+        callbackWrappers.delete(cb)
+      }
+    },
+  },
+
   library: {
     getAll: () => ipcRenderer.invoke('library:getAll'),
     getCollections: (repoId: string) => ipcRenderer.invoke('library:getCollections', repoId),
