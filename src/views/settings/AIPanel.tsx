@@ -337,7 +337,7 @@ function OpenAICompatibleSection(props: {
   )
 }
 
-type AITabId = 'api' | 'cli' | 'mcp'
+type AITabId = 'api' | 'cli' | 'mcp' | 'defaults'
 
 export default function AIPanel() {
   const [activeAITab, setActiveAITab] = useState<AITabId>('api')
@@ -650,9 +650,10 @@ export default function AIPanel() {
   }
 
   const tabs: { id: AITabId; label: string }[] = [
-    { id: 'api', label: 'API / HTTPS' },
-    { id: 'cli', label: 'CLI' },
-    { id: 'mcp', label: 'MCP' },
+    { id: 'api',      label: 'API / HTTPS' },
+    { id: 'cli',      label: 'CLI' },
+    { id: 'mcp',      label: 'MCP' },
+    { id: 'defaults', label: 'Defaults' },
   ]
 
   return (
@@ -674,7 +675,11 @@ export default function AIPanel() {
 
       {activeAITab === 'api' && (
         <div className="ai-tab-panel" role="tabpanel">
-          <div className="section-block-body-desc">Git Suite calls these models directly using your API key.</div>
+          <p className="ai-tab-desc">
+            Git Suite makes HTTPS calls to each provider directly using your API key. You pay the
+            provider per token — no subscription needed. Best for fine-grained control over which
+            model handles each feature.
+          </p>
 
         <ProviderCard
           icon={<IconAnthropic width={20} height={20} style={{ color: 'var(--text)' }} />}
@@ -762,9 +767,12 @@ export default function AIPanel() {
 
       {activeAITab === 'cli' && (
         <div className="ai-tab-panel" role="tabpanel">
-          <div className="section-block-body-desc">
-            Git Suite spawns the CLI tool and talks to it via stdio. Uses your subscription.
-          </div>
+          <p className="ai-tab-desc">
+            Git Suite launches the CLI tool as a subprocess and communicates with it over stdio.
+            Authentication and billing flow through your existing Claude.ai or OpenCode
+            subscription rather than a per-token API key. Best if you're already paying for one
+            of these tools.
+          </p>
 
         <ProviderCard
           icon={<IconClaude width={20} height={20} style={{ color: 'var(--text)' }} />}
@@ -900,9 +908,15 @@ export default function AIPanel() {
 
       {activeAITab === 'mcp' && mcpStatusLoaded && (
         <div className="ai-tab-panel" role="tabpanel">
+          <p className="ai-tab-desc">
+            The Model Context Protocol lets AI tools share capabilities with each other. Below, you
+            can expose Git Suite as an MCP server so the Claude Code CLI can call its tools — or
+            register third-party MCP servers as additional tool sources for Git Suite itself.
+          </p>
+
           <div className="ai-tab-section-label">Expose Git Suite to Claude Code</div>
           <div className="section-block-body-desc">
-            Let the Claude Code CLI call Git Suite's tools via the Model Context Protocol.
+            Let the Claude Code CLI call Git Suite's tools.
           </div>
 
           <div className="settings-group-row">
@@ -1043,21 +1057,24 @@ export default function AIPanel() {
         </div>
       )}
 
-      <div className="ai-defaults">
-        <div className="ai-tab-section-label">Defaults</div>
-        <div className="section-block-body-desc">
-          Which model is used for which feature. Works with any transport above.
+      {activeAITab === 'defaults' && (
+        <div className="ai-tab-panel" role="tabpanel">
+          <p className="ai-tab-desc">
+            Pick which provider and model power Git Suite's built-in AI features — the chat overlay,
+            skill generation, and tag extraction. These defaults work with any transport above, so
+            you can mix and match (e.g. an API key for chat, a CLI subscription for skill gen).
+          </p>
+          <DefaultsSection
+            chatDefault={chatDefault}   setChatDefault={setChatDefault}
+            skillDefault={skillDefault} setSkillDefault={setSkillDefault}
+            tagDefault={tagDefault}     setTagDefault={setTagDefault}
+            anthropicConfigured={!!anthropicCfg.apiKey}
+            openaiConfigured={!!openaiCfg.apiKey}
+            googleConfigured={!!googleCfg.apiKey}
+            endpoints={endpoints}
+          />
         </div>
-        <DefaultsSection
-          chatDefault={chatDefault}   setChatDefault={setChatDefault}
-          skillDefault={skillDefault} setSkillDefault={setSkillDefault}
-          tagDefault={tagDefault}     setTagDefault={setTagDefault}
-          anthropicConfigured={!!anthropicCfg.apiKey}
-          openaiConfigured={!!openaiCfg.apiKey}
-          googleConfigured={!!googleCfg.apiKey}
-          endpoints={endpoints}
-        />
-      </div>
+      )}
     </>
   )
 }

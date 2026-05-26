@@ -149,13 +149,13 @@ describe('Settings — sidebar IA', () => {
 describe('Settings — AI panel', () => {
   beforeEach(() => { setupApi() })
 
-  it('renders the three transport tabs and the Defaults label', async () => {
+  it('renders all four AI tabs', async () => {
     render(<Settings />)
     await waitFor(() => {
       expect(screen.getByRole('tab', { name: /API \/ HTTPS/i })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /^CLI$/ })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /^MCP$/ })).toBeInTheDocument()
-      expect(screen.getByText(/^Defaults$/i)).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /^Defaults$/ })).toBeInTheDocument()
     })
   })
 
@@ -197,11 +197,13 @@ describe('Settings — AI panel', () => {
     })
   })
 
-  it('Defaults section is always visible below the tabs', async () => {
+  it('Defaults tab content is hidden until the Defaults tab is selected', async () => {
     render(<Settings />)
+    await waitFor(() => screen.getByRole('tab', { name: /^Defaults$/ }))
+    expect(screen.queryByText(/Pick which provider and model power/i)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: /^Defaults$/ }))
     await waitFor(() => {
-      expect(screen.getByText(/^Defaults$/i)).toBeInTheDocument()
-      expect(screen.getByText(/Which model is used for which feature/i)).toBeInTheDocument()
+      expect(screen.getByText(/Pick which provider and model power/i)).toBeInTheDocument()
     })
   })
 
