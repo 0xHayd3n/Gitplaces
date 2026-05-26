@@ -22,14 +22,14 @@ export default function ProviderCard({
   actions,
 }: ProviderCardProps) {
   return (
-    <div className="connector-row provider-card">
+    <div className="connector-row">
       <div className="connector-icon">{icon}</div>
       <div className="connector-info" style={{ flex: 1 }}>
         <div className="connector-name" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {name}
           <span className={`transport-chip ${chip.toLowerCase()}`}>{chip}</span>
         </div>
-        <div className="connector-desc" style={{ marginTop: 2 }}>{description}</div>
+        <div className="connector-desc">{description}</div>
         {children && <div style={{ marginTop: 8 }}>{children}</div>}
         {status && (
           <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, opacity: 0.75 }}>
