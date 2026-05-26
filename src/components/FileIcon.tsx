@@ -5,8 +5,10 @@ import {
   SiVuedotjs, SiSvelte, SiLua, SiZig, SiElixir, SiHaskell, SiDart,
   SiGnubash, SiDocker, SiR, SiScala, SiClojure, SiErlang, SiJulia,
   SiOcaml, SiSolidity, SiCoffeescript, SiElm,
-  SiGit, SiNodedotjs, SiEslint, SiPrettier, SiVite, SiWebpack,
-  SiRollupdotjs, SiBabel, SiJest, SiVitest, SiYarn, SiPnpm,
+  SiGit, SiNodedotjs, SiNpm, SiEslint, SiPrettier, SiStylelint,
+  SiVite, SiWebpack, SiRollupdotjs, SiBabel, SiJest, SiVitest,
+  SiYarn, SiPnpm, SiTravisci, SiCircleci, SiGithubactions,
+  SiVercel, SiNetlify,
 } from 'react-icons/si'
 import {
   File, Scale, Settings, Lock, Braces, FileCode, Code, BookOpen,
@@ -21,36 +23,107 @@ type IconDef = {
 
 // ── Exact filename matches (case-sensitive) ──────────────────────────
 const FILENAME_ICONS: Record<string, IconDef> = {
-  'Dockerfile':        { icon: SiDocker,     color: '#0ea5e9' },
-  '.dockerignore':     { icon: SiDocker,     color: '#0ea5e9' },
-  '.gitignore':        { icon: SiGit,        color: '#f97316' },
-  '.gitattributes':    { icon: SiGit,        color: '#f97316' },
-  '.gitmodules':       { icon: SiGit,        color: '#f97316' },
-  'LICENSE':           { icon: Scale,        color: '#9ca3af' },
-  'LICENSE.md':        { icon: Scale,        color: '#9ca3af' },
-  'Makefile':          { icon: Settings,     color: '#9ca3af' },
-  '.env':              { icon: Lock,         color: '#f59e0b' },
-  '.env.local':        { icon: Lock,         color: '#f59e0b' },
-  '.env.example':      { icon: Lock,         color: '#f59e0b' },
-  'package.json':      { icon: SiNodedotjs,  color: '#16a34a' },
-  'package-lock.json': { icon: SiNodedotjs,  color: '#16a34a' },
-  'tsconfig.json':     { icon: SiTypescript,  color: '#3178c6' },
-  '.eslintrc.json':    { icon: SiEslint,     color: '#4b32c3' },
-  '.eslintrc.js':      { icon: SiEslint,     color: '#4b32c3' },
-  '.prettierrc':       { icon: SiPrettier,   color: '#f7b93e' },
-  '.prettierrc.json':  { icon: SiPrettier,   color: '#f7b93e' },
-  'vite.config.ts':    { icon: SiVite,       color: '#646cff' },
-  'vite.config.js':    { icon: SiVite,       color: '#646cff' },
-  'webpack.config.js': { icon: SiWebpack,    color: '#8dd6f9' },
-  'rollup.config.js':  { icon: SiRollupdotjs,color: '#ec4a3f' },
-  '.babelrc':          { icon: SiBabel,      color: '#f5da55' },
-  'babel.config.js':   { icon: SiBabel,      color: '#f5da55' },
-  'jest.config.ts':    { icon: SiJest,       color: '#c21325' },
-  'jest.config.js':    { icon: SiJest,       color: '#c21325' },
-  'vitest.config.ts':  { icon: SiVitest,     color: '#6e9f18' },
-  'yarn.lock':         { icon: SiYarn,       color: '#2c8ebb' },
-  'pnpm-lock.yaml':    { icon: SiPnpm,       color: '#f69220' },
+  // Docker
+  'Dockerfile':           { icon: SiDocker,     color: '#0ea5e9' },
+  '.dockerignore':        { icon: SiDocker,     color: '#0ea5e9' },
+  // Git
+  '.gitignore':           { icon: SiGit,        color: '#f97316' },
+  '.gitattributes':       { icon: SiGit,        color: '#f97316' },
+  '.gitmodules':          { icon: SiGit,        color: '#f97316' },
+  '.gitkeep':             { icon: SiGit,        color: '#f97316' },
+  // License / build
+  'LICENSE':              { icon: Scale,        color: '#9ca3af' },
+  'LICENSE.md':           { icon: Scale,        color: '#9ca3af' },
+  'LICENSE.txt':          { icon: Scale,        color: '#9ca3af' },
+  'COPYING':              { icon: Scale,        color: '#9ca3af' },
+  'Makefile':             { icon: Settings,     color: '#9ca3af' },
+  'CMakeLists.txt':       { icon: Settings,     color: '#9ca3af' },
+  // Secrets
+  '.env':                 { icon: Lock,         color: '#f59e0b' },
+  '.env.local':           { icon: Lock,         color: '#f59e0b' },
+  '.env.example':         { icon: Lock,         color: '#f59e0b' },
+  '.env.development':     { icon: Lock,         color: '#f59e0b' },
+  '.env.production':      { icon: Lock,         color: '#f59e0b' },
+  // Editor / formatter
+  '.editorconfig':        { icon: Settings,     color: '#9ca3af' },
+  // Node / npm / pnpm / yarn
+  'package.json':         { icon: SiNodedotjs,  color: '#16a34a' },
+  'package-lock.json':    { icon: SiNodedotjs,  color: '#16a34a' },
+  '.nvmrc':               { icon: SiNodedotjs,  color: '#16a34a' },
+  '.node-version':        { icon: SiNodedotjs,  color: '#16a34a' },
+  '.npmrc':               { icon: SiNpm,        color: '#cb3837' },
+  '.npmignore':           { icon: SiNpm,        color: '#cb3837' },
+  'yarn.lock':            { icon: SiYarn,       color: '#2c8ebb' },
+  '.yarnrc':              { icon: SiYarn,       color: '#2c8ebb' },
+  '.yarnrc.yml':          { icon: SiYarn,       color: '#2c8ebb' },
+  'pnpm-lock.yaml':       { icon: SiPnpm,       color: '#f69220' },
+  'pnpm-workspace.yaml':  { icon: SiPnpm,       color: '#f69220' },
+  // TypeScript
+  'tsconfig.json':        { icon: SiTypescript, color: '#3178c6' },
+  // ESLint
+  '.eslintrc':            { icon: SiEslint,     color: '#4b32c3' },
+  '.eslintrc.json':       { icon: SiEslint,     color: '#4b32c3' },
+  '.eslintrc.js':         { icon: SiEslint,     color: '#4b32c3' },
+  '.eslintrc.cjs':        { icon: SiEslint,     color: '#4b32c3' },
+  '.eslintrc.yaml':       { icon: SiEslint,     color: '#4b32c3' },
+  '.eslintrc.yml':        { icon: SiEslint,     color: '#4b32c3' },
+  '.eslintignore':        { icon: SiEslint,     color: '#4b32c3' },
+  'eslint.config.js':     { icon: SiEslint,     color: '#4b32c3' },
+  'eslint.config.mjs':    { icon: SiEslint,     color: '#4b32c3' },
+  // Prettier
+  '.prettierrc':          { icon: SiPrettier,   color: '#f7b93e' },
+  '.prettierrc.json':     { icon: SiPrettier,   color: '#f7b93e' },
+  '.prettierrc.js':       { icon: SiPrettier,   color: '#f7b93e' },
+  '.prettierrc.yaml':     { icon: SiPrettier,   color: '#f7b93e' },
+  '.prettierrc.yml':      { icon: SiPrettier,   color: '#f7b93e' },
+  '.prettierignore':      { icon: SiPrettier,   color: '#f7b93e' },
+  'prettier.config.js':   { icon: SiPrettier,   color: '#f7b93e' },
+  // Stylelint
+  '.stylelintrc':         { icon: SiStylelint,  color: '#4b32c3' },
+  '.stylelintrc.json':    { icon: SiStylelint,  color: '#4b32c3' },
+  '.stylelintrc.js':      { icon: SiStylelint,  color: '#4b32c3' },
+  '.stylelintignore':     { icon: SiStylelint,  color: '#4b32c3' },
+  'stylelint.config.js':  { icon: SiStylelint,  color: '#4b32c3' },
+  // Bundlers / builders
+  'vite.config.ts':       { icon: SiVite,       color: '#646cff' },
+  'vite.config.js':       { icon: SiVite,       color: '#646cff' },
+  'vite.config.mjs':      { icon: SiVite,       color: '#646cff' },
+  'webpack.config.js':    { icon: SiWebpack,    color: '#8dd6f9' },
+  'webpack.config.ts':    { icon: SiWebpack,    color: '#8dd6f9' },
+  'rollup.config.js':     { icon: SiRollupdotjs, color: '#ec4a3f' },
+  'rollup.config.ts':     { icon: SiRollupdotjs, color: '#ec4a3f' },
+  // Babel
+  '.babelrc':             { icon: SiBabel,      color: '#f5da55' },
+  '.babelrc.json':        { icon: SiBabel,      color: '#f5da55' },
+  '.babelrc.js':          { icon: SiBabel,      color: '#f5da55' },
+  'babel.config.js':      { icon: SiBabel,      color: '#f5da55' },
+  'babel.config.json':    { icon: SiBabel,      color: '#f5da55' },
+  'babel.config.cjs':     { icon: SiBabel,      color: '#f5da55' },
+  // Jest / Vitest
+  'jest.config.ts':       { icon: SiJest,       color: '#c21325' },
+  'jest.config.js':       { icon: SiJest,       color: '#c21325' },
+  'jest.config.json':     { icon: SiJest,       color: '#c21325' },
+  'vitest.config.ts':     { icon: SiVitest,     color: '#6e9f18' },
+  'vitest.config.js':     { icon: SiVitest,     color: '#6e9f18' },
+  // CI / deploy
+  '.travis.yml':          { icon: SiTravisci,   color: '#a3a3a3' },
+  '.circleci':            { icon: SiCircleci,   color: '#a3a3a3' },
+  'vercel.json':          { icon: SiVercel,     color: '#ffffff' },
+  'netlify.toml':         { icon: SiNetlify,    color: '#00c7b7' },
+  // commit / changelog
+  'commitlint.config.js': { icon: SiGit,        color: '#f97316' },
+  'commitlint.config.ts': { icon: SiGit,        color: '#f97316' },
+  '.commitlintrc':        { icon: SiGit,        color: '#f97316' },
+  '.commitlintrc.json':   { icon: SiGit,        color: '#f97316' },
+  'CHANGELOG.md':         { icon: BookOpen,     color: '#3b82f6' },
+  'README.md':            { icon: BookOpen,     color: '#3b82f6' },
+  'README':               { icon: BookOpen,     color: '#3b82f6' },
 }
+
+// ── Filename PREFIX matches (e.g. tsconfig.*.json) ──────────────────
+const FILENAME_PREFIX_ICONS: { prefix: string; def: IconDef }[] = [
+  { prefix: 'tsconfig.', def: { icon: SiTypescript, color: '#3178c6' } },
+]
 
 // ── Extension matches (keys are lowercase, no dot) ───────────────────
 const EXTENSION_ICONS: Record<string, IconDef> = {
@@ -172,7 +245,12 @@ function resolveIcon(filename: string): IconDef {
   const filenameMatch = FILENAME_ICONS[filename]
   if (filenameMatch) return filenameMatch
 
-  // 2. Extension match (case-insensitive)
+  // 2. Filename prefix match (e.g. tsconfig.build.json → TS icon)
+  for (const { prefix, def } of FILENAME_PREFIX_ICONS) {
+    if (filename.startsWith(prefix)) return def
+  }
+
+  // 3. Extension match (case-insensitive)
   const dotIdx = filename.lastIndexOf('.')
   if (dotIdx > 0) {
     const ext = filename.slice(dotIdx + 1).toLowerCase()
@@ -180,7 +258,7 @@ function resolveIcon(filename: string): IconDef {
     if (extMatch) return extMatch
   }
 
-  // 3. Fallback
+  // 4. Fallback
   return FALLBACK
 }
 
