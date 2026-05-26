@@ -17,6 +17,38 @@ type ProviderConfig = { enabled: boolean; apiKey?: string; organization?: string
 type OpenAICompatibleEndpoint = { id: string; label: string; baseUrl: string; apiKey?: string }
 type DefaultRef = { provider: string; model: string; endpoint?: string } | undefined
 
+// Curated model lists shown in the Defaults dropdowns and the provider-card
+// hover tooltips. Update as new models ship. The Phase-4 plan calls this a
+// follow-up "fancy picker" — kept renderer-side because it's pure UI metadata.
+const KNOWN_MODELS_BY_PROVIDER: Record<'anthropic' | 'openai' | 'google', { id: string; label: string }[]> = {
+  anthropic: [
+    { id: 'claude-opus-4-7',           label: 'Claude Opus 4.7 (1M context)' },
+    { id: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6' },
+    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+  ],
+  openai: [
+    { id: 'gpt-4o',       label: 'GPT-4o' },
+    { id: 'gpt-4o-mini',  label: 'GPT-4o mini' },
+    { id: 'gpt-4.1',      label: 'GPT-4.1' },
+    { id: 'gpt-4.1-mini', label: 'GPT-4.1 mini' },
+    { id: 'o3-mini',      label: 'o3-mini' },
+  ],
+  google: [
+    { id: 'gemini-2.5-pro',   label: 'Gemini 2.5 Pro' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+    { id: 'gemini-1.5-pro',   label: 'Gemini 1.5 Pro' },
+    { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+  ],
+}
+
+const PROVIDER_INFO_TOOLTIP: Record<string, string> = {
+  anthropic: 'Includes:\n• ' + KNOWN_MODELS_BY_PROVIDER.anthropic.map(m => m.label).join('\n• '),
+  openai:    'Includes:\n• ' + KNOWN_MODELS_BY_PROVIDER.openai.map(m => m.label).join('\n• '),
+  google:    'Includes:\n• ' + KNOWN_MODELS_BY_PROVIDER.google.map(m => m.label).join('\n• '),
+  'openai-compatible': 'Run any OpenAI-compatible API:\n• Ollama\n• LM Studio\n• llama.cpp\n• Custom self-hosted endpoints',
+}
+
 const BACKGROUND_OPTIONS: { value: BackgroundMode; label: string }[] = [
   { value: 'none', label: 'Default' },
   { value: 'dither', label: 'Dithered' },
@@ -95,6 +127,22 @@ const ProvidersIcon = () => (
   </svg>
 )
 
+const InfoIcon = ({ title }: { title: string }) => (
+  <span
+    title={title}
+    style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 6, opacity: 0.55, cursor: 'help', flexShrink: 0 }}
+  >
+    <svg
+      width={12} height={12} viewBox="0 0 12 12" fill="none"
+      stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round"
+    >
+      <circle cx="6" cy="6" r="5" />
+      <path d="M6 5.4v3" />
+      <circle cx="6" cy="3.6" r="0.4" fill="currentColor" stroke="none" />
+    </svg>
+  </span>
+)
+
 const CATEGORIES: { id: CategoryId; label: string; icon: ReactNode }[] = [
   { id: 'providers', label: 'Providers', icon: <ProvidersIcon /> },
   { id: 'claude-desktop', label: 'Claude Desktop', icon: <DesktopIcon /> },
@@ -139,8 +187,10 @@ function OpenAICompatibleSection(props: {
       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
         <div className="connector-icon"><IconOllama width={20} height={20} style={{ color: 'var(--text)' }} /></div>
         <div className="connector-info" style={{ flex: 1 }}>
-          <div className="connector-name">Local / openai-compatible</div>
-          <div className="connector-desc">Ollama, LM Studio, llama.cpp — anything that speaks the OpenAI REST API.</div>
+          <div className="connector-name" style={{ display: 'flex', alignItems: 'center' }}>
+            Local / openai-compatible
+            <InfoIcon title={PROVIDER_INFO_TOOLTIP['openai-compatible']} />
+          </div>
         </div>
         <div className="connector-actions">
           <button className="settings-btn" onClick={() => setAdding(true)}>Add endpoint</button>
@@ -191,9 +241,195 @@ function DefaultsSection(props: {
   setSkillDefault: Dispatch<SetStateAction<DefaultRef>>
   tagDefault:   DefaultRef
   setTagDefault: Dispatch<SetStateAction<DefaultRef>>
+  anthropicConfigured: boolean
+  openaiConfigured:    boolean
+  googleConfigured:    boolean
+  endpoints: OpenAICompatibleEndpoint[]
 }) {
-  // Task 10 replaces this with the real implementation.
-  return null
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const availableProviders: { id: string; label: string }[] = []
+  if (props.anthropicConfigured)  availableProviders.push({ id: 'anthropic',         label: 'Anthropic' })
+  if (props.openaiConfigured)     availableProviders.push({ id: 'openai',            label: 'OpenAI' })
+  if (props.googleConfigured)     availableProviders.push({ id: 'google',            label: 'Google Gemini' })
+  if (props.endpoints.length > 0) availableProviders.push({ id: 'openai-compatible', label: 'Local / openai-compatible' })
+
+  const saveRef = async (
+    feature: 'chat' | 'skillGen' | 'tagExtract',
+    ref: { provider: string; model: string; endpoint?: string },
+    setter: Dispatch<SetStateAction<DefaultRef>>,
+  ) => {
+    setSaveError(null)
+    try {
+      await window.api.llm.setDefault(feature, ref)
+      setter(ref)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const featureRow = (
+    label: string,
+    description: string,
+    current: DefaultRef,
+    feature: 'chat' | 'skillGen' | 'tagExtract',
+    setter: Dispatch<SetStateAction<DefaultRef>>,
+  ) => {
+    const provider = current?.provider ?? ''
+    const endpoint = current?.endpoint ?? ''
+    const model    = current?.model    ?? ''
+
+    const onProviderChange = (next: string) => {
+      if (next === '') return
+      if (next === 'openai-compatible') {
+        const ep = props.endpoints[0]?.id
+        if (!ep) return
+        const carriedModel = current?.provider === 'openai-compatible' ? model : ''
+        if (carriedModel) {
+          saveRef(feature, { provider: 'openai-compatible', endpoint: ep, model: carriedModel }, setter)
+        } else {
+          // Set local state but don't save until model is typed
+          setter({ provider: 'openai-compatible', endpoint: ep, model: '' })
+        }
+      } else {
+        const known = KNOWN_MODELS_BY_PROVIDER[next as 'anthropic' | 'openai' | 'google']
+        const firstModel = known?.[0]?.id
+        if (!firstModel) return
+        saveRef(feature, { provider: next, model: firstModel }, setter)
+      }
+    }
+
+    const onEndpointChange = (next: string) => {
+      if (provider !== 'openai-compatible') return
+      if (model.trim()) {
+        saveRef(feature, { provider, endpoint: next, model }, setter)
+      } else {
+        setter({ provider, endpoint: next, model: '' })
+      }
+    }
+
+    const onModelSelectChange = (next: string) => {
+      if (!provider || provider === 'openai-compatible') return
+      saveRef(feature, { provider, model: next }, setter)
+    }
+
+    const onModelTextChange = (next: string) => {
+      if (provider !== 'openai-compatible' || !endpoint) return
+      setter({ provider, endpoint, model: next })
+    }
+
+    const onModelTextBlur = () => {
+      if (provider !== 'openai-compatible' || !endpoint) return
+      const trimmed = model.trim()
+      if (trimmed) saveRef(feature, { provider, endpoint, model: trimmed }, setter)
+    }
+
+    const knownModels = provider !== '' && provider !== 'openai-compatible'
+      ? KNOWN_MODELS_BY_PROVIDER[provider as 'anthropic' | 'openai' | 'google']
+      : undefined
+
+    return (
+      <div className="settings-group-row settings-group-row--full">
+        <div className="settings-group-row-main">
+          <div className="settings-group-row-label">{label}</div>
+          <div className="settings-group-row-sub">{description}</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <select
+            className="settings-input"
+            value={provider}
+            onChange={e => onProviderChange(e.target.value)}
+            style={{ flex: '0 1 200px' }}
+          >
+            <option value="" disabled>— Select provider —</option>
+            {availableProviders.map(p => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+
+          {provider === 'openai-compatible' && (
+            <>
+              <select
+                className="settings-input"
+                value={endpoint}
+                onChange={e => onEndpointChange(e.target.value)}
+                style={{ flex: '0 1 180px' }}
+              >
+                {props.endpoints.map(ep => (
+                  <option key={ep.id} value={ep.id}>{ep.label}</option>
+                ))}
+              </select>
+              <input
+                className="settings-input"
+                placeholder="model name (e.g. llama3.1:70b)"
+                value={model}
+                onChange={e => onModelTextChange(e.target.value)}
+                onBlur={onModelTextBlur}
+                style={{ flex: '1 1 200px' }}
+              />
+            </>
+          )}
+
+          {knownModels && (
+            <select
+              className="settings-input"
+              value={model}
+              onChange={e => onModelSelectChange(e.target.value)}
+              style={{ flex: '1 1 240px' }}
+            >
+              {!knownModels.find(m => m.id === model) && model && (
+                <option value={model}>{model} (custom)</option>
+              )}
+              {knownModels.map(m => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const empty = availableProviders.length === 0
+
+  return (
+    <div className="settings-group">
+      <div className="settings-group-title">Defaults</div>
+      <div className="settings-group-body">
+        {empty ? (
+          <div style={{ padding: '16px', fontSize: 12, color: 'var(--text2)' }}>
+            Configure at least one provider above (add an API key or a local endpoint) to set defaults.
+          </div>
+        ) : (
+          <>
+            {featureRow(
+              'Chat default',
+              'Used by the AI Chat overlay when no agent specifies a model.',
+              props.chatDefault, 'chat', props.setChatDefault,
+            )}
+            {featureRow(
+              'Skill generation default',
+              'Used when generating skills from repositories.',
+              props.skillDefault, 'skillGen', props.setSkillDefault,
+            )}
+            {featureRow(
+              'Tag extraction default',
+              'Background task: extracts search tags from queries.',
+              props.tagDefault, 'tagExtract', props.setTagDefault,
+            )}
+          </>
+        )}
+        {saveError && (
+          <div style={{ padding: '8px 16px', color: 'var(--accent-red, #991b1b)', fontSize: 12 }}>
+            Save error: {saveError}
+          </div>
+        )}
+        <div style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text2)' }}>
+          Note (Phase 4): defaults are stored but not yet read by the call sites — that wiring lands in a follow-up. Today the chat, skill gen, and tag extraction features continue to use their hardcoded Claude models.
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function Settings() {
@@ -673,8 +909,10 @@ export default function Settings() {
             <div className="connector-row">
               <div className="connector-icon"><IconAnthropic width={20} height={20} style={{ color: 'var(--text)' }} /></div>
               <div className="connector-info">
-                <div className="connector-name">Anthropic</div>
-                <div className="connector-desc">Claude Sonnet, Opus, Haiku via the Anthropic API.</div>
+                <div className="connector-name" style={{ display: 'flex', alignItems: 'center' }}>
+                  Anthropic
+                  <InfoIcon title={PROVIDER_INFO_TOOLTIP.anthropic} />
+                </div>
                 <input
                   className="settings-input"
                   type="password"
@@ -695,8 +933,10 @@ export default function Settings() {
             <div className="connector-row">
               <div className="connector-icon"><IconOpenAI width={20} height={20} style={{ color: 'var(--text)' }} /></div>
               <div className="connector-info">
-                <div className="connector-name">OpenAI</div>
-                <div className="connector-desc">GPT-4o, GPT-4.1, o-series.</div>
+                <div className="connector-name" style={{ display: 'flex', alignItems: 'center' }}>
+                  OpenAI
+                  <InfoIcon title={PROVIDER_INFO_TOOLTIP.openai} />
+                </div>
                 <input
                   className="settings-input"
                   type="password"
@@ -726,8 +966,10 @@ export default function Settings() {
             <div className="connector-row">
               <div className="connector-icon"><IconGemini width={20} height={20} style={{ color: 'var(--text)' }} /></div>
               <div className="connector-info">
-                <div className="connector-name">Google Gemini</div>
-                <div className="connector-desc">Gemini 1.5/2.0/2.5 Pro and Flash.</div>
+                <div className="connector-name" style={{ display: 'flex', alignItems: 'center' }}>
+                  Google Gemini
+                  <InfoIcon title={PROVIDER_INFO_TOOLTIP.google} />
+                </div>
                 <input
                   className="settings-input"
                   type="password"
@@ -750,11 +992,14 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Defaults section — Task 10 will replace this stub */}
         <DefaultsSection
           chatDefault={chatDefault} setChatDefault={setChatDefault}
           skillDefault={skillDefault} setSkillDefault={setSkillDefault}
           tagDefault={tagDefault} setTagDefault={setTagDefault}
+          anthropicConfigured={!!anthropicCfg.apiKey}
+          openaiConfigured={!!openaiCfg.apiKey}
+          googleConfigured={!!googleCfg.apiKey}
+          endpoints={endpoints}
         />
       </>
     )
