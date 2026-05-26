@@ -14,6 +14,7 @@ interface DiscoverRowProps {
   title?: string
   onMore?: () => void
   onPause?: (paused: boolean) => void
+  onLanguageClick?: (lang: string) => void
 }
 
 // Emoji shortcode parser kept local — RepoCard exports a similar table but we
@@ -28,13 +29,14 @@ function parseEmoji(text: string): string {
 }
 
 function DiscoverRowCardItem({
-  repo, posIndex, columns, visible, onNavigate,
+  repo, posIndex, columns, visible, onNavigate, onLanguageClick,
 }: {
   repo: RepoRow
   posIndex: number
   columns: number
   visible: number
   onNavigate: (path: string) => void
+  onLanguageClick?: (lang: string) => void
 }) {
   const [desc, setDesc] = useState<string | null>(() => {
     if (repo.detected_language && repo.detected_language !== 'en' && repo.translated_description) {
@@ -97,7 +99,11 @@ function DiscoverRowCardItem({
       <div className="repo-card-image">
         <DitherBackground avatarUrl={repo.avatar_url} fallbackGradient={gradient} />
         {repo.language && (
-          <span className="repo-card-lang-overlay" title={repo.language}>
+          <span
+            className="repo-card-lang-overlay"
+            onClick={e => { e.stopPropagation(); onLanguageClick?.(repo.language!) }}
+            title={repo.language}
+          >
             <LanguageIcon lang={repo.language} size={18} boxed />
           </span>
         )}
@@ -128,7 +134,7 @@ function DiscoverRowCardItem({
   )
 }
 
-export default function DiscoverRow({ repos, activeIndex, columns, onNavigate, onAdvance, title = 'Recommended for You', onMore, onPause }: DiscoverRowProps) {
+export default function DiscoverRow({ repos, activeIndex, columns, onNavigate, onAdvance, title = 'Recommended for You', onMore, onPause, onLanguageClick }: DiscoverRowProps) {
   if (repos.length === 0) return null
 
   const visible = Math.min(columns, repos.length)
@@ -178,6 +184,7 @@ export default function DiscoverRow({ repos, activeIndex, columns, onNavigate, o
             columns={columns}
             visible={visible}
             onNavigate={onNavigate}
+            onLanguageClick={onLanguageClick}
           />
         ))}
         <button

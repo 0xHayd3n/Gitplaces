@@ -1102,6 +1102,7 @@ export default function Discover() {
                         onNavigate={navigateToRepo}
                         onMore={() => setViewMode('recommended')}
                         onPause={setHeroPaused}
+                        onLanguageClick={handleLanguageClick}
                         onAdvance={(delta) => {
                           const visible = Math.min(effectiveCols, rowRepos.length)
                           const max = Math.max(0, rowRepos.length - visible)
@@ -1123,6 +1124,7 @@ export default function Discover() {
                     columns={effectiveCols}
                     onNavigate={navigateToRepo}
                     onMore={() => setViewMode('last-visited')}
+                    onLanguageClick={handleLanguageClick}
                     onAdvance={(delta) => {
                       const visible = Math.min(effectiveCols, recentlyVisited.length)
                       const max = Math.max(0, recentlyVisited.length - visible)
