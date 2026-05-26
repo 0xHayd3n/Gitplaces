@@ -9,6 +9,7 @@ export type ProviderCardProps = {
   description: string
   nameAccessory?: ReactNode
   status?: { tone: StatusTone; text: string }
+  statusAccessory?: ReactNode
   children?: ReactNode
   actions?: ReactNode
 }
@@ -20,6 +21,7 @@ export default function ProviderCard({
   description,
   nameAccessory,
   status,
+  statusAccessory,
   children,
   actions,
 }: ProviderCardProps) {
@@ -35,9 +37,12 @@ export default function ProviderCard({
         <div className="connector-desc">{description}</div>
         {children && <div style={{ marginTop: 8 }}>{children}</div>}
         {status && (
-          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, opacity: 0.75 }}>
-            <span className={`status-dot ${status.tone}`} />
-            {status.text}
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, fontSize: 11.5 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, opacity: 0.75 }}>
+              <span className={`status-dot ${status.tone}`} />
+              {status.text}
+            </span>
+            {statusAccessory}
           </div>
         )}
       </div>

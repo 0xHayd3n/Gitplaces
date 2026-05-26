@@ -602,6 +602,26 @@ export default function AIPanel() {
     const manualOpen  = mcpManualOpen[target]
     const pathOpen    = mcpPathOpen[target]
 
+    const testInline = isThisTest && mcpTestResult ? (
+      <span style={{
+        color: mcpTestResult.ok ? 'var(--accent-green, #16a34a)' : 'var(--accent-red, #991b1b)',
+        fontSize: 11.5,
+      }}>
+        {mcpTestResult.text}
+      </span>
+    ) : (
+      <button
+        type="button"
+        onClick={() => handleTestConnection(target)}
+        style={{
+          background: 'transparent', border: 'none', padding: 0,
+          color: 'var(--accent)', cursor: 'pointer', fontSize: 11.5,
+        }}
+      >
+        Test
+      </button>
+    )
+
     return (
       <div key={target} style={{ marginBottom: 14 }}>
         <ProviderCard
@@ -613,13 +633,22 @@ export default function AIPanel() {
             tone: status.configured ? 'green' : 'gray',
             text: status.configured ? 'Configured' : 'Not configured',
           }}
+          statusAccessory={testInline}
           actions={<>
             <button className="settings-btn" onClick={() => handleAutoConfigure(target)}>Auto-configure</button>
-            <button className="settings-btn" onClick={() => handleTestConnection(target)}>Test</button>
-            {isThisTest && mcpTestResult && (
-              mcpTestResult.ok
-                ? <span className="connector-badge connected">{mcpTestResult.text}</span>
-                : <span className="connector-badge" style={{ background: 'var(--accent-red-soft, #fee2e2)', color: 'var(--accent-red, #991b1b)' }}>{mcpTestResult.text}</span>
+            <button
+              className="settings-btn settings-btn--ghost"
+              onClick={() => setMcpManualOpen(prev => ({ ...prev, [target]: !prev[target] }))}
+            >
+              Manual config
+            </button>
+            {status.configPath && (
+              <button
+                className="settings-btn settings-btn--ghost"
+                onClick={() => setMcpPathOpen(prev => ({ ...prev, [target]: !prev[target] }))}
+              >
+                File path
+              </button>
             )}
           </>}
         />
@@ -630,51 +659,25 @@ export default function AIPanel() {
           </p>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-          <button
-            className="connector-advanced-toggle"
-            onClick={() => setMcpManualOpen(prev => ({ ...prev, [target]: !prev[target] }))}
-            type="button"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: manualOpen ? 'rotate(180deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
-              <path d="M2 4l4 4 4-4"/>
-            </svg>
-            Manual configuration
-          </button>
-          {manualOpen && (
-            <div style={{ marginLeft: 18 }}>
-              <p className="settings-hint" style={{ margin: '0 0 4px' }}>
-                Add this to <code>{info.configFile}</code>:
-              </p>
-              <div className="settings-mcp-snippet-row">
-                <pre className="settings-mcp-snippet">{snippet}</pre>
-                <button className="settings-btn settings-mcp-copy-btn" onClick={() => handleCopy(target)}>
-                  {isCopied ? 'Copied!' : 'Copy'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {status.configPath && (
-            <>
-              <button
-                className="connector-advanced-toggle"
-                onClick={() => setMcpPathOpen(prev => ({ ...prev, [target]: !prev[target] }))}
-                type="button"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: pathOpen ? 'rotate(180deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
-                  <path d="M2 4l4 4 4-4"/>
-                </svg>
-                Config file path
+        {manualOpen && (
+          <div style={{ marginTop: 8 }}>
+            <p className="settings-hint" style={{ margin: '0 0 4px' }}>
+              Add this to <code>{info.configFile}</code>:
+            </p>
+            <div className="settings-mcp-snippet-row">
+              <pre className="settings-mcp-snippet">{snippet}</pre>
+              <button className="settings-btn settings-mcp-copy-btn" onClick={() => handleCopy(target)}>
+                {isCopied ? 'Copied!' : 'Copy'}
               </button>
-              {pathOpen && (
-                <p className="settings-hint settings-mcp-path" style={{ margin: '0 0 0 18px' }}>
-                  {status.configPath}
-                </p>
-              )}
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
+
+        {pathOpen && status.configPath && (
+          <p className="settings-hint settings-mcp-path" style={{ margin: '6px 0 0' }}>
+            {status.configPath}
+          </p>
+        )}
       </div>
     )
   }
