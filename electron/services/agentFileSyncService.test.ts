@@ -8,23 +8,30 @@ import type { AgentRow } from '../../src/types/agent'
 import {
   subagentPath,
   slashCommandPath,
+  opencodeSubagentPath,
   checkConflict,
   previewSubagentFile,
   previewSlashCommandFile,
+  previewOpenCodeSubagentFile,
   syncAgentToDisk,
   cleanupAgentFiles,
 } from './agentFileSyncService'
 
 let tmpDir = ''
+let opencodeTmpDir = ''
 
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-sync-'))
+  opencodeTmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'agent-sync-oc-'))
   process.env.CLAUDE_HOME = tmpDir
+  process.env.OPENCODE_HOME = opencodeTmpDir
 })
 
 afterEach(async () => {
   delete process.env.CLAUDE_HOME
+  delete process.env.OPENCODE_HOME
   await fs.rm(tmpDir, { recursive: true, force: true })
+  await fs.rm(opencodeTmpDir, { recursive: true, force: true })
 })
 
 // Primary content used in every sync test below — passed explicitly into
@@ -407,5 +414,163 @@ describe('cleanupAgentFiles', () => {
     const r = await cleanupAgentFiles('foo', { cleanSubagent: true, cleanSlashCommand: true })
     expect(r.subagent).toMatchObject({ status: 'deleted' })
     expect(r.slashCommand).toMatchObject({ status: 'deleted' })
+  })
+})
+
+// ── opencode subagent sync ──────────────────────────────────────────
+
+describe('opencodeSubagentPath', () => {
+  it('returns OPENCODE_HOME/agents/<handle>.md', () => {
+    expect(opencodeSubagentPath('foo')).toBe(path.join(opencodeTmpDir, 'agents', 'foo.md'))
+  })
+})
+
+describe('previewOpenCodeSubagentFile', () => {
+  it('writes name, description, and body — omits tools and model when defaults', () => {
+    const out = previewOpenCodeSubagentFile(baseAgent({ model_provider: 'opencode' }), BODY)
+    const parsed = matter(out)
+    expect(parsed.data.name).toBe('my-agent')
+    expect(parsed.data.description).toBe('A test agent.')
+    expect(parsed.data.tools).toBeUndefined()
+    expect(parsed.data.model).toBeUndefined()
+    expect(parsed.content.trim()).toBe('Agent body content.')
+  })
+
+  it('emits comma-separated tools when array is non-empty', () => {
+    const out = previewOpenCodeSubagentFile(
+      baseAgent({ model_provider: 'opencode', tools: '["Read","Edit","Bash"]' }),
+      BODY,
+    )
+    expect(matter(out).data.tools).toBe('Read, Edit, Bash')
+  })
+
+  it('strips the opencode/ provider prefix from the model field', () => {
+    const out = previewOpenCodeSubagentFile(
+      baseAgent({ model_provider: 'opencode', model: 'opencode/claude-sonnet-4-6' }),
+      BODY,
+    )
+    expect(matter(out).data.model).toBe('claude-sonnet-4-6')
+    expect(out).not.toMatch(/opencode\//)
+  })
+
+  it('passes bare model ids through unchanged', () => {
+    const out = previewOpenCodeSubagentFile(
+      baseAgent({ model_provider: 'opencode', model: 'claude-sonnet-4-6' }),
+      BODY,
+    )
+    expect(matter(out).data.model).toBe('claude-sonnet-4-6')
+  })
+
+  it('omits the model field entirely when model is "inherit"', () => {
+    const out = previewOpenCodeSubagentFile(
+      baseAgent({ model_provider: 'opencode', model: 'inherit' }),
+      BODY,
+    )
+    expect(matter(out).data.model).toBeUndefined()
+    expect(out).not.toMatch(/^model:/m)
+  })
+})
+
+describe('syncAgentToDisk — opencode branch', () => {
+  it('writes the agent to ~/.opencode/agents/<handle>.md when model_provider is opencode', async () => {
+    const agent = baseAgent({
+      is_subagent: 1,
+      model_provider: 'opencode',
+      model: 'opencode/claude-sonnet-4-6',
+    })
+    const result = await syncAgentToDisk(agent, BODY)
+    expect(result.subagent).toMatchObject({ status: 'written', path: opencodeSubagentPath('my-agent') })
+    expect(await fileExists(opencodeSubagentPath('my-agent'))).toBe(true)
+    const written = await fs.readFile(opencodeSubagentPath('my-agent'), 'utf-8')
+    expect(written).toContain('name: my-agent')
+    expect(written).toContain('model: claude-sonnet-4-6')
+  })
+
+  it('does NOT sync the opencode agent to .claude/agents/', async () => {
+    const agent = baseAgent({
+      is_subagent: 1,
+      model_provider: 'opencode',
+      model: 'opencode/claude-sonnet-4-6',
+    })
+    await syncAgentToDisk(agent, BODY)
+    expect(await fileExists(subagentPath('my-agent'))).toBe(false)
+  })
+
+  it('does NOT sync the anthropic agent to .opencode/agents/', async () => {
+    const agent = baseAgent({
+      is_subagent: 1,
+      model_provider: 'anthropic',
+      model: 'sonnet',
+    })
+    await syncAgentToDisk(agent, BODY)
+    expect(await fileExists(opencodeSubagentPath('my-agent'))).toBe(false)
+    expect(await fileExists(subagentPath('my-agent'))).toBe(true)
+  })
+
+  it('returns skipped when opencode agent has is_subagent=0 and never synced', async () => {
+    const agent = baseAgent({
+      is_subagent: 0,
+      model_provider: 'opencode',
+      synced_subagent_at: null,
+    })
+    const result = await syncAgentToDisk(agent, BODY)
+    expect(result.subagent).toMatchObject({ status: 'skipped' })
+  })
+
+  it('deletes the opencode file when is_subagent flips off after previous sync', async () => {
+    await fs.mkdir(path.join(opencodeTmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(opencodeSubagentPath('my-agent'), 'previously synced')
+    const agent = baseAgent({
+      is_subagent: 0,
+      model_provider: 'opencode',
+      synced_subagent_at: '2026-05-20T00:00:00.000Z',
+    })
+    const result = await syncAgentToDisk(agent, BODY)
+    expect(result.subagent).toMatchObject({ status: 'deleted' })
+    expect(await fileExists(opencodeSubagentPath('my-agent'))).toBe(false)
+  })
+
+  it('returns conflict when opencode file exists, never synced, forceOverwrite=false', async () => {
+    await fs.mkdir(path.join(opencodeTmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(opencodeSubagentPath('my-agent'), 'hand-authored opencode agent')
+    const agent = baseAgent({
+      is_subagent: 1,
+      model_provider: 'opencode',
+      synced_subagent_at: null,
+    })
+    const result = await syncAgentToDisk(agent, BODY)
+    expect(result.subagent).toMatchObject({ status: 'conflict' })
+    expect(await fs.readFile(opencodeSubagentPath('my-agent'), 'utf-8')).toBe('hand-authored opencode agent')
+  })
+
+  it('renames the opencode file when handle changes', async () => {
+    await fs.mkdir(path.join(opencodeTmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(opencodeSubagentPath('old-handle'), 'previously synced')
+    const agent = baseAgent({
+      handle: 'new-handle',
+      is_subagent: 1,
+      model_provider: 'opencode',
+      synced_subagent_at: '2026-05-20T00:00:00.000Z',
+    })
+    await syncAgentToDisk(agent, BODY, { oldHandle: 'old-handle' })
+    expect(await fileExists(opencodeSubagentPath('old-handle'))).toBe(false)
+    expect(await fileExists(opencodeSubagentPath('new-handle'))).toBe(true)
+  })
+
+  it('opencode subagent + claude slash command can coexist for one agent', async () => {
+    // Edge case: an agent might be set up as a slash command (Claude Code surface)
+    // even though its primary provider is opencode. Each surface is independent.
+    const agent = baseAgent({
+      is_subagent: 1,
+      is_slash_command: 1,
+      model_provider: 'opencode',
+      model: 'opencode/claude-sonnet-4-6',
+    })
+    const result = await syncAgentToDisk(agent, BODY)
+    expect(result.subagent).toMatchObject({ status: 'written', path: opencodeSubagentPath('my-agent') })
+    expect(result.slashCommand).toMatchObject({ status: 'written' })
+    expect(await fileExists(opencodeSubagentPath('my-agent'))).toBe(true)
+    expect(await fileExists(slashCommandPath('my-agent'))).toBe(true)
+    expect(await fileExists(subagentPath('my-agent'))).toBe(false)
   })
 })

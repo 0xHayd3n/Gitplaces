@@ -12,12 +12,20 @@ export function claudeHome(): string {
   return process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.claude')
 }
 
+export function opencodeHome(): string {
+  return process.env.OPENCODE_HOME ?? path.join(os.homedir(), '.opencode')
+}
+
 export function subagentPath(handle: string): string {
   return path.join(claudeHome(), 'agents', `${handle}.md`)
 }
 
 export function slashCommandPath(handle: string): string {
   return path.join(claudeHome(), 'commands', `${handle}.md`)
+}
+
+export function opencodeSubagentPath(handle: string): string {
+  return path.join(opencodeHome(), 'agents', `${handle}.md`)
 }
 
 async function fileExists(p: string): Promise<boolean> {
@@ -68,6 +76,19 @@ function modelForClaudeFrontmatter(model: string): string | null {
   return model
 }
 
+/**
+ * Convert an agent's stored model string into the form OpenCode expects in
+ * `.opencode/agents/*.md` frontmatter. OpenCode accepts the bare model id
+ * (e.g. 'claude-sonnet-4-6'); strip any 'provider/' prefix. 'inherit' returns
+ * null so the caller omits the field and OpenCode's own default resolves.
+ */
+function modelForOpenCodeFrontmatter(model: string): string | null {
+  if (model === 'inherit') return null
+  const slashIdx = model.indexOf('/')
+  if (slashIdx === -1) return model
+  return model.slice(slashIdx + 1)
+}
+
 function resolvedDescription(agent: AgentRow, primaryContent: string): string {
   const explicit = agent.description?.trim()
   if (explicit) return explicit
@@ -86,6 +107,22 @@ export function previewSubagentFile(agent: AgentRow, primaryContent: string): st
   const claudeModel = modelForClaudeFrontmatter(agent.model)
   if (claudeModel !== null) {
     data.model = claudeModel
+  }
+  return matter.stringify(primaryContent, data)
+}
+
+export function previewOpenCodeSubagentFile(agent: AgentRow, primaryContent: string): string {
+  const data: Record<string, unknown> = {
+    name: agent.handle,
+    description: resolvedDescription(agent, primaryContent),
+  }
+  const tools = parseAgentTools(agent.tools)
+  if (tools !== null) {
+    data.tools = tools.join(', ')
+  }
+  const opencodeModel = modelForOpenCodeFrontmatter(agent.model)
+  if (opencodeModel !== null) {
+    data.model = opencodeModel
   }
   return matter.stringify(primaryContent, data)
 }
@@ -126,17 +163,21 @@ export async function syncAgentToDisk(
   primaryContent: string,
   ctx: SyncContext = {},
 ): Promise<SyncResult> {
-  const [subagent, slashCommand] = await Promise.all([
+  const [claudeSubagent, opencodeSubagent, slashCommand] = await Promise.all([
     syncOneSurface({
-      // Only Anthropic agents sync to .claude/agents/. Other providers
-      // (openai, google, opencode, openai-compatible) either have no CLI
-      // runtime (openai/google/openai-compatible) or have their own sync
-      // target landing in Phase 6 (opencode → .opencode/agents/).
       enabled: agent.is_subagent === 1 && agent.model_provider === 'anthropic',
       currentPath: subagentPath(agent.handle),
       oldPath: ctx.oldHandle ? subagentPath(ctx.oldHandle) : null,
       syncedAt: agent.synced_subagent_at,
       content: () => previewSubagentFile(agent, primaryContent),
+      forceOverwrite: ctx.forceOverwrite === true,
+    }),
+    syncOneSurface({
+      enabled: agent.is_subagent === 1 && agent.model_provider === 'opencode',
+      currentPath: opencodeSubagentPath(agent.handle),
+      oldPath: ctx.oldHandle ? opencodeSubagentPath(ctx.oldHandle) : null,
+      syncedAt: agent.synced_subagent_at,
+      content: () => previewOpenCodeSubagentFile(agent, primaryContent),
       forceOverwrite: ctx.forceOverwrite === true,
     }),
     syncOneSurface({
@@ -148,6 +189,11 @@ export async function syncAgentToDisk(
       forceOverwrite: ctx.forceOverwrite === true,
     }),
   ])
+  // The anthropic and opencode subagent branches are mutually exclusive
+  // (gated on agent.model_provider). At most one runs; the other returns
+  // 'skipped'. Collapse into the single SyncResult.subagent slot so
+  // persistSyncResult/synced_subagent_at tracking stays provider-agnostic.
+  const subagent = claudeSubagent.status === 'skipped' ? opencodeSubagent : claudeSubagent
   return { subagent, slashCommand }
 }
 
