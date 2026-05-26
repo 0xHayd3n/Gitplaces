@@ -88,10 +88,9 @@ function OpenAICompatibleSection(props: {
       name="Local / OpenAI-compatible"
       chip="API"
       description="Ollama, LM Studio, llama.cpp, or any OpenAI-compatible endpoint."
+      nameAccessory={<InfoIcon title={PROVIDER_INFO_TOOLTIP['openai-compatible']} />}
       actions={<button className="settings-btn" onClick={() => setAdding(true)}>Add endpoint</button>}
     >
-      <InfoIcon title={PROVIDER_INFO_TOOLTIP['openai-compatible']} />
-
       {props.endpoints.length > 0 && (
         <div style={{ marginTop: 8 }}>
           {props.endpoints.map(ep => (
@@ -186,6 +185,7 @@ export default function AIPanel() {
           name="Anthropic"
           chip="API"
           description="Claude Opus, Sonnet, Haiku."
+          nameAccessory={<InfoIcon title={PROVIDER_INFO_TOOLTIP.anthropic} />}
           actions={<>
             <button className="settings-btn" disabled={!anthropicCfg.apiKey} onClick={() => testProvider('anthropic', 'claude-haiku-4-5-20251001')}>Test</button>
             {renderStatus('anthropic')}
@@ -207,6 +207,7 @@ export default function AIPanel() {
           name="OpenAI"
           chip="API"
           description="GPT-4o, GPT-4.1, o3-mini."
+          nameAccessory={<InfoIcon title={PROVIDER_INFO_TOOLTIP.openai} />}
           actions={<>
             <button className="settings-btn" disabled={!openaiCfg.apiKey} onClick={() => testProvider('openai', 'gpt-4o')}>Test</button>
             {renderStatus('openai')}
@@ -237,6 +238,7 @@ export default function AIPanel() {
           name="Google Gemini"
           chip="API"
           description="Gemini 2.5 Pro, Flash; Gemini 1.5."
+          nameAccessory={<InfoIcon title={PROVIDER_INFO_TOOLTIP.google} />}
           actions={<>
             <button className="settings-btn" disabled={!googleCfg.apiKey} onClick={() => testProvider('google', 'gemini-2.5-pro')}>Test</button>
             {renderStatus('google')}

@@ -7,6 +7,7 @@ export type ProviderCardProps = {
   name: string
   chip: 'API' | 'CLI' | 'MCP'
   description: string
+  nameAccessory?: ReactNode
   status?: { tone: StatusTone; text: string }
   children?: ReactNode
   actions?: ReactNode
@@ -17,6 +18,7 @@ export default function ProviderCard({
   name,
   chip,
   description,
+  nameAccessory,
   status,
   children,
   actions,
@@ -28,6 +30,7 @@ export default function ProviderCard({
         <div className="connector-name" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {name}
           <span className={`transport-chip ${chip.toLowerCase()}`}>{chip}</span>
+          {nameAccessory}
         </div>
         <div className="connector-desc">{description}</div>
         {children && <div style={{ marginTop: 8 }}>{children}</div>}
