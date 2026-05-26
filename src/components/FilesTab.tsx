@@ -16,7 +16,7 @@ import { populateSvgCache } from './SvgThumb'
 import { buildVisibleRows } from '../lib/fileTree/model'
 import { buildDiffBaseOptions } from '../lib/fileTree/diffBaseOptions'
 import type { TreeEntry, VisibleRow, Density, SearchMode, DiffBaseRef } from '../lib/fileTree/types'
-import { isVideoFile, isPdfFile } from './DirectoryListing'
+import { isVideoFile, isPdfFile } from './files/fileTypes'
 
 // FileContentPanel's local TreeEntry doesn't include 'commit'; this alias
 // matches its expected shape so casts at the boundary are explicit.

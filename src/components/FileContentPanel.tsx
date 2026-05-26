@@ -1,8 +1,8 @@
 import { lazy, Suspense } from 'react'
 import { detectLanguage } from '../utils/detectLanguage'
-import { DirectoryListing, ImagePreview, VideoPlayer, FileMetaView, isImageFile, isVideoFile, isPdfFile } from './DirectoryListing'
+import { isImageFile, isVideoFile, isPdfFile } from './files/fileTypes'
+import { ImagePreview, VideoPlayer, FileMetaView } from './files/fileViewers'
 import CodeToolbar from './CodeToolbar'
-import type { ViewMode, SortField, SortDirection } from './ViewModeBar'
 
 const CodeViewer = lazy(() => import('./CodeViewer'))
 const ReadmeRenderer = lazy(() => import('./ReadmeRenderer'))
@@ -48,9 +48,9 @@ interface Props {
   onToggleWordWrap: () => void
   lineCount: number
   onLineCountReady: (count: number) => void
-  viewMode: ViewMode
-  sortField: SortField
-  sortDirection: SortDirection
+  viewMode?: string
+  sortField?: string
+  sortDirection?: string
   filterText?: string
   treeData?: Map<string, TreeEntry[]>
   onContextMenu?: (e: React.MouseEvent, entry: TreeEntry, fullPath: string) => void
@@ -59,31 +59,10 @@ interface Props {
 export default function FileContentPanel({
   selectedPath, selectedEntry, blobContent, blobRawBase64, blobLoading,
   owner, name, branch,
-  dirEntries, onSelectEntry, onNavigateToFile,
+  onNavigateToFile,
   wordWrap, onToggleWordWrap, lineCount, onLineCountReady,
-  viewMode, sortField, sortDirection, filterText, treeData, onContextMenu,
 }: Props) {
   if (!selectedPath) {
-    if (dirEntries) {
-      return (
-        <div className="file-content-panel">
-          <DirectoryListing
-            entries={dirEntries}
-            onSelect={onSelectEntry}
-            basePath=""
-            viewMode={viewMode}
-            filterText={filterText}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            owner={owner}
-            name={name}
-            branch={branch}
-            treeData={treeData}
-            onContextMenu={onContextMenu}
-          />
-        </div>
-      )
-    }
     return (
       <div className="file-content-empty">
         <p>Select a file to view its contents</p>
@@ -113,26 +92,7 @@ export default function FileContentPanel({
         />
       )}
 
-      {selectedEntry?.type === 'tree' && dirEntries ? (
-        <DirectoryListing
-          entries={dirEntries}
-          onSelect={onSelectEntry}
-          basePath={selectedPath}
-          viewMode={viewMode}
-          filterText={filterText}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          owner={owner}
-          name={name}
-          branch={branch}
-          treeData={treeData}
-          onContextMenu={onContextMenu}
-        />
-      ) : selectedEntry?.type === 'tree' && !dirEntries ? (
-        <div className="file-content-panel__loading">
-          <span className="spin-ring" style={{ width: 14, height: 14 }} />
-        </div>
-      ) : isImageFile(filename) ? (
+      {isImageFile(filename) ? (
         isSvg && blobLoading ? (
           <div className="file-content-panel__loading">
             <span className="spin-ring" style={{ width: 14, height: 14 }} />
