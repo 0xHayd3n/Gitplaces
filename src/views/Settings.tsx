@@ -1,13 +1,21 @@
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode, type Dispatch, type SetStateAction } from 'react'
 import { useAppearance, type BackgroundMode } from '../contexts/Appearance'
 import { useGitHubAuth } from '../contexts/GitHubAuth'
 import { useGitHubLogin } from '../hooks/useGitHubLogin'
+import IconAnthropic from '~icons/simple-icons/anthropic'
+import IconOpenAI from '~icons/simple-icons/openai'
+import IconGemini from '~icons/simple-icons/googlegemini'
+import IconOllama from '~icons/simple-icons/ollama'
 
 type SetupPhase = 'idle' | 'checking' | 'installing' | 'auth' | 'done' | 'error'
 type LoginPhase = 'idle' | 'logging-in' | 'done' | 'error'
-type CategoryId = 'claude-desktop' | 'appearance' | 'language' | 'downloads' | 'projects' | 'connectors' | 'updates'
+type CategoryId = 'providers' | 'claude-desktop' | 'appearance' | 'language' | 'downloads' | 'projects' | 'connectors' | 'updates'
 
 type CustomConnector = { id: string; name: string; url: string; oauthClientId: string; oauthClientSecret: string }
+
+type ProviderConfig = { enabled: boolean; apiKey?: string; organization?: string }
+type OpenAICompatibleEndpoint = { id: string; label: string; baseUrl: string; apiKey?: string }
+type DefaultRef = { provider: string; model: string; endpoint?: string } | undefined
 
 const BACKGROUND_OPTIONS: { value: BackgroundMode; label: string }[] = [
   { value: 'none', label: 'Default' },
@@ -78,7 +86,17 @@ const UpdatesIcon = () => (
   </svg>
 )
 
+const ProvidersIcon = () => (
+  <svg {...iconProps}>
+    <circle cx="5" cy="8" r="2" />
+    <circle cx="11" cy="4" r="2" />
+    <circle cx="11" cy="12" r="2" />
+    <path d="M7 8h2 M9 4H7l-2 4 2 4h2 M9 12h2" />
+  </svg>
+)
+
 const CATEGORIES: { id: CategoryId; label: string; icon: ReactNode }[] = [
+  { id: 'providers', label: 'Providers', icon: <ProvidersIcon /> },
   { id: 'claude-desktop', label: 'Claude Desktop', icon: <DesktopIcon /> },
   { id: 'appearance', label: 'Appearance', icon: <PaletteIcon /> },
   { id: 'language', label: 'Language & Speech', icon: <GlobeIcon /> },
@@ -87,6 +105,96 @@ const CATEGORIES: { id: CategoryId; label: string; icon: ReactNode }[] = [
   { id: 'connectors', label: 'Connectors', icon: <ConnectorsIcon /> },
   { id: 'updates', label: 'Updates', icon: <UpdatesIcon /> },
 ]
+
+function OpenAICompatibleSection(props: {
+  endpoints: OpenAICompatibleEndpoint[]
+  setEndpoints: Dispatch<SetStateAction<OpenAICompatibleEndpoint[]>>
+  testProvider: (provider: string, modelHint: string) => Promise<void>
+  renderStatus: (provider: string) => ReactNode
+}) {
+  const [adding, setAdding] = useState(false)
+  const [newId,    setNewId]    = useState('')
+  const [newLabel, setNewLabel] = useState('')
+  const [newUrl,   setNewUrl]   = useState('')
+  const [newKey,   setNewKey]   = useState('')
+
+  const submitAdd = async () => {
+    if (!newId.trim() || !newLabel.trim() || !newUrl.trim()) return
+    const ep = { id: newId.trim(), label: newLabel.trim(), baseUrl: newUrl.trim(), apiKey: newKey.trim() || undefined }
+    await window.api.llm.upsertOpenAICompatibleEndpoint(ep)
+    const fresh = await window.api.llm.listOpenAICompatibleEndpoints()
+    props.setEndpoints(fresh)
+    setAdding(false)
+    setNewId(''); setNewLabel(''); setNewUrl(''); setNewKey('')
+  }
+
+  const removeEp = async (id: string) => {
+    await window.api.llm.removeOpenAICompatibleEndpoint(id)
+    const fresh = await window.api.llm.listOpenAICompatibleEndpoints()
+    props.setEndpoints(fresh)
+  }
+
+  return (
+    <div className="connector-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+        <div className="connector-icon"><IconOllama width={20} height={20} style={{ color: 'var(--text)' }} /></div>
+        <div className="connector-info" style={{ flex: 1 }}>
+          <div className="connector-name">Local / openai-compatible</div>
+          <div className="connector-desc">Ollama, LM Studio, llama.cpp — anything that speaks the OpenAI REST API.</div>
+        </div>
+        <div className="connector-actions">
+          <button className="settings-btn" onClick={() => setAdding(true)}>Add endpoint</button>
+        </div>
+      </div>
+
+      {props.endpoints.length > 0 && (
+        <div className="connector-list" style={{ marginLeft: 50 }}>
+          {props.endpoints.map(ep => (
+            <div key={ep.id} className="connector-row">
+              <div className="connector-info" style={{ flex: 1 }}>
+                <div className="connector-name">{ep.label}</div>
+                <div className="connector-desc">{ep.baseUrl} <span style={{ opacity: 0.6 }}>(id: {ep.id})</span></div>
+              </div>
+              <div className="connector-actions">
+                <button className="settings-btn" onClick={() => props.testProvider(`openai-compatible:${ep.id}`, 'gpt-3.5-turbo')}>Test</button>
+                {props.renderStatus(`openai-compatible:${ep.id}`)}
+                <button className="settings-btn settings-btn--link" onClick={() => removeEp(ep.id)}>Remove</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {adding && (
+        <div className="connector-add-modal" style={{ marginLeft: 50 }}>
+          <div className="connector-modal-header"><strong>Add openai-compatible endpoint</strong></div>
+          <div className="connector-modal-fields" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input className="settings-input" placeholder="id (slug, e.g. ollama-local)" value={newId}    onChange={e => setNewId(e.target.value)} />
+            <input className="settings-input" placeholder="Display label"                value={newLabel} onChange={e => setNewLabel(e.target.value)} />
+            <input className="settings-input" placeholder="Base URL (e.g. http://localhost:11434/v1)" value={newUrl} onChange={e => setNewUrl(e.target.value)} />
+            <input className="settings-input" type="password" placeholder="API key (optional, leave blank for local)" value={newKey} onChange={e => setNewKey(e.target.value)} />
+          </div>
+          <div className="connector-modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
+            <button className="settings-btn settings-btn--ghost" onClick={() => setAdding(false)}>Cancel</button>
+            <button className="settings-btn" onClick={submitAdd}>Add</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DefaultsSection(props: {
+  chatDefault:  DefaultRef
+  setChatDefault: Dispatch<SetStateAction<DefaultRef>>
+  skillDefault: DefaultRef
+  setSkillDefault: Dispatch<SetStateAction<DefaultRef>>
+  tagDefault:   DefaultRef
+  setTagDefault: Dispatch<SetStateAction<DefaultRef>>
+}) {
+  // Task 10 replaces this with the real implementation.
+  return null
+}
 
 export default function Settings() {
   const { background, setBackground, invertDarkImages, setInvertDarkImages } = useAppearance()
@@ -129,6 +237,16 @@ export default function Settings() {
   const [updateChecking, setUpdateChecking] = useState(false)
   const [intervalDraft, setIntervalDraft] = useState(String(checkIntervalHours))
 
+  // Providers state
+  const [anthropicCfg,  setAnthropicCfg]  = useState<ProviderConfig>({ enabled: false })
+  const [openaiCfg,     setOpenaiCfg]     = useState<ProviderConfig>({ enabled: false })
+  const [googleCfg,     setGoogleCfg]     = useState<ProviderConfig>({ enabled: false })
+  const [endpoints,     setEndpoints]     = useState<OpenAICompatibleEndpoint[]>([])
+  const [chatDefault,   setChatDefault]   = useState<DefaultRef>(undefined)
+  const [skillDefault,  setSkillDefault]  = useState<DefaultRef>(undefined)
+  const [tagDefault,    setTagDefault]    = useState<DefaultRef>(undefined)
+  const [testStatus,    setTestStatus]    = useState<Record<string, { ok: boolean; message?: string } | 'testing'>>({})
+
   useEffect(() => {
     window.api.skillSync.getStatus().then(setSyncStatus)
   }, [])
@@ -148,6 +266,32 @@ export default function Settings() {
       setLastCheckedTs(timestamp)
     }).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (activeCategory !== 'providers') return
+    let cancelled = false
+    ;(async () => {
+      const api = window.api.llm
+      const [a, o, g, eps, cd, sd, td] = await Promise.all([
+        api.getProviderConfig('anthropic'),
+        api.getProviderConfig('openai'),
+        api.getProviderConfig('google'),
+        api.listOpenAICompatibleEndpoints(),
+        api.getDefault('chat'),
+        api.getDefault('skillGen'),
+        api.getDefault('tagExtract'),
+      ])
+      if (cancelled) return
+      setAnthropicCfg(a)
+      setOpenaiCfg(o)
+      setGoogleCfg(g)
+      setEndpoints(eps)
+      setChatDefault(cd)
+      setSkillDefault(sd)
+      setTagDefault(td)
+    })().catch(err => console.error('[settings] failed to load provider configs:', err))
+    return () => { cancelled = true }
+  }, [activeCategory])
 
   useEffect(() => {
     const onFailed = (_payload: { owner?: string; filename?: string; summary?: boolean; failCount?: number }) => {
@@ -498,6 +642,122 @@ export default function Settings() {
       delete next[id]
       return next
     })
+  }
+
+  const renderProviders = () => {
+    const saveProvider = async (provider: 'anthropic' | 'openai' | 'google', cfg: ProviderConfig) => {
+      await window.api.llm.setProviderConfig(provider, cfg)
+    }
+
+    const testProvider = async (provider: string, modelHint: string) => {
+      setTestStatus(s => ({ ...s, [provider]: 'testing' }))
+      const result = await window.api.llm.testConnection({ provider, model: modelHint })
+      setTestStatus(s => ({ ...s, [provider]: { ok: result.ok, message: result.ok ? `OK: ${result.sample ?? ''}` : `${result.kind}: ${result.message}` } }))
+    }
+
+    const renderStatus = (provider: string) => {
+      const s = testStatus[provider]
+      if (s === 'testing') return <span className="connector-badge">Testing…</span>
+      if (!s) return null
+      if (s.ok) return <span className="connector-badge connected">{s.message}</span>
+      return <span className="connector-badge" style={{ background: 'var(--accent-red-soft, #fee2e2)', color: 'var(--accent-red, #991b1b)' }}>{s.message}</span>
+    }
+
+    return (
+      <>
+        <div className="settings-group">
+          <div className="settings-group-title">API providers</div>
+          <div className="settings-group-body">
+
+            {/* Anthropic card */}
+            <div className="connector-row">
+              <div className="connector-icon"><IconAnthropic width={20} height={20} style={{ color: 'var(--text)' }} /></div>
+              <div className="connector-info">
+                <div className="connector-name">Anthropic</div>
+                <div className="connector-desc">Claude Sonnet, Opus, Haiku via the Anthropic API.</div>
+                <input
+                  className="settings-input"
+                  type="password"
+                  placeholder="sk-ant-..."
+                  value={anthropicCfg.apiKey ?? ''}
+                  onChange={e => setAnthropicCfg({ ...anthropicCfg, apiKey: e.target.value, enabled: e.target.value.length > 0 })}
+                  onBlur={() => saveProvider('anthropic', anthropicCfg)}
+                  style={{ marginTop: 8, width: '100%' }}
+                />
+              </div>
+              <div className="connector-actions">
+                <button className="settings-btn" disabled={!anthropicCfg.apiKey} onClick={() => testProvider('anthropic', 'claude-haiku-4-5-20251001')}>Test</button>
+                {renderStatus('anthropic')}
+              </div>
+            </div>
+
+            {/* OpenAI card */}
+            <div className="connector-row">
+              <div className="connector-icon"><IconOpenAI width={20} height={20} style={{ color: 'var(--text)' }} /></div>
+              <div className="connector-info">
+                <div className="connector-name">OpenAI</div>
+                <div className="connector-desc">GPT-4o, GPT-4.1, o-series.</div>
+                <input
+                  className="settings-input"
+                  type="password"
+                  placeholder="sk-..."
+                  value={openaiCfg.apiKey ?? ''}
+                  onChange={e => setOpenaiCfg({ ...openaiCfg, apiKey: e.target.value, enabled: e.target.value.length > 0 })}
+                  onBlur={() => saveProvider('openai', openaiCfg)}
+                  style={{ marginTop: 8, width: '100%' }}
+                />
+                <input
+                  className="settings-input"
+                  type="text"
+                  placeholder="Organization ID (optional)"
+                  value={openaiCfg.organization ?? ''}
+                  onChange={e => setOpenaiCfg({ ...openaiCfg, organization: e.target.value || undefined })}
+                  onBlur={() => saveProvider('openai', openaiCfg)}
+                  style={{ marginTop: 4, width: '100%' }}
+                />
+              </div>
+              <div className="connector-actions">
+                <button className="settings-btn" disabled={!openaiCfg.apiKey} onClick={() => testProvider('openai', 'gpt-4o')}>Test</button>
+                {renderStatus('openai')}
+              </div>
+            </div>
+
+            {/* Google card */}
+            <div className="connector-row">
+              <div className="connector-icon"><IconGemini width={20} height={20} style={{ color: 'var(--text)' }} /></div>
+              <div className="connector-info">
+                <div className="connector-name">Google Gemini</div>
+                <div className="connector-desc">Gemini 1.5/2.0/2.5 Pro and Flash.</div>
+                <input
+                  className="settings-input"
+                  type="password"
+                  placeholder="g-..."
+                  value={googleCfg.apiKey ?? ''}
+                  onChange={e => setGoogleCfg({ ...googleCfg, apiKey: e.target.value, enabled: e.target.value.length > 0 })}
+                  onBlur={() => saveProvider('google', googleCfg)}
+                  style={{ marginTop: 8, width: '100%' }}
+                />
+              </div>
+              <div className="connector-actions">
+                <button className="settings-btn" disabled={!googleCfg.apiKey} onClick={() => testProvider('google', 'gemini-2.5-pro')}>Test</button>
+                {renderStatus('google')}
+              </div>
+            </div>
+
+            {/* OpenAI-compatible card */}
+            <OpenAICompatibleSection endpoints={endpoints} setEndpoints={setEndpoints} testProvider={testProvider} renderStatus={renderStatus} />
+
+          </div>
+        </div>
+
+        {/* Defaults section — Task 10 will replace this stub */}
+        <DefaultsSection
+          chatDefault={chatDefault} setChatDefault={setChatDefault}
+          skillDefault={skillDefault} setSkillDefault={setSkillDefault}
+          tagDefault={tagDefault} setTagDefault={setTagDefault}
+        />
+      </>
+    )
   }
 
   const renderConnectors = () => (
@@ -1197,6 +1457,7 @@ export default function Settings() {
       <main className="settings-content">
         <div key={activeCategory} className="settings-pane">
           <h2 className="settings-pane-title">{activeLabel}</h2>
+          {activeCategory === 'providers' && renderProviders()}
           {activeCategory === 'claude-desktop' && renderClaudeDesktop()}
           {activeCategory === 'appearance' && renderAppearance()}
           {activeCategory === 'language' && renderLanguage()}
