@@ -1,8 +1,11 @@
 // @vitest-environment node
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
-const { mockAnthropicGen } = vi.hoisted(() => ({
+const { mockAnthropicGen, mockOpenAIGen, mockGoogleGen, mockOpenAICompatGen } = vi.hoisted(() => ({
   mockAnthropicGen: vi.fn(),
+  mockOpenAIGen: vi.fn(),
+  mockGoogleGen: vi.fn(),
+  mockOpenAICompatGen: vi.fn(),
 }))
 
 vi.mock('./adapters/anthropic', () => ({
@@ -13,11 +16,38 @@ vi.mock('./adapters/anthropic', () => ({
   })),
 }))
 
+vi.mock('./adapters/openai', () => ({
+  OpenAIAdapter: vi.fn().mockImplementation(() => ({
+    generateText: mockOpenAIGen,
+    streamText: vi.fn(),
+    runAgentLoop: vi.fn(),
+  })),
+}))
+
+vi.mock('./adapters/google', () => ({
+  GoogleAdapter: vi.fn().mockImplementation(() => ({
+    generateText: mockGoogleGen,
+    streamText: vi.fn(),
+    runAgentLoop: vi.fn(),
+  })),
+}))
+
+vi.mock('./adapters/openai-compatible', () => ({
+  OpenAICompatibleAdapter: vi.fn().mockImplementation(() => ({
+    generateText: mockOpenAICompatGen,
+    streamText: vi.fn(),
+    runAgentLoop: vi.fn(),
+  })),
+}))
+
 import { createLLMService } from './index'
 import { LLMError } from './types'
 
 beforeEach(() => {
   mockAnthropicGen.mockReset()
+  mockOpenAIGen.mockReset()
+  mockGoogleGen.mockReset()
+  mockOpenAICompatGen.mockReset()
 })
 
 describe('createLLMService', () => {
@@ -44,21 +74,49 @@ describe('createLLMService', () => {
     expect(out.text).toBe('hi')
   })
 
-  it('throws LLMError kind=unknown for a provider that has no adapter yet (openai in Phase 1)', async () => {
+  it('dispatches an openai ModelRef to the OpenAI adapter', async () => {
+    mockOpenAIGen.mockResolvedValue({ text: 'gpt', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } })
     const svc = createLLMService()
-    await expect(svc.generateText(
+    await svc.generateText(
       { provider: 'openai', model: 'gpt-4o' },
       { messages: [{ role: 'user', content: 'hi' }] },
-    )).rejects.toMatchObject({
-      name: 'LLMError',
-      kind: 'unknown',
-    })
+    )
+    expect(mockOpenAIGen).toHaveBeenCalledTimes(1)
+    expect(mockAnthropicGen).not.toHaveBeenCalled()
+  })
+
+  it('dispatches a google ModelRef to the Google adapter', async () => {
+    mockGoogleGen.mockResolvedValue({ text: 'gemini', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } })
+    const svc = createLLMService()
+    await svc.generateText(
+      { provider: 'google', model: 'gemini-2.5-pro' },
+      { messages: [{ role: 'user', content: 'hi' }] },
+    )
+    expect(mockGoogleGen).toHaveBeenCalledTimes(1)
+  })
+
+  it('dispatches an openai-compatible ModelRef to the OpenAICompatible adapter', async () => {
+    mockOpenAICompatGen.mockResolvedValue({ text: 'llama', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } })
+    const svc = createLLMService()
+    await svc.generateText(
+      { provider: 'openai-compatible', endpoint: 'ollama-local', model: 'llama3.1' },
+      { messages: [{ role: 'user', content: 'hi' }] },
+    )
+    expect(mockOpenAICompatGen).toHaveBeenCalledTimes(1)
+  })
+
+  it('still throws LLMError kind=unknown for opencode (Phase 6)', async () => {
+    const svc = createLLMService()
+    await expect(svc.generateText(
+      { provider: 'opencode', model: 'claude-sonnet-4-6' },
+      { messages: [{ role: 'user', content: 'hi' }] },
+    )).rejects.toMatchObject({ name: 'LLMError', kind: 'unknown' })
   })
 
   it('streamText surfaces resolveAdapter throws as a rejected iterable, not a sync exception', async () => {
     const svc = createLLMService()
     const iter = svc.streamText(
-      { provider: 'openai', model: 'gpt-4o' },
+      { provider: 'opencode', model: 'claude-sonnet-4-6' },
       { messages: [{ role: 'user', content: 'hi' }] },
     )
     // Calling streamText must NOT throw synchronously — the call returns an iterator.
@@ -72,7 +130,7 @@ describe('createLLMService', () => {
   it('runAgentLoop surfaces resolveAdapter throws as a rejected iterable, not a sync exception', async () => {
     const svc = createLLMService()
     const iter = svc.runAgentLoop(
-      { provider: 'openai', model: 'gpt-4o' },
+      { provider: 'opencode', model: 'claude-sonnet-4-6' },
       { messages: [{ role: 'user', content: 'hi' }] },
     )
     await expect((async () => { for await (const _ of iter) { /* unreachable */ } })()).rejects.toMatchObject({

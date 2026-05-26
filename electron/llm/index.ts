@@ -1,4 +1,7 @@
 import { AnthropicAdapter } from './adapters/anthropic'
+import { OpenAIAdapter } from './adapters/openai'
+import { GoogleAdapter } from './adapters/google'
+import { OpenAICompatibleAdapter } from './adapters/openai-compatible'
 import { LLMError } from './types'
 import type {
   AgentEvent,
@@ -21,23 +24,25 @@ type AdapterLike = {
 export function createLLMService(): LLMService {
   // Adapters are constructed lazily — keeps test mocks predictable and avoids
   // touching settings storage when an adapter is never used.
-  let anthropicAdapter: AnthropicAdapter | undefined
+  let anthropicAdapter:        AnthropicAdapter        | undefined
+  let openaiAdapter:           OpenAIAdapter           | undefined
+  let googleAdapter:           GoogleAdapter           | undefined
+  let openaiCompatibleAdapter: OpenAICompatibleAdapter | undefined
 
   function resolveAdapter(ref: ModelRef): AdapterLike {
     switch (ref.provider) {
       case 'anthropic':
         return (anthropicAdapter ??= new AnthropicAdapter())
-      // Other providers land in Phase 4. Until then, calling them is an error.
       case 'openai':
+        return (openaiAdapter ??= new OpenAIAdapter())
       case 'google':
-      case 'opencode':
+        return (googleAdapter ??= new GoogleAdapter())
       case 'openai-compatible':
-        throw new LLMError(
-          'unknown',
-          `Provider "${ref.provider}" has no adapter yet — scheduled for Phase 4.`,
-        )
+        return (openaiCompatibleAdapter ??= new OpenAICompatibleAdapter())
+      case 'opencode':
+        // OpenCode adapter lands in Phase 6 alongside its sync target.
+        throw new LLMError('unknown', 'Provider "opencode" has no adapter yet — scheduled for Phase 6.')
       default: {
-        // Exhaustiveness — should be unreachable while ProviderId stays narrow.
         const exhaustive: never = ref.provider
         throw new LLMError('unknown', `Unknown provider: ${String(exhaustive)}`)
       }
