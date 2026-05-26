@@ -280,6 +280,60 @@ export default function AIPanel() {
     setOpencodeLoggedIn(false)
   }
 
+  // MCP exposure state
+  const [mcpConfigured, setMcpConfigured] = useState(false)
+  const [mcpConfigPath, setMcpConfigPath] = useState<string | null>(null)
+  const [mcpStatusLoaded, setMcpStatusLoaded] = useState(false)
+  const [configSnippet, setConfigSnippet]   = useState('')
+  const [copied, setCopied]                 = useState(false)
+  const [autoConfigStatus, setAutoConfigStatus] = useState<string | null>(null)
+  const [autoConfigIsError, setAutoConfigIsError] = useState(false)
+  const [testResult, setTestResult]         = useState<string | null>(null)
+
+  const loadMcpStatus = useCallback(async () => {
+    const [status, snippet] = await Promise.all([
+      window.api.mcp.getStatus(),
+      window.api.mcp.getConfigSnippet(),
+    ])
+    setMcpConfigured(status.configured)
+    setMcpConfigPath(status.configPath)
+    setConfigSnippet(snippet)
+    setMcpStatusLoaded(true)
+  }, [])
+
+  useEffect(() => { loadMcpStatus() }, [loadMcpStatus])
+
+  const handleAutoConfigure = async () => {
+    setAutoConfigStatus(null)
+    const result = await window.api.mcp.autoConfigure()
+    if (result.success) {
+      setAutoConfigStatus('Configured!')
+      setAutoConfigIsError(false)
+      await loadMcpStatus()
+    } else {
+      setAutoConfigStatus(`Failed: ${result.error ?? 'unknown error'}`)
+      setAutoConfigIsError(true)
+    }
+    timers.current.push(setTimeout(() => { setAutoConfigStatus(null); setAutoConfigIsError(false) }, 3000))
+  }
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(configSnippet)
+    setCopied(true)
+    timers.current.push(setTimeout(() => setCopied(false), 2000))
+  }
+
+  const handleTestConnection = async () => {
+    setTestResult(null)
+    const result = await window.api.mcp.testConnection()
+    if (result.running) {
+      setTestResult(`Running — ${result.skillCount} active skill${result.skillCount !== 1 ? 's' : ''}`)
+    } else {
+      setTestResult('Not running')
+    }
+    timers.current.push(setTimeout(() => setTestResult(null), 4000))
+  }
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -543,9 +597,69 @@ export default function AIPanel() {
         )}
       </SectionBlock>
 
-      <SectionBlock title="MCP" defaultExpanded={false}>
-        <div style={{ opacity: 0.5, fontSize: 12 }}>MCP exposure coming in Task 8.</div>
-      </SectionBlock>
+      {mcpStatusLoaded && (
+        <SectionBlock
+          title="MCP"
+          count={1}
+          defaultExpanded={!mcpConfigured}
+        >
+          <div className="section-block-body-desc">
+            Expose Git Suite's tools to Claude Code CLI via the Model Context Protocol.
+          </div>
+
+          <div className="settings-group-row">
+            <div className="settings-group-row-main">
+              <div className="settings-group-row-label">Status</div>
+              <div className="settings-group-row-sub">
+                <span className={`status-dot ${mcpConfigured ? 'active' : 'inactive'}`} />
+                {mcpConfigured ? 'Configured' : 'Not configured'}
+              </div>
+            </div>
+            <button className="settings-btn" onClick={handleAutoConfigure}>
+              Auto-configure
+            </button>
+          </div>
+
+          {mcpConfigPath && (
+            <div className="settings-group-row settings-group-row--full">
+              <p className="settings-hint settings-mcp-path">
+                Config file: {mcpConfigPath}
+              </p>
+            </div>
+          )}
+
+          {autoConfigStatus && (
+            <div className="settings-group-row settings-group-row--full">
+              <p className={`settings-hint${autoConfigIsError ? ' error' : ' success'}`}>{autoConfigStatus}</p>
+            </div>
+          )}
+
+          <div className="settings-group-row settings-group-row--full">
+            <div className="settings-group-row-label">Manual configuration</div>
+            <p className="settings-hint" style={{ marginTop: 4 }}>
+              Add this to <code>claude_desktop_config.json</code>:
+            </p>
+            <div className="settings-mcp-snippet-row">
+              <pre className="settings-mcp-snippet">{configSnippet}</pre>
+              <button className="settings-btn settings-mcp-copy-btn" onClick={handleCopy}>
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
+
+          <div className="settings-group-row">
+            <div className="settings-group-row-main">
+              <div className="settings-group-row-label">Test connection</div>
+              <div className="settings-group-row-sub">
+                {testResult ?? 'Verify the MCP server is reachable.'}
+              </div>
+            </div>
+            <button className="settings-btn" onClick={handleTestConnection}>
+              Test
+            </button>
+          </div>
+        </SectionBlock>
+      )}
 
       <SectionBlock title="Custom MCP" badge="BETA" defaultExpanded={false}>
         <div style={{ opacity: 0.5, fontSize: 12 }}>Custom MCP coming in Task 9.</div>
