@@ -86,6 +86,19 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
   }, [owner, name])
 
   useEffect(() => {
+    setExpanded(new Map())
+    setTreeData(new Map())
+    setSelected(new Set())
+    setFocused(null)
+    setAnchor(null)
+    setSelectedEntry(null)
+    setBlobContent(null)
+    setBlobRawBase64(null)
+    setPathHistory([''])
+    setHistoryIndex(0)
+  }, [owner, name, branch])
+
+  useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)

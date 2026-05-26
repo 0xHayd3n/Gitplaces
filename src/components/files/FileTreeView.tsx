@@ -79,6 +79,7 @@ export default function FileTreeView(props: Props) {
               width={props.width}
               onClick={e => props.onRowClick(ancestor, e)}
               onContextMenu={e => props.onRowContextMenu(ancestor, e)}
+              onSegmentClick={depth => props.onSegmentClick(ancestor, depth)}
             />
           </div>
         ))}
