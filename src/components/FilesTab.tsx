@@ -1,143 +1,94 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { useRepoNav } from '../contexts/RepoNav'
-import FileTreePanel from './FileTreePanel'
-import FileContentPanel from './FileContentPanel'
-import ViewModeBar from './ViewModeBar'
-import type { ViewMode, SortField, SortDirection } from './ViewModeBar'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useResizable } from '../hooks/useResizable'
-import { isVideoFile, isPdfFile } from './DirectoryListing'
-import { ChevronRight } from 'lucide-react'
+import { useLastCommits } from '../hooks/useLastCommits'
+import { useGitStatus } from '../hooks/useGitStatus'
+import { useFileTreeKeyboard } from '../hooks/useFileTreeKeyboard'
+import FilesToolbar from './files/FilesToolbar'
+import FileTreeView from './files/FileTreeView'
+import DirectoryPane from './files/DirectoryPane'
+import FileContentPanel from './FileContentPanel'
 import ContextMenu from './ContextMenu'
 import type { ContextMenuTarget } from './ContextMenu'
 import { populateSvgCache } from './SvgThumb'
+import { buildVisibleRows } from '../lib/fileTree/model'
+import { buildDiffBaseOptions } from '../lib/fileTree/diffBaseOptions'
+import type { TreeEntry, VisibleRow, Density, SearchMode, DiffBaseRef } from '../lib/fileTree/types'
+import { isVideoFile, isPdfFile } from './DirectoryListing'
 
-interface TreeEntry {
-  path: string
-  mode: string
-  type: 'blob' | 'tree'
-  sha: string
-  size?: number
-}
+// FileContentPanel's local TreeEntry doesn't include 'commit'; this alias
+// matches its expected shape so casts at the boundary are explicit.
+type ContentPanelEntry = { path: string; mode: string; type: 'blob' | 'tree'; sha: string; size?: number }
 
 interface Props {
   owner: string
   name: string
   branch: string
   initialPath?: string | null
+  repoId?: string | null
+  releases?: { tag_name: string }[]
 }
 
-export default function FilesTab({ owner, name, branch, initialPath }: Props) {
+export default function FilesTab({ owner, name, branch, initialPath, repoId, releases }: Props) {
   const [rootTreeSha, setRootTreeSha] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [retryKey, setRetryKey] = useState(0)
 
-  const [expandedDirs, setExpandedDirs] = useState<Map<string, string>>(new Map())
+  const [expanded, setExpanded] = useState<Map<string, string>>(new Map())
   const [treeData, setTreeData] = useState<Map<string, TreeEntry[]>>(new Map())
-  const [selectedPath, setSelectedPath] = useState<string | null>(null)
-  const [selectedEntry, setSelectedEntry] = useState<TreeEntry | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [focused, setFocused] = useState<string | null>(null)
+  const [anchor, setAnchor] = useState<string | null>(null)
+  const [selectedEntry, setSelectedEntry] = useState<ContentPanelEntry | null>(null)
   const [blobContent, setBlobContent] = useState<string | null>(null)
   const [blobRawBase64, setBlobRawBase64] = useState<string | null>(null)
   const [blobLoading, setBlobLoading] = useState(false)
-  const [treeLoading, setTreeLoading] = useState<Set<string>>(new Set())
-  const [errorDirs, setErrorDirs] = useState<Set<string>>(new Set())
-  const [wordWrap, setWordWrap] = useLocalStorage('files:wordWrap', false)
-  const handleToggleWordWrap = useCallback(() => setWordWrap(w => !w), [setWordWrap])
-  const [lineCount, setLineCount] = useState(0)
-  const [filterText, setFilterText] = useState('')
+  const [, setTreeLoading] = useState<Set<string>>(new Set())
 
-  // View mode — persisted
-  const [viewMode, setViewMode] = useLocalStorage<ViewMode>('files:viewMode', 'details')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchMode, setSearchMode] = useLocalStorage<SearchMode>('files:searchMode', 'expand')
+  const [density, setDensity] = useLocalStorage<Density>('files:density', 'comfortable')
+  const [diffBaseMap, setDiffBaseMap] = useLocalStorage<Record<string, DiffBaseRef | null>>('files:diffBase', {})
+  const diffBase = repoId ? diffBaseMap[repoId] ?? null : null
+  const setDiffBase = useCallback((ref: DiffBaseRef | null) => {
+    if (!repoId) return
+    setDiffBaseMap(prev => ({ ...prev, [repoId]: ref }))
+  }, [repoId, setDiffBaseMap])
 
-  // Sort — persisted
-  const [sortField, setSortField] = useLocalStorage<SortField>('files:sortField', 'name')
-  const [sortDirection, setSortDirection] = useLocalStorage<SortDirection>('files:sortDirection', 'asc')
-
-  // Navigation history
   const [pathHistory, setPathHistory] = useState<string[]>([''])
   const [historyIndex, setHistoryIndex] = useState(0)
   const skipHistoryRef = useRef(false)
 
   const { width: sidebarWidth, isCollapsed, toggleCollapse, handleProps } = useResizable({
     storageKey: 'files:sidebarWidth',
-    defaultWidth: 220,
-    minWidth: 180,
+    defaultWidth: 280,
+    minWidth: 200,
     maxWidth: 600,
   })
 
-  // ── Load persisted SVG cache so SvgThumb renders instantly ──
+  const lastCommits = useLastCommits({ repoId: repoId ?? null, owner, name, ref: branch })
+  const gitStatus = useGitStatus({
+    repoId: repoId ?? null, owner, name,
+    baseRef: diffBase?.ref ?? null,
+    headRef: branch,
+  })
+
+  const repoNav = useRepoNav()
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; target: ContextMenuTarget } | null>(null)
+
   useEffect(() => {
     window.api.svgCache.read(owner, name).then(data => {
       if (data) populateSvgCache(data)
     }).catch(() => {})
   }, [owner, name])
 
-  // ── RepoNav context (published below after goBack/goForward/handleBreadcrumbNavigate) ──
-  const repoNav = useRepoNav()
-
-  const [ctxMenu, setCtxMenu] = useState<{
-    x: number; y: number; target: ContextMenuTarget
-  } | null>(null)
-
-  // ── Navigation history helpers ──
-
-  function pushHistory(path: string) {
-    if (skipHistoryRef.current) return
-    setPathHistory(prev => [...prev.slice(0, historyIndex + 1), path])
-    setHistoryIndex(prev => prev + 1)
-  }
-
-  // ── Keyboard shortcuts ──
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      // Ctrl+Shift+F → focus search in toolbar
-      if (e.ctrlKey && e.shiftKey && e.key === 'F') {
-        e.preventDefault()
-        window.dispatchEvent(new CustomEvent('files-toolbar:focus-search'))
-      }
-      // Ctrl+B → toggle sidebar
-      if (e.ctrlKey && e.key === 'b' && !e.shiftKey) {
-        e.preventDefault()
-        toggleCollapse()
-      }
-      // Alt+Left → go back
-      if (e.altKey && e.key === 'ArrowLeft') {
-        e.preventDefault()
-        goBack()
-      }
-      // Alt+Right → go forward
-      if (e.altKey && e.key === 'ArrowRight') {
-        e.preventDefault()
-        goForward()
-      }
-      // Alt+Up → go up
-      if (e.altKey && e.key === 'ArrowUp') {
-        e.preventDefault()
-        goUp()
-      }
-      // Backspace → go up (only when not in an input/textarea/contenteditable)
-      if (e.key === 'Backspace') {
-        const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase()
-        const isEditable = tag === 'input' || tag === 'textarea' || (document.activeElement as HTMLElement)?.isContentEditable
-        if (!isEditable) {
-          e.preventDefault()
-          goUp()
-        }
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleCollapse, historyIndex, pathHistory, selectedPath])
-
-  // ── Resolve branch → root tree SHA ──
-
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
-
     ;(async () => {
       try {
         const { rootTreeSha: sha } = await window.api.github.getBranch(owner, name, branch)
@@ -146,7 +97,7 @@ export default function FilesTab({ owner, name, branch, initialPath }: Props) {
         const entries = await window.api.github.getTree(owner, name, sha)
         if (cancelled) return
         setTreeData(prev => new Map(prev).set(sha, entries))
-      } catch (err) {
+      } catch {
         if (branch === 'main') {
           try {
             const { rootTreeSha: sha } = await window.api.github.getBranch(owner, name, 'master')
@@ -157,367 +108,198 @@ export default function FilesTab({ owner, name, branch, initialPath }: Props) {
             setTreeData(prev => new Map(prev).set(sha, entries))
             setLoading(false)
             return
-          } catch {
-            // Fall through to error
-          }
+          } catch { /* fall through */ }
         }
         if (!cancelled) setError('Unable to load repository files.')
       } finally {
         if (!cancelled) setLoading(false)
       }
     })()
-
     return () => { cancelled = true }
   }, [owner, name, branch, retryKey])
 
-  // ── Navigate to initial path ──
+  const visibleRows = useMemo(() => {
+    if (!rootTreeSha) return []
+    return buildVisibleRows({
+      rootTreeSha,
+      treeData,
+      expanded,
+      searchQuery,
+      searchMode,
+      flattenEmpty: true,
+    })
+  }, [rootTreeSha, treeData, expanded, searchQuery, searchMode])
 
+  // Request last-commit metadata for visible blob rows. Pass {path, sha} pairs.
   useEffect(() => {
-    if (!initialPath || !rootTreeSha) return
+    const rows = visibleRows.filter(r => r.type === 'blob').map(r => ({ path: r.path, sha: r.sha }))
+    if (rows.length > 0) lastCommits.request(rows)
+  }, [visibleRows, lastCommits])
 
-    let cancelled = false
+  const diffBaseOptions = useMemo(
+    () => buildDiffBaseOptions(releases ?? [], branch),
+    [releases, branch],
+  )
 
-    ;(async () => {
-      const segments = initialPath.split('/')
-      let currentSha = rootTreeSha
-      let currentPath = ''
-      const localTreeData = new Map<string, TreeEntry[]>()
+  function pushHistory(path: string) {
+    if (skipHistoryRef.current) return
+    setPathHistory(prev => [...prev.slice(0, historyIndex + 1), path])
+    setHistoryIndex(prev => prev + 1)
+  }
 
-      async function getEntries(sha: string): Promise<TreeEntry[]> {
-        if (localTreeData.has(sha)) return localTreeData.get(sha)!
-        const entries = await window.api.github.getTree(owner, name, sha)
-        localTreeData.set(sha, entries)
-        setTreeData(prev => new Map(prev).set(sha, entries))
-        return entries
-      }
-
-      for (let i = 0; i < segments.length - 1; i++) {
-        const segment = segments[i]
-        currentPath = currentPath ? `${currentPath}/${segment}` : segment
-
-        try {
-          const entries = await getEntries(currentSha)
-          if (cancelled) return
-          const dirEntry = entries.find(e => e.path === segment && e.type === 'tree')
-          if (!dirEntry) return
-          setExpandedDirs(prev => new Map(prev).set(currentPath, dirEntry.sha))
-          currentSha = dirEntry.sha
-        } catch {
-          return
-        }
-      }
-
-      const lastSegment = segments[segments.length - 1]
-      try {
-        const entries = await getEntries(currentSha)
-        if (cancelled) return
-        const targetEntry = entries.find(e => e.path === lastSegment)
-        if (!targetEntry) return
-
-        setSelectedPath(initialPath)
-        setSelectedEntry(targetEntry)
-
-        if (targetEntry.type === 'blob') {
-          // PDFs load directly by URL in PdfViewer — no blob fetch needed
-          if (isPdfFile(initialPath)) return
-          if (targetEntry.size && targetEntry.size > 1_000_000) return
-          setBlobLoading(true)
-          try {
-            const result = await window.api.github.getBlob(owner, name, targetEntry.sha)
-            if (!cancelled) {
-              setBlobContent(result.content)
-              setBlobRawBase64(result.rawBase64)
-            }
-          } catch {
-            // Content panel will show fallback
-          } finally {
-            if (!cancelled) setBlobLoading(false)
-          }
-        }
-      } catch {
-        return
-      }
-    })()
-
-    return () => { cancelled = true }
-  }, [initialPath, rootTreeSha, owner, name])
-
-  // ── Handlers ──
-
-  const handleToggleDir = useCallback(async (path: string, sha: string) => {
-    if (errorDirs.has(path)) {
-      setErrorDirs(prev => {
-        const next = new Set(prev)
-        next.delete(path)
-        return next
-      })
-    }
-
-    if (expandedDirs.has(path)) {
-      setExpandedDirs(prev => {
-        const next = new Map(prev)
-        next.delete(path)
-        return next
-      })
-      return
-    }
-
-    if (!treeData.has(sha)) {
-      setTreeLoading(prev => new Set(prev).add(path))
-      try {
-        const entries = await window.api.github.getTree(owner, name, sha)
-        setTreeData(prev => new Map(prev).set(sha, entries))
-      } catch {
-        setTreeLoading(prev => {
-          const next = new Set(prev)
-          next.delete(path)
-          return next
-        })
-        setErrorDirs(prev => new Set(prev).add(path))
-        return
-      }
+  const ensureTreeLoaded = useCallback(async (sha: string) => {
+    const existing = treeData.get(sha)
+    if (existing) return existing
+    setTreeLoading(prev => new Set(prev).add(sha))
+    try {
+      const entries = await window.api.github.getTree(owner, name, sha)
+      setTreeData(prev => new Map(prev).set(sha, entries))
+      return entries as TreeEntry[]
+    } finally {
       setTreeLoading(prev => {
         const next = new Set(prev)
-        next.delete(path)
+        next.delete(sha)
         return next
       })
     }
+  }, [owner, name, treeData])
 
-    setExpandedDirs(prev => new Map(prev).set(path, sha))
-    setSelectedPath(path)
-    setSelectedEntry({ path: path.split('/').pop()!, mode: '', type: 'tree', sha })
-    setBlobContent(null)
-  }, [expandedDirs, treeData, errorDirs, owner, name])
-
-  const handleSelectFile = useCallback(async (entry: TreeEntry, fullPath: string) => {
-    setSelectedPath(fullPath)
-    setSelectedEntry({ ...entry, path: entry.path })
-    setBlobContent(null)
-    setBlobRawBase64(null)
-
-    if (entry.type === 'tree') {
-      if (!treeData.has(entry.sha)) {
-        try {
-          const entries = await window.api.github.getTree(owner, name, entry.sha)
-          setTreeData(prev => new Map(prev).set(entry.sha, entries))
-        } catch {
-          // Directory listing will show empty
-        }
-      }
-      setExpandedDirs(prev => new Map(prev).set(fullPath, entry.sha))
-      pushHistory(fullPath)
-      return
+  const handleToggleExpand = useCallback(async (path: string) => {
+    const row = visibleRows.find(r => r.path === path)
+    if (!row || row.type !== 'tree') return
+    if (expanded.has(path)) {
+      setExpanded(prev => { const n = new Map(prev); n.delete(path); return n })
+    } else {
+      await ensureTreeLoaded(row.sha)
+      setExpanded(prev => new Map(prev).set(path, row.sha))
     }
+  }, [visibleRows, expanded, ensureTreeLoaded])
 
-    if (isVideoFile(fullPath)) {
-      pushHistory(fullPath)
-      return
-    }
-
-    // PDFs load directly by URL in PdfViewer — skip the blob fetch entirely
-    if (isPdfFile(fullPath)) {
-      pushHistory(fullPath)
-      return
-    }
-
-    if (entry.size && entry.size > 1_000_000) {
-      pushHistory(fullPath)
-      return
-    }
-
-    setBlobLoading(true)
-    try {
-      const result = await window.api.github.getBlob(owner, name, entry.sha)
-      setBlobContent(result.content)
-      setBlobRawBase64(result.rawBase64)
-    } catch {
-      setBlobContent(null)
-    } finally {
-      setBlobLoading(false)
-    }
-    pushHistory(fullPath)
-  }, [owner, name, treeData, historyIndex])
-
-  const handleBreadcrumbNavigate = useCallback((path: string) => {
-    if (!path) {
-      setSelectedPath(null)
-      setSelectedEntry(null)
-      setBlobContent(null)
-      pushHistory('')
-      return
-    }
-    const sha = expandedDirs.get(path)
-    if (sha) {
-      setSelectedPath(path)
-      setSelectedEntry({ path: path.split('/').pop()!, mode: '', type: 'tree', sha })
+  const handleActivate = useCallback(async (path: string) => {
+    const row = visibleRows.find(r => r.path === path)
+    if (!row) return
+    if (row.type === 'tree') {
+      if (!expanded.has(path)) await handleToggleExpand(path)
+      setSelectedEntry({ path: row.name, mode: '', type: 'tree', sha: row.sha })
       setBlobContent(null)
       pushHistory(path)
+      return
     }
-  }, [expandedDirs, historyIndex])
-
-  const handleNavigateToFile = useCallback(async (targetPath: string) => {
-    if (!rootTreeSha) return
-
-    const segments = targetPath.split('/')
-    let currentSha = rootTreeSha
-
-    let currentPath = ''
-    for (let i = 0; i < segments.length - 1; i++) {
-      const segment = segments[i]
-      currentPath = currentPath ? `${currentPath}/${segment}` : segment
-
-      let entries = treeData.get(currentSha)
-      if (!entries) {
-        try {
-          entries = await window.api.github.getTree(owner, name, currentSha)
-          setTreeData(prev => new Map(prev).set(currentSha, entries!))
-        } catch { return }
-      }
-
-      const dirEntry = entries.find(e => e.path === segment && e.type === 'tree')
-      if (!dirEntry) return
-      setExpandedDirs(prev => new Map(prev).set(currentPath, dirEntry.sha))
-      currentSha = dirEntry.sha
+    if (row.type === 'commit') {
+      // Submodule — no content to display, just record selection.
+      pushHistory(path)
+      return
     }
-
-    const lastSegment = segments[segments.length - 1]
-    let entries = treeData.get(currentSha)
-    if (!entries) {
-      try {
-        entries = await window.api.github.getTree(owner, name, currentSha)
-        setTreeData(prev => new Map(prev).set(currentSha, entries!))
-      } catch { return }
-    }
-
-    const targetEntry = entries.find(e => e.path === lastSegment)
-    if (!targetEntry) return
-
-    handleSelectFile(targetEntry, targetPath)
-  }, [rootTreeSha, treeData, owner, name, handleSelectFile])
-
-  const handlePathSubmit = useCallback((path: string) => {
-    handleNavigateToFile(path)
-  }, [handleNavigateToFile])
-
-  // ── Silent navigation (for back/forward — no history push) ──
-
-  const silentNavigate = useCallback(async (path: string) => {
-    skipHistoryRef.current = true
-    try {
-      if (!path) {
-        setSelectedPath(null)
-        setSelectedEntry(null)
-        setBlobContent(null)
-        setBlobRawBase64(null)
-      } else {
-        await handleNavigateToFile(path)
-      }
-    } finally {
-      skipHistoryRef.current = false
-    }
-  }, [handleNavigateToFile])
-
-  function goBack() {
-    if (historyIndex <= 0) return
-    const newIndex = historyIndex - 1
-    setHistoryIndex(newIndex)
-    silentNavigate(pathHistory[newIndex])
-  }
-
-  function goForward() {
-    if (historyIndex >= pathHistory.length - 1) return
-    const newIndex = historyIndex + 1
-    setHistoryIndex(newIndex)
-    silentNavigate(pathHistory[newIndex])
-  }
-
-  function goUp() {
-    if (!selectedPath) return
-    const parent = selectedPath.split('/').slice(0, -1).join('/')
-    pushHistory(parent || '')
-    silentNavigate(parent || '')
-  }
-
-  function goHome() {
-    setSelectedPath(null)
-    setSelectedEntry(null)
+    setSelectedEntry({ path: row.name, mode: '', type: 'blob', sha: row.sha, size: row.size })
     setBlobContent(null)
     setBlobRawBase64(null)
-    pushHistory('')
-  }
-
-  // ── Publish file path + nav state to NavBar via context ──
-
-  // Use refs so published callbacks always see the latest closure values
-  const goBackRef = useRef(goBack)
-  goBackRef.current = goBack
-  const goForwardRef = useRef(goForward)
-  goForwardRef.current = goForward
-  const breadcrumbNavRef = useRef(handleBreadcrumbNavigate)
-  breadcrumbNavRef.current = handleBreadcrumbNavigate
-
-  useEffect(() => {
-    repoNav.setFilePath(selectedPath ?? '')
-  }, [selectedPath])
-
-  // Publish whether the entry is a directory for NavBar icon rendering
-  const isDir = selectedEntry?.type === 'tree' || !selectedPath
-  useEffect(() => {
-    repoNav.setIsDirectory(isDir)
-  }, [isDir])
-
-  useEffect(() => {
-    repoNav.setFileNav({
-      canGoBack: historyIndex > 0,
-      canGoForward: historyIndex < pathHistory.length - 1,
-      onGoBack: () => goBackRef.current(),
-      onGoForward: () => goForwardRef.current(),
-    })
-  }, [historyIndex, pathHistory.length])
-
-  useEffect(() => {
-    repoNav.setOnFilePathClick(() => (path: string) => {
-      breadcrumbNavRef.current(path)
-    })
-    return () => {
-      repoNav.setFilePath(null)
-      repoNav.setOnFilePathClick(null)
-      repoNav.setFileNav(null)
-      repoNav.setIsDirectory(true)
+    if (!isVideoFile(path) && !isPdfFile(path) && (!row.size || row.size <= 1_000_000)) {
+      setBlobLoading(true)
+      try {
+        const result = await window.api.github.getBlob(owner, name, row.sha)
+        setBlobContent(result.content)
+        setBlobRawBase64(result.rawBase64)
+      } catch { setBlobContent(null) }
+      finally { setBlobLoading(false) }
     }
-  }, [])
+    pushHistory(path)
+  }, [visibleRows, expanded, handleToggleExpand, owner, name])
 
-  const handleContextMenu = useCallback((e: React.MouseEvent, entry: TreeEntry, fullPath: string) => {
+  const handleRowClick = useCallback((row: VisibleRow, e: React.MouseEvent) => {
+    setFocused(row.path)
+    if (e.shiftKey && anchor) {
+      const startIdx = visibleRows.findIndex(r => r.path === anchor)
+      const endIdx = visibleRows.findIndex(r => r.path === row.path)
+      if (startIdx >= 0 && endIdx >= 0) {
+        const [lo, hi] = startIdx <= endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
+        const range = new Set(visibleRows.slice(lo, hi + 1).map(r => r.path))
+        setSelected(range)
+      }
+      return
+    }
+    if (e.ctrlKey || e.metaKey) {
+      setSelected(prev => {
+        const next = new Set(prev)
+        if (next.has(row.path)) next.delete(row.path)
+        else next.add(row.path)
+        return next
+      })
+      setAnchor(row.path)
+      return
+    }
+    setSelected(new Set([row.path]))
+    setAnchor(row.path)
+    handleActivate(row.path)
+  }, [visibleRows, anchor, handleActivate])
+
+  const handleSelect = useCallback((path: string, opts: { shift: boolean; ctrl: boolean }) => {
+    if (opts.shift && anchor) {
+      const startIdx = visibleRows.findIndex(r => r.path === anchor)
+      const endIdx = visibleRows.findIndex(r => r.path === path)
+      if (startIdx >= 0 && endIdx >= 0) {
+        const [lo, hi] = startIdx <= endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
+        setSelected(new Set(visibleRows.slice(lo, hi + 1).map(r => r.path)))
+      }
+    } else if (opts.ctrl) {
+      setSelected(prev => {
+        const next = new Set(prev)
+        if (next.has(path)) next.delete(path); else next.add(path)
+        return next
+      })
+      setAnchor(path)
+    } else {
+      setSelected(new Set([path]))
+      setAnchor(path)
+    }
+  }, [visibleRows, anchor])
+
+  const keyboard = useFileTreeKeyboard({
+    rows: visibleRows,
+    focused,
+    selected,
+    onFocusChange: setFocused,
+    onToggleExpand: handleToggleExpand,
+    onSelect: handleSelect,
+    onActivate: handleActivate,
+  })
+
+  const handleSegmentClick = useCallback((row: VisibleRow, depth: number) => {
+    if (!row.flattenedSegments) return
+    const parentPath = row.path.split('/').slice(0, -row.flattenedSegments.length).join('/')
+    const segs = row.flattenedSegments.slice(0, depth + 1)
+    const targetPath = parentPath ? `${parentPath}/${segs.join('/')}` : segs.join('/')
+    setFocused(targetPath)
+    handleActivate(targetPath)
+  }, [handleActivate])
+
+  const handleContextMenu = useCallback((row: VisibleRow, e: React.MouseEvent) => {
     e.preventDefault()
-    const isDir = entry.type === 'tree'
-    const ext = entry.path.split('.').pop()?.toLowerCase() ?? ''
+    const ext = row.path.split('.').pop()?.toLowerCase() ?? ''
     const mdExts = new Set(['md', 'mdx', 'markdown'])
-
+    const isDir = row.type === 'tree'
     let hasMarkdown = false
     if (isDir) {
-      const sha = expandedDirs.get(fullPath) ?? entry.sha
-      const children = treeData.get(sha)
+      const children = treeData.get(row.sha)
       if (children) {
-        let mdCount = 0
+        let count = 0
         for (const c of children) {
           if (c.type === 'blob' && mdExts.has(c.path.split('.').pop()?.toLowerCase() ?? '')) {
-            mdCount++
-            if (mdCount >= 2) { hasMarkdown = true; break }
+            count++
+            if (count >= 2) { hasMarkdown = true; break }
           }
         }
       } else {
-        hasMarkdown = true  // unloaded folder: assume yes, service handles gracefully
+        hasMarkdown = true
       }
     } else {
       hasMarkdown = mdExts.has(ext)
     }
-
     setCtxMenu({
       x: e.clientX,
       y: e.clientY,
-      target: { path: entry.path, type: entry.type, hasMarkdown, fullPath },
+      target: { path: row.name, type: row.type === 'commit' ? 'blob' : row.type, hasMarkdown, fullPath: row.path },
     })
-  }, [expandedDirs, treeData])
+  }, [treeData])
 
   const handleDownloadRaw = useCallback((target: ContextMenuTarget) => {
     const promise = target.type === 'tree'
@@ -535,7 +317,187 @@ export default function FilesTab({ owner, name, branch, initialPath }: Props) {
     }).catch(err => console.error('Conversion failed:', err))
   }, [owner, name, branch])
 
-  // ── Render ──
+  useEffect(() => {
+    if (!initialPath || !rootTreeSha) return
+    let cancelled = false
+    ;(async () => {
+      const segments = initialPath.split('/')
+      let currentSha = rootTreeSha
+      let currentPath = ''
+      for (let i = 0; i < segments.length - 1; i++) {
+        const seg = segments[i]
+        currentPath = currentPath ? `${currentPath}/${seg}` : seg
+        try {
+          const entries = await ensureTreeLoaded(currentSha)
+          if (cancelled) return
+          const dirEntry = entries.find(e => e.path === seg && e.type === 'tree')
+          if (!dirEntry) return
+          setExpanded(prev => new Map(prev).set(currentPath, dirEntry.sha))
+          currentSha = dirEntry.sha
+        } catch { return }
+      }
+      const lastSeg = segments[segments.length - 1]
+      try {
+        const entries = await ensureTreeLoaded(currentSha)
+        if (cancelled) return
+        const target = entries.find(e => e.path === lastSeg)
+        if (!target) return
+        setSelected(new Set([initialPath]))
+        setFocused(initialPath)
+        setAnchor(initialPath)
+        handleActivate(initialPath)
+      } catch { return }
+    })()
+    return () => { cancelled = true }
+  }, [initialPath, rootTreeSha, ensureTreeLoaded, handleActivate])
+
+  const breadcrumbNavRef = useRef<(path: string) => void>(() => {})
+  breadcrumbNavRef.current = (path: string) => {
+    if (!path) {
+      setSelected(new Set())
+      setSelectedEntry(null)
+      setBlobContent(null)
+      pushHistory('')
+      return
+    }
+    handleActivate(path)
+  }
+
+  const focusedPath = focused ?? (selected.size > 0 ? [...selected][0] : '')
+  useEffect(() => {
+    repoNav.setFilePath(focusedPath ?? '')
+  }, [focusedPath])
+
+  const focusedRow = visibleRows.find(r => r.path === focusedPath)
+  const isDir = focusedRow?.type === 'tree' || !focusedPath
+  useEffect(() => {
+    repoNav.setIsDirectory(isDir)
+  }, [isDir])
+
+  useEffect(() => {
+    repoNav.setFileNav({
+      canGoBack: historyIndex > 0,
+      canGoForward: historyIndex < pathHistory.length - 1,
+      onGoBack: () => {
+        if (historyIndex <= 0) return
+        skipHistoryRef.current = true
+        setHistoryIndex(i => i - 1)
+        const target = pathHistory[historyIndex - 1]
+        if (target) handleActivate(target)
+        skipHistoryRef.current = false
+      },
+      onGoForward: () => {
+        if (historyIndex >= pathHistory.length - 1) return
+        skipHistoryRef.current = true
+        setHistoryIndex(i => i + 1)
+        const target = pathHistory[historyIndex + 1]
+        if (target) handleActivate(target)
+        skipHistoryRef.current = false
+      },
+    })
+  }, [historyIndex, pathHistory.length])
+
+  useEffect(() => {
+    repoNav.setOnFilePathClick(() => (path: string) => breadcrumbNavRef.current(path))
+    return () => {
+      repoNav.setFilePath(null)
+      repoNav.setOnFilePathClick(null)
+      repoNav.setFileNav(null)
+      repoNav.setIsDirectory(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+        e.preventDefault()
+        window.dispatchEvent(new CustomEvent('files-toolbar:focus-search'))
+      }
+      if (e.ctrlKey && e.key === 'b' && !e.shiftKey) {
+        e.preventDefault()
+        toggleCollapse()
+      }
+      if (e.key === 'Backspace') {
+        const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase()
+        const isEditable = tag === 'input' || tag === 'textarea' || (document.activeElement as HTMLElement)?.isContentEditable
+        if (!isEditable && focusedPath) {
+          e.preventDefault()
+          const parent = focusedPath.split('/').slice(0, -1).join('/')
+          if (parent) handleActivate(parent)
+          else {
+            setSelected(new Set()); setSelectedEntry(null); setBlobContent(null)
+          }
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [toggleCollapse, focusedPath, handleActivate])
+
+  const rightPaneContent = useMemo(() => {
+    if (focusedRow?.type === 'blob') {
+      return (
+        <FileContentPanel
+          key={focusedRow.path}
+          selectedPath={focusedRow.path}
+          selectedEntry={selectedEntry}
+          blobContent={blobContent}
+          blobRawBase64={blobRawBase64}
+          blobLoading={blobLoading}
+          owner={owner}
+          name={name}
+          branch={branch}
+          dirEntries={null}
+          onSelectEntry={() => {}}
+          onNavigateToFile={path => handleActivate(path)}
+          wordWrap={false}
+          onToggleWordWrap={() => {}}
+          lineCount={0}
+          onLineCountReady={() => {}}
+          viewMode="details"
+          sortField="name"
+          sortDirection="asc"
+          filterText=""
+          treeData={treeData as unknown as Map<string, ContentPanelEntry[]>}
+          onContextMenu={() => {}}
+        />
+      )
+    }
+    const dirEntries: TreeEntry[] = (() => {
+      if (!focusedPath) return treeData.get(rootTreeSha ?? '') ?? []
+      if (focusedRow?.type === 'tree') return treeData.get(focusedRow.sha) ?? []
+      return []
+    })()
+    return (
+      <DirectoryPane
+        entries={dirEntries}
+        basePath={focusedPath ?? ''}
+        density={density}
+        selected={selected}
+        getLastCommit={p => lastCommits.get(p)}
+        getGitStatus={p => gitStatus.statusMap.get(p)}
+        owner={owner}
+        name={name}
+        width={800}
+        onRowClick={(entry, fullPath, e) => {
+          handleRowClick({
+            path: fullPath, type: entry.type, name: entry.path, depth: 0, sha: entry.sha,
+            size: entry.size, isExpanded: false, isFlattened: false,
+            level: 1, posInSet: 1, setSize: 1,
+          }, e)
+        }}
+        onRowContextMenu={(entry, fullPath, e) => {
+          handleContextMenu({
+            path: fullPath, type: entry.type, name: entry.path, depth: 0, sha: entry.sha,
+            size: entry.size, isExpanded: false, isFlattened: false,
+            level: 1, posInSet: 1, setSize: 1,
+          }, e)
+        }}
+      />
+    )
+  }, [focusedRow, focusedPath, selectedEntry, blobContent, blobRawBase64, blobLoading,
+      owner, name, branch, treeData, rootTreeSha, density, selected, lastCommits, gitStatus,
+      handleRowClick, handleContextMenu, handleActivate])
 
   if (loading) {
     return (
@@ -546,7 +508,6 @@ export default function FilesTab({ owner, name, branch, initialPath }: Props) {
       </div>
     )
   }
-
   if (error) {
     return (
       <div className="files-tab">
@@ -558,48 +519,42 @@ export default function FilesTab({ owner, name, branch, initialPath }: Props) {
     )
   }
 
-  const selectedDirEntries = selectedEntry?.type === 'tree'
-    ? treeData.get(selectedEntry.sha) ?? null
-    : !selectedPath && rootTreeSha
-      ? treeData.get(rootTreeSha) ?? null
-      : null
-
   return (
     <div className="files-tab">
-      {(selectedEntry?.type === 'tree' || !selectedPath) && selectedDirEntries && (
-        <ViewModeBar
-          itemCount={selectedDirEntries.length}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSortFieldChange={setSortField}
-          onSortDirectionChange={setSortDirection}
-          searchValue={filterText}
-          onSearchChange={setFilterText}
-        />
+      <FilesToolbar
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchMode={searchMode}
+        onSearchModeChange={setSearchMode}
+        density={density}
+        onDensityChange={setDensity}
+        diffBase={diffBase}
+        onDiffBaseChange={setDiffBase}
+        diffBaseOptions={diffBaseOptions}
+      />
+      {gitStatus.error && (
+        <div className="files-tab__compare-error">
+          Compare failed · <button onClick={() => gitStatus.retry()}>Retry</button>
+        </div>
       )}
       <div className="files-tab__body">
         {!isCollapsed ? (
           <div className="files-tab__tree" style={{ width: sidebarWidth }}>
-            {rootTreeSha && treeData.has(rootTreeSha) && (
-              <FileTreePanel
-                entries={treeData.get(rootTreeSha)!}
-                expandedDirs={expandedDirs}
-                treeData={treeData}
-                treeLoading={treeLoading}
-                errorDirs={errorDirs}
-                selectedPath={selectedPath}
-                basePath=""
-                depth={0}
-                owner={owner}
-                name={name}
-                onToggleDir={handleToggleDir}
-                onSelectFile={handleSelectFile}
-                filterText={filterText}
-                onContextMenu={handleContextMenu}
-              />
-            )}
+            <FileTreeView
+              rows={visibleRows}
+              density={density}
+              focused={focused}
+              selected={selected}
+              getLastCommit={p => lastCommits.get(p)}
+              getGitStatus={p => gitStatus.statusMap.get(p)}
+              owner={owner}
+              name={name}
+              width={sidebarWidth}
+              onRowClick={handleRowClick}
+              onRowContextMenu={handleContextMenu}
+              onSegmentClick={handleSegmentClick}
+              onKeyDown={keyboard.handleKeyDown}
+            />
           </div>
         ) : (
           <button className="files-tab__expand-btn" title="Show sidebar (Ctrl+B)" onClick={toggleCollapse}>
@@ -612,32 +567,14 @@ export default function FilesTab({ owner, name, branch, initialPath }: Props) {
           </div>
         )}
         <div className="files-tab__content">
-          <FileContentPanel
-            key={selectedPath ?? ''}
-            selectedPath={selectedPath}
-            selectedEntry={selectedEntry}
-            blobContent={blobContent}
-            blobRawBase64={blobRawBase64}
-            blobLoading={blobLoading}
-            owner={owner}
-            name={name}
-            branch={branch}
-            dirEntries={selectedDirEntries}
-            onSelectEntry={handleSelectFile}
-            onNavigateToFile={handleNavigateToFile}
-            wordWrap={wordWrap}
-            onToggleWordWrap={handleToggleWordWrap}
-            lineCount={lineCount}
-            onLineCountReady={setLineCount}
-            viewMode={viewMode}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            filterText={filterText}
-            treeData={treeData}
-            onContextMenu={handleContextMenu}
-          />
+          {rightPaneContent}
         </div>
       </div>
+      {selected.size > 1 && (
+        <div className="files-tab__selection-status">
+          {selected.size} files selected
+        </div>
+      )}
       {ctxMenu && (
         <ContextMenu
           x={ctxMenu.x}

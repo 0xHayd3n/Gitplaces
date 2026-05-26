@@ -1778,6 +1778,8 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                     name={name ?? ''}
                     branch={repo.default_branch ?? 'main'}
                     initialPath={filesTargetPath}
+                    repoId={repo?.id ?? null}
+                    releases={Array.isArray(releases) ? releases : []}
                   />
                 )}
 
