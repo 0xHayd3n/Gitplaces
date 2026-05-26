@@ -7,7 +7,7 @@ import Store from 'electron-store'
 import type Database from 'better-sqlite3'
 import { getDb, closeDb } from './db'
 import { getToken, setToken, clearToken, setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner, migrateApiStore } from './store'
-import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, type CompareSummary } from './github'
+import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, getLastCommitForPath, compareRefs, type CompareSummary } from './github'
 import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
 import { scanFromSources } from './mcp-scanner'
 import type { McpScanResult } from '../src/types/mcp'
@@ -97,7 +97,7 @@ import { fetchRepoBundle, type RepoBundle } from './githubGraphql'
 import { sanitiseRef } from './sanitiseRef'
 import type { CollectionRow, CollectionRepoRow } from '../src/types/repo'
 import { classifyRepoBucket } from '../src/lib/classifyRepoType'
-import { cascadeRepoId } from './db-helpers'
+import { cascadeRepoId, readLastCommitCache, writeLastCommitCache, readCompareCache, writeCompareCache, getCachedTreeShaForPath } from './db-helpers'
 import { LRUCache } from './lruCache'
 import { poolAll } from './concurrency'
 
@@ -1110,6 +1110,51 @@ ipcMain.handle('github:getBlob', async (_event, owner: string, name: string, blo
   const result = await getBlobBySha(token, owner, name, blobSha)
   blobCache.set(blobSha, result)
   return result
+})
+
+ipcMain.handle('github:getLastCommitForPath', async (
+  _event,
+  repoId: string,
+  owner: string,
+  name: string,
+  ref: string,
+  path: string,
+) => {
+  const db = getDb(app.getPath('userData'))
+  const treeSha = getCachedTreeShaForPath(db, repoId, path)
+  if (treeSha) {
+    const cached = readLastCommitCache(db, repoId, treeSha, path)
+    if (cached) return cached
+  }
+  const token = getToken() ?? null
+  try {
+    const info = await getLastCommitForPath(token, owner, name, ref, path)
+    if (info && treeSha) writeLastCommitCache(db, repoId, treeSha, path, info)
+    return info
+  } catch {
+    return null
+  }
+})
+
+ipcMain.handle('github:compareRefs', async (
+  _event,
+  repoId: string,
+  owner: string,
+  name: string,
+  base: string,
+  head: string,
+) => {
+  const db = getDb(app.getPath('userData'))
+  const cached = readCompareCache(db, repoId, base, head)
+  if (cached) return cached
+  const token = getToken() ?? null
+  try {
+    const files = await compareRefs(token, owner, name, base, head)
+    writeCompareCache(db, repoId, base, head, files)
+    return files
+  } catch {
+    return null
+  }
 })
 
 ipcMain.handle('github:getReceivedEvents', async (_event, username: string) => {

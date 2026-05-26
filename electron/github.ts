@@ -843,3 +843,68 @@ export async function putFileContents(
   if (!res.ok) throw new Error(`putFileContents failed: ${res.status}`)
   return res.json() as Promise<{ content: { sha: string } }>
 }
+
+export interface LastCommitInfo {
+  message: string
+  author_login: string | null
+  author_avatar: string | null
+  committed_at: string
+  commit_sha: string
+}
+
+/**
+ * Fetch the most recent commit that touched `path` on `ref`.
+ * Returns null if the file has no commit history (newly added, or 404).
+ */
+export async function getLastCommitForPath(
+  token: string | null,
+  owner: string,
+  name: string,
+  ref: string,
+  path: string,
+): Promise<LastCommitInfo | null> {
+  const url = `${BASE}/repos/${owner}/${name}/commits?path=${encodeURIComponent(path)}&sha=${encodeURIComponent(ref)}&per_page=1`
+  const res = await fetch(url, { headers: githubHeaders(token) })
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
+  const data = (await res.json()) as Array<{
+    sha: string
+    commit: { message: string; author: { date: string } }
+    author: { login: string; avatar_url: string } | null
+  }>
+  if (data.length === 0) return null
+  const c = data[0]
+  return {
+    message: c.commit.message.split('\n')[0],
+    author_login: c.author?.login ?? null,
+    author_avatar: c.author?.avatar_url ?? null,
+    committed_at: c.commit.author.date,
+    commit_sha: c.sha,
+  }
+}
+
+export interface CompareFile {
+  path: string
+  status: 'added' | 'modified' | 'removed' | 'renamed'
+}
+
+/**
+ * Fetch the file-level diff between `base` and `head`. Both args accept SHAs,
+ * branches, tags, or relative refs (e.g. 'main~5'). Returns the list of
+ * changed files with their status.
+ */
+export async function compareRefs(
+  token: string | null,
+  owner: string,
+  name: string,
+  base: string,
+  head: string,
+): Promise<CompareFile[]> {
+  const url = `${BASE}/repos/${owner}/${name}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`
+  const res = await fetch(url, { headers: githubHeaders(token) })
+  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
+  const data = (await res.json()) as { files?: Array<{ filename: string; status: string }> }
+  return (data.files ?? [])
+    .filter(f => ['added', 'modified', 'removed', 'renamed'].includes(f.status))
+    .map(f => ({ path: f.filename, status: f.status as CompareFile['status'] }))
+}

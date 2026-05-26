@@ -124,6 +124,18 @@ declare global {
           topFiles: { filename: string; status: string; additions: number; deletions: number }[]
           topAuthors: { login: string; avatarUrl: string; commits: number }[]
         }>
+        getLastCommitForPath: (
+          repoId: string, owner: string, name: string, ref: string, path: string,
+        ) => Promise<{
+          message: string
+          author_login: string | null
+          author_avatar: string | null
+          committed_at: string
+          commit_sha: string
+        } | null>
+        compareRefs: (
+          repoId: string, owner: string, name: string, base: string, head: string,
+        ) => Promise<{ path: string; status: 'added' | 'modified' | 'removed' | 'renamed' }[] | null>
       }
       settings: {
         get: (key: string) => Promise<string | null>

@@ -1,6 +1,7 @@
 // electron/db-helpers.ts
 // Shared DB utilities used by both main.ts and IPC handlers.
 import type Database from 'better-sqlite3'
+import type { LastCommitInfo, CompareFile } from './github'
 
 /**
  * Cascade-update the repo primary key from a synthetic "owner/name" ID to the
@@ -31,4 +32,84 @@ export function cascadeRepoId(db: Database.Database, owner: string, name: string
     db.prepare('UPDATE skills SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
     db.prepare('UPDATE sub_skills SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
   }
+}
+
+export function readLastCommitCache(
+  db: Database.Database,
+  repoId: string,
+  treeSha: string,
+  path: string,
+): LastCommitInfo | null {
+  const row = db.prepare(`
+    SELECT message, author_login, author_avatar, committed_at, commit_sha
+    FROM last_commits
+    WHERE repo_id = ? AND tree_sha = ? AND path = ?
+  `).get(repoId, treeSha, path) as LastCommitInfo | undefined
+  return row ?? null
+}
+
+export function writeLastCommitCache(
+  db: Database.Database,
+  repoId: string,
+  treeSha: string,
+  path: string,
+  info: LastCommitInfo,
+): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO last_commits
+      (repo_id, tree_sha, path, message, author_login, author_avatar, committed_at, commit_sha)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(repoId, treeSha, path, info.message, info.author_login, info.author_avatar, info.committed_at, info.commit_sha)
+}
+
+const COMPARE_TTL_MS = 60 * 60 * 1000  // 1 hour
+
+export function readCompareCache(
+  db: Database.Database,
+  repoId: string,
+  baseRef: string,
+  headRef: string,
+): CompareFile[] | null {
+  const row = db.prepare(`
+    SELECT files_json, fetched_at FROM compare_diffs
+    WHERE repo_id = ? AND base_ref = ? AND head_ref = ?
+  `).get(repoId, baseRef, headRef) as { files_json: string; fetched_at: number } | undefined
+  if (!row) return null
+  if (Date.now() - row.fetched_at >= COMPARE_TTL_MS) {
+    db.prepare(`DELETE FROM compare_diffs WHERE repo_id = ? AND base_ref = ? AND head_ref = ?`).run(repoId, baseRef, headRef)
+    return null
+  }
+  return JSON.parse(row.files_json) as CompareFile[]
+}
+
+export function writeCompareCache(
+  db: Database.Database,
+  repoId: string,
+  baseRef: string,
+  headRef: string,
+  files: CompareFile[],
+): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO compare_diffs (repo_id, base_ref, head_ref, files_json, fetched_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(repoId, baseRef, headRef, JSON.stringify(files), Date.now())
+}
+
+/**
+ * Look up the tree sha currently associated with a path on a ref. Used by
+ * last-commit cache to make entries content-addressed: if the file's tree sha
+ * has changed (i.e. the file changed), the cache misses and we refetch.
+ * Returns null if we don't have that path's tree sha cached.
+ */
+export function getCachedTreeShaForPath(
+  db: Database.Database,
+  repoId: string,
+  path: string,
+): string | null {
+  const row = db.prepare(`
+    SELECT tree_sha FROM last_commits
+    WHERE repo_id = ? AND path = ?
+    ORDER BY rowid DESC LIMIT 1
+  `).get(repoId, path) as { tree_sha: string } | undefined
+  return row?.tree_sha ?? null
 }
