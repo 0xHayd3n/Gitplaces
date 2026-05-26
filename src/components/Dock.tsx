@@ -127,15 +127,15 @@ export default function Dock({ onAiClick, aiOpen }: DockProps) {
         {/* TTS playback bar portals in here when active; collapses when empty */}
         <div id="tts-dock-slot" />
 
-        <div className="dock-items-row">
-          {/* Breadcrumb + back arrow (relocated here from the top window
-              drag strip per UX choice). NavBar renders nothing on routes
-              without a meaningful breadcrumb, so this is a no-op on those. */}
-          <div className="dock-navbar-slot">
-            <NavBar />
-          </div>
-          <span className="dock-divider" aria-hidden="true" />
+        {/* Breadcrumb + back arrow (relocated here from the top window
+            drag strip per UX choice). Sits as its own row above the
+            dock icons. NavBar renders nothing on routes without a
+            meaningful breadcrumb, so the slot collapses on those. */}
+        <div className="dock-navbar-slot">
+          <NavBar />
+        </div>
 
+        <div className="dock-items-row">
           {/* Nav items */}
           {NAV_ITEMS.map(({ label, path, icon }) => (
             <button
