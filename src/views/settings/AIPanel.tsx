@@ -418,11 +418,13 @@ export default function AIPanel() {
           chip="CLI"
           description="Anthropic's CLI agent. Runs Claude via your Claude.ai subscription."
           status={
-            claudeCodeLoggedIn === true
-              ? { tone: 'green', text: 'Installed · Logged in' }
-              : claudeCodeInstalled === false
-                ? { tone: 'gray', text: 'Not installed' }
-                : { tone: 'amber', text: 'Installed · Not logged in' }
+            claudeCodeInstalled === null
+              ? { tone: 'gray', text: 'Checking…' }
+              : claudeCodeLoggedIn === true
+                ? { tone: 'green', text: 'Installed · Logged in' }
+                : claudeCodeInstalled === false
+                  ? { tone: 'gray', text: 'Not installed' }
+                  : { tone: 'amber', text: 'Installed · Not logged in' }
           }
           actions={
             (setupPhase !== 'idle' && setupPhase !== 'done') || loginPhase === 'logging-in' ? (
