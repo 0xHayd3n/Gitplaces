@@ -134,6 +134,16 @@ declare global {
           committed_at: string
           commit_sha: string
         } | null>
+        getLastCommitsForPaths: (
+          repoId: string, owner: string, name: string, ref: string,
+          pathShas: { path: string; sha: string }[],
+        ) => Promise<Record<string, {
+          message: string
+          author_login: string | null
+          author_avatar: string | null
+          committed_at: string
+          commit_sha: string
+        } | null>>
         compareRefs: (
           repoId: string, owner: string, name: string, base: string, head: string,
         ) => Promise<{ path: string; status: 'added' | 'modified' | 'removed' | 'renamed' }[] | null>

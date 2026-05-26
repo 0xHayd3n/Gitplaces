@@ -296,6 +296,97 @@ function mapAlert(a: GqlVulnAlert): SecurityAlert {
   }
 }
 
+// ── Batched last-commit fetcher (Files-tab decoration) ──────────────────────
+
+import type { LastCommitInfo } from './github'
+
+const BATCH_SIZE = 50
+
+/**
+ * Fetch the most recent commit that touched each path on `branch`. Issues
+ * one GraphQL query per `BATCH_SIZE` paths using aliases. Returns a map of
+ * path → commit info (or null if the path has no history on this branch).
+ */
+export async function fetchLastCommitsForPaths(
+  token: string,
+  owner: string,
+  name: string,
+  branch: string,
+  paths: readonly string[],
+): Promise<Map<string, LastCommitInfo | null>> {
+  const result = new Map<string, LastCommitInfo | null>()
+  if (paths.length === 0) return result
+
+  for (let i = 0; i < paths.length; i += BATCH_SIZE) {
+    const chunk = paths.slice(i, i + BATCH_SIZE)
+    const aliases = chunk.map((_, j) => {
+      const idx = i + j
+      return `f${idx}: history(first: 1, path: $p${idx}) { nodes { oid messageHeadline committedDate author { name avatarUrl user { login } } } }`
+    }).join('\n            ')
+    const varDecls = chunk.map((_, j) => `$p${i + j}: String!`).join(', ')
+    const variables: Record<string, string> = { owner, name, branch }
+    chunk.forEach((p, j) => { variables[`p${i + j}`] = p })
+
+    const query = `
+      query LastCommitsBatch($owner: String!, $name: String!, $branch: String!, ${varDecls}) {
+        repository(owner: $owner, name: $name) {
+          ref(qualifiedName: $branch) {
+            target {
+              ... on Commit {
+                ${aliases}
+              }
+            }
+          }
+        }
+      }
+    `
+
+    const headers: HeadersInit = {
+      Authorization: `bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    }
+
+    const res = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ query, variables }),
+      signal: AbortSignal.timeout(15_000),
+    }).catch(() => null)
+
+    if (!res || !res.ok) {
+      for (const p of chunk) result.set(p, null)
+      continue
+    }
+    const json = await res.json().catch(() => null) as { data?: { repository?: { ref?: { target?: Record<string, { nodes: Array<{ oid: string; messageHeadline: string; committedDate: string; author: { name: string | null; avatarUrl: string | null; user: { login: string } | null } }> }> } } } } | null
+    const target = json?.data?.repository?.ref?.target
+    if (!target) {
+      for (const p of chunk) result.set(p, null)
+      continue
+    }
+    chunk.forEach((p, j) => {
+      const idx = i + j
+      const entry = target[`f${idx}`]
+      const node = entry?.nodes?.[0]
+      if (!node) {
+        result.set(p, null)
+        return
+      }
+      result.set(p, {
+        message: node.messageHeadline,
+        author_login: node.author.user?.login ?? null,
+        author_avatar: node.author.avatarUrl ?? null,
+        committed_at: node.committedDate,
+        commit_sha: node.oid,
+      })
+    })
+  }
+
+  return result
+}
+
+// ── Mapping ─────────────────────────────────────────────────────────────────
+
 function mapRepository(r: GqlRepository, owner: string): RepoBundle {
   const dismissedBySeverity = {
     critical: 0, high: 0, moderate: 0, low: 0,

@@ -67,6 +67,10 @@ contextBridge.exposeInMainWorld('api', {
     getRawFile: (owner: string, name: string, branch: string, path: string) => ipcRenderer.invoke('github:getRawFile', owner, name, branch, path),
     getLastCommitForPath: (repoId: string, owner: string, name: string, ref: string, path: string, sha: string) =>
       ipcRenderer.invoke('github:getLastCommitForPath', repoId, owner, name, ref, path, sha),
+    getLastCommitsForPaths: (
+      repoId: string, owner: string, name: string, ref: string,
+      pathShas: { path: string; sha: string }[],
+    ) => ipcRenderer.invoke('github:getLastCommitsForPaths', repoId, owner, name, ref, pathShas),
     compareRefs: (repoId: string, owner: string, name: string, base: string, head: string) =>
       ipcRenderer.invoke('github:compareRefs', repoId, owner, name, base, head),
     getReceivedEvents: (username: string) =>

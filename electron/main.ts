@@ -7,7 +7,7 @@ import Store from 'electron-store'
 import type Database from 'better-sqlite3'
 import { getDb, closeDb } from './db'
 import { getToken, setToken, clearToken, setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner, migrateApiStore } from './store'
-import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, getLastCommitForPath, compareRefs, type CompareSummary } from './github'
+import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, getLastCommitForPath, compareRefs, type CompareSummary, type LastCommitInfo } from './github'
 import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
 import { scanFromSources } from './mcp-scanner'
 import type { McpScanResult } from '../src/types/mcp'
@@ -93,7 +93,7 @@ import { startAgentsBackupSyncService, pushAllPendingAgents } from './services/a
 import { parseOgImage, isGenericGitHubOg } from './services/ogImageService'
 import { getRepoUserEvents } from './services/repoUserEvents'
 import { getRepoStats, getRepoMomentum } from './services/repoStats'
-import { fetchRepoBundle, type RepoBundle } from './githubGraphql'
+import { fetchRepoBundle, fetchLastCommitsForPaths, type RepoBundle } from './githubGraphql'
 import { sanitiseRef } from './sanitiseRef'
 import type { CollectionRow, CollectionRepoRow } from '../src/types/repo'
 import { classifyRepoBucket } from '../src/lib/classifyRepoType'
@@ -1132,6 +1132,54 @@ ipcMain.handle('github:getLastCommitForPath', async (
   } catch {
     return null
   }
+})
+
+ipcMain.handle('github:getLastCommitsForPaths', async (
+  _event,
+  repoId: string,
+  owner: string,
+  name: string,
+  ref: string,
+  pathShas: { path: string; sha: string }[],
+) => {
+  const db = getDb(app.getPath('userData'))
+  const result: Record<string, LastCommitInfo | null> = {}
+  const missing: { path: string; sha: string }[] = []
+
+  // Cache check
+  for (const { path, sha } of pathShas) {
+    const cached = readLastCommitCache(db, repoId, sha, path)
+    if (cached) {
+      result[path] = cached
+    } else {
+      missing.push({ path, sha })
+    }
+  }
+
+  if (missing.length === 0) return result
+
+  const token = getToken()
+  if (!token) {
+    // Without a token, GraphQL won't work. Return null for misses.
+    for (const { path } of missing) result[path] = null
+    return result
+  }
+
+  try {
+    const fetched = await fetchLastCommitsForPaths(
+      token, owner, name, ref,
+      missing.map(m => m.path),
+    )
+    for (const { path, sha } of missing) {
+      const info = fetched.get(path) ?? null
+      result[path] = info
+      if (info) writeLastCommitCache(db, repoId, sha, path, info)
+    }
+  } catch {
+    for (const { path } of missing) result[path] = null
+  }
+
+  return result
 })
 
 ipcMain.handle('github:compareRefs', async (
