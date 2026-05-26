@@ -3,12 +3,11 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { useLastCommits } from './useLastCommits'
 
 beforeEach(() => {
-  // @ts-expect-error global stub
   window.api = {
     github: {
       getLastCommitForPath: vi.fn(),
     },
-  }
+  } as unknown as typeof window.api
 })
 
 describe('useLastCommits', () => {

@@ -3,12 +3,11 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { useGitStatus } from './useGitStatus'
 
 beforeEach(() => {
-  // @ts-expect-error global stub
   window.api = {
     github: {
       compareRefs: vi.fn(),
     },
-  }
+  } as unknown as typeof window.api
 })
 
 describe('useGitStatus', () => {
