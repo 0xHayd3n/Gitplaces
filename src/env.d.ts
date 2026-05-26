@@ -89,6 +89,7 @@ declare global {
           isStarred: boolean
           vulnerabilities: import('../../electron/githubGraphql').RepoBundle['vulnerabilities']
           securityPolicyUrl: string | null
+          rootTree: import('../../electron/githubGraphql').RepoBundle['rootTree']
         } | null>
         recordFork:       (owner: string, name: string) => Promise<void>
         setArchivedAt:    (owner: string, name: string, archived: boolean) => Promise<void>

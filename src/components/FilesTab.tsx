@@ -29,9 +29,13 @@ interface Props {
   initialPath?: string | null
   repoId?: string | null
   releases?: { tag_name: string }[]
+  prefetchedTree?: {
+    sha: string
+    entries: Array<{ path: string; mode: string; type: 'blob' | 'tree' | 'commit'; sha: string; size?: number }>
+  } | null
 }
 
-export default function FilesTab({ owner, name, branch, initialPath, repoId, releases }: Props) {
+export default function FilesTab({ owner, name, branch, initialPath, repoId, releases, prefetchedTree }: Props) {
   const [rootTreeSha, setRootTreeSha] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -99,6 +103,16 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
   }, [owner, name, branch])
 
   useEffect(() => {
+    // If RepoDetail prefetched the root tree via fetchRepoBundle, use it
+    // directly — skip the getBranch + initial getTree REST calls.
+    if (prefetchedTree) {
+      setRootTreeSha(prefetchedTree.sha)
+      setTreeData(prev => new Map(prev).set(prefetchedTree.sha, prefetchedTree.entries as TreeEntry[]))
+      setLoading(false)
+      setError(null)
+      return
+    }
+
     let cancelled = false
     setLoading(true)
     setError(null)
@@ -129,7 +143,7 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
       }
     })()
     return () => { cancelled = true }
-  }, [owner, name, branch, retryKey])
+  }, [owner, name, branch, retryKey, prefetchedTree])
 
   const visibleRows = useMemo(() => {
     if (!rootTreeSha) return []

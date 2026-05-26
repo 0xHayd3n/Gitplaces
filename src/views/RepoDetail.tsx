@@ -543,6 +543,10 @@ export default function RepoDetail() {
   const [seedSignals, setSeedSignals] = useState<string[]>([])
 
   const [repo, setRepo] = useState<RepoRow | null>(null)
+  const [prefetchedTree, setPrefetchedTree] = useState<{
+    sha: string
+    entries: Array<{ path: string; mode: string; type: 'blob' | 'tree' | 'commit'; sha: string; size?: number }>
+  } | null>(null)
   const [repoError, setRepoError] = useState(false)
   const [activeTab, setActiveTab] = useState<Tab>('readme')
   const [filesTargetPath, setFilesTargetPath] = useState<string | null>(null)
@@ -786,6 +790,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     setReadmeBadges(cached?.readmeBadges ?? [])
 
     // Always reset ephemeral/derived state
+    setPrefetchedTree(null)
     setRepoError(false)
     setReadmeFetched(false)
     setTranslating(false)
@@ -901,6 +906,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
         setReleases(bundle.releases)
         writeSessionCache(_releasesCache, cacheKey, bundle.releases)
         releasesFetchedRef.current = cacheKey
+        setPrefetchedTree(bundle.rootTree)
         window.api.verification.getScore(row.id)
           .then(s => { if (!cancelled && s) { setSeedTier(s.tier); setSeedSignals(s.signals) } })
           .catch(() => {})
@@ -1780,6 +1786,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                     initialPath={filesTargetPath}
                     repoId={repo?.id ?? null}
                     releases={Array.isArray(releases) ? releases : []}
+                    prefetchedTree={prefetchedTree}
                   />
                 )}
 
