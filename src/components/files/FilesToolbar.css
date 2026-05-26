@@ -28,7 +28,7 @@
   padding: 0 8px 0 24px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--bg2);
+  background: transparent;
   color: var(--t1);
   font-size: 11px;
 }
@@ -53,7 +53,7 @@
   flex: 1 1 auto;
   min-width: 0;
   appearance: none;
-  background: var(--bg2);
+  background: transparent;
   border: 1px solid var(--border);
   color: var(--t1);
   font-size: 11px;
