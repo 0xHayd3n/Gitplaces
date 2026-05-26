@@ -149,18 +149,17 @@ describe('Settings — sidebar IA', () => {
 describe('Settings — AI panel', () => {
   beforeEach(() => { setupApi() })
 
-  it('renders all five AI section headers', async () => {
+  it('renders the three transport tabs and the Defaults label', async () => {
     render(<Settings />)
     await waitFor(() => {
-      expect(screen.getByText(/API \/ HTTPS/i)).toBeInTheDocument()
-      expect(screen.getByText(/^CLI$/)).toBeInTheDocument()
-      expect(screen.getByText(/^MCP$/)).toBeInTheDocument()
-      expect(screen.getByText(/Custom MCP/i)).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /API \/ HTTPS/i })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /^CLI$/ })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: /^MCP$/ })).toBeInTheDocument()
       expect(screen.getByText(/^Defaults$/i)).toBeInTheDocument()
     })
   })
 
-  it('renders the Anthropic provider card in the API section', async () => {
+  it('renders the Anthropic provider card in the default API tab', async () => {
     render(<Settings />)
     await waitFor(() => {
       expect(screen.getByText(/^Anthropic$/)).toBeInTheDocument()
@@ -168,38 +167,42 @@ describe('Settings — AI panel', () => {
     })
   })
 
-  it("renders Anthropic's Claude Code card in the CLI section", async () => {
+  it("renders Anthropic's Claude Code card after switching to the CLI tab", async () => {
     render(<Settings />)
+    await waitFor(() => screen.getByRole('tab', { name: /^CLI$/ }))
+    expect(screen.queryByText(/Anthropic's Claude Code/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: /^CLI$/ }))
     await waitFor(() => {
       expect(screen.getByText(/Anthropic's Claude Code/)).toBeInTheDocument()
     })
   })
 
-  it('MCP section is collapsed by default when configured', async () => {
-    setupApi({ mcpConfigured: true, configPath: '/path/to/config.json' })
+  it('MCP tab content is hidden until the MCP tab is selected', async () => {
     render(<Settings />)
-    await waitFor(() => {
-      expect(screen.getByText(/^MCP$/)).toBeInTheDocument()
-    })
+    await waitFor(() => screen.getByRole('tab', { name: /^MCP$/ }))
     expect(screen.queryByText(/Manual configuration/i)).not.toBeInTheDocument()
-  })
-
-  it('MCP section is expanded by default when NOT configured', async () => {
-    setupApi({ mcpConfigured: false })
-    render(<Settings />)
+    fireEvent.click(screen.getByRole('tab', { name: /^MCP$/ }))
     await waitFor(() => {
       expect(screen.getByText(/Manual configuration/i)).toBeInTheDocument()
     })
   })
 
-  it('clicking a section header toggles body visibility', async () => {
+  it('MCP tab includes the Custom MCP subsection', async () => {
     render(<Settings />)
-    await waitFor(() => screen.getByText(/^Defaults$/i))
-    expect(screen.queryByText(/Which model is used for which feature/i)).not.toBeInTheDocument()
-    fireEvent.click(screen.getByText(/^Defaults$/i))
-    expect(screen.getByText(/Which model is used for which feature/i)).toBeInTheDocument()
-    fireEvent.click(screen.getByText(/^Defaults$/i))
-    expect(screen.queryByText(/Which model is used for which feature/i)).not.toBeInTheDocument()
+    await waitFor(() => screen.getByRole('tab', { name: /^MCP$/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /^MCP$/ }))
+    await waitFor(() => {
+      expect(screen.getByText(/Custom MCP/i)).toBeInTheDocument()
+      expect(screen.getByText(/\+ Add custom connector/i)).toBeInTheDocument()
+    })
+  })
+
+  it('Defaults section is always visible below the tabs', async () => {
+    render(<Settings />)
+    await waitFor(() => {
+      expect(screen.getByText(/^Defaults$/i)).toBeInTheDocument()
+      expect(screen.getByText(/Which model is used for which feature/i)).toBeInTheDocument()
+    })
   })
 
   it('clicking Test on Anthropic card calls llm.testConnection', async () => {

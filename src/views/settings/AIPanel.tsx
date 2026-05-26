@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode, type Dispatch, type SetStateAction } from 'react'
-import SectionBlock from './shared/SectionBlock'
 import ProviderCard from './shared/ProviderCard'
 import IconAnthropic from '~icons/simple-icons/anthropic'
 import IconClaude from '~icons/simple-icons/claude'
@@ -338,7 +337,11 @@ function OpenAICompatibleSection(props: {
   )
 }
 
+type AITabId = 'api' | 'cli' | 'mcp'
+
 export default function AIPanel() {
+  const [activeAITab, setActiveAITab] = useState<AITabId>('api')
+
   // Providers state
   const [anthropicCfg, setAnthropicCfg] = useState<ProviderConfig>({ enabled: false })
   const [openaiCfg,    setOpenaiCfg]    = useState<ProviderConfig>({ enabled: false })
@@ -646,12 +649,32 @@ export default function AIPanel() {
     return <span className="connector-badge" style={{ background: 'var(--accent-red-soft, #fee2e2)', color: 'var(--accent-red, #991b1b)' }}>{s.message}</span>
   }
 
-  const apiCount = 4
+  const tabs: { id: AITabId; label: string }[] = [
+    { id: 'api', label: 'API / HTTPS' },
+    { id: 'cli', label: 'CLI' },
+    { id: 'mcp', label: 'MCP' },
+  ]
 
   return (
     <>
-      <SectionBlock title="API / HTTPS" count={apiCount} defaultExpanded>
-        <div className="section-block-body-desc">Git Suite calls these models directly using your API key.</div>
+      <div className="ai-tabs" role="tablist" aria-label="AI transport">
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={activeAITab === t.id}
+            className={`ai-tab${activeAITab === t.id ? ' active' : ''}`}
+            onClick={() => setActiveAITab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeAITab === 'api' && (
+        <div className="ai-tab-panel" role="tabpanel">
+          <div className="section-block-body-desc">Git Suite calls these models directly using your API key.</div>
 
         <ProviderCard
           icon={<IconAnthropic width={20} height={20} style={{ color: 'var(--text)' }} />}
@@ -734,12 +757,14 @@ export default function AIPanel() {
           testProvider={testProvider}
           renderStatus={renderStatus}
         />
-      </SectionBlock>
-
-      <SectionBlock title="CLI" count={2} defaultExpanded>
-        <div className="section-block-body-desc">
-          Git Suite spawns the CLI tool and talks to it via stdio. Uses your subscription.
         </div>
+      )}
+
+      {activeAITab === 'cli' && (
+        <div className="ai-tab-panel" role="tabpanel">
+          <div className="section-block-body-desc">
+            Git Suite spawns the CLI tool and talks to it via stdio. Uses your subscription.
+          </div>
 
         <ProviderCard
           icon={<IconClaude width={20} height={20} style={{ color: 'var(--text)' }} />}
@@ -870,16 +895,14 @@ export default function AIPanel() {
             ))}
           </div>
         )}
-      </SectionBlock>
+        </div>
+      )}
 
-      {mcpStatusLoaded && (
-        <SectionBlock
-          title="MCP"
-          count={1}
-          defaultExpanded={!mcpConfigured}
-        >
+      {activeAITab === 'mcp' && mcpStatusLoaded && (
+        <div className="ai-tab-panel" role="tabpanel">
+          <div className="ai-tab-section-label">Expose Git Suite to Claude Code</div>
           <div className="section-block-body-desc">
-            Expose Git Suite's tools to Claude Code CLI via the Model Context Protocol.
+            Let the Claude Code CLI call Git Suite's tools via the Model Context Protocol.
           </div>
 
           <div className="settings-group-row">
@@ -933,13 +956,13 @@ export default function AIPanel() {
               Test
             </button>
           </div>
-        </SectionBlock>
-      )}
 
-      <SectionBlock title="Custom MCP" count={customConnectors.length} badge="BETA" defaultExpanded={false}>
-        <div className="section-block-body-desc">
-          Third-party MCP servers Git Suite can call as tool sources.
-        </div>
+          <div className="ai-tab-section-label" style={{ marginTop: 20 }}>
+            Custom MCP <span className="transport-chip beta" style={{ marginLeft: 6 }}>BETA</span>
+          </div>
+          <div className="section-block-body-desc">
+            Third-party MCP servers Git Suite can call as tool sources.
+          </div>
 
         {customConnectors.map(c => (
           <div key={c.id} className="connector-row">
@@ -1017,9 +1040,11 @@ export default function AIPanel() {
             + Add custom connector
           </button>
         )}
-      </SectionBlock>
+        </div>
+      )}
 
-      <SectionBlock title="Defaults" defaultExpanded={false}>
+      <div className="ai-defaults">
+        <div className="ai-tab-section-label">Defaults</div>
         <div className="section-block-body-desc">
           Which model is used for which feature. Works with any transport above.
         </div>
@@ -1032,7 +1057,7 @@ export default function AIPanel() {
           googleConfigured={!!googleCfg.apiKey}
           endpoints={endpoints}
         />
-      </SectionBlock>
+      </div>
     </>
   )
 }

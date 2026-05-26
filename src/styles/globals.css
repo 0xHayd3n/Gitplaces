@@ -11861,6 +11861,60 @@ a {
   font-style: italic;
 }
 
+/* AI panel tabs (inside the AI settings page) */
+.ai-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.ai-tab {
+  flex: 1;
+  padding: 7px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--t2);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.ai-tab:hover { color: var(--t1); background: rgba(255, 255, 255, 0.04); }
+.ai-tab.active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.ai-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ai-tab-panel {
+  margin-bottom: 20px;
+}
+
+.ai-tab-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0 0 4px 0;
+  display: flex;
+  align-items: center;
+}
+
+.ai-defaults {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 /* status-dot tone variants (used by ProviderCard) */
 .status-dot.green { background: #4ade80; }
 .status-dot.amber { background: #f59e0b; }
