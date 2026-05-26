@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { useAppearance, type BackgroundMode } from '../contexts/Appearance'
 import AIPanel from './settings/AIPanel'
 import ConnectorsPanel from './settings/ConnectorsPanel'
@@ -98,8 +98,6 @@ export default function Settings() {
   const [updateChecking, setUpdateChecking] = useState(false)
   const [intervalDraft, setIntervalDraft] = useState(String(checkIntervalHours))
 
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
-  useEffect(() => () => { timers.current.forEach(clearTimeout) }, [])
 
   useEffect(() => {
     window.api.settings.get('autoUpdateEnabled').then(val => {
