@@ -288,40 +288,48 @@ a {
    when docked alongside the compact Discover top-nav. */
 .titlebar-controls {
   position: fixed;
-  top: 3px;
-  right: 6px;
+  top: 0;
+  right: 0;
   z-index: 2147483647;
   display: flex;
   align-items: center;
-  gap: 4px;
   -webkit-app-region: no-drag;
 }
 .titlebar-ctrl {
   -webkit-app-region: no-drag;
-  width: 26px;
-  height: 26px;
+  width: 36px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 7px;
-  background: #252525;
-  color: rgba(255, 255, 255, 0.5);
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #ffffff;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+/* Soft dark halo around each icon — provides contrast on any background
+   (the app is dark-only, but the halo keeps the strokes readable on the
+   lighter portions of dithered banners and gradient headers without
+   needing a backdrop behind the button cluster). */
+.titlebar-ctrl svg {
+  filter:
+    drop-shadow(0 0 3px rgba(0, 0, 0, 0.85))
+    drop-shadow(0 0 1px rgba(0, 0, 0, 1));
 }
 
-.titlebar-ctrl:hover {
-  background: #2d2d2d;
-  color: rgba(255, 255, 255, 0.9);
+/* Traffic-light hover backgrounds. Icons stay white with their halo —
+   only the background color changes on hover. */
+.titlebar-ctrl-minimize:hover {
+  background: #ffbd2e;
 }
-
+.titlebar-ctrl-maximize:hover {
+  background: #28c940;
+}
 .titlebar-ctrl-close:hover {
-  background: rgba(255, 80, 80, 0.25);
-  color: #ff6b6b;
-  border-color: rgba(255, 80, 80, 0.35);
+  background: #e81123;
 }
 
 .titlebar-wordmark {
@@ -2618,12 +2626,6 @@ a {
   background: #252525;
   border: none;
   transition: background 0.15s;
-}
-.app-navbar-url-favicon {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  flex-shrink: 0;
 }
 .app-navbar-url-text {
   font-family: 'Inter', sans-serif;

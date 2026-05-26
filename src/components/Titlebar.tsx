@@ -21,18 +21,18 @@ export default function Titlebar() {
         <div className="titlebar-controls">
           <button
             data-testid="ctrl-minimize"
-            className="titlebar-ctrl"
+            className="titlebar-ctrl titlebar-ctrl-minimize"
             onClick={minimize}
             aria-label="Minimize"
             title="Minimize"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              <line x1="1" y1="5" x2="9" y2="5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="square" />
             </svg>
           </button>
           <button
             data-testid="ctrl-maximize"
-            className="titlebar-ctrl"
+            className="titlebar-ctrl titlebar-ctrl-maximize"
             onClick={maximize}
             aria-label="Maximize"
             title="Maximize"
@@ -49,8 +49,8 @@ export default function Titlebar() {
             title="Close"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <line x1="2" y1="2" x2="8" y2="8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-              <line x1="8" y1="2" x2="2" y2="8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              <line x1="1.5" y1="1.5" x2="8.5" y2="8.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="square" />
+              <line x1="8.5" y1="1.5" x2="1.5" y2="8.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="square" />
             </svg>
           </button>
         </div>,

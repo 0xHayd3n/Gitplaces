@@ -165,17 +165,15 @@
   flex-shrink: 0;
 }
 
-/* Drag strip docked at the very top of the article layout. Provides the
-   window drag region for repo views and reserves the OS title-bar zone so
-   the tabs row below never enters it (and therefore stays clickable when
-   sticky-docked). Sticky so it remains pinned at top: 0 of the scroll
-   container as the user scrolls. Real DOM element (not ::before) because
-   Chromium's WM_NCHITTEST skips pseudo-elements for app-region.
-   Transparent by default so the banner shows through to the top edge; the
-   strip turns opaque only once the user has scrolled (.article-layout--
-   scrolled) so it visually appears alongside the docked tabs. The drag
-   region itself is active in both states — users can always drag the
-   window from the top. */
+/* Drag strip docked at the top of the article layout while the banner is
+   showing. Provides a window drag region and reserves 32px above the tabs
+   so the banner's dither bg can extend up under it (top: -32px on
+   .article-layout-dither-bg). Once the user starts scrolling, or the
+   layout opts into collapsedHeader (Files tab), the strip collapses to
+   height 0 so the tabs row docks flush at the top — the global .titlebar
+   above the article layout still provides the OS title-bar drag region.
+   Real DOM element (not ::before) because Chromium's WM_NCHITTEST skips
+   pseudo-elements for app-region. */
 .article-layout-drag-strip {
   position: sticky;
   top: 0;
@@ -184,11 +182,13 @@
   flex-shrink: 0;
   background: transparent;
   -webkit-app-region: drag;
-  transition: background 0.12s ease;
+  overflow: hidden;
+  transition: height 0.15s ease-out;
 }
 
-.article-layout--scrolled .article-layout-drag-strip {
-  background: var(--surface-1);
+.article-layout--scrolled .article-layout-drag-strip,
+.article-layout--collapsed-header .article-layout-drag-strip {
+  height: 0;
 }
 
 /* Extend the dither banner up behind the drag strip so the banner visually
@@ -204,11 +204,27 @@
   flex-shrink: 0;
   position: sticky;
   /* Docks 32px below viewport top so the row sits below the drag strip,
-     keeping it out of the title-bar zone and reliably clickable. */
+     keeping it out of the title-bar zone and reliably clickable. When
+     scrolled or in collapsed-header mode the drag strip collapses to 0,
+     so we override top to 0 (see rule below) and the tabs row docks
+     flush against the top of the article layout. */
   top: 32px;
   z-index: 10;
   background: var(--surface-1);
   border-bottom: 1px solid var(--bg3);
+  /* The tabs slot is itself a drag region so the window can be dragged
+     from the empty space in the row. Required for repo-overlay views
+     (.repo-overlay is position: fixed; inset: 0; z-index: 300, painting
+     over the global .titlebar) and for the scrolled / collapsed-header
+     state where the drag strip has zero height. Tab buttons
+     (.repo-detail-tab) carve out -webkit-app-region: no-drag so clicks
+     still reach them. */
+  -webkit-app-region: drag;
+}
+
+.article-layout--scrolled .article-layout-tabs-slot,
+.article-layout--collapsed-header .article-layout-tabs-slot {
+  top: 0;
 }
 
 .article-layout-body {

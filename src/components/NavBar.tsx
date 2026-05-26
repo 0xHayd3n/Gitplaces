@@ -1,22 +1,8 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useSearchParams } from 'react-router-dom'
 import { Folder, ChevronRight } from 'lucide-react'
 import { useRepoNav } from '../contexts/RepoNav'
 import FileIcon from './FileIcon'
-import logoSrc from '../assets/logo.png'
-import { VIEW_MODES, type ViewModeKey } from '../lib/discoverQueries'
-import { VIEW_MODE_ICONS } from './ViewModeIcons'
 import { useWhitewashAvatar } from '../hooks/useWhitewashAvatar'
-
-
-function DiscoverBreadcrumbIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" style={{ marginRight: 3, flexShrink: 0 }}>
-      <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.5" />
-      <line x1="8.8" y1="8.8" x2="12" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}
 
 const ROUTE_LABELS: Record<string, string> = {
   '/library':  'My Library',
@@ -47,7 +33,6 @@ export default function NavBar() {
   const navigate = useNavigate()
   const { state: nav } = useRepoNav()
   const path     = location.pathname
-  const [searchParams] = useSearchParams()
 
   const isRepo = path.startsWith('/repo/')
   const repoAvatarUrl = isRepo ? (location.state as any)?.repoAvatarUrl as string | null : null
@@ -63,21 +48,6 @@ export default function NavBar() {
   if (isRepo) {
     const parts = path.split('/')
     const repoName = parts[3] || ''
-
-    const fromDiscoverView = (location.state as any)?.fromDiscoverView as ViewModeKey | undefined
-    if (fromDiscoverView) {
-      const vm = VIEW_MODES.find(m => m.key === fromDiscoverView)
-      const Icon = VIEW_MODE_ICONS[fromDiscoverView]
-      segments.push({ label: 'Discover', onClick: () => navigate(`/discover?view=${fromDiscoverView}`) })
-      if (vm) {
-        segments.push({
-          label: vm.label,
-          onClick: () => navigate(`/discover?view=${fromDiscoverView}`),
-        })
-      }
-    } else {
-      segments.push({ label: 'Discover', onClick: () => navigate('/discover') })
-    }
 
     if (repoName) {
       if (nav.activeTab && nav.activeTab !== 'readme') {
@@ -132,19 +102,6 @@ export default function NavBar() {
         segments.push({ label: tabLabel })
       }
     }
-  } else if (path.startsWith('/discover')) {
-    const v = searchParams.get('view')
-    const viewMode: ViewModeKey | null = (v === 'recommended' || v === 'all') ? v : null
-
-    segments.push({ label: 'Discover', icon: <DiscoverBreadcrumbIcon />, onClick: () => navigate('/discover') })
-    if (viewMode) {
-      const vm = VIEW_MODES.find(m => m.key === viewMode)!
-      const Icon = VIEW_MODE_ICONS[viewMode]
-      segments.push({
-        label: vm.label,
-        icon: <Icon size={12} />,
-      })
-    }
   } else if (path.startsWith('/library/collection/')) {
     const collectionName = (location.state as any)?.collectionName as string | undefined
     segments.push({ label: 'Library', onClick: () => navigate('/library') })
@@ -160,6 +117,12 @@ export default function NavBar() {
     if (inFilesTab && nav.canGoBack && nav.onGoBack) { nav.onGoBack(); return }
     navigate(-1)
   }
+
+  // No meaningful breadcrumb for this route (e.g. /discover after the
+  // Discover / view-mode segments were removed) — render nothing so the
+  // dock-navbar-slot in Dock.tsx collapses and the back arrow + logo
+  // don't show with empty context.
+  if (segments.length === 0) return null
 
   return (
     <div className="app-navbar">
@@ -177,12 +140,10 @@ export default function NavBar() {
         </button>
       </div>
       <div className="app-navbar-url">
-        <img src={logoSrc} alt="" className="app-navbar-url-favicon" />
         <span className="app-navbar-url-text">
-          <span className="app-navbar-url-base">Git Suite</span>
           {segments.map((seg, i) => (
             <span key={i}>
-              <ChevronRight size={12} className="app-navbar-url-sep-icon" aria-hidden="true" />
+              {i > 0 && <ChevronRight size={12} className="app-navbar-url-sep-icon" aria-hidden="true" />}
               {seg.onClick ? (
                 <button className="app-navbar-url-segment" onClick={seg.onClick}>{seg.icon}{seg.label}</button>
               ) : (
