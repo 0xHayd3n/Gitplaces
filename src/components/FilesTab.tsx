@@ -105,7 +105,7 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
   useEffect(() => {
     // If RepoDetail prefetched the root tree via fetchRepoBundle, use it
     // directly — skip the getBranch + initial getTree REST calls.
-    if (prefetchedTree) {
+    if (prefetchedTree && retryKey === 0) {
       setRootTreeSha(prefetchedTree.sha)
       setTreeData(prev => new Map(prev).set(prefetchedTree.sha, prefetchedTree.entries as TreeEntry[]))
       setLoading(false)

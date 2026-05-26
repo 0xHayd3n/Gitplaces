@@ -7,7 +7,7 @@ import Store from 'electron-store'
 import type Database from 'better-sqlite3'
 import { getDb, closeDb } from './db'
 import { getToken, setToken, clearToken, setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner, migrateApiStore } from './store'
-import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, getLastCommitForPath, compareRefs, type CompareSummary, type LastCommitInfo } from './github'
+import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, compareRefs, type CompareSummary, type LastCommitInfo } from './github'
 import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
 import { scanFromSources } from './mcp-scanner'
 import type { McpScanResult } from '../src/types/mcp'
@@ -915,6 +915,7 @@ ipcMain.handle('github:fetchRepoBundle', async (_event, owner: string, name: str
     isStarred: bundle.isStarred,
     vulnerabilities: bundle.vulnerabilities,
     securityPolicyUrl: bundle.securityPolicyUrl,
+    rootTree: bundle.rootTree,
   }
 })
 
@@ -1112,27 +1113,6 @@ ipcMain.handle('github:getBlob', async (_event, owner: string, name: string, blo
   return result
 })
 
-ipcMain.handle('github:getLastCommitForPath', async (
-  _event,
-  repoId: string,
-  owner: string,
-  name: string,
-  ref: string,
-  path: string,
-  sha: string,  // file's blob sha, used as content-addressed cache key
-) => {
-  const db = getDb(app.getPath('userData'))
-  const cached = readLastCommitCache(db, repoId, sha, path)
-  if (cached) return cached
-  const token = getToken() ?? null
-  try {
-    const info = await getLastCommitForPath(token, owner, name, ref, path)
-    if (info) writeLastCommitCache(db, repoId, sha, path, info)
-    return info
-  } catch {
-    return null
-  }
-})
 
 ipcMain.handle('github:getLastCommitsForPaths', async (
   _event,

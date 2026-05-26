@@ -125,15 +125,7 @@ declare global {
           topFiles: { filename: string; status: string; additions: number; deletions: number }[]
           topAuthors: { login: string; avatarUrl: string; commits: number }[]
         }>
-        getLastCommitForPath: (
-          repoId: string, owner: string, name: string, ref: string, path: string, sha: string,
-        ) => Promise<{
-          message: string
-          author_login: string | null
-          author_avatar: string | null
-          committed_at: string
-          commit_sha: string
-        } | null>
+
         getLastCommitsForPaths: (
           repoId: string, owner: string, name: string, ref: string,
           pathShas: { path: string; sha: string }[],

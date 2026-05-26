@@ -65,8 +65,7 @@ contextBridge.exposeInMainWorld('api', {
     getTree:    (owner: string, name: string, treeSha: string) => ipcRenderer.invoke('github:getTree', owner, name, treeSha),
     getBlob:    (owner: string, name: string, blobSha: string) => ipcRenderer.invoke('github:getBlob', owner, name, blobSha),
     getRawFile: (owner: string, name: string, branch: string, path: string) => ipcRenderer.invoke('github:getRawFile', owner, name, branch, path),
-    getLastCommitForPath: (repoId: string, owner: string, name: string, ref: string, path: string, sha: string) =>
-      ipcRenderer.invoke('github:getLastCommitForPath', repoId, owner, name, ref, path, sha),
+
     getLastCommitsForPaths: (
       repoId: string, owner: string, name: string, ref: string,
       pathShas: { path: string; sha: string }[],

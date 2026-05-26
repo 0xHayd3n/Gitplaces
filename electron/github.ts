@@ -852,36 +852,6 @@ export interface LastCommitInfo {
   commit_sha: string
 }
 
-/**
- * Fetch the most recent commit that touched `path` on `ref`.
- * Returns null if the file has no commit history (newly added, or 404).
- */
-export async function getLastCommitForPath(
-  token: string | null,
-  owner: string,
-  name: string,
-  ref: string,
-  path: string,
-): Promise<LastCommitInfo | null> {
-  const url = `${BASE}/repos/${owner}/${name}/commits?path=${encodeURIComponent(path)}&sha=${encodeURIComponent(ref)}&per_page=1`
-  const res = await fetch(url, { headers: githubHeaders(token) })
-  if (res.status === 404) return null
-  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
-  const data = (await res.json()) as Array<{
-    sha: string
-    commit: { message: string; author: { date: string } }
-    author: { login: string; avatar_url: string } | null
-  }>
-  if (data.length === 0) return null
-  const c = data[0]
-  return {
-    message: c.commit.message.split('\n')[0],
-    author_login: c.author?.login ?? null,
-    author_avatar: c.author?.avatar_url ?? null,
-    committed_at: c.commit.author.date,
-    commit_sha: c.sha,
-  }
-}
 
 export interface CompareFile {
   path: string
