@@ -4807,12 +4807,43 @@ a {
   overflow-y: overlay;
 }
 
+.settings-title-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 4px 0;
+}
+
+.settings-back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--t2);
+  cursor: pointer;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.settings-back-btn:hover {
+  background: var(--bg2);
+  color: var(--t1);
+}
+.settings-back-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .settings-title {
   font-family: 'Inter', sans-serif;
   font-size: 18px;
   font-weight: 600;
   color: var(--t1);
-  margin: 0 0 4px 8px;
+  margin: 0;
   letter-spacing: -0.01em;
 }
 
@@ -4867,7 +4898,7 @@ a {
   flex: 1;
   min-width: 0;
   overflow-y: overlay;
-  padding: 32px 40px 100px;
+  padding: 32px 40px 48px;
 }
 
 @keyframes settings-pane-in {

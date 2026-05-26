@@ -113,7 +113,9 @@ function AppContent() {
           <ProfileOverlayPortal />
         </main>
       </div>
-      <Dock onAiClick={toggleAi} aiOpen={aiOpen} />
+      {!location.pathname.startsWith('/settings') && (
+        <Dock onAiClick={toggleAi} aiOpen={aiOpen} />
+      )}
       {aiMounted && (
         <Suspense fallback={null}>
           <AiDialogue open={aiOpen} onClose={closeAi} />

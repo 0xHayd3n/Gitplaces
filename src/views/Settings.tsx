@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAppearance, type BackgroundMode } from '../contexts/Appearance'
 import AIPanel from './settings/AIPanel'
 import ConnectorsPanel from './settings/ConnectorsPanel'
@@ -79,6 +80,7 @@ const CATEGORIES: { id: CategoryId; label: string; icon: ReactNode }[] = [
 ]
 
 export default function Settings() {
+  const navigate = useNavigate()
   const { background, setBackground, invertDarkImages, setInvertDarkImages } = useAppearance()
   const [activeCategory, setActiveCategory] = useState<CategoryId>('ai')
   const [preferredLanguage, setPreferredLanguage] = useState('en')
@@ -484,7 +486,19 @@ export default function Settings() {
   return (
     <div className="settings-view">
       <aside className="settings-sidebar">
-        <h1 className="settings-title">Settings</h1>
+        <div className="settings-title-row">
+          <button
+            type="button"
+            className="settings-back-btn"
+            onClick={() => navigate(-1)}
+            aria-label="Back"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M10 3L5 8l5 5" />
+            </svg>
+          </button>
+          <h1 className="settings-title">Settings</h1>
+        </div>
         <nav className="settings-nav" aria-label="Settings categories">
           {CATEGORIES.map(cat => (
             <button
