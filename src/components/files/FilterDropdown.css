@@ -1,0 +1,103 @@
+.filter-dd {
+  position: relative;
+  width: 100%;
+}
+
+.filter-dd__trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--t1);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  outline: none;
+  transition: background 100ms ease;
+}
+.filter-dd__trigger:hover {
+  background: rgba(255,255,255,0.06);
+}
+.filter-dd__trigger--open,
+.filter-dd__trigger:active {
+  background: rgba(255,255,255,0.10);
+}
+
+.filter-dd__icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--t3);
+}
+.filter-dd__trigger:hover .filter-dd__icon,
+.filter-dd__trigger--open .filter-dd__icon {
+  color: var(--t1);
+}
+
+.filter-dd__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-dd__chev {
+  flex-shrink: 0;
+  color: var(--t3);
+  transition: transform 120ms ease;
+}
+.filter-dd__trigger--open .filter-dd__chev {
+  transform: rotate(180deg);
+  color: var(--t1);
+}
+
+.filter-dd__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: 160px;
+  background: var(--bg2, #1a1a1e);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  padding: 4px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+}
+
+.filter-dd__option {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  color: var(--t1);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  outline: none;
+  width: 100%;
+}
+.filter-dd__option:hover {
+  background: rgba(255,255,255,0.08);
+}
+.filter-dd__option--selected {
+  background: rgba(124, 58, 237, 0.12);
+  color: var(--t1);
+}
+.filter-dd__option--selected:hover {
+  background: rgba(124, 58, 237, 0.18);
+}

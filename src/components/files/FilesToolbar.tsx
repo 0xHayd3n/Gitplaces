@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { Search, ChevronDown } from 'lucide-react'
+import { Search, Filter, Rows3, GitCompare } from 'lucide-react'
 import type { SearchMode, Density, DiffBaseRef } from '../../lib/fileTree/types'
+import FilterDropdown from './FilterDropdown'
 import './FilesToolbar.css'
 
 interface DiffBaseOption {
@@ -20,17 +21,17 @@ interface Props {
   diffBaseOptions: DiffBaseOption[]
 }
 
-const MODE_LABEL: Record<SearchMode, string> = {
-  expand: 'Expand matches',
-  collapse: 'Collapse non-matches',
-  hide: 'Hide non-matches',
-}
+const MODE_OPTIONS: { value: SearchMode; label: string }[] = [
+  { value: 'expand',   label: 'Expand matches' },
+  { value: 'collapse', label: 'Collapse non-matches' },
+  { value: 'hide',     label: 'Hide non-matches' },
+]
 
-const DENSITY_LABEL: Record<Density, string> = {
-  compact: 'Compact',
-  comfortable: 'Comfortable',
-  spacious: 'Spacious',
-}
+const DENSITY_OPTIONS: { value: Density; label: string }[] = [
+  { value: 'compact',     label: 'Compact' },
+  { value: 'comfortable', label: 'Comfortable' },
+  { value: 'spacious',    label: 'Spacious' },
+]
 
 export default function FilesToolbar(props: Props) {
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -40,6 +41,13 @@ export default function FilesToolbar(props: Props) {
     window.addEventListener('files-toolbar:focus-search', onFocus)
     return () => window.removeEventListener('files-toolbar:focus-search', onFocus)
   }, [])
+
+  // Encode the diff base as a single string for FilterDropdown's value contract.
+  const diffBaseValue = props.diffBase ? `${props.diffBase.type}:${props.diffBase.ref}` : null
+  const diffBaseDropdownOptions = props.diffBaseOptions.map(opt => ({
+    value: `${opt.ref.type}:${opt.ref.ref}`,
+    label: opt.label,
+  }))
 
   return (
     <div className="files-toolbar">
@@ -55,45 +63,32 @@ export default function FilesToolbar(props: Props) {
         />
       </div>
 
-      <label className="files-toolbar__select">
-        <span className="files-toolbar__select-label">Mode</span>
-        <select value={props.searchMode} onChange={e => props.onSearchModeChange(e.target.value as SearchMode)}>
-          {(Object.keys(MODE_LABEL) as SearchMode[]).map(m => (
-            <option key={m} value={m}>{MODE_LABEL[m]}</option>
-          ))}
-        </select>
-        <ChevronDown size={10} />
-      </label>
+      <FilterDropdown
+        icon={<Filter size={13} />}
+        value={props.searchMode}
+        options={MODE_OPTIONS}
+        onChange={v => v && props.onSearchModeChange(v)}
+      />
 
-      <label className="files-toolbar__select">
-        <span className="files-toolbar__select-label">Density</span>
-        <select value={props.density} onChange={e => props.onDensityChange(e.target.value as Density)}>
-          {(Object.keys(DENSITY_LABEL) as Density[]).map(d => (
-            <option key={d} value={d}>{DENSITY_LABEL[d]}</option>
-          ))}
-        </select>
-        <ChevronDown size={10} />
-      </label>
+      <FilterDropdown
+        icon={<Rows3 size={13} />}
+        value={props.density}
+        options={DENSITY_OPTIONS}
+        onChange={v => v && props.onDensityChange(v)}
+      />
 
-      <label className="files-toolbar__select">
-        <span className="files-toolbar__select-label">Compare</span>
-        <select
-          value={props.diffBase ? `${props.diffBase.type}:${props.diffBase.ref}` : ''}
-          onChange={e => {
-            if (!e.target.value) { props.onDiffBaseChange(null); return }
-            const [type, ...rest] = e.target.value.split(':')
-            props.onDiffBaseChange({ type: type as DiffBaseRef['type'], ref: rest.join(':') })
-          }}
-        >
-          <option value="">None</option>
-          {props.diffBaseOptions.map(opt => (
-            <option key={`${opt.ref.type}:${opt.ref.ref}`} value={`${opt.ref.type}:${opt.ref.ref}`}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown size={10} />
-      </label>
+      <FilterDropdown
+        icon={<GitCompare size={13} />}
+        value={diffBaseValue}
+        options={diffBaseDropdownOptions}
+        placeholder="Compare"
+        allowNone
+        onChange={v => {
+          if (!v) { props.onDiffBaseChange(null); return }
+          const [type, ...rest] = v.split(':')
+          props.onDiffBaseChange({ type: type as DiffBaseRef['type'], ref: rest.join(':') })
+        }}
+      />
     </div>
   )
 }
