@@ -113,19 +113,21 @@ function DiscoverRowCardItem({
           <div className="repo-card-title">{repo.name}</div>
           <span className="repo-card-author">by {repo.owner}</span>
         </div>
-        {typeConfig && pillAccent && repo.type_sub && (
-          <span
-            className="repo-card-pill"
-            style={{ '--pill-accent': pillAccent } as React.CSSProperties}
-          >
-            {typeConfig.icon && (
-              <span className="repo-card-pill-icon">
-                <typeConfig.icon size={10} fill="currentColor" />
-              </span>
-            )}
-            {typeConfig.label}
-          </span>
-        )}
+        <div className="repo-card-pill-row">
+          {typeConfig && pillAccent && repo.type_sub && (
+            <span
+              className="repo-card-pill"
+              style={{ '--pill-accent': pillAccent } as React.CSSProperties}
+            >
+              {typeConfig.icon && (
+                <span className="repo-card-pill-icon">
+                  <typeConfig.icon size={10} fill="currentColor" />
+                </span>
+              )}
+              {typeConfig.label}
+            </span>
+          )}
+        </div>
         {parsedDescription && (
           <p className="repo-card-description">{parsedDescription}</p>
         )}

@@ -2321,6 +2321,14 @@ a {
 }
 .repo-card-author:hover { color: rgba(255, 255, 255, 0.85); }
 
+/* Reserved slot for the pill — keeps description on a consistent baseline
+   whether or not the repo has a classified bucket / subtype. */
+.repo-card-pill-row {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+}
+
 .repo-card-pill {
   display: inline-flex;
   align-items: center;

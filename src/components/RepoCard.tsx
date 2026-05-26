@@ -146,21 +146,23 @@ const RepoCard = memo(function RepoCard({
             by {repo.owner}
           </button>
         </div>
-        {typeConfig && pillAccent && typeSub && (
-          <button
-            type="button"
-            className="repo-card-pill"
-            style={{ '--pill-accent': pillAccent } as React.CSSProperties}
-            onClick={e => { e.stopPropagation(); onSubtypeClick?.(typeSub) }}
-          >
-            {typeConfig.icon && (
-              <span className="repo-card-pill-icon">
-                <typeConfig.icon size={10} fill="currentColor" />
-              </span>
-            )}
-            {typeConfig.label}
-          </button>
-        )}
+        <div className="repo-card-pill-row">
+          {typeConfig && pillAccent && typeSub && (
+            <button
+              type="button"
+              className="repo-card-pill"
+              style={{ '--pill-accent': pillAccent } as React.CSSProperties}
+              onClick={e => { e.stopPropagation(); onSubtypeClick?.(typeSub) }}
+            >
+              {typeConfig.icon && (
+                <span className="repo-card-pill-icon">
+                  <typeConfig.icon size={10} fill="currentColor" />
+                </span>
+              )}
+              {typeConfig.label}
+            </button>
+          )}
+        </div>
         {parsedDescription && (
           <p className="repo-card-description">{parsedDescription}</p>
         )}
