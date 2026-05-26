@@ -104,7 +104,7 @@ function DiscoverRowCardItem({
             onClick={e => { e.stopPropagation(); onLanguageClick?.(repo.language!) }}
             title={repo.language}
           >
-            <LanguageIcon lang={repo.language} size={18} boxed />
+            <LanguageIcon lang={repo.language} size={26} boxed />
           </span>
         )}
       </div>
