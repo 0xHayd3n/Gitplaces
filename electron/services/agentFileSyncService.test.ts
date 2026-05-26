@@ -415,6 +415,57 @@ describe('cleanupAgentFiles', () => {
     expect(r.subagent).toMatchObject({ status: 'deleted' })
     expect(r.slashCommand).toMatchObject({ status: 'deleted' })
   })
+
+  it('removes ~/.opencode/agents/<handle>.md when cleanSubagent is true', async () => {
+    // An opencode-provider agent's subagent file lives at the opencode path.
+    // Cleanup must remove it on agent delete — otherwise the file is orphaned.
+    await fs.mkdir(path.join(opencodeTmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(opencodeSubagentPath('foo'), 'previously synced opencode agent')
+    const r = await cleanupAgentFiles('foo', { cleanSubagent: true, cleanSlashCommand: false })
+    expect(r.subagent).toMatchObject({ status: 'deleted' })
+    expect(await fileExists(opencodeSubagentPath('foo'))).toBe(false)
+  })
+
+  it('sweeps BOTH .claude and .opencode subagent paths when cleanSubagent is true', async () => {
+    // If an agent flipped provider mid-life, both paths may exist. A delete should
+    // sweep both regardless of the agent's current provider.
+    await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
+    await fs.mkdir(path.join(opencodeTmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(subagentPath('foo'), 'claude')
+    await fs.writeFile(opencodeSubagentPath('foo'), 'opencode')
+    await cleanupAgentFiles('foo', { cleanSubagent: true, cleanSlashCommand: false })
+    expect(await fileExists(subagentPath('foo'))).toBe(false)
+    expect(await fileExists(opencodeSubagentPath('foo'))).toBe(false)
+  })
+
+  it('does NOT touch the opencode path when cleanSubagent is false', async () => {
+    await fs.mkdir(path.join(opencodeTmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(opencodeSubagentPath('foo'), 'opencode')
+    await cleanupAgentFiles('foo', { cleanSubagent: false, cleanSlashCommand: true })
+    expect(await fileExists(opencodeSubagentPath('foo'))).toBe(true)
+  })
+})
+
+// ── checkConflict — opencode branch ─────────────────────────────────
+
+describe('checkConflict — opencode branch', () => {
+  it('detects an existing opencode subagent file when modelProvider is opencode', async () => {
+    await fs.mkdir(path.join(opencodeTmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(opencodeSubagentPath('foo'), 'existing opencode agent')
+    const r = await checkConflict('foo', 'opencode')
+    expect(r.subagentExists).toBe(true)
+    expect(r.subagentPath).toBe(opencodeSubagentPath('foo'))
+  })
+
+  it('does NOT report a conflict on the claude path for an opencode-provider agent', async () => {
+    // A hand-authored claude-path file must not block enabling an opencode subagent —
+    // they target different surfaces.
+    await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
+    await fs.writeFile(subagentPath('foo'), 'hand-authored claude')
+    const r = await checkConflict('foo', 'opencode')
+    expect(r.subagentExists).toBe(false)
+    expect(r.subagentPath).toBe(opencodeSubagentPath('foo'))
+  })
 })
 
 // ── opencode subagent sync ──────────────────────────────────────────

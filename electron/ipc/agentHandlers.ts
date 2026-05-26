@@ -440,9 +440,9 @@ export function registerAgentHandlers(): void {
 
   ipcMain.handle('agents:sync:checkConflict', async (_, agentId: string) => {
     const db = getDb(app.getPath('userData'))
-    const row = db.prepare(`SELECT handle FROM agents WHERE id = ?`).get(agentId) as { handle: string } | undefined
+    const row = db.prepare(`SELECT handle, model_provider FROM agents WHERE id = ?`).get(agentId) as { handle: string; model_provider: string } | undefined
     if (!row) throw new Error(`Unknown agent id: ${agentId}`)
-    return checkConflict(row.handle)
+    return checkConflict(row.handle, row.model_provider)
   })
 
   ipcMain.handle('agents:sync:retry', async (_, agentId: string): Promise<SyncResult> => {

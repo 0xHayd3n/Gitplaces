@@ -34,13 +34,13 @@ async function fileExists(p: string): Promise<boolean> {
 
 // ── Conflict detection ──────────────────────────────────────────────
 
-export async function checkConflict(handle: string): Promise<{
+export async function checkConflict(handle: string, modelProvider?: string): Promise<{
   subagentExists: boolean
   slashCommandExists: boolean
   subagentPath: string
   slashCommandPath: string
 }> {
-  const sp = subagentPath(handle)
+  const sp = modelProvider === 'opencode' ? opencodeSubagentPath(handle) : subagentPath(handle)
   const cp = slashCommandPath(handle)
   return {
     subagentExists: await fileExists(sp),
@@ -260,9 +260,12 @@ export async function cleanupAgentFiles(
   handle: string,
   opts: { cleanSubagent: boolean; cleanSlashCommand: boolean },
 ): Promise<{ subagent: SyncOutcome; slashCommand: SyncOutcome }> {
-  const subagent: SyncOutcome = opts.cleanSubagent
-    ? await deleteSurfaceFile(subagentPath(handle))
-    : { status: 'skipped' }
+  let subagent: SyncOutcome = { status: 'skipped' }
+  if (opts.cleanSubagent) {
+    const claudeResult = await deleteSurfaceFile(subagentPath(handle))
+    const opencodeResult = await deleteSurfaceFile(opencodeSubagentPath(handle))
+    subagent = claudeResult.status === 'error' ? claudeResult : opencodeResult.status === 'error' ? opencodeResult : claudeResult
+  }
   const slashCommand: SyncOutcome = opts.cleanSlashCommand
     ? await deleteSurfaceFile(slashCommandPath(handle))
     : { status: 'skipped' }
