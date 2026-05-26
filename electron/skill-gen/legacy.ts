@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { spawn, execFile } from 'child_process'
 import { existsSync } from 'fs'
 import * as path from 'path'
@@ -713,23 +712,29 @@ export async function triggerClaudeAuth(): Promise<void> {
 export async function generateWithRawPrompt(
   prompt: string,
   readme: string,
-  options?: { model?: string; maxTokens?: number; apiKey?: string }
+  options?: { model?: string; maxTokens?: number }
 ): Promise<string> {
   const model = options?.model ?? 'claude-haiku-4-5'
   const maxTokens = options?.maxTokens ?? 3072
 
   const nodePath = await findNode()
   if (!nodePath) {
-    // Fall back to Anthropic SDK API if no Node available
-    if (!options?.apiKey) throw new Error('Node.js not found and no API key provided')
-    const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey: options.apiKey })
-    const response = await client.messages.create({
-      model, max_tokens: maxTokens,
-      messages: [{ role: 'user', content: prompt }],
-    })
-    const raw = response.content[0].type === 'text' ? response.content[0].text : ''
-    return stripHallucinatedUrls(raw, readme)
+    // No Node available — fall back to the in-process LLM service. The auth
+    // check (and any provider-specific concerns) live inside the adapter.
+    const llm = createLLMService()
+    try {
+      const result = await llm.generateText(
+        { provider: 'anthropic', model },
+        {
+          messages: [{ role: 'user', content: prompt }],
+          maxTokens,
+        },
+      )
+      return stripHallucinatedUrls(result.text, readme)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      throw new Error(`Node.js not found and LLM fallback failed: ${message}`)
+    }
   }
 
   const cliPath = findLocalCli()

@@ -44,7 +44,7 @@ export async function inferFocusInstructions(
   repoType: RepoType,
   extraction: ExtractionResult,
   readmeHead: string,
-  options: { apiKey?: string; typeBucket?: string; typeSub?: string },
+  options: { typeBucket?: string; typeSub?: string },
 ): Promise<string | null> {
   // Skip when there's no useful signal
   if (
@@ -63,7 +63,6 @@ export async function inferFocusInstructions(
       generateWithRawPrompt(prompt, '', {
         model: 'claude-haiku-4-5',
         maxTokens: 200,
-        apiKey: options.apiKey,
       }),
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error('Focus inference timed out')), TIMEOUT_MS)

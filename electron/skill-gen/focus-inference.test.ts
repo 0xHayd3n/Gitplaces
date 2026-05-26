@@ -34,7 +34,7 @@ describe('inferFocusInstructions', () => {
 
   it('returns bullet points from Haiku for a library with exports', async () => {
     mockGenerate.mockResolvedValue('- Schema validation library\n- Focus on z.object() and z.string()\n- Show parse vs safeParse patterns')
-    const result = await inferFocusInstructions('library', libraryExtraction, 'Zod is a TypeScript-first schema validation library', { apiKey: 'test-key' })
+    const result = await inferFocusInstructions('library', libraryExtraction, 'Zod is a TypeScript-first schema validation library', {})
     expect(result).toContain('Schema validation')
     expect(mockGenerate).toHaveBeenCalledWith(
       expect.stringContaining('Repo type: library'),
@@ -44,20 +44,20 @@ describe('inferFocusInstructions', () => {
   })
 
   it('returns null for generic type with no exports', async () => {
-    const result = await inferFocusInstructions('generic', genericNoExports, 'Some readme', { apiKey: 'test-key' })
+    const result = await inferFocusInstructions('generic', genericNoExports, 'Some readme', {})
     expect(result).toBeNull()
     expect(mockGenerate).not.toHaveBeenCalled()
   })
 
   it('returns null when generateWithRawPrompt throws', async () => {
     mockGenerate.mockRejectedValue(new Error('API error'))
-    const result = await inferFocusInstructions('library', libraryExtraction, 'readme', { apiKey: 'test-key' })
+    const result = await inferFocusInstructions('library', libraryExtraction, 'readme', {})
     expect(result).toBeNull()
   })
 
   it('includes export names in the prompt', async () => {
     mockGenerate.mockResolvedValue('- bullet point')
-    await inferFocusInstructions('library', libraryExtraction, 'readme', { apiKey: 'test-key' })
+    await inferFocusInstructions('library', libraryExtraction, 'readme', {})
     const prompt = mockGenerate.mock.calls[0][0]
     expect(prompt).toContain('z (function)')
     expect(prompt).toContain('ZodString (class)')
@@ -71,7 +71,7 @@ describe('inferFocusInstructions', () => {
       })),
     }
     mockGenerate.mockResolvedValue('- bullet point')
-    await inferFocusInstructions('library', manyExports, 'readme', { apiKey: 'test-key' })
+    await inferFocusInstructions('library', manyExports, 'readme', {})
     const prompt = mockGenerate.mock.calls[0][0]
     expect(prompt).toContain('fn0')
     expect(prompt).toContain('fn19')
@@ -81,7 +81,6 @@ describe('inferFocusInstructions', () => {
   it('includes Category line when typeBucket and typeSub are provided', async () => {
     mockGenerate.mockResolvedValue('- bullet point')
     await inferFocusInstructions('library', libraryExtraction, 'readme', {
-      apiKey: 'test-key',
       typeBucket: 'ai-ml',
       typeSub: 'orm',
     })
@@ -92,7 +91,6 @@ describe('inferFocusInstructions', () => {
   it('includes Category line with only typeBucket when typeSub is absent', async () => {
     mockGenerate.mockResolvedValue('- bullet point')
     await inferFocusInstructions('library', libraryExtraction, 'readme', {
-      apiKey: 'test-key',
       typeBucket: 'frameworks',
     })
     const prompt = mockGenerate.mock.calls[0][0]
@@ -102,9 +100,7 @@ describe('inferFocusInstructions', () => {
 
   it('omits Category line when neither typeBucket nor typeSub provided', async () => {
     mockGenerate.mockResolvedValue('- bullet point')
-    await inferFocusInstructions('library', libraryExtraction, 'readme', {
-      apiKey: 'test-key',
-    })
+    await inferFocusInstructions('library', libraryExtraction, 'readme', {})
     const prompt = mockGenerate.mock.calls[0][0]
     expect(prompt).not.toContain('Category:')
   })
@@ -112,7 +108,6 @@ describe('inferFocusInstructions', () => {
   it('includes Category line with only typeSub when typeBucket is absent', async () => {
     mockGenerate.mockResolvedValue('- bullet point')
     await inferFocusInstructions('library', libraryExtraction, 'readme', {
-      apiKey: 'test-key',
       typeSub: 'orm',
     })
     const prompt = mockGenerate.mock.calls[0][0]
@@ -123,7 +118,6 @@ describe('inferFocusInstructions', () => {
   it('attempts inference for generic repo with no exports when typeSub is present', async () => {
     mockGenerate.mockResolvedValue('- bullet point')
     const result = await inferFocusInstructions('generic', genericNoExports, 'readme', {
-      apiKey: 'test-key',
       typeSub: 'docker-compose',
     })
     expect(result).toBe('- bullet point')
@@ -133,7 +127,6 @@ describe('inferFocusInstructions', () => {
   it('attempts inference for generic repo with no exports when typeBucket is present', async () => {
     mockGenerate.mockResolvedValue('- bullet point')
     const result = await inferFocusInstructions('generic', genericNoExports, 'readme', {
-      apiKey: 'test-key',
       typeBucket: 'infrastructure',
     })
     expect(result).toBe('- bullet point')
@@ -141,9 +134,7 @@ describe('inferFocusInstructions', () => {
   })
 
   it('still returns null for generic repo with no exports and no subtypes', async () => {
-    const result = await inferFocusInstructions('generic', genericNoExports, 'readme', {
-      apiKey: 'test-key',
-    })
+    const result = await inferFocusInstructions('generic', genericNoExports, 'readme', {})
     expect(result).toBeNull()
     expect(mockGenerate).not.toHaveBeenCalled()
   })

@@ -21,7 +21,6 @@ export interface ComponentsInput {
   readme: string
   version: string
   defaultBranch: string
-  apiKey?: string
   typeBucket?: string
   typeSub?: string
   scannedComponents?: Array<{ name: string; props: Array<{ name: string; type: string; required: boolean; defaultValue?: string }> }>
@@ -60,14 +59,14 @@ export async function generateComponents(
   let focus: string | null = null
   try {
     focus = await inferFocusInstructions('component-library', extraction, input.readme.slice(0, 2000),
-      { apiKey: input.apiKey, typeBucket: input.typeBucket, typeSub: input.typeSub })
+      { typeBucket: input.typeBucket, typeSub: input.typeSub })
   } catch (err) {
     console.error('[components] focus inference failed, continuing:', err)
   }
 
   const prompt = buildComponentsPrompt(extraction, input.readme, repoFullName, focus, input.scannedComponents)
   const raw = await generateWithRawPrompt(prompt, input.readme, {
-    model: 'claude-haiku-4-5', maxTokens: 4096, apiKey: input.apiKey,
+    model: 'claude-haiku-4-5', maxTokens: 4096,
   })
   const { content, result } = validateComponents(raw, input.readme)
   return { content, validation: result }

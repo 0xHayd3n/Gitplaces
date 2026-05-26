@@ -171,3 +171,18 @@ describe('generateComponentsSkill', () => {
     expect(prompt).toContain('- Divider: (no props extracted)')
   })
 })
+
+describe('legacy.ts SDK boundary (Phase 3 structural assertion)', () => {
+  it('no longer imports @anthropic-ai/sdk anywhere', async () => {
+    // After Phase 3 Task 4, no Anthropic-SDK code remains in legacy.ts.
+    // All LLM calls route through electron/llm/.
+    const fs = await import('node:fs/promises')
+    const path = await import('node:path')
+    const source = await fs.readFile(
+      path.join(process.cwd(), 'electron/skill-gen/legacy.ts'),
+      'utf-8',
+    )
+    expect(source).not.toContain('new Anthropic(')
+    expect(source).not.toContain('@anthropic-ai/sdk')
+  })
+})

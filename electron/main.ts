@@ -1450,7 +1450,6 @@ ipcMain.handle('skill:generate', async (event, owner: string, name: string, opti
         readme: readmeContent,
         version,
         defaultBranch: repo.default_branch ?? 'main',
-        apiKey: apiKey ?? undefined,
         typeBucket: repo.type_bucket ?? undefined,
         typeSub: repo.type_sub ?? undefined,
         scannedComponents: skillInput.scannedComponents,
