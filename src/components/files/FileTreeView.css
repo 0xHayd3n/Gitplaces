@@ -1,0 +1,29 @@
+.file-tree-view {
+  position: relative;
+  overflow: auto;
+  height: 100%;
+  width: 100%;
+  outline: none;
+}
+.file-tree-view__list {
+  position: relative;
+  width: 100%;
+}
+.file-tree-view__item { }
+
+.file-tree-view__sticky-overlay {
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+.file-tree-view__sticky-row {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  pointer-events: auto;
+}
