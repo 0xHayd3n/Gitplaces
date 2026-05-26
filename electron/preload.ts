@@ -500,7 +500,7 @@ contextBridge.exposeInMainWorld('api', {
       starredRepos: string[]
       installedSkills: string[]
       pageContext?: string
-      agentId?: number | null
+      agentId?: string | null
       modelRef?: { provider: string; model: string; endpoint?: string }
     }) =>
       ipcRenderer.invoke('ai:sendMessage', payload) as Promise<{ text: string; html: string }>,

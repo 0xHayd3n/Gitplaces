@@ -392,7 +392,7 @@ declare global {
           starredRepos: string[]
           installedSkills: string[]
           pageContext?: string
-          agentId?: number | null
+          agentId?: string | null
           modelRef?: { provider: string; model: string; endpoint?: string }
         }) => Promise<{ text: string; html: string }>
         onStreamToken: (cb: (token: string) => void) => void

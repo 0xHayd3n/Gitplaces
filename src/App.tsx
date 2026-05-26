@@ -42,10 +42,14 @@ function AppContent() {
   const pageKey = (backgroundLocation ?? location).pathname.split('/')[1] || 'root'
   const { background } = useAppearance()
   const [aiOpen, setAiOpen] = useState(false)
+  const [aiMounted, setAiMounted] = useState(false)
   const { nodeRef: tooltipRef } = useTooltip()
   const isDiscoverPage = location.pathname === '/' || location.pathname.startsWith('/discover') || location.pathname.startsWith('/library') || location.pathname.startsWith('/repo/') || location.pathname.startsWith('/create')
 
-  const toggleAi = useCallback(() => setAiOpen(o => !o), [])
+  const toggleAi = useCallback(() => {
+    setAiMounted(true)
+    setAiOpen(o => !o)
+  }, [])
   const closeAi = useCallback(() => setAiOpen(false), [])
 
   useEffect(() => {
@@ -110,7 +114,7 @@ function AppContent() {
         </main>
       </div>
       <Dock onAiClick={toggleAi} aiOpen={aiOpen} />
-      {aiOpen && (
+      {aiMounted && (
         <Suspense fallback={null}>
           <AiDialogue open={aiOpen} onClose={closeAi} />
         </Suspense>

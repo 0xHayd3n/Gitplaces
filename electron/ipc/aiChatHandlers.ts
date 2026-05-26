@@ -52,7 +52,7 @@ export function registerAiChatHandlers(): void {
     starredRepos: string[]
     installedSkills: string[]
     pageContext?: string
-    agentId?: number | null
+    agentId?: string | null
     modelRef?: ModelRef
   }) => {
     const win = BrowserWindow.fromWebContents(event.sender)

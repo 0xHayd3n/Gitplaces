@@ -10,7 +10,7 @@ export interface RunChatRequest {
   installedSkills: string[]
   pageContext?: string
   /** Agent id from the agents table, or null for "quick chat" mode. */
-  agentId?: number | null
+  agentId?: string | null
   /** Optional explicit model. Falls back to settings.defaults.chat or sonnet-4-6. */
   modelRef?: ModelRef
 }
