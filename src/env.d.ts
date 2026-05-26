@@ -125,7 +125,7 @@ declare global {
           topAuthors: { login: string; avatarUrl: string; commits: number }[]
         }>
         getLastCommitForPath: (
-          repoId: string, owner: string, name: string, ref: string, path: string,
+          repoId: string, owner: string, name: string, ref: string, path: string, sha: string,
         ) => Promise<{
           message: string
           author_login: string | null

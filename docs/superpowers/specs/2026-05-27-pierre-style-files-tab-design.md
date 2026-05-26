@@ -30,7 +30,7 @@ Rewrite the Files tab of `RepoDetail` to match the feature set and feel of Pierr
 - Per-repo SVG cache
 
 ### New IPCs (added in main process)
-- `window.api.github.getLastCommitForPath(repoId, owner, name, ref, path)` → `{ message, author_login, author_avatar, committed_at, commit_sha } | null`. Calls `GET /repos/{owner}/{repo}/commits?path=X&per_page=1`. Uses existing GitHub client with ETag caching.
+- `window.api.github.getLastCommitForPath(repoId, owner, name, ref, path, sha)` → `{ message, author_login, author_avatar, committed_at, commit_sha } | null`. Calls `GET /repos/{owner}/{repo}/commits?path=X&per_page=1`. `sha` is the file's blob sha (from `VisibleRow.sha`), used as the content-addressed cache key in the `last_commits` table.
 - `window.api.github.compareRefs(owner, name, base, head)` → `{ files: Array<{ path: string, status: 'added' | 'modified' | 'removed' | 'renamed' }> }`. Calls `GET /repos/{owner}/{repo}/compare/{base}...{head}`.
 - Both IPCs read from / write to the new SQLite tables (`last_commits`, `compare_diffs`) so cache is shared across renderer reloads.
 

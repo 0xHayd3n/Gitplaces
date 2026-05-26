@@ -95,21 +95,3 @@ export function writeCompareCache(
   `).run(repoId, baseRef, headRef, JSON.stringify(files), Date.now())
 }
 
-/**
- * Look up the tree sha currently associated with a path on a ref. Used by
- * last-commit cache to make entries content-addressed: if the file's tree sha
- * has changed (i.e. the file changed), the cache misses and we refetch.
- * Returns null if we don't have that path's tree sha cached.
- */
-export function getCachedTreeShaForPath(
-  db: Database.Database,
-  repoId: string,
-  path: string,
-): string | null {
-  const row = db.prepare(`
-    SELECT tree_sha FROM last_commits
-    WHERE repo_id = ? AND path = ?
-    ORDER BY rowid DESC LIMIT 1
-  `).get(repoId, path) as { tree_sha: string } | undefined
-  return row?.tree_sha ?? null
-}

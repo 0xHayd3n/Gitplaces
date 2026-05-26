@@ -908,16 +908,15 @@ ipcMain.handle('github:getLastCommitForPath', async (
   name: string,
   ref: string,
   path: string,
+  sha: string,  // file's blob sha, used as content-addressed cache key
 ) => {
-  const treeSha = getCachedTreeShaForPath(repoId, ref, path)  // see step 3
-  if (treeSha) {
-    const cached = readLastCommitCache(repoId, treeSha, path)
-    if (cached) return cached
-  }
-  const token = readToken()
+  const db = getDb(app.getPath('userData'))
+  const cached = readLastCommitCache(db, repoId, sha, path)
+  if (cached) return cached
+  const token = getToken() ?? null
   try {
     const info = await getLastCommitForPath(token, owner, name, ref, path)
-    if (info && treeSha) writeLastCommitCache(repoId, treeSha, path, info)
+    if (info) writeLastCommitCache(db, repoId, sha, path, info)
     return info
   } catch {
     return null
@@ -1002,27 +1001,9 @@ export function writeCompareCache(
   `).run(repoId, baseRef, headRef, JSON.stringify(files), Date.now())
 }
 
-/**
- * Look up the tree sha currently associated with a path on a ref. Used by
- * last-commit cache to make entries content-addressed: if the file's tree sha
- * has changed (i.e. the file changed), the cache misses and we refetch.
- * Returns null if we don't have that path's tree sha cached.
- */
-export function getCachedTreeShaForPath(repoId: string, ref: string, path: string): string | null {
-  // Cheap approximation: trust the most recently fetched last_commits row for
-  // this path. We only invalidate when the file's blob sha changes — which we
-  // can't directly observe without a fresh tree fetch. Acceptable: cache hits
-  // dominate the normal case where the file hasn't changed.
-  const row = db.prepare(`
-    SELECT tree_sha FROM last_commits
-    WHERE repo_id = ? AND path = ?
-    ORDER BY rowid DESC LIMIT 1
-  `).get(repoId, path) as { tree_sha: string } | undefined
-  return row?.tree_sha ?? null
-}
 ```
 
-Note: import `db` at the top of `db-helpers.ts` if not already imported (check existing imports).
+Note: `readLastCommitCache` and `writeLastCommitCache` use `tree_sha` as the column name (matching the DB schema); the `sha` passed from the renderer is the file's blob sha, which we write directly into that column.
 
 - [ ] **Step 4: Wire up the imports in `main.ts`**
 
@@ -1040,7 +1021,6 @@ import {
   writeLastCommitCache,
   readCompareCache,
   writeCompareCache,
-  getCachedTreeShaForPath,
 } from './db-helpers'
 ```
 
@@ -1049,8 +1029,8 @@ import {
 Find the existing `getBlob` entry in the github section of preload (around line 66) and add immediately after:
 
 ```ts
-    getLastCommitForPath: (repoId: string, owner: string, name: string, ref: string, path: string) =>
-      ipcRenderer.invoke('github:getLastCommitForPath', repoId, owner, name, ref, path),
+    getLastCommitForPath: (repoId: string, owner: string, name: string, ref: string, path: string, sha: string) =>
+      ipcRenderer.invoke('github:getLastCommitForPath', repoId, owner, name, ref, path, sha),
     compareRefs: (repoId: string, owner: string, name: string, base: string, head: string) =>
       ipcRenderer.invoke('github:compareRefs', repoId, owner, name, base, head),
 ```
@@ -1061,7 +1041,7 @@ Find the `window.api.github` type definition (likely in `src/types/window.d.ts` 
 
 ```ts
     getLastCommitForPath: (
-      repoId: string, owner: string, name: string, ref: string, path: string,
+      repoId: string, owner: string, name: string, ref: string, path: string, sha: string,
     ) => Promise<{
       message: string
       author_login: string | null
@@ -1134,7 +1114,7 @@ describe('useLastCommits', () => {
     ;(window.api.github.getLastCommitForPath as ReturnType<typeof vi.fn>).mockResolvedValue(info)
 
     const { result } = renderHook(() => useLastCommits({ repoId: 1, owner: 'o', name: 'n', ref: 'main' }))
-    result.current.request(['src/foo.ts'])
+    result.current.request([{ path: 'src/foo.ts', sha: 'sha1' }])
 
     await waitFor(() => {
       expect(result.current.get('src/foo.ts')).toEqual(info)
@@ -1147,9 +1127,9 @@ describe('useLastCommits', () => {
     mockFn.mockResolvedValue(info)
 
     const { result } = renderHook(() => useLastCommits({ repoId: 1, owner: 'o', name: 'n', ref: 'main' }))
-    result.current.request(['src/foo.ts'])
+    result.current.request([{ path: 'src/foo.ts', sha: 'sha1' }])
     await waitFor(() => expect(result.current.get('src/foo.ts')).toEqual(info))
-    result.current.request(['src/foo.ts'])  // request again
+    result.current.request([{ path: 'src/foo.ts', sha: 'sha1' }])  // request again
 
     expect(mockFn).toHaveBeenCalledTimes(1)
   })
@@ -1157,7 +1137,7 @@ describe('useLastCommits', () => {
   it('handles null results without erroring', async () => {
     ;(window.api.github.getLastCommitForPath as ReturnType<typeof vi.fn>).mockResolvedValue(null)
     const { result } = renderHook(() => useLastCommits({ repoId: 1, owner: 'o', name: 'n', ref: 'main' }))
-    result.current.request(['src/foo.ts'])
+    result.current.request([{ path: 'src/foo.ts', sha: 'sha1' }])
     await waitFor(() => {
       // null result is stored as a sentinel (not undefined) so we know we already tried.
       expect(result.current.get('src/foo.ts')).toBeNull()
@@ -1188,9 +1168,14 @@ interface UseLastCommitsInput {
   ref: string
 }
 
+interface PathSha {
+  path: string
+  sha: string
+}
+
 interface UseLastCommitsResult {
   get(path: string): LastCommitInfo | null | undefined  // undefined = unknown, null = no history, info = ok
-  request(paths: string[]): void
+  request(rows: PathSha[]): void
 }
 
 const MAX_PARALLEL = 6
@@ -1198,7 +1183,7 @@ const MAX_PARALLEL = 6
 export function useLastCommits(input: UseLastCommitsInput): UseLastCommitsResult {
   const [cache, setCache] = useState<Map<string, LastCommitInfo | null>>(new Map())
   const inFlight = useRef<Set<string>>(new Set())
-  const queue = useRef<string[]>([])
+  const queue = useRef<PathSha[]>([])
   const activeCount = useRef(0)
 
   // Reset when repo/ref changes.
@@ -1212,10 +1197,10 @@ export function useLastCommits(input: UseLastCommitsInput): UseLastCommitsResult
   const pump = useCallback(() => {
     if (!input.repoId) return
     while (activeCount.current < MAX_PARALLEL && queue.current.length > 0) {
-      const path = queue.current.shift()!
+      const { path, sha } = queue.current.shift()!
       activeCount.current++
       window.api.github
-        .getLastCommitForPath(input.repoId, input.owner, input.name, input.ref, path)
+        .getLastCommitForPath(input.repoId, input.owner, input.name, input.ref, path, sha)
         .then(info => {
           setCache(prev => {
             const next = new Map(prev)
@@ -1234,12 +1219,12 @@ export function useLastCommits(input: UseLastCommitsInput): UseLastCommitsResult
     }
   }, [input.repoId, input.owner, input.name, input.ref])
 
-  const request = useCallback((paths: string[]) => {
-    for (const path of paths) {
+  const request = useCallback((rows: PathSha[]) => {
+    for (const { path, sha } of rows) {
       if (cache.has(path)) continue
       if (inFlight.current.has(path)) continue
       inFlight.current.add(path)
-      queue.current.push(path)
+      queue.current.push({ path, sha })
     }
     pump()
   }, [cache, pump])
@@ -2926,8 +2911,8 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
 
   // ── Request last-commit metadata for visible blob rows ──
   useEffect(() => {
-    const paths = visibleRows.filter(r => r.type === 'blob').map(r => r.path)
-    if (paths.length > 0) lastCommits.request(paths)
+    const rows = visibleRows.filter(r => r.type === 'blob').map(r => ({ path: r.path, sha: r.sha }))
+    if (rows.length > 0) lastCommits.request(rows)
   }, [visibleRows, lastCommits])
 
   // ── Diff-base dropdown options ──

@@ -97,7 +97,7 @@ import { fetchRepoBundle, type RepoBundle } from './githubGraphql'
 import { sanitiseRef } from './sanitiseRef'
 import type { CollectionRow, CollectionRepoRow } from '../src/types/repo'
 import { classifyRepoBucket } from '../src/lib/classifyRepoType'
-import { cascadeRepoId, readLastCommitCache, writeLastCommitCache, readCompareCache, writeCompareCache, getCachedTreeShaForPath } from './db-helpers'
+import { cascadeRepoId, readLastCommitCache, writeLastCommitCache, readCompareCache, writeCompareCache } from './db-helpers'
 import { LRUCache } from './lruCache'
 import { poolAll } from './concurrency'
 
@@ -1119,17 +1119,15 @@ ipcMain.handle('github:getLastCommitForPath', async (
   name: string,
   ref: string,
   path: string,
+  sha: string,  // file's blob sha, used as content-addressed cache key
 ) => {
   const db = getDb(app.getPath('userData'))
-  const treeSha = getCachedTreeShaForPath(db, repoId, path)
-  if (treeSha) {
-    const cached = readLastCommitCache(db, repoId, treeSha, path)
-    if (cached) return cached
-  }
+  const cached = readLastCommitCache(db, repoId, sha, path)
+  if (cached) return cached
   const token = getToken() ?? null
   try {
     const info = await getLastCommitForPath(token, owner, name, ref, path)
-    if (info && treeSha) writeLastCommitCache(db, repoId, treeSha, path, info)
+    if (info) writeLastCommitCache(db, repoId, sha, path, info)
     return info
   } catch {
     return null
