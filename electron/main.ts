@@ -45,6 +45,7 @@ import { registerRecommendHandlers } from './ipc/recommendHandlers'
 import { registerEngagementHandlers } from './ipc/engagementHandlers'
 import { registerUpdateHandlers } from './ipc/updateHandlers'
 import { registerLLMHandlers } from './ipc/llmHandlers'
+import { shutdownMcpClient } from './llm/mcpClient'
 import { startUpdateService, checkIsFork, applySkillRegen } from './services/updateService'
 import { runAnatomyBackfill } from './anatomy/backfill'
 import { registerCreateHandlers, closeAllOnQuit } from './ipc/createHandlers'
@@ -2690,5 +2691,6 @@ app.on('activate', () => {
 app.on('before-quit', () => {
   closeAllOnQuit()
   mcpProcess?.kill()
+  void shutdownMcpClient()
   closeDb()
 })
