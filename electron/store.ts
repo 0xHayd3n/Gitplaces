@@ -126,6 +126,19 @@ export function setProviderConfig(provider: ProviderId, cfg: ProviderConfig): vo
   }
 }
 
+/**
+ * OpenAI has an optional `organization` field on top of the generic
+ * `apiKey` + `enabled`. This dedicated helper reads it alongside the
+ * generic provider config so the adapter gets a complete view.
+ */
+export function getOpenAIProviderConfig(): { enabled: boolean; apiKey?: string; organization?: string } {
+  const base = getProviderConfig('openai')
+  return {
+    ...base,
+    organization: apiStore.get('providers.openai.organization') as string | undefined,
+  }
+}
+
 // ── openai-compatible endpoint list ─────────────────────────────
 export function listOpenAICompatibleEndpoints(): OpenAICompatibleEndpoint[] {
   return apiStore.get('providers.openai-compatible.endpoints') ?? []

@@ -29,6 +29,7 @@ import {
   upsertOpenAICompatibleEndpoint,
   removeOpenAICompatibleEndpoint,
   migrateApiStore,
+  getOpenAIProviderConfig,
 } from './store'
 
 beforeEach(() => {
@@ -158,5 +159,22 @@ describe('openai-compatible endpoints', () => {
     expect(listOpenAICompatibleEndpoints()).toEqual([
       { id: 'e2', label: 'two', baseUrl: 'http://b' },
     ])
+  })
+})
+
+describe('getOpenAIProviderConfig', () => {
+  it('returns generic providerConfig fields plus organization', () => {
+    setProviderConfig('openai', { enabled: true, apiKey: 'sk-x' })
+    mockStore.__seed('providers.openai.organization', 'org-foo')  // direct write — no setter for this field yet
+    expect(getOpenAIProviderConfig()).toEqual({
+      enabled: true,
+      apiKey: 'sk-x',
+      organization: 'org-foo',
+    })
+  })
+
+  it('returns organization=undefined when not set', () => {
+    setProviderConfig('openai', { enabled: true, apiKey: 'sk-y' })
+    expect(getOpenAIProviderConfig().organization).toBeUndefined()
   })
 })

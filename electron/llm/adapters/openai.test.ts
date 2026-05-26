@@ -19,7 +19,7 @@ vi.mock('@ai-sdk/openai', () => ({
 }))
 
 vi.mock('../../store', () => ({
-  getProviderConfig: vi.fn(() => ({ enabled: true, apiKey: 'sk-openai-test' })),
+  getOpenAIProviderConfig: vi.fn(() => ({ enabled: true, apiKey: 'sk-openai-test' })),
 }))
 
 import { OpenAIAdapter } from './openai'
@@ -63,7 +63,7 @@ describe('OpenAIAdapter.generateText', () => {
 
   it('throws LLMError kind=auth_missing when no API key is configured', async () => {
     const storeMod = await import('../../store')
-    vi.mocked(storeMod.getProviderConfig).mockReturnValueOnce({ enabled: true, apiKey: undefined })
+    vi.mocked(storeMod.getOpenAIProviderConfig).mockReturnValueOnce({ enabled: true, apiKey: undefined })
 
     const adapter = new OpenAIAdapter()
     await expect(adapter.generateText(
@@ -99,7 +99,7 @@ describe('OpenAIAdapter.generateText', () => {
 
   it('passes the optional organization header to createOpenAI when configured', async () => {
     const storeMod = await import('../../store')
-    vi.mocked(storeMod.getProviderConfig).mockReturnValueOnce({ enabled: true, apiKey: 'sk-x', organization: 'org-foo' } as any)
+    vi.mocked(storeMod.getOpenAIProviderConfig).mockReturnValueOnce({ enabled: true, apiKey: 'sk-x', organization: 'org-foo' })
     mockGenerateText.mockResolvedValue({ text: 'ok', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } })
 
     const adapter = new OpenAIAdapter()
@@ -108,5 +108,17 @@ describe('OpenAIAdapter.generateText', () => {
       { messages: [{ role: 'user', content: 'hi' }] },
     )
     expect(mockCreateOpenAI).toHaveBeenCalledWith({ apiKey: 'sk-x', organization: 'org-foo' })
+  })
+
+  it('normalizes ECONNREFUSED into LLMError kind=network', async () => {
+    const netErr: any = new Error('connect ECONNREFUSED 127.0.0.1:443')
+    netErr.code = 'ECONNREFUSED'
+    mockGenerateText.mockRejectedValue(netErr)
+
+    const adapter = new OpenAIAdapter()
+    await expect(adapter.generateText(
+      { provider: 'openai', model: 'gpt-4o' },
+      { messages: [{ role: 'user', content: 'hi' }] },
+    )).rejects.toMatchObject({ name: 'LLMError', kind: 'network' })
   })
 })

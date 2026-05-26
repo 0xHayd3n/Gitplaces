@@ -1,6 +1,6 @@
 import { generateText } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
-import { getProviderConfig } from '../../store'
+import { getOpenAIProviderConfig } from '../../store'
 import { LLMError } from '../types'
 import type {
   LLMCallOpts,
@@ -48,7 +48,7 @@ export class OpenAIAdapter {
   }
 
   private resolveCreds(): { apiKey: string; organization?: string } {
-    const cfg = getProviderConfig('openai') as { enabled: boolean; apiKey?: string; organization?: string }
+    const cfg = getOpenAIProviderConfig()
     if (!cfg.apiKey) {
       throw new LLMError('auth_missing', 'OpenAI API key is not configured. Set it in Settings → Providers.')
     }
