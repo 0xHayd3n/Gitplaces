@@ -149,13 +149,13 @@ describe('Settings — sidebar IA', () => {
 describe('Settings — AI panel', () => {
   beforeEach(() => { setupApi() })
 
-  it('renders all four AI tabs', async () => {
+  it('renders three AI tabs (no Defaults tab)', async () => {
     render(<Settings />)
     await waitFor(() => {
       expect(screen.getByRole('tab', { name: /API \/ HTTPS/i })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /^CLI$/ })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: /^MCP$/ })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: /^Defaults$/ })).toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: /^Defaults$/ })).not.toBeInTheDocument()
     })
   })
 
@@ -197,13 +197,20 @@ describe('Settings — AI panel', () => {
     })
   })
 
-  it('Defaults tab content is hidden until the Defaults tab is selected', async () => {
+  it('renders the AI section intro above the tabs', async () => {
     render(<Settings />)
-    await waitFor(() => screen.getByRole('tab', { name: /^Defaults$/ }))
-    expect(screen.queryByText(/Pick which provider and model power/i)).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('tab', { name: /^Defaults$/ }))
     await waitFor(() => {
-      expect(screen.getByText(/Pick which provider and model power/i)).toBeInTheDocument()
+      expect(screen.getByText(/Git Suite's built-in AI features/i)).toBeInTheDocument()
+    })
+  })
+
+  it('MCP tab shows the Claude Code MCP card and a Manual configuration toggle', async () => {
+    render(<Settings />)
+    await waitFor(() => screen.getByRole('tab', { name: /^MCP$/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /^MCP$/ }))
+    await waitFor(() => {
+      expect(screen.getByText(/Claude Code MCP/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Manual configuration/i })).toBeInTheDocument()
     })
   })
 

@@ -19,7 +19,6 @@ const OpenCodeIcon = () => (
 type ProviderConfig = { enabled: boolean; apiKey?: string; organization?: string }
 type OpenAICompatibleEndpoint = { id: string; label: string; baseUrl: string; apiKey?: string }
 type CustomConnector = { id: string; name: string; url: string; oauthClientId: string; oauthClientSecret: string }
-type DefaultRef = { provider: string; model: string; endpoint?: string } | undefined
 
 const KNOWN_MODELS_BY_PROVIDER: Record<'anthropic' | 'openai' | 'google', { id: string; label: string }[]> = {
   anthropic: [
@@ -65,203 +64,6 @@ const InfoIcon = ({ title }: { title: string }) => (
     </svg>
   </span>
 )
-
-function DefaultsSection(props: {
-  chatDefault:  DefaultRef
-  setChatDefault: Dispatch<SetStateAction<DefaultRef>>
-  skillDefault: DefaultRef
-  setSkillDefault: Dispatch<SetStateAction<DefaultRef>>
-  tagDefault:   DefaultRef
-  setTagDefault: Dispatch<SetStateAction<DefaultRef>>
-  anthropicConfigured: boolean
-  openaiConfigured:    boolean
-  googleConfigured:    boolean
-  endpoints: OpenAICompatibleEndpoint[]
-}) {
-  const [saveError, setSaveError] = useState<string | null>(null)
-
-  const availableProviders: { id: string; label: string }[] = []
-  if (props.anthropicConfigured)  availableProviders.push({ id: 'anthropic',         label: 'Anthropic' })
-  if (props.openaiConfigured)     availableProviders.push({ id: 'openai',            label: 'OpenAI' })
-  if (props.googleConfigured)     availableProviders.push({ id: 'google',            label: 'Google Gemini' })
-  if (props.endpoints.length > 0) availableProviders.push({ id: 'openai-compatible', label: 'Local / openai-compatible' })
-
-  const saveRef = async (
-    feature: 'chat' | 'skillGen' | 'tagExtract',
-    ref: { provider: string; model: string; endpoint?: string },
-    setter: Dispatch<SetStateAction<DefaultRef>>,
-  ) => {
-    setSaveError(null)
-    try {
-      await window.api.llm.setDefault(feature, ref)
-      setter(ref)
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  const featureRow = (
-    label: string,
-    description: string,
-    current: DefaultRef,
-    feature: 'chat' | 'skillGen' | 'tagExtract',
-    setter: Dispatch<SetStateAction<DefaultRef>>,
-  ) => {
-    const provider = current?.provider ?? ''
-    const endpoint = current?.endpoint ?? ''
-    const model    = current?.model    ?? ''
-
-    const onProviderChange = (next: string) => {
-      if (next === '') return
-      if (next === 'openai-compatible') {
-        const ep = props.endpoints[0]?.id
-        if (!ep) return
-        const carriedModel = current?.provider === 'openai-compatible' ? model : ''
-        if (carriedModel) {
-          saveRef(feature, { provider: 'openai-compatible', endpoint: ep, model: carriedModel }, setter)
-        } else {
-          // Set local state but don't save until model is typed
-          setter({ provider: 'openai-compatible', endpoint: ep, model: '' })
-        }
-      } else {
-        const known = KNOWN_MODELS_BY_PROVIDER[next as 'anthropic' | 'openai' | 'google']
-        const firstModel = known?.[0]?.id
-        if (!firstModel) return
-        saveRef(feature, { provider: next, model: firstModel }, setter)
-      }
-    }
-
-    const onEndpointChange = (next: string) => {
-      if (provider !== 'openai-compatible') return
-      if (model.trim()) {
-        saveRef(feature, { provider, endpoint: next, model }, setter)
-      } else {
-        setter({ provider, endpoint: next, model: '' })
-      }
-    }
-
-    const onModelSelectChange = (next: string) => {
-      if (!provider || provider === 'openai-compatible') return
-      saveRef(feature, { provider, model: next }, setter)
-    }
-
-    const onModelTextChange = (next: string) => {
-      if (provider !== 'openai-compatible' || !endpoint) return
-      setter({ provider, endpoint, model: next })
-    }
-
-    const onModelTextBlur = () => {
-      if (provider !== 'openai-compatible' || !endpoint) return
-      const trimmed = model.trim()
-      if (trimmed) saveRef(feature, { provider, endpoint, model: trimmed }, setter)
-    }
-
-    const knownModels = provider !== '' && provider !== 'openai-compatible'
-      ? KNOWN_MODELS_BY_PROVIDER[provider as 'anthropic' | 'openai' | 'google']
-      : undefined
-
-    return (
-      <div className="settings-group-row settings-group-row--full">
-        <div className="settings-group-row-main">
-          <div className="settings-group-row-label">{label}</div>
-          <div className="settings-group-row-sub">{description}</div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-          <select
-            className="settings-input"
-            value={provider}
-            onChange={e => onProviderChange(e.target.value)}
-            style={{ flex: '0 1 200px' }}
-          >
-            <option value="" disabled>— Select provider —</option>
-            {availableProviders.map(p => (
-              <option key={p.id} value={p.id}>{p.label}</option>
-            ))}
-          </select>
-
-          {provider === 'openai-compatible' && (
-            <>
-              <select
-                className="settings-input"
-                value={endpoint}
-                onChange={e => onEndpointChange(e.target.value)}
-                style={{ flex: '0 1 180px' }}
-              >
-                {props.endpoints.map(ep => (
-                  <option key={ep.id} value={ep.id}>{ep.label}</option>
-                ))}
-              </select>
-              <input
-                className="settings-input"
-                placeholder="model name (e.g. llama3.1:70b)"
-                value={model}
-                onChange={e => onModelTextChange(e.target.value)}
-                onBlur={onModelTextBlur}
-                style={{ flex: '1 1 200px' }}
-              />
-            </>
-          )}
-
-          {knownModels && (
-            <select
-              className="settings-input"
-              value={model}
-              onChange={e => onModelSelectChange(e.target.value)}
-              style={{ flex: '1 1 240px' }}
-            >
-              {!knownModels.find(m => m.id === model) && model && (
-                <option value={model}>{model} (custom)</option>
-              )}
-              {knownModels.map(m => (
-                <option key={m.id} value={m.id}>{m.label}</option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  const empty = availableProviders.length === 0
-
-  return (
-    <div className="settings-group">
-      <div className="settings-group-body">
-        {empty ? (
-          <div style={{ padding: '16px', fontSize: 12, color: 'var(--text2)' }}>
-            Configure at least one provider above (add an API key or a local endpoint) to set defaults.
-          </div>
-        ) : (
-          <>
-            {featureRow(
-              'Chat default',
-              'Used by the AI Chat overlay when no agent specifies a model.',
-              props.chatDefault, 'chat', props.setChatDefault,
-            )}
-            {featureRow(
-              'Skill generation default',
-              'Used when generating skills from repositories.',
-              props.skillDefault, 'skillGen', props.setSkillDefault,
-            )}
-            {featureRow(
-              'Tag extraction default',
-              'Background task: extracts search tags from queries.',
-              props.tagDefault, 'tagExtract', props.setTagDefault,
-            )}
-          </>
-        )}
-        {saveError && (
-          <div style={{ padding: '8px 16px', color: 'var(--accent-red, #991b1b)', fontSize: 12 }}>
-            Save error: {saveError}
-          </div>
-        )}
-        <div style={{ padding: '8px 16px', fontSize: 12, color: 'var(--text2)' }}>
-          Note (Phase 4): defaults are stored but not yet read by the call sites — that wiring lands in a follow-up. Today the chat, skill gen, and tag extraction features continue to use their hardcoded Claude models.
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function OpenAICompatibleSection(props: {
   endpoints: OpenAICompatibleEndpoint[]
@@ -337,7 +139,7 @@ function OpenAICompatibleSection(props: {
   )
 }
 
-type AITabId = 'api' | 'cli' | 'mcp' | 'defaults'
+type AITabId = 'api' | 'cli' | 'mcp'
 
 export default function AIPanel() {
   const [activeAITab, setActiveAITab] = useState<AITabId>('api')
@@ -490,7 +292,9 @@ export default function AIPanel() {
   const [copied, setCopied]                 = useState(false)
   const [autoConfigStatus, setAutoConfigStatus] = useState<string | null>(null)
   const [autoConfigIsError, setAutoConfigIsError] = useState(false)
-  const [testResult, setTestResult]         = useState<string | null>(null)
+  const [testResult, setTestResult]         = useState<{ ok: boolean; text: string } | null>(null)
+  const [manualConfigOpen, setManualConfigOpen] = useState(false)
+  const [configPathOpen, setConfigPathOpen]     = useState(false)
 
   const loadMcpStatus = useCallback(async () => {
     const [status, snippet] = await Promise.all([
@@ -529,9 +333,9 @@ export default function AIPanel() {
     setTestResult(null)
     const result = await window.api.mcp.testConnection()
     if (result.running) {
-      setTestResult(`Running — ${result.skillCount} active skill${result.skillCount !== 1 ? 's' : ''}`)
+      setTestResult({ ok: true, text: `Running — ${result.skillCount} active skill${result.skillCount !== 1 ? 's' : ''}` })
     } else {
-      setTestResult('Not running')
+      setTestResult({ ok: false, text: 'Not running' })
     }
     timers.current.push(setTimeout(() => setTestResult(null), 4000))
   }
@@ -602,32 +406,22 @@ export default function AIPanel() {
     })
   }
 
-  const [chatDefault,  setChatDefault]  = useState<DefaultRef>(undefined)
-  const [skillDefault, setSkillDefault] = useState<DefaultRef>(undefined)
-  const [tagDefault,   setTagDefault]   = useState<DefaultRef>(undefined)
-
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       const api = window.api.llm
-      const [a, o, g, eps, cd, sd, td] = await Promise.all([
+      const [a, o, g, eps] = await Promise.all([
         api.getProviderConfig('anthropic'),
         api.getProviderConfig('openai'),
         api.getProviderConfig('google'),
         api.listOpenAICompatibleEndpoints(),
-        api.getDefault('chat'),
-        api.getDefault('skillGen'),
-        api.getDefault('tagExtract'),
       ])
       if (cancelled) return
       setAnthropicCfg(a)
       setOpenaiCfg(o)
       setGoogleCfg(g)
       setEndpoints(eps)
-      setChatDefault(cd)
-      setSkillDefault(sd)
-      setTagDefault(td)
-    })().catch(err => console.error('[AIPanel] failed to load provider configs and defaults:', err))
+    })().catch(err => console.error('[AIPanel] failed to load provider configs:', err))
     return () => { cancelled = true }
   }, [])
 
@@ -650,14 +444,18 @@ export default function AIPanel() {
   }
 
   const tabs: { id: AITabId; label: string }[] = [
-    { id: 'api',      label: 'API / HTTPS' },
-    { id: 'cli',      label: 'CLI' },
-    { id: 'mcp',      label: 'MCP' },
-    { id: 'defaults', label: 'Defaults' },
+    { id: 'api', label: 'API / HTTPS' },
+    { id: 'cli', label: 'CLI' },
+    { id: 'mcp', label: 'MCP' },
   ]
 
   return (
     <>
+      <p className="ai-tab-desc">
+        Git Suite's built-in AI features — the chat overlay, skill generation, and tag extraction —
+        can each use a different provider and model. The transports below can be mixed and matched
+        (e.g. an API key for chat, a CLI subscription for skill generation).
+      </p>
       <div className="ai-tabs" role="tablist" aria-label="AI transport">
         {tabs.map(t => (
           <button
@@ -914,61 +712,68 @@ export default function AIPanel() {
             register third-party MCP servers as additional tool sources for Git Suite itself.
           </p>
 
-          <div className="ai-tab-section-label">Expose Git Suite to Claude Code</div>
-          <div className="section-block-body-desc">
-            Let the Claude Code CLI call Git Suite's tools.
-          </div>
-
-          <div className="settings-group-row">
-            <div className="settings-group-row-main">
-              <div className="settings-group-row-label">Status</div>
-              <div className="settings-group-row-sub">
-                <span className={`status-dot ${mcpConfigured ? 'green' : 'gray'}`} />
-                {mcpConfigured ? 'Configured' : 'Not configured'}
-              </div>
-            </div>
-            <button className="settings-btn" onClick={handleAutoConfigure}>
-              Auto-configure
-            </button>
-          </div>
-
-          {mcpConfigPath && (
-            <div className="settings-group-row settings-group-row--full">
-              <p className="settings-hint settings-mcp-path">
-                Config file: {mcpConfigPath}
-              </p>
-            </div>
-          )}
+          <ProviderCard
+            icon={<IconClaude width={20} height={20} style={{ color: 'var(--text)' }} />}
+            name="Claude Code MCP"
+            chip="MCP"
+            description="Let the Claude Code CLI call Git Suite's tools."
+            status={{
+              tone: mcpConfigured ? 'green' : 'gray',
+              text: mcpConfigured ? 'Configured' : 'Not configured',
+            }}
+            actions={<>
+              <button className="settings-btn" onClick={handleAutoConfigure}>Auto-configure</button>
+              <button className="settings-btn" onClick={handleTestConnection}>Test</button>
+              {testResult && (
+                testResult.ok
+                  ? <span className="connector-badge connected">{testResult.text}</span>
+                  : <span className="connector-badge" style={{ background: 'var(--accent-red-soft, #fee2e2)', color: 'var(--accent-red, #991b1b)' }}>{testResult.text}</span>
+              )}
+            </>}
+          />
 
           {autoConfigStatus && (
-            <div className="settings-group-row settings-group-row--full">
-              <p className={`settings-hint${autoConfigIsError ? ' error' : ' success'}`}>{autoConfigStatus}</p>
-            </div>
+            <p className={`settings-hint${autoConfigIsError ? ' error' : ' success'}`} style={{ margin: '4px 0 0' }}>
+              {autoConfigStatus}
+            </p>
           )}
 
-          <div className="settings-group-row settings-group-row--full">
-            <div className="settings-group-row-label">Manual configuration</div>
-            <p className="settings-hint" style={{ marginTop: 4 }}>
-              Add this to <code>claude_desktop_config.json</code>:
-            </p>
-            <div className="settings-mcp-snippet-row">
-              <pre className="settings-mcp-snippet">{configSnippet}</pre>
-              <button className="settings-btn settings-mcp-copy-btn" onClick={handleCopy}>
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-          </div>
-
-          <div className="settings-group-row">
-            <div className="settings-group-row-main">
-              <div className="settings-group-row-label">Test connection</div>
-              <div className="settings-group-row-sub">
-                {testResult ?? 'Verify the MCP server is reachable.'}
-              </div>
-            </div>
-            <button className="settings-btn" onClick={handleTestConnection}>
-              Test
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+            <button className="connector-advanced-toggle" onClick={() => setManualConfigOpen(v => !v)} type="button">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: manualConfigOpen ? 'rotate(180deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
+                <path d="M2 4l4 4 4-4"/>
+              </svg>
+              Manual configuration
             </button>
+            {manualConfigOpen && (
+              <div style={{ marginLeft: 18 }}>
+                <p className="settings-hint" style={{ margin: '0 0 4px' }}>
+                  Add this to <code>claude_desktop_config.json</code>:
+                </p>
+                <div className="settings-mcp-snippet-row">
+                  <pre className="settings-mcp-snippet">{configSnippet}</pre>
+                  <button className="settings-btn settings-mcp-copy-btn" onClick={handleCopy}>
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {mcpConfigPath && (
+              <>
+                <button className="connector-advanced-toggle" onClick={() => setConfigPathOpen(v => !v)} type="button">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: configPathOpen ? 'rotate(180deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
+                    <path d="M2 4l4 4 4-4"/>
+                  </svg>
+                  Config file path
+                </button>
+                {configPathOpen && (
+                  <p className="settings-hint settings-mcp-path" style={{ margin: '0 0 0 18px' }}>
+                    {mcpConfigPath}
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           <div className="ai-tab-section-label" style={{ marginTop: 20 }}>
@@ -1057,24 +862,6 @@ export default function AIPanel() {
         </div>
       )}
 
-      {activeAITab === 'defaults' && (
-        <div className="ai-tab-panel" role="tabpanel">
-          <p className="ai-tab-desc">
-            Pick which provider and model power Git Suite's built-in AI features — the chat overlay,
-            skill generation, and tag extraction. These defaults work with any transport above, so
-            you can mix and match (e.g. an API key for chat, a CLI subscription for skill gen).
-          </p>
-          <DefaultsSection
-            chatDefault={chatDefault}   setChatDefault={setChatDefault}
-            skillDefault={skillDefault} setSkillDefault={setSkillDefault}
-            tagDefault={tagDefault}     setTagDefault={setTagDefault}
-            anthropicConfigured={!!anthropicCfg.apiKey}
-            openaiConfigured={!!openaiCfg.apiKey}
-            googleConfigured={!!googleCfg.apiKey}
-            endpoints={endpoints}
-          />
-        </div>
-      )}
     </>
   )
 }
