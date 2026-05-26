@@ -3,52 +3,64 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import Settings from './Settings'
 
 function setupApi(opts: {
-  apiKey?: string | null
   mcpConfigured?: boolean
   configPath?: string | null
-  autoConfigResult?: { success: boolean; error?: string }
-  snippet?: string
-  testResult?: { running: boolean; skillCount: number }
-}) {
+  anthropicKey?: string | null
+} = {}) {
   Object.defineProperty(window, 'api', {
     value: {
       settings: {
-        getApiKey: vi.fn().mockResolvedValue(opts.apiKey ?? null),
-        setApiKey: vi.fn().mockResolvedValue(undefined),
-        getPreferredLanguage: vi.fn().mockResolvedValue('en'),
-        setPreferredLanguage: vi.fn().mockResolvedValue(undefined),
         get: vi.fn().mockResolvedValue(null),
         set: vi.fn().mockResolvedValue(undefined),
+        getPreferredLanguage: vi.fn().mockResolvedValue('en'),
+        setPreferredLanguage: vi.fn().mockResolvedValue(undefined),
       },
       skill: {
         detectClaudeCode: vi.fn().mockResolvedValue(false),
-        checkAuthStatus: vi.fn().mockResolvedValue(false),
-        onSetupProgress: vi.fn(),
+        checkAuthStatus:  vi.fn().mockResolvedValue(false),
+        onSetupProgress:  vi.fn(),
         offSetupProgress: vi.fn(),
-        onLoginProgress: vi.fn(),
+        onLoginProgress:  vi.fn(),
         offLoginProgress: vi.fn(),
+        setup:        vi.fn().mockResolvedValue(undefined),
+        loginClaude:  vi.fn().mockResolvedValue(undefined),
+        logoutClaude: vi.fn().mockResolvedValue(undefined),
+      },
+      llm: {
+        getProviderConfig: vi.fn().mockImplementation((p: string) =>
+          Promise.resolve({ enabled: p === 'anthropic' && !!opts.anthropicKey, apiKey: p === 'anthropic' ? (opts.anthropicKey ?? undefined) : undefined })
+        ),
+        setProviderConfig: vi.fn().mockResolvedValue(undefined),
+        listOpenAICompatibleEndpoints: vi.fn().mockResolvedValue([]),
+        upsertOpenAICompatibleEndpoint: vi.fn().mockResolvedValue(undefined),
+        removeOpenAICompatibleEndpoint: vi.fn().mockResolvedValue(undefined),
+        getDefault: vi.fn().mockResolvedValue(undefined),
+        setDefault: vi.fn().mockResolvedValue(undefined),
+        testConnection: vi.fn().mockResolvedValue({ ok: true, sample: 'hi' }),
       },
       mcp: {
         getStatus: vi.fn().mockResolvedValue({
           configured: opts.mcpConfigured ?? false,
           configPath: opts.configPath ?? null,
         }),
-        autoConfigure: vi.fn().mockResolvedValue(opts.autoConfigResult ?? { success: true }),
-        getConfigSnippet: vi.fn().mockResolvedValue(
-          opts.snippet ?? '{"mcpServers":{"git-suite":{}}}'
-        ),
-        testConnection: vi.fn().mockResolvedValue(
-          opts.testResult ?? { running: false, skillCount: 0 }
-        ),
+        autoConfigure: vi.fn().mockResolvedValue({ success: true }),
+        getConfigSnippet: vi.fn().mockResolvedValue('{"mcpServers":{"git-suite":{}}}'),
+        testConnection: vi.fn().mockResolvedValue({ running: false, skillCount: 0 }),
       },
-      download: {
-        getDefaultFolder: vi.fn().mockResolvedValue('/default/downloads'),
-        pickFolder: vi.fn().mockResolvedValue(null),
+      opencode: {
+        detect: vi.fn().mockResolvedValue(false),
+        checkAuthStatus: vi.fn().mockResolvedValue(false),
+        setup: vi.fn().mockResolvedValue({ ok: true }),
+        loginOpenCode: vi.fn().mockResolvedValue({ ok: true }),
+        logoutOpenCode: vi.fn().mockResolvedValue(undefined),
+        onSetupProgress: vi.fn(),
+        offSetupProgress: vi.fn(),
+        onLoginProgress: vi.fn(),
+        offLoginProgress: vi.fn(),
       },
-      tts: {
-        getVoices: vi.fn().mockResolvedValue([]),
-        synthesize: vi.fn().mockResolvedValue({ audio: new ArrayBuffer(0), wordBoundaries: [] }),
-        checkAvailable: vi.fn().mockResolvedValue(true),
+      github: {
+        disconnect: vi.fn().mockResolvedValue(undefined),
+        openLoginPopup: vi.fn().mockResolvedValue(undefined),
       },
       skillSync: {
         getStatus: vi.fn().mockResolvedValue({ enabled: false, repoOwner: undefined, failedCount: 0, lastSynced: null }),
@@ -58,6 +70,24 @@ function setupApi(opts: {
         disconnect: vi.fn(),
         retryFailed: vi.fn(),
       },
+      connectors: {
+        test: vi.fn().mockResolvedValue({ ok: true }),
+      },
+      download: {
+        getDefaultFolder: vi.fn().mockResolvedValue('/default'),
+        pickFolder: vi.fn().mockResolvedValue(null),
+      },
+      tts: {
+        getVoices: vi.fn().mockResolvedValue([]),
+        synthesize: vi.fn().mockResolvedValue({ audio: new ArrayBuffer(0), wordBoundaries: [] }),
+        checkAvailable: vi.fn().mockResolvedValue(true),
+      },
+      updates: {
+        lastChecked: vi.fn().mockResolvedValue({ timestamp: null }),
+        checkNow: vi.fn().mockResolvedValue(undefined),
+        restartService: vi.fn().mockResolvedValue(undefined),
+      },
+      openExternal: vi.fn().mockResolvedValue(undefined),
     },
     writable: true,
     configurable: true,
@@ -70,148 +100,144 @@ function setupApi(opts: {
   })
 }
 
-describe('Settings — Claude Desktop section', () => {
-  beforeEach(() => {
-    setupApi({})
+// Stub GitHubAuth + useGitHubLogin contexts — Settings imports them transitively via ConnectorsPanel.
+vi.mock('../contexts/GitHubAuth', () => ({
+  useGitHubAuth: () => ({ user: null, refresh: vi.fn() }),
+}))
+vi.mock('../hooks/useGitHubLogin', () => ({
+  useGitHubLogin: () => ({
+    status: 'idle',
+    userCode: null,
+    verificationUri: null,
+    verificationUriComplete: null,
+    error: null,
+    start: vi.fn(),
+    cancel: vi.fn(),
+    reset: vi.fn(),
+  }),
+}))
+vi.mock('../contexts/Appearance', () => ({
+  useAppearance: () => ({ background: 'none', setBackground: vi.fn(), invertDarkImages: false, setInvertDarkImages: vi.fn() }),
+}))
+
+describe('Settings — sidebar IA', () => {
+  beforeEach(() => { setupApi() })
+
+  it('renders the AI sidebar entry', async () => {
+    render(<Settings />)
+    expect(screen.getByRole('button', { name: /^AI$/i })).toBeInTheDocument()
   })
 
-  it('renders CLAUDE DESKTOP section title', async () => {
+  it('does NOT render the old "Providers" sidebar entry', () => {
     render(<Settings />)
-    await waitFor(() => {
-      expect(screen.getAllByText(/CLAUDE DESKTOP/i).length).toBeGreaterThan(0)
-    })
+    expect(screen.queryByRole('button', { name: /^Providers$/i })).not.toBeInTheDocument()
   })
 
-  it('shows Not configured status when not configured', async () => {
+  it('does NOT render the old "Claude Code & OpenCode" sidebar entry', () => {
     render(<Settings />)
-    await waitFor(() => {
-      expect(screen.getByText(/Not configured/i)).toBeInTheDocument()
-    })
+    expect(screen.queryByRole('button', { name: /Claude Code & OpenCode/i })).not.toBeInTheDocument()
   })
 
-  it('shows Configured status when configured', async () => {
-    setupApi({ mcpConfigured: true, configPath: '/path/to/config.json' })
+  it('renders AI by default (no need to click)', async () => {
     render(<Settings />)
     await waitFor(() => {
-      expect(screen.getByText(/^Configured$/i)).toBeInTheDocument()
-    })
-  })
-
-  it('shows config path when available', async () => {
-    setupApi({ configPath: '/path/to/claude_desktop_config.json' })
-    render(<Settings />)
-    await waitFor(() => {
-      expect(screen.getByText(/claude_desktop_config\.json/)).toBeInTheDocument()
-    })
-  })
-
-  it('renders Auto-configure button', async () => {
-    render(<Settings />)
-    await waitFor(() => {
-      expect(screen.getByText(/Auto-configure Claude Desktop/i)).toBeInTheDocument()
-    })
-  })
-
-  it('copies config snippet to clipboard', async () => {
-    const snippet = '{"mcpServers":{"git-suite":{}}}'
-    setupApi({ snippet })
-    render(<Settings />)
-    await waitFor(() => screen.getByRole('button', { name: /^Copy$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /^Copy$/i }))
-    await waitFor(() => {
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(snippet)
-    })
-  })
-
-  it('renders Test connection button', async () => {
-    render(<Settings />)
-    await waitFor(() => {
-      expect(screen.getByText(/Test connection/i)).toBeInTheDocument()
-    })
-  })
-
-  it('calls mcp.autoConfigure when Auto-configure clicked', async () => {
-    setupApi({ mcpConfigured: false })
-    render(<Settings />)
-    await waitFor(() => screen.getByText(/Auto-configure/i))
-    fireEvent.click(screen.getByText(/Auto-configure Claude Desktop/i))
-    await waitFor(() => {
-      expect(window.api.mcp.autoConfigure).toHaveBeenCalled()
-    })
-    await waitFor(() => {
-      expect(screen.getByText(/Configured!/i)).toBeInTheDocument()
-    })
-  })
-
-  it('shows failure message when autoConfigure fails', async () => {
-    setupApi({ autoConfigResult: { success: false, error: 'Permission denied' } })
-    render(<Settings />)
-    await waitFor(() => screen.getByText(/Auto-configure Claude Desktop/i))
-    fireEvent.click(screen.getByText(/Auto-configure Claude Desktop/i))
-    await waitFor(() => {
-      expect(screen.getByText(/Failed: Permission denied/i)).toBeInTheDocument()
-    })
-  })
-
-  it('calls mcp.testConnection when Test connection clicked', async () => {
-    setupApi({ testResult: { running: true, skillCount: 3 } })
-    render(<Settings />)
-    await waitFor(() => screen.getByText(/Test connection/i))
-    fireEvent.click(screen.getByText(/Test connection/i))
-    await waitFor(() => {
-      expect(window.api.mcp.testConnection).toHaveBeenCalled()
-    })
-    await waitFor(() => {
-      expect(screen.getByText(/Running — 3 active skills/i)).toBeInTheDocument()
+      expect(screen.getByText(/API \/ HTTPS/i)).toBeInTheDocument()
     })
   })
 })
 
-describe('Settings — Text-to-Speech section', () => {
-  beforeEach(() => {
-    setupApi({})
-    // Add tts and settings.get to the mock API
-    ;(window.api as any).tts = {
-      getVoices: vi.fn().mockResolvedValue([
-        { shortName: 'en-US-AriaNeural', label: 'Aria (Female)' },
-        { shortName: 'en-US-GuyNeural', label: 'Guy (Male)' },
-      ]),
-      synthesize: vi.fn().mockResolvedValue({ audio: new ArrayBuffer(0), wordBoundaries: [] }),
-      checkAvailable: vi.fn().mockResolvedValue(true),
-    }
-    ;(window.api as any).settings.get = vi.fn().mockResolvedValue(null)
-    ;(window.api as any).settings.set = vi.fn().mockResolvedValue(undefined)
-  })
+describe('Settings — AI panel', () => {
+  beforeEach(() => { setupApi() })
 
-  it('renders TEXT-TO-SPEECH section title', async () => {
+  it('renders all five AI section headers', async () => {
     render(<Settings />)
     await waitFor(() => {
-      expect(screen.getByText(/TEXT-TO-SPEECH/)).toBeInTheDocument()
+      expect(screen.getByText(/API \/ HTTPS/i)).toBeInTheDocument()
+      expect(screen.getByText(/^CLI$/)).toBeInTheDocument()
+      expect(screen.getByText(/^MCP$/)).toBeInTheDocument()
+      expect(screen.getByText(/Custom MCP/i)).toBeInTheDocument()
+      expect(screen.getByText(/^Defaults$/i)).toBeInTheDocument()
     })
   })
 
-  it('renders voice dropdown with curated voices', async () => {
+  it('renders the Anthropic provider card in the API section', async () => {
     render(<Settings />)
     await waitFor(() => {
-      expect(screen.getByText('Aria (Female)')).toBeInTheDocument()
-      expect(screen.getByText('Guy (Male)')).toBeInTheDocument()
+      expect(screen.getByText(/^Anthropic$/)).toBeInTheDocument()
+      expect(screen.getByPlaceholderText(/sk-ant-/)).toBeInTheDocument()
     })
   })
 
-  it('saves voice preference on change', async () => {
+  it("renders Anthropic's Claude Code card in the CLI section", async () => {
     render(<Settings />)
-    await waitFor(() => screen.getByText('Aria (Female)'))
-    const select = screen.getByDisplayValue('Aria (Female)') as HTMLSelectElement
-    fireEvent.change(select, { target: { value: 'en-US-GuyNeural' } })
     await waitFor(() => {
-      expect(window.api.settings.set).toHaveBeenCalledWith('tts_voice', 'en-US-GuyNeural')
+      expect(screen.getByText(/Anthropic's Claude Code/)).toBeInTheDocument()
     })
   })
 
-  it('renders Preview button', async () => {
+  it('MCP section is collapsed by default when configured', async () => {
+    setupApi({ mcpConfigured: true, configPath: '/path/to/config.json' })
     render(<Settings />)
     await waitFor(() => {
-      expect(screen.getByText(/Preview/)).toBeInTheDocument()
+      expect(screen.getByText(/^MCP$/)).toBeInTheDocument()
     })
+    expect(screen.queryByText(/Manual configuration/i)).not.toBeInTheDocument()
+  })
+
+  it('MCP section is expanded by default when NOT configured', async () => {
+    setupApi({ mcpConfigured: false })
+    render(<Settings />)
+    await waitFor(() => {
+      expect(screen.getByText(/Manual configuration/i)).toBeInTheDocument()
+    })
+  })
+
+  it('clicking a section header toggles body visibility', async () => {
+    render(<Settings />)
+    await waitFor(() => screen.getByText(/^Defaults$/i))
+    expect(screen.queryByText(/Which model is used for which feature/i)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText(/^Defaults$/i))
+    expect(screen.getByText(/Which model is used for which feature/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByText(/^Defaults$/i))
+    expect(screen.queryByText(/Which model is used for which feature/i)).not.toBeInTheDocument()
+  })
+
+  it('clicking Test on Anthropic card calls llm.testConnection', async () => {
+    setupApi({ anthropicKey: 'sk-ant-test' })
+    render(<Settings />)
+    await waitFor(() => screen.getByText(/^Anthropic$/))
+    const testButtons = screen.getAllByRole('button', { name: /^Test$/i })
+    fireEvent.click(testButtons[0])
+    await waitFor(() => {
+      expect(window.api.llm.testConnection).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'anthropic' })
+      )
+    })
+  })
+})
+
+describe('Settings — Connectors panel', () => {
+  beforeEach(() => { setupApi() })
+
+  it('shows the AI tab by default, so Connectors panel only appears after click', async () => {
+    render(<Settings />)
+    expect(screen.queryByText(/Connect external services Git Suite can read from/i)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Connectors$/ }))
+    await waitFor(() => {
+      expect(screen.getByText(/Connect external services Git Suite can read from/i)).toBeInTheDocument()
+    })
+  })
+
+  it('renders GitHub and Skills Backup; does NOT render Claude subscription or Custom MCP rows', async () => {
+    render(<Settings />)
+    fireEvent.click(screen.getByRole('button', { name: /^Connectors$/ }))
+    await waitFor(() => {
+      expect(screen.getByText(/^GitHub$/)).toBeInTheDocument()
+      expect(screen.getByText(/Skills Backup/i)).toBeInTheDocument()
+    })
+    // The Claude subscription row used to live here — it shouldn't anymore.
+    expect(screen.queryByText(/skills use your subscription/i)).not.toBeInTheDocument()
+    // The custom-connector add button also moved out.
+    expect(screen.queryByText(/\+ Add custom connector/i)).not.toBeInTheDocument()
   })
 })
