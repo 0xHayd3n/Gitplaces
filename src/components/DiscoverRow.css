@@ -47,10 +47,12 @@
   color: var(--t2);
 }
 
-/* ── Carousel container ── */
+/* ── Carousel container ──
+   Height must fit the new Nexus-style card: 140px image + ~130px body
+   (title + author + pill + 2-line description with paddings/gaps). */
 .discover-row-carousel {
   position: relative;
-  height: 200px;
+  height: 280px;
   overflow: hidden;
 }
 
