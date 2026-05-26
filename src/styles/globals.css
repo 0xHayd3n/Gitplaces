@@ -3124,6 +3124,15 @@ a {
   flex: 1;
   min-width: 0;
 }
+.files-tab__filters-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 6px 48px 6px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  min-height: 32px;
+}
 .files-tab__loading,
 .files-tab__error {
   display: flex;

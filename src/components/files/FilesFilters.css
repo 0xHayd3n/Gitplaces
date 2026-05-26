@@ -1,25 +1,26 @@
 .files-filters {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   flex-shrink: 0;
-  margin-right: 24px;
 }
 
-/* Restore the sidebar-era width so each dropdown has a clear hit
-   target and the value never feels cramped. */
+/* Each dropdown shrinks to its content. */
 .files-filters .filter-dd {
-  width: 150px;
+  width: auto;
 }
 .files-filters .filter-dd__trigger {
-  width: 100%;
-  padding: 6px 8px;
-  gap: 6px;
+  width: auto;
+  padding: 4px 6px;
+  gap: 4px;
   font-size: 12px;
 }
+.files-filters .filter-dd__value {
+  flex: 0 0 auto;
+}
 .files-filters .filter-dd__menu {
-  /* Anchor menu to the left edge of the trigger and let it grow by
-     content. Cap width to keep the longest tag label from blowing out. */
+  /* Anchor menu to the left edge of the trigger; cap so a long tag
+     label doesn't blow out. */
   right: auto;
   min-width: 160px;
   max-width: 260px;

@@ -9,7 +9,6 @@ import { useFileTreeKeyboard } from '../hooks/useFileTreeKeyboard'
 import FilesToolbar from './files/FilesToolbar'
 import FileTreeView from './files/FileTreeView'
 import DirectoryPane from './files/DirectoryPane'
-import FilesPathBar from './files/FilesPathBar'
 import FilesFilters from './files/FilesFilters'
 import FileContentPanel from './FileContentPanel'
 import ContextMenu from './ContextMenu'
@@ -589,33 +588,17 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
           </div>
         )}
         <div className="files-tab__content">
-          <FilesPathBar
-            path={focusedPath ?? ''}
-            onNavigate={p => {
-              if (!p) {
-                setSelected(new Set())
-                setSelectedEntry(null)
-                setBlobContent(null)
-                setBlobRawBase64(null)
-                setFocused(null)
-                setAnchor(null)
-                pushHistory('')
-                return
-              }
-              handleActivate(p)
-            }}
-            rightSlot={
-              <FilesFilters
-                searchMode={searchMode}
-                onSearchModeChange={setSearchMode}
-                density={density}
-                onDensityChange={setDensity}
-                diffBase={diffBase}
-                onDiffBaseChange={setDiffBase}
-                diffBaseOptions={diffBaseOptions}
-              />
-            }
-          />
+          <div className="files-tab__filters-bar">
+            <FilesFilters
+              searchMode={searchMode}
+              onSearchModeChange={setSearchMode}
+              density={density}
+              onDensityChange={setDensity}
+              diffBase={diffBase}
+              onDiffBaseChange={setDiffBase}
+              diffBaseOptions={diffBaseOptions}
+            />
+          </div>
           <div className="files-tab__content-inner">
             {rightPaneContent}
           </div>
