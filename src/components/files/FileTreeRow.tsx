@@ -66,13 +66,15 @@ function FileTreeRow({
 
   const nameContent = (
     <span className="file-row__namecol">
-      {isDir ? (
-        <ChevronRight
-          size={12}
-          className={'file-row__chevron' + (row.isExpanded ? ' file-row__chevron--expanded' : '')}
-        />
-      ) : (
-        <span className="file-row__chevron-spacer" />
+      {variant === 'tree' && (
+        isDir ? (
+          <ChevronRight
+            size={12}
+            className={'file-row__chevron' + (row.isExpanded ? ' file-row__chevron--expanded' : '')}
+          />
+        ) : (
+          <span className="file-row__chevron-spacer" />
+        )
       )}
       {isDir ? (
         <Folder size={14} className="file-row__icon file-row__icon--folder" />
