@@ -28,7 +28,7 @@
   padding: 6px 8px 6px 24px;
   border: 1px solid var(--border);
   border-radius: 4px;
-  background: var(--bg3);
+  background: #2a2a30;
   color: var(--t1);
   font-size: 11px;
   outline: none;
@@ -54,7 +54,7 @@
   min-width: 0;
   appearance: none;
   -webkit-appearance: none;
-  background: var(--bg3);
+  background: #2a2a30;
   border: 1px solid var(--border);
   color: var(--t1);
   font-size: 11px;
