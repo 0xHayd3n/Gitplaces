@@ -421,7 +421,8 @@ export default function AIPanel() {
   )
   const [mcpTestResult, setMcpTestResult] = useState<{ target: McpTarget; ok: boolean; text: string } | null>(null)
   const [mcpManualOpen, setMcpManualOpen] = useState<Record<McpTarget, boolean>>(emptyTargetMap(false))
-  const [mcpPathOpen, setMcpPathOpen]     = useState<Record<McpTarget, boolean>>(emptyTargetMap(false))
+  const [mcpPathShownAsTitle, setMcpPathShownAsTitle] = useState<Record<McpTarget, boolean>>(emptyTargetMap(false))
+  const [mcpPathCopied, setMcpPathCopied] = useState<Record<McpTarget, boolean>>(emptyTargetMap(false))
 
   const loadMcpStatus = useCallback(async () => {
     const results = await Promise.all(
@@ -463,6 +464,16 @@ export default function AIPanel() {
     timers.current.push(setTimeout(() => {
       setMcpCopied(prev => ({ ...prev, [target]: false }))
     }, 2000))
+  }
+
+  const handleCopyPath = async (target: McpTarget) => {
+    const path = mcpStatus[target].configPath
+    if (!path) return
+    await navigator.clipboard.writeText(path)
+    setMcpPathCopied(prev => ({ ...prev, [target]: true }))
+    timers.current.push(setTimeout(() => {
+      setMcpPathCopied(prev => ({ ...prev, [target]: false }))
+    }, 1500))
   }
 
   const handleTestConnection = async (target: McpTarget) => {
@@ -600,7 +611,8 @@ export default function AIPanel() {
     const isThisTest  = mcpTestResult?.target === target
     const isCopied    = mcpCopied[target]
     const manualOpen  = mcpManualOpen[target]
-    const pathOpen    = mcpPathOpen[target]
+    const pathShownAsTitle = mcpPathShownAsTitle[target]
+    const pathCopied  = mcpPathCopied[target]
 
     const testInline = isThisTest && mcpTestResult ? (
       <span style={{
@@ -622,34 +634,88 @@ export default function AIPanel() {
       </button>
     )
 
+    const titleNode = pathShownAsTitle && status.configPath ? (
+      <button
+        type="button"
+        autoFocus
+        onClick={() => handleCopyPath(target)}
+        onBlur={() => setMcpPathShownAsTitle(prev => ({ ...prev, [target]: false }))}
+        style={{
+          background: 'transparent', border: 'none', padding: 0,
+          color: 'var(--accent)', cursor: 'pointer',
+          font: 'inherit', wordBreak: 'break-all', textAlign: 'left',
+        }}
+        title="Click to copy"
+      >
+        {pathCopied ? 'Copied!' : status.configPath}
+      </button>
+    ) : info.name
+
+    const pathToggleIcon = (
+      <button
+        type="button"
+        // preventDefault on mousedown keeps the path button focused so its onBlur
+        // doesn't fire and race the toggle's onClick. Click elsewhere → blur fires
+        // → revert; click the icon → onClick toggles cleanly.
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setMcpPathShownAsTitle(prev => ({ ...prev, [target]: !prev[target] }))}
+        disabled={!status.configPath}
+        title={pathShownAsTitle ? 'Show name' : 'Show config file path'}
+        aria-label={pathShownAsTitle ? 'Show name' : 'Show config file path'}
+        style={{
+          background: 'transparent', border: 'none', padding: 2,
+          color: status.configPath ? 'var(--t2)' : 'var(--t3)',
+          cursor: status.configPath ? 'pointer' : 'default',
+          display: 'inline-flex', alignItems: 'center',
+          opacity: status.configPath ? 0.7 : 0.35,
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 5a1 1 0 011-1h3l1.5 1.5H13a1 1 0 011 1V12a1 1 0 01-1 1H3a1 1 0 01-1-1V5z"/>
+        </svg>
+      </button>
+    )
+
+    const iconBtnStyle: React.CSSProperties = {
+      padding: 6, lineHeight: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    }
+
     return (
       <div key={target} style={{ marginBottom: 14 }}>
         <ProviderCard
           icon={info.icon}
-          name={info.name}
+          name={titleNode}
           chip="MCP"
           description={info.description}
+          nameAccessory={pathToggleIcon}
           status={{
             tone: status.configured ? 'green' : 'gray',
             text: status.configured ? 'Configured' : 'Not configured',
           }}
           statusAccessory={testInline}
           actions={<>
-            <button className="settings-btn" onClick={() => handleAutoConfigure(target)}>Auto-configure</button>
+            <button
+              className="settings-btn"
+              style={iconBtnStyle}
+              onClick={() => handleAutoConfigure(target)}
+              title="Auto-configure"
+              aria-label="Auto-configure"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.2 3.2l2.1 2.1M10.7 10.7l2.1 2.1M3.2 12.8l2.1-2.1M10.7 5.3l2.1-2.1"/>
+              </svg>
+            </button>
             <button
               className="settings-btn settings-btn--ghost"
+              style={iconBtnStyle}
               onClick={() => setMcpManualOpen(prev => ({ ...prev, [target]: !prev[target] }))}
+              title="Manual configuration"
+              aria-label="Manual configuration"
             >
-              Manual config
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 2.5c-1.5 0-2 1-2 2.2v1.5c0 .8-.3 1.3-1 1.3.7 0 1 .5 1 1.3v1.5c0 1.2.5 2.2 2 2.2M10 2.5c1.5 0 2 1 2 2.2v1.5c0 .8.3 1.3 1 1.3-.7 0-1 .5-1 1.3v1.5c0 1.2-.5 2.2-2 2.2"/>
+              </svg>
             </button>
-            {status.configPath && (
-              <button
-                className="settings-btn settings-btn--ghost"
-                onClick={() => setMcpPathOpen(prev => ({ ...prev, [target]: !prev[target] }))}
-              >
-                File path
-              </button>
-            )}
           </>}
         />
 
@@ -671,12 +737,6 @@ export default function AIPanel() {
               </button>
             </div>
           </div>
-        )}
-
-        {pathOpen && status.configPath && (
-          <p className="settings-hint settings-mcp-path" style={{ margin: '6px 0 0' }}>
-            {status.configPath}
-          </p>
         )}
       </div>
     )

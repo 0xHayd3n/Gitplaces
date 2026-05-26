@@ -226,7 +226,7 @@ describe('Settings — AI panel', () => {
     })
   })
 
-  it('MCP tab shows all four MCP cards (Claude / OpenCode / Gemini / Codex), each with a Manual config toggle', async () => {
+  it('MCP tab shows all four MCP cards (Claude / OpenCode / Gemini / Codex), each with a Manual configuration toggle', async () => {
     render(<Settings />)
     await waitFor(() => screen.getByRole('tab', { name: /^MCP$/ }))
     fireEvent.click(screen.getByRole('tab', { name: /^MCP$/ }))
@@ -235,8 +235,8 @@ describe('Settings — AI panel', () => {
       expect(screen.getByText(/OpenCode MCP/i)).toBeInTheDocument()
       expect(screen.getByText(/Gemini CLI MCP/i)).toBeInTheDocument()
       expect(screen.getByText(/Codex CLI MCP/i)).toBeInTheDocument()
-      // One Manual-config toggle per card.
-      expect(screen.getAllByRole('button', { name: /^Manual config$/i })).toHaveLength(4)
+      // One Manual-configuration icon-toggle per card.
+      expect(screen.getAllByRole('button', { name: /^Manual configuration$/i })).toHaveLength(4)
     })
   })
 

@@ -4,7 +4,7 @@ export type StatusTone = 'green' | 'amber' | 'red' | 'gray'
 
 export type ProviderCardProps = {
   icon: ReactNode
-  name: string
+  name: ReactNode
   chip: 'API' | 'CLI' | 'MCP'
   description: string
   nameAccessory?: ReactNode
