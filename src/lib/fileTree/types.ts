@@ -40,6 +40,8 @@ export interface VisibleRow {
   setSize: number
 }
 
+// Field names match the `last_commits` SQLite columns so cache rows
+// can be destructured directly into this shape without a mapping layer.
 export interface LastCommitInfo {
   message: string
   author_login: string | null
