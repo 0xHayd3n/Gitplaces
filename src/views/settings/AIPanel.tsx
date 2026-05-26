@@ -607,35 +607,24 @@ export default function AIPanel() {
     let cancelled = false
     ;(async () => {
       const api = window.api.llm
-      const [cd, sd, td] = await Promise.all([
-        api.getDefault('chat'),
-        api.getDefault('skillGen'),
-        api.getDefault('tagExtract'),
-      ])
-      if (cancelled) return
-      setChatDefault(cd)
-      setSkillDefault(sd)
-      setTagDefault(td)
-    })().catch(err => console.error('[AIPanel] failed to load defaults:', err))
-    return () => { cancelled = true }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      const api = window.api.llm
-      const [a, o, g, eps] = await Promise.all([
+      const [a, o, g, eps, cd, sd, td] = await Promise.all([
         api.getProviderConfig('anthropic'),
         api.getProviderConfig('openai'),
         api.getProviderConfig('google'),
         api.listOpenAICompatibleEndpoints(),
+        api.getDefault('chat'),
+        api.getDefault('skillGen'),
+        api.getDefault('tagExtract'),
       ])
       if (cancelled) return
       setAnthropicCfg(a)
       setOpenaiCfg(o)
       setGoogleCfg(g)
       setEndpoints(eps)
-    })().catch(err => console.error('[AIPanel] failed to load provider configs:', err))
+      setChatDefault(cd)
+      setSkillDefault(sd)
+      setTagDefault(td)
+    })().catch(err => console.error('[AIPanel] failed to load provider configs and defaults:', err))
     return () => { cancelled = true }
   }, [])
 
