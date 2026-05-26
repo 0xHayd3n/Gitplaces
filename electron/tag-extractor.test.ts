@@ -76,6 +76,7 @@ describe('extractTags', () => {
     mockGenerateText.mockResolvedValue({ text: '["http","python"]', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } })
 
     await extractTags('fast async http for python', ['http', 'python'])
+    expect(storeMod.getDefault).toHaveBeenCalledWith('tagExtract')
     expect(mockGenerateText).toHaveBeenCalledWith(
       { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' },
       expect.any(Object),
