@@ -28,17 +28,17 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function relativeAge(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime()
-  const minutes = Math.floor(ms / 60_000)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days < 30) return `${days}d ago`
-  const months = Math.floor(days / 30)
-  if (months < 12) return `${months}mo ago`
-  return `${Math.floor(months / 12)}y ago`
+function formatDateModified(iso: string): string {
+  const d = new Date(iso)
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear()
+  let hours = d.getHours()
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  const ampm = hours >= 12 ? 'PM' : 'AM'
+  hours = hours % 12
+  if (hours === 0) hours = 12
+  return `${day}/${month}/${year} ${hours}:${minutes} ${ampm}`
 }
 
 function fileTypeLabel(path: string, isDir: boolean): string {
@@ -129,16 +129,12 @@ function FileTreeRow({
       {nameContent}
       {variant === 'listing' && (
         <>
-          <span className="file-row__message">{lastCommit?.message ?? ''}</span>
+          <span className="file-row__date">{lastCommit ? formatDateModified(lastCommit.committed_at) : ''}</span>
           <span className="file-row__type">{fileTypeLabel(row.path, isDir)}</span>
           <span className="file-row__size">{!isDir && row.size != null ? formatBytes(row.size) : ''}</span>
           <span className="file-row__author">
-            {lastCommit?.author_avatar && (
-              <img className="file-row__avatar" src={lastCommit.author_avatar} alt="" />
-            )}
             <span className="file-row__author-name">{lastCommit?.author_login ?? ''}</span>
           </span>
-          <span className="file-row__age">{lastCommit ? relativeAge(lastCommit.committed_at) : ''}</span>
         </>
       )}
     </div>

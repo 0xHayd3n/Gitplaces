@@ -40,9 +40,13 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  padding-right: 6px;
 }
-.directory-pane__h-size,
-.directory-pane__h-age {
+/* Header-only dividers between columns. Data rows don't get these. */
+.directory-pane__h-cell:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+.directory-pane__h-size {
   justify-content: flex-end;
   text-align: right;
 }

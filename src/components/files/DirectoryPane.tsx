@@ -18,32 +18,30 @@ interface Props {
   onRowContextMenu: (entry: TreeEntry, fullPath: string, e: React.MouseEvent) => void
 }
 
-type ColKey = 'name' | 'desc' | 'type' | 'size' | 'author' | 'age'
+type ColKey = 'name' | 'date' | 'type' | 'size' | 'author'
 
 interface ColWidths {
   name: number
-  desc: number
+  date: number
   type: number
   size: number
   author: number
-  age: number
 }
 
 const DEFAULT_WIDTHS: ColWidths = {
-  name: 260,
-  desc: 320,
-  type: 60,
+  name: 280,
+  date: 170,
+  type: 64,
   size: 72,
   author: 130,
-  age: 72,
 }
 
 const MIN_WIDTHS: Record<ColKey, number> = {
-  name: 100, desc: 60, type: 40, size: 48, author: 60, age: 48,
+  name: 100, date: 100, type: 40, size: 48, author: 60,
 }
 
 export default function DirectoryPane(props: Props) {
-  const [colWidths, setColWidths] = useLocalStorage<ColWidths>('files:dirColWidths', DEFAULT_WIDTHS)
+  const [colWidths, setColWidths] = useLocalStorage<ColWidths>('files:dirColWidthsV2', DEFAULT_WIDTHS)
   const dragRef = useRef<{ col: ColKey; startX: number; startWidth: number } | null>(null)
 
   const sorted = useMemo(() => {
@@ -76,7 +74,7 @@ export default function DirectoryPane(props: Props) {
   }, [])
 
   const gridTemplate =
-    `${colWidths.name}px ${colWidths.desc}px ${colWidths.type}px ${colWidths.size}px ${colWidths.author}px ${colWidths.age}px 1fr`
+    `${colWidths.name}px ${colWidths.date}px ${colWidths.type}px ${colWidths.size}px ${colWidths.author}px 1fr`
 
   const cssVars = { '--dp-grid': gridTemplate } as React.CSSProperties
 
@@ -97,11 +95,10 @@ export default function DirectoryPane(props: Props) {
     <div className="directory-pane" style={cssVars}>
       <div className="directory-pane__header">
         <span className="directory-pane__h-cell directory-pane__h-name">Name{handle('name')}</span>
-        <span className="directory-pane__h-cell directory-pane__h-desc">Description{handle('desc')}</span>
+        <span className="directory-pane__h-cell directory-pane__h-date">Date modified{handle('date')}</span>
         <span className="directory-pane__h-cell directory-pane__h-type">Type{handle('type')}</span>
         <span className="directory-pane__h-cell directory-pane__h-size">Size{handle('size')}</span>
         <span className="directory-pane__h-cell directory-pane__h-author">Author{handle('author')}</span>
-        <span className="directory-pane__h-cell directory-pane__h-age">Age{handle('age')}</span>
         <span className="directory-pane__h-cell" />
       </div>
       {sorted.map((entry, i) => {
