@@ -77,10 +77,11 @@ export default function FileContentPanel({
   const rawUrl = `https://raw.githubusercontent.com/${owner}/${name}/${branch}/${selectedPath}`
   const isSvg = filename.split('.').pop()?.toLowerCase() === 'svg'
   const isCodeFile = selectedEntry?.type === 'blob' && blobContent !== null && !isBinaryContent(blobContent) && !isImageFile(filename) && !isVideoFile(filename) && !isPdfFile(filename) && !isMarkdownFile(filename) && !blobLoading
+  const isMd = isMarkdownFile(filename)
   const lang = isCodeFile ? detectLanguage(filename) : 'text'
 
   return (
-    <div className="file-content-panel">
+    <div className={'file-content-panel' + (isMd ? ' file-content-panel--article' : '')}>
       {isCodeFile && (
         <CodeToolbar
           language={lang}
