@@ -67,7 +67,7 @@
   --chip-mcp-bg:   rgba(74, 157, 209, 0.18);
   --chip-mcp-text: #93c5fd;
   --chip-beta-bg:  rgba(255, 180, 80, 0.15);
-  --chip-beta-text:#f0c890;
+  --chip-beta-text: #f0c890;
 
   /* Semantic */
   --green:        #059669;
@@ -11797,6 +11797,7 @@ a {
   font: inherit;
 }
 .section-block-header:hover { background: rgba(255,255,255,0.025); }
+.section-block-header:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .section-block-title-row { display: flex; align-items: center; gap: 10px; }
 .section-block-title {
   font-size: 11px;
