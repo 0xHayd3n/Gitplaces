@@ -30,6 +30,8 @@ import {
   removeOpenAICompatibleEndpoint,
   migrateApiStore,
   getOpenAIProviderConfig,
+  getDefault,
+  setDefault,
 } from './store'
 
 beforeEach(() => {
@@ -176,5 +178,32 @@ describe('getOpenAIProviderConfig', () => {
   it('returns organization=undefined when not set', () => {
     setProviderConfig('openai', { enabled: true, apiKey: 'sk-y' })
     expect(getOpenAIProviderConfig().organization).toBeUndefined()
+  })
+})
+
+describe('defaults', () => {
+  it('getDefault returns undefined when no default has been set', () => {
+    expect(getDefault('chat')).toBeUndefined()
+    expect(getDefault('skillGen')).toBeUndefined()
+    expect(getDefault('tagExtract')).toBeUndefined()
+  })
+
+  it('setDefault round-trips a ModelRef for each feature key', () => {
+    setDefault('chat',        { provider: 'anthropic', model: 'claude-sonnet-4-6' })
+    setDefault('skillGen',    { provider: 'openai',    model: 'gpt-4o' })
+    setDefault('tagExtract',  { provider: 'openai-compatible', endpoint: 'ollama-local', model: 'llama3.1:70b' })
+
+    expect(getDefault('chat')).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4-6' })
+    expect(getDefault('skillGen')).toEqual({ provider: 'openai', model: 'gpt-4o' })
+    expect(getDefault('tagExtract')).toEqual({
+      provider: 'openai-compatible',
+      endpoint: 'ollama-local',
+      model: 'llama3.1:70b',
+    })
+  })
+
+  it('setDefault validates the ref by calling parseModelRef (rejects invalid)', () => {
+    expect(() => setDefault('chat', { provider: 'mystery' as any, model: 'foo' }))
+      .toThrow(/provider/i)
   })
 })

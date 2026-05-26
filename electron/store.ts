@@ -1,5 +1,6 @@
 import Store from 'electron-store'
 import type { ProviderId } from './llm/types'
+import { parseModelRef, formatModelRef } from './llm/registry'
 
 interface GitHubStoreSchema {
   'github.token'?: string
@@ -72,6 +73,10 @@ interface ApiStoreSchema {
   'providers.opencode.enabled'?: boolean
   'providers.openai-compatible.enabled'?: boolean
   'providers.openai-compatible.endpoints'?: OpenAICompatibleEndpoint[]
+
+  'defaults.chat'?:       { provider: ProviderId; model: string; endpoint?: string }
+  'defaults.skillGen'?:   { provider: ProviderId; model: string; endpoint?: string }
+  'defaults.tagExtract'?: { provider: ProviderId; model: string; endpoint?: string }
 }
 
 const apiStore = new Store<ApiStoreSchema>({ encryptionKey: 'git-suite-api-key-v1' })
@@ -137,6 +142,26 @@ export function getOpenAIProviderConfig(): { enabled: boolean; apiKey?: string; 
     ...base,
     organization: apiStore.get('providers.openai.organization') as string | undefined,
   }
+}
+
+// ── Defaults (per-feature ModelRef preferences) ─────────────────
+export type DefaultFeature = 'chat' | 'skillGen' | 'tagExtract'
+export type StoredModelRef = { provider: ProviderId; model: string; endpoint?: string }
+
+export function getDefault(feature: DefaultFeature): StoredModelRef | undefined {
+  const key = `defaults.${feature}` as keyof ApiStoreSchema
+  return apiStore.get(key) as StoredModelRef | undefined
+}
+
+export function setDefault(feature: DefaultFeature, ref: StoredModelRef): void {
+  // Validate the ref shape by round-tripping through the parser. This rejects
+  // unknown providers + malformed openai-compatible endpoints, matching the
+  // validation that the LLM service performs at call time.
+  const formatted = formatModelRef(ref)
+  parseModelRef(formatted)  // throws on invalid
+
+  const key = `defaults.${feature}` as keyof ApiStoreSchema
+  apiStore.set(key, ref as never)
 }
 
 // ── openai-compatible endpoint list ─────────────────────────────
