@@ -1,0 +1,28 @@
+.files-filters {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Inside the filters bar, the dropdown shrinks to its content
+   (the default is width: 100% for sidebar usage). */
+.files-filters .filter-dd {
+  width: auto;
+}
+.files-filters .filter-dd__trigger {
+  width: auto;
+  padding: 4px 6px;
+  gap: 4px;
+  font-size: 12px;
+}
+.files-filters .filter-dd__value {
+  flex: 0 0 auto;
+}
+.files-filters .filter-dd__menu {
+  /* Drop the right-edge stretch — anchor to the left, grow rightward
+     by content. Cap width to keep the longest tag label from blowing out. */
+  right: auto;
+  min-width: 160px;
+  max-width: 260px;
+}

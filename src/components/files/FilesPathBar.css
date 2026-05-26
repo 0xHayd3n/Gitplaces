@@ -1,16 +1,31 @@
 .files-path-bar {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 6px 12px;
+  gap: 8px;
+  padding: 6px 10px 6px 12px;
   border-bottom: 1px solid var(--border);
   font-size: 12px;
   font-family: 'Inter', sans-serif;
   color: var(--t2);
   flex-shrink: 0;
   min-height: 32px;
+}
+
+.files-path-bar__crumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
   white-space: nowrap;
+}
+
+.files-path-bar__right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .files-path-bar__row {

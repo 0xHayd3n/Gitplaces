@@ -10,6 +10,7 @@ import FilesToolbar from './files/FilesToolbar'
 import FileTreeView from './files/FileTreeView'
 import DirectoryPane from './files/DirectoryPane'
 import FilesPathBar from './files/FilesPathBar'
+import FilesFilters from './files/FilesFilters'
 import FileContentPanel from './FileContentPanel'
 import ContextMenu from './ContextMenu'
 import type { ContextMenuTarget } from './ContextMenu'
@@ -560,13 +561,6 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
             <FilesToolbar
               searchValue={searchQuery}
               onSearchChange={setSearchQuery}
-              searchMode={searchMode}
-              onSearchModeChange={setSearchMode}
-              density={density}
-              onDensityChange={setDensity}
-              diffBase={diffBase}
-              onDiffBaseChange={setDiffBase}
-              diffBaseOptions={diffBaseOptions}
             />
             <FileTreeView
               rows={visibleRows}
@@ -610,6 +604,17 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
               }
               handleActivate(p)
             }}
+            rightSlot={
+              <FilesFilters
+                searchMode={searchMode}
+                onSearchModeChange={setSearchMode}
+                density={density}
+                onDensityChange={setDensity}
+                diffBase={diffBase}
+                onDiffBaseChange={setDiffBase}
+                diffBaseOptions={diffBaseOptions}
+              />
+            }
           />
           <div className="files-tab__content-inner">
             {rightPaneContent}
