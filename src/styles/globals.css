@@ -2306,6 +2306,133 @@ a {
   background: rgba(255,255,255,0.3);
 }
 
+/* ── New card design (Nexus-style) ─────────────────────────────── */
+.repo-card-image {
+  position: relative;
+  height: 140px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.repo-card-lang-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  z-index: 2;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.repo-card-lang-overlay:hover {
+  background: rgba(0, 0, 0, 0.85);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.repo-card-body {
+  padding: 12px 14px 14px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  transition: background 0.2s;
+}
+.repo-card:hover .repo-card-body { background: rgba(0, 0, 0, 0.88); }
+
+.repo-card-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.repo-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.repo-card-author {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s;
+}
+.repo-card-author:hover { color: rgba(255, 255, 255, 0.85); }
+
+.repo-card-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.9);
+  background: color-mix(in srgb, var(--pill-accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pill-accent) 30%, transparent);
+  width: fit-content;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: inherit;
+  --pill-accent: rgba(255, 255, 255, 0.4);
+}
+.repo-card-pill:hover {
+  background: color-mix(in srgb, var(--pill-accent) 25%, transparent);
+  border-color: color-mix(in srgb, var(--pill-accent) 50%, transparent);
+}
+
+.repo-card-pill-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--pill-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+.repo-card-pill-icon svg { width: 10px; height: 10px; }
+
+.repo-card-description {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  margin: 0;
+}
+
+/* Skeleton variant for the new image area (used by DiscoverGrid) */
+.repo-card-skeleton-image { height: 140px; background: var(--bg3); }
+
 /* Topics row in RepoDetail */
 .repo-detail-topics {
   display: flex;
