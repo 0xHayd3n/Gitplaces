@@ -3108,10 +3108,21 @@ a {
   color: var(--t1);
 }
 .files-tab__content {
+  display: flex;
+  flex-direction: column;
   flex: 1;
-  overflow-y: overlay;
   min-width: 0;
   overflow: hidden;
+}
+.files-tab__content-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+.files-tab__content-inner > * {
+  flex: 1;
+  min-width: 0;
 }
 .files-tab__loading,
 .files-tab__error {

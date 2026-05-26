@@ -9,6 +9,7 @@ import { useFileTreeKeyboard } from '../hooks/useFileTreeKeyboard'
 import FilesToolbar from './files/FilesToolbar'
 import FileTreeView from './files/FileTreeView'
 import DirectoryPane from './files/DirectoryPane'
+import FilesPathBar from './files/FilesPathBar'
 import FileContentPanel from './FileContentPanel'
 import ContextMenu from './ContextMenu'
 import type { ContextMenuTarget } from './ContextMenu'
@@ -594,7 +595,25 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
           </div>
         )}
         <div className="files-tab__content">
-          {rightPaneContent}
+          <FilesPathBar
+            path={focusedPath ?? ''}
+            onNavigate={p => {
+              if (!p) {
+                setSelected(new Set())
+                setSelectedEntry(null)
+                setBlobContent(null)
+                setBlobRawBase64(null)
+                setFocused(null)
+                setAnchor(null)
+                pushHistory('')
+                return
+              }
+              handleActivate(p)
+            }}
+          />
+          <div className="files-tab__content-inner">
+            {rightPaneContent}
+          </div>
         </div>
       </div>
       {selected.size > 1 && (
