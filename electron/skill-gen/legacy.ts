@@ -714,7 +714,21 @@ export async function generateWithRawPrompt(
   readme: string,
   options?: { model?: string; maxTokens?: number }
 ): Promise<string> {
-  const model = options?.model ?? 'claude-haiku-4-5'
+  // Skill generation uses Claude Code CLI when Node is available (faster, no API
+  // cost on Max plans). When a non-Anthropic skillGen default is configured,
+  // the CLI path will fail — users must either remove the default or accept that
+  // skill generation requires the in-process LLM fallback (the `if (!nodePath)`
+  // branch below).
+  const { getDefault } = await import('../store')
+  const def = getDefault('skillGen')
+  const explicit = options?.model
+  const fallbackModel = 'claude-haiku-4-5'
+  const resolvedRef = explicit
+    ? { provider: 'anthropic' as const, model: explicit }
+    : def
+      ? (def as { provider: string; model: string; endpoint?: string })
+      : { provider: 'anthropic' as const, model: fallbackModel }
+  const model = resolvedRef.model
   const maxTokens = options?.maxTokens ?? 3072
 
   const nodePath = await findNode()
@@ -724,7 +738,7 @@ export async function generateWithRawPrompt(
     const llm = createLLMService()
     try {
       const result = await llm.generateText(
-        { provider: 'anthropic', model },
+        resolvedRef as Parameters<typeof llm.generateText>[0],
         {
           messages: [{ role: 'user', content: prompt }],
           maxTokens,

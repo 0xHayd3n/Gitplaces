@@ -1,6 +1,14 @@
 import { createLLMService } from './llm'
+import { getDefault } from './store'
+import type { ModelRef } from './llm/types'
 
-const TAG_MODEL = { provider: 'anthropic' as const, model: 'claude-haiku-4-5-20251001' }
+const FALLBACK_TAG_MODEL: ModelRef = { provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }
+
+function resolveTagModel(): ModelRef {
+  const def = getDefault('tagExtract')
+  if (!def) return FALLBACK_TAG_MODEL
+  return def as ModelRef
+}
 
 export async function extractTags(
   query: string,
@@ -25,15 +33,12 @@ Examples:
 Return only the JSON array, nothing else.`
 
   try {
-    const result = await llm.generateText(TAG_MODEL, {
+    const result = await llm.generateText(resolveTagModel(), {
       messages: [{ role: 'user', content: prompt }],
       maxTokens: 256,
     })
     return JSON.parse(result.text.trim())
   } catch {
-    // Either the LLM call failed (auth, network, etc.) OR the response was
-    // unparseable JSON. Fall back to a simple word-split — the IPC handler
-    // treats an empty/incomplete list as "no smart tags, do raw search."
     return query.toLowerCase().split(/\s+/).filter(w => w.length > 2).slice(0, 5)
   }
 }
