@@ -886,7 +886,7 @@ export default function AIPanel() {
             <div className="settings-group-row-main">
               <div className="settings-group-row-label">Status</div>
               <div className="settings-group-row-sub">
-                <span className={`status-dot ${mcpConfigured ? 'active' : 'inactive'}`} />
+                <span className={`status-dot ${mcpConfigured ? 'green' : 'gray'}`} />
                 {mcpConfigured ? 'Configured' : 'Not configured'}
               </div>
             </div>
