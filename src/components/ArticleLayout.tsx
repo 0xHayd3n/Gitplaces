@@ -70,15 +70,13 @@ export function ArticleLayout({
       ref={resolvedScrollRef}
       className={`article-layout${fullBleedBody ? ' article-layout--fullbleed' : ''}${(tocSlot || statsSlot) ? ' article-layout--has-toc' : ''}${collapsedHeader ? ' article-layout--collapsed-header' : ''}${isScrolled ? ' article-layout--scrolled' : ''}`}
     >
-      {/* Drag strip occupies the title-bar zone (top 32px). The navbar sits
-          inside it so the breadcrumb and back arrow are vertically aligned
-          with the portalled window controls (fixed top: 3px). The navbar has
-          -webkit-app-region: no-drag on its root, so interactive controls
-          remain clickable; empty areas of the strip stay draggable when no
-          navbar is present. */}
-      <div className="article-layout-drag-strip">
-        {navBar && <div className="article-layout-navbar-slot">{navBar}</div>}
-      </div>
+      {/* Drag strip occupies the title-bar zone (top 32px) as a window
+          drag region. The navbar that used to sit here has moved into
+          the tabs slot below (so the breadcrumb + back arrow visually
+          attach to the tabs row, not the window chrome). The portalled
+          window controls (min/max/close) still live at fixed top: 3px
+          and dock above this strip. */}
+      <div className="article-layout-drag-strip" />
       <div className="article-layout-top">
         {!collapsedHeader && dither && <div className="article-layout-dither-bg">{dither}</div>}
         <div className="article-layout-top-panel">
@@ -95,7 +93,10 @@ export function ArticleLayout({
           {!collapsedHeader && actionRowExtras && <div className="article-layout-action-row-extras">{actionRowExtras}</div>}
         </div>
       </div>
-      <div className="article-layout-tabs-slot article-layout-sticky-top">{tabs}</div>
+      <div className="article-layout-tabs-slot article-layout-sticky-top">
+        {navBar && <div className="article-layout-navbar-slot">{navBar}</div>}
+        {tabs}
+      </div>
       <div
         className={`article-layout-body${fullBleedBody ? ' article-layout-body--full-bleed' : ''}${(tocSlot || statsSlot) ? ' article-layout-body--with-toc' : ''}`}
       >

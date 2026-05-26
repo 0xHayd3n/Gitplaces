@@ -209,6 +209,13 @@
   z-index: 10;
   background: var(--surface-1);
   border-bottom: 1px solid var(--bg3);
+  display: flex;
+  flex-direction: column;
+}
+/* When the navbar is inside the tabs slot, give it a divider so the
+   breadcrumb row and tabs row read as two stacked rows of the same bar. */
+.article-layout-tabs-slot > .article-layout-navbar-slot {
+  border-bottom: 1px solid var(--bg3);
 }
 
 .article-layout-body {
