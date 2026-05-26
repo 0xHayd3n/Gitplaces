@@ -562,6 +562,51 @@ a {
   opacity: 1;
   transition: opacity 350ms ease, transform 350ms ease;
   -webkit-app-region: no-drag;
+  max-width: calc(100vw - 40px);
+}
+
+/* Slot for the relocated NavBar (back arrow + breadcrumb) inside the
+   dock. Hides itself when the NavBar renders nothing meaningful so the
+   dock keeps its compact pill shape on routes without a breadcrumb. */
+.dock-navbar-slot {
+  display: flex;
+  align-items: center;
+  max-width: 540px;
+  min-width: 0;
+  overflow: hidden;
+}
+.dock-navbar-slot:empty,
+.dock-navbar-slot:has(> .app-navbar:empty) {
+  display: none;
+}
+.dock-navbar-slot + .dock-divider:has(+ .dock-item) {
+  display: block;
+}
+/* Override .app-navbar's drag-strip-era sizing when it's inside the dock. */
+.dock-navbar-slot .app-navbar {
+  position: static;
+  height: auto;
+  padding: 0;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.dock-navbar-slot .app-navbar-url {
+  background: transparent;
+  border: none;
+  padding: 0 8px;
+  height: auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.dock-navbar-slot .app-navbar-url-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .dock-items-row {

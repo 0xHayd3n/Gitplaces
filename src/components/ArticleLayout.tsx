@@ -71,12 +71,12 @@ export function ArticleLayout({
       className={`article-layout${fullBleedBody ? ' article-layout--fullbleed' : ''}${(tocSlot || statsSlot) ? ' article-layout--has-toc' : ''}${collapsedHeader ? ' article-layout--collapsed-header' : ''}${isScrolled ? ' article-layout--scrolled' : ''}`}
     >
       {/* Drag strip occupies the title-bar zone (top 32px) as a window
-          drag region. The navbar that used to sit here has moved into
-          the tabs slot below (so the breadcrumb + back arrow visually
-          attach to the tabs row, not the window chrome). The portalled
-          window controls (min/max/close) still live at fixed top: 3px
-          and dock above this strip. */}
+          drag region. The navbar (back arrow + breadcrumb) was moved
+          into the floating Dock at the bottom of the screen, so this
+          strip is now empty by default. The `navBar` prop is still
+          accepted for backwards compat with callers but is ignored. */}
       <div className="article-layout-drag-strip" />
+      {void navBar /* prop preserved for caller compat; rendering moved to Dock */}
       <div className="article-layout-top">
         {!collapsedHeader && dither && <div className="article-layout-dither-bg">{dither}</div>}
         <div className="article-layout-top-panel">
@@ -93,10 +93,7 @@ export function ArticleLayout({
           {!collapsedHeader && actionRowExtras && <div className="article-layout-action-row-extras">{actionRowExtras}</div>}
         </div>
       </div>
-      <div className="article-layout-tabs-slot article-layout-sticky-top">
-        {navBar && <div className="article-layout-navbar-slot">{navBar}</div>}
-        {tabs}
-      </div>
+      <div className="article-layout-tabs-slot article-layout-sticky-top">{tabs}</div>
       <div
         className={`article-layout-body${fullBleedBody ? ' article-layout-body--full-bleed' : ''}${(tocSlot || statsSlot) ? ' article-layout-body--with-toc' : ''}`}
       >

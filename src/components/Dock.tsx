@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import NavBar from './NavBar'
 
 // ── Nav icons (20×20, filled) ────────────────────────────────────
 
@@ -127,6 +128,14 @@ export default function Dock({ onAiClick, aiOpen }: DockProps) {
         <div id="tts-dock-slot" />
 
         <div className="dock-items-row">
+          {/* Breadcrumb + back arrow (relocated here from the top window
+              drag strip per UX choice). NavBar renders nothing on routes
+              without a meaningful breadcrumb, so this is a no-op on those. */}
+          <div className="dock-navbar-slot">
+            <NavBar />
+          </div>
+          <span className="dock-divider" aria-hidden="true" />
+
           {/* Nav items */}
           {NAV_ITEMS.map(({ label, path, icon }) => (
             <button
