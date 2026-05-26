@@ -2691,6 +2691,7 @@ app.on('activate', () => {
 app.on('before-quit', () => {
   closeAllOnQuit()
   mcpProcess?.kill()
+  // best-effort: subprocess may be mid-shutdown, DB is closed next
   void shutdownMcpClient()
   closeDb()
 })
