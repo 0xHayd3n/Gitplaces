@@ -113,7 +113,7 @@
 }
 
 .file-row[data-variant='listing'] .file-row__size {
-  text-align: right;
+  text-align: left;
   margin-left: 0;
 }
 
