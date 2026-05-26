@@ -44,6 +44,7 @@ import { registerAgentHandlers } from './ipc/agentHandlers'
 import { registerRecommendHandlers } from './ipc/recommendHandlers'
 import { registerEngagementHandlers } from './ipc/engagementHandlers'
 import { registerUpdateHandlers } from './ipc/updateHandlers'
+import { registerLLMHandlers } from './ipc/llmHandlers'
 import { startUpdateService, checkIsFork, applySkillRegen } from './services/updateService'
 import { runAnatomyBackfill } from './anatomy/backfill'
 import { registerCreateHandlers, closeAllOnQuit } from './ipc/createHandlers'
@@ -2621,6 +2622,7 @@ ipcMain.handle('fetch-link-preview', async (_event, url: string) => {
 
 app.whenReady().then(() => {
   migrateApiStore()
+  registerLLMHandlers()
   // Grant permissions (including microphone for speech-to-text)
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(true)

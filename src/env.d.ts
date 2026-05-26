@@ -133,6 +133,17 @@ declare global {
         getPreferredLanguage(): Promise<string>
         setPreferredLanguage(lang: string): Promise<void>
       }
+      llm: {
+        listProviders(): Promise<string[]>
+        getProviderConfig(provider: string): Promise<{ enabled: boolean; apiKey?: string; organization?: string }>
+        setProviderConfig(provider: string, cfg: { enabled: boolean; apiKey?: string; organization?: string }): Promise<void>
+        listOpenAICompatibleEndpoints(): Promise<Array<{ id: string; label: string; baseUrl: string; apiKey?: string }>>
+        upsertOpenAICompatibleEndpoint(ep: { id: string; label: string; baseUrl: string; apiKey?: string }): Promise<void>
+        removeOpenAICompatibleEndpoint(id: string): Promise<void>
+        getDefault(feature: 'chat' | 'skillGen' | 'tagExtract'): Promise<{ provider: string; model: string; endpoint?: string } | undefined>
+        setDefault(feature: 'chat' | 'skillGen' | 'tagExtract', ref: { provider: string; model: string; endpoint?: string }): Promise<void>
+        testConnection(ref: { provider: string; model: string; endpoint?: string }): Promise<{ ok: boolean; sample?: string; kind?: string; message?: string }>
+      }
       db: {
         setStarredAt(repoId: string, value: string | null): Promise<void>
         cacheTranslatedDescription(repoId: string, text: string, targetLang: string, detectedLang: string): Promise<void>

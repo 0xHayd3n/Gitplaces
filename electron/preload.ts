@@ -80,6 +80,18 @@ contextBridge.exposeInMainWorld('api', {
     setPreferredLanguage: (lang: string) => ipcRenderer.invoke('settings:setPreferredLanguage', lang),
   },
 
+  llm: {
+    listProviders:                 () => ipcRenderer.invoke('llm:listProviders') as Promise<string[]>,
+    getProviderConfig:             (provider: string) => ipcRenderer.invoke('llm:getProviderConfig', provider) as Promise<{ enabled: boolean; apiKey?: string; organization?: string }>,
+    setProviderConfig:             (provider: string, cfg: { enabled: boolean; apiKey?: string; organization?: string }) => ipcRenderer.invoke('llm:setProviderConfig', provider, cfg) as Promise<void>,
+    listOpenAICompatibleEndpoints: () => ipcRenderer.invoke('llm:listOpenAICompatibleEndpoints') as Promise<Array<{ id: string; label: string; baseUrl: string; apiKey?: string }>>,
+    upsertOpenAICompatibleEndpoint: (ep: { id: string; label: string; baseUrl: string; apiKey?: string }) => ipcRenderer.invoke('llm:upsertOpenAICompatibleEndpoint', ep) as Promise<void>,
+    removeOpenAICompatibleEndpoint: (id: string) => ipcRenderer.invoke('llm:removeOpenAICompatibleEndpoint', id) as Promise<void>,
+    getDefault:                    (feature: 'chat' | 'skillGen' | 'tagExtract') => ipcRenderer.invoke('llm:getDefault', feature) as Promise<{ provider: string; model: string; endpoint?: string } | undefined>,
+    setDefault:                    (feature: 'chat' | 'skillGen' | 'tagExtract', ref: { provider: string; model: string; endpoint?: string }) => ipcRenderer.invoke('llm:setDefault', feature, ref) as Promise<void>,
+    testConnection:                (ref: { provider: string; model: string; endpoint?: string }) => ipcRenderer.invoke('llm:testConnection', ref) as Promise<{ ok: boolean; sample?: string; kind?: string; message?: string }>,
+  },
+
   skill: {
     generate: (owner: string, name: string, options?: { flavour?: 'library' | 'codebase' | 'domain', enabledComponents?: string[], enabledTools?: string[], target?: 'master' | 'components' | 'all', ref?: string }) =>
       ipcRenderer.invoke('skill:generate', owner, name, options),
