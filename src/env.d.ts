@@ -194,6 +194,28 @@ declare global {
         onLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
         offLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
       }
+      gemini: {
+        detect(): Promise<boolean>
+        checkAuthStatus(): Promise<boolean>
+        setup(): Promise<{ ok: boolean; error?: string }>
+        loginGemini(): Promise<{ ok: boolean; error?: string }>
+        logoutGemini(): Promise<void>
+        onSetupProgress(cb: (event: { phase: string; line?: string }) => void): void
+        offSetupProgress(cb: (event: { phase: string; line?: string }) => void): void
+        onLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
+        offLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
+      }
+      codex: {
+        detect(): Promise<boolean>
+        checkAuthStatus(): Promise<boolean>
+        setup(): Promise<{ ok: boolean; error?: string }>
+        loginCodex(): Promise<{ ok: boolean; error?: string }>
+        logoutCodex(): Promise<void>
+        onSetupProgress(cb: (event: { phase: string; line?: string }) => void): void
+        offSetupProgress(cb: (event: { phase: string; line?: string }) => void): void
+        onLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
+        offLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
+      }
       library: {
         getAll(): Promise<LibraryRow[]>
         getCollections(repoId: string): Promise<{ id: string; name: string }[]>
@@ -323,9 +345,9 @@ declare global {
         read(owner: string, name: string): Promise<Record<string, string> | null>
       }
       mcp: {
-        getStatus(): Promise<{ configured: boolean; configPath: string | null }>
-        autoConfigure(): Promise<{ success: boolean; error?: string }>
-        getConfigSnippet(): Promise<string>
+        getStatus(target?: 'claude' | 'opencode' | 'gemini' | 'codex'): Promise<{ configured: boolean; configPath: string | null }>
+        autoConfigure(target?: 'claude' | 'opencode' | 'gemini' | 'codex'): Promise<{ success: boolean; error?: string }>
+        getConfigSnippet(target?: 'claude' | 'opencode' | 'gemini' | 'codex'): Promise<string>
         testConnection(): Promise<{ running: boolean; skillCount: number }>
         scanTools(owner: string, name: string): Promise<import('./types/mcp').McpScanResult>
       }

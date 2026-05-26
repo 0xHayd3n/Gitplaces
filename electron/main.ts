@@ -30,6 +30,36 @@ import {
   loginOpenCode,
   logoutOpenCode,
 } from './skill-gen/opencode'
+import {
+  detectGemini,
+  checkGeminiAuthStatus,
+  installGeminiCLI,
+  loginGemini,
+  logoutGemini,
+} from './skill-gen/gemini-cli'
+import {
+  detectCodex,
+  checkCodexAuthStatus,
+  installCodexCLI,
+  loginCodex,
+  logoutCodex,
+} from './skill-gen/codex-cli'
+import {
+  buildGitSuiteEntry,
+  readClaudeStatus,
+  readOpenCodeStatus,
+  readGeminiStatus,
+  readCodexStatus,
+  writeClaudeMcpConfig,
+  writeOpenCodeMcpConfig,
+  writeGeminiMcpConfig,
+  writeCodexMcpConfig,
+  getClaudeMcpSnippet,
+  getOpenCodeMcpSnippet,
+  getGeminiMcpSnippet,
+  getCodexMcpSnippet,
+  type McpTarget,
+} from './services/mcpConfigService'
 import { generateComponents as generateComponentsSlim } from './skill-gen/components'
 import { prepareWrite } from './skill-gen/regeneration'
 import { extractionCache } from './skill-gen/extraction-cache'
@@ -205,16 +235,6 @@ let mcpProcess: ReturnType<typeof spawn> | null = null
 let deviceFlowAbort: AbortController | null = null
 
 // ── MCP helpers ──────────────────────────────────────────────────────────────
-function getClaudeConfigPath(): string | null {
-  switch (process.platform) {
-    case 'darwin':
-      return path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json')
-    case 'win32':
-      return path.join(process.env.APPDATA ?? os.homedir(), 'Claude', 'claude_desktop_config.json')
-    default:
-      return null
-  }
-}
 
 function getMcpScriptPath(): string {
   return path.join(__dirname, 'mcp-server.js')
@@ -1353,6 +1373,94 @@ ipcMain.handle('opencode:logoutOpenCode', async () => {
   await logoutOpenCode()
 })
 
+// ── Gemini CLI IPC ──────────────────────────────────────────────────
+
+ipcMain.handle('gemini:detect', async () => detectGemini())
+ipcMain.handle('gemini:checkAuthStatus', async () => checkGeminiAuthStatus())
+
+ipcMain.handle('gemini:setup', async (event) => {
+  const send = (phase: string, line?: string) => {
+    if (!event.sender.isDestroyed()) {
+      event.sender.send('gemini:setup-progress', { phase, line })
+    }
+  }
+  send('checking')
+  if (await detectGemini()) {
+    send('done')
+    return { ok: true }
+  }
+  send('installing')
+  try {
+    await installGeminiCLI((line) => send('installing', line))
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    send('error', msg)
+    return { ok: false, error: msg }
+  }
+  send('done')
+  return { ok: true }
+})
+
+ipcMain.handle('gemini:loginGemini', async (event) => {
+  const send = (message: string, opts?: { isError?: boolean; done?: boolean }) => {
+    if (!event.sender.isDestroyed()) {
+      event.sender.send('gemini:login-progress', { message, ...opts })
+    }
+  }
+  const result = await loginGemini((line) => send(line))
+  if (result.ok) send('Login successful', { done: true })
+  else send(result.error ?? 'Login failed', { isError: true, done: true })
+  return result
+})
+
+ipcMain.handle('gemini:logoutGemini', async () => {
+  await logoutGemini()
+})
+
+// ── Codex CLI IPC ──────────────────────────────────────────────────
+
+ipcMain.handle('codex:detect', async () => detectCodex())
+ipcMain.handle('codex:checkAuthStatus', async () => checkCodexAuthStatus())
+
+ipcMain.handle('codex:setup', async (event) => {
+  const send = (phase: string, line?: string) => {
+    if (!event.sender.isDestroyed()) {
+      event.sender.send('codex:setup-progress', { phase, line })
+    }
+  }
+  send('checking')
+  if (await detectCodex()) {
+    send('done')
+    return { ok: true }
+  }
+  send('installing')
+  try {
+    await installCodexCLI((line) => send('installing', line))
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    send('error', msg)
+    return { ok: false, error: msg }
+  }
+  send('done')
+  return { ok: true }
+})
+
+ipcMain.handle('codex:loginCodex', async (event) => {
+  const send = (message: string, opts?: { isError?: boolean; done?: boolean }) => {
+    if (!event.sender.isDestroyed()) {
+      event.sender.send('codex:login-progress', { message, ...opts })
+    }
+  }
+  const result = await loginCodex((line) => send(line))
+  if (result.ok) send('Login successful', { done: true })
+  else send(result.error ?? 'Login failed', { isError: true, done: true })
+  return result
+})
+
+ipcMain.handle('codex:logoutCodex', async () => {
+  await logoutCodex()
+})
+
 ipcMain.handle('skill:cancelLearn', (_event, owner: string, name: string) => {
   const key = `${owner}/${name}` as const
   return { cancelled: learnProcessRegistry.cancel(key) }
@@ -1954,63 +2062,36 @@ ipcMain.handle('collection:toggle', async (_, id: string, active: number) => {
 })
 
 // ── MCP IPC ──────────────────────────────────────────────────────────────────
-ipcMain.handle('mcp:getStatus', async () => {
-  const configPath = getClaudeConfigPath()
-  if (!configPath) return { configured: false, configPath: null }
-  try {
-    const raw = await fs.readFile(configPath, 'utf8')
-    const config = JSON.parse(raw) as Record<string, unknown>
-    const servers = config.mcpServers as Record<string, unknown> | undefined
-    if (servers == null || !('git-suite' in servers)) return { configured: false, configPath }
-    // Validate the configured command path still exists on disk
-    const entry = servers['git-suite'] as { command?: string } | undefined
-    if (entry?.command) {
-      try { await fs.access(entry.command) } catch { return { configured: false, configPath } }
-    }
-    return { configured: true, configPath }
-  } catch {
-    return { configured: false, configPath }
+ipcMain.handle('mcp:getStatus', async (_event, target: McpTarget = 'claude') => {
+  switch (target) {
+    case 'opencode': return readOpenCodeStatus()
+    case 'gemini':   return readGeminiStatus()
+    case 'codex':    return readCodexStatus()
+    case 'claude':
+    default:         return readClaudeStatus()
   }
 })
 
-ipcMain.handle('mcp:autoConfigure', async () => {
-  const configPath = getClaudeConfigPath()
-  if (!configPath) return { success: false, error: 'Unsupported platform' }
-  try {
-    let existing: Record<string, unknown> = {}
-    try {
-      const raw = await fs.readFile(configPath, 'utf8')
-      existing = JSON.parse(raw) as Record<string, unknown>
-    } catch {
-      // File doesn't exist or is invalid — start fresh
-    }
-    const mcpServers = (existing.mcpServers ?? {}) as Record<string, unknown>
-    mcpServers['git-suite'] = {
-      command: process.execPath,
-      args: [getMcpScriptPath()],
-      env: { ELECTRON_RUN_AS_NODE: '1' },
-    }
-    existing.mcpServers = mcpServers
-    // Ensure parent directory exists
-    await fs.mkdir(path.dirname(configPath), { recursive: true })
-    await fs.writeFile(configPath, JSON.stringify(existing, null, 2), 'utf8')
-    return { success: true }
-  } catch (err) {
-    return { success: false, error: String(err) }
+ipcMain.handle('mcp:autoConfigure', async (_event, target: McpTarget = 'claude') => {
+  const entry = buildGitSuiteEntry(process.execPath, getMcpScriptPath())
+  switch (target) {
+    case 'opencode': return writeOpenCodeMcpConfig(entry)
+    case 'gemini':   return writeGeminiMcpConfig(entry)
+    case 'codex':    return writeCodexMcpConfig(entry)
+    case 'claude':
+    default:         return writeClaudeMcpConfig(entry)
   }
 })
 
-ipcMain.handle('mcp:getConfigSnippet', async () => {
-  const snippet = {
-    mcpServers: {
-      'git-suite': {
-        command: process.execPath,
-        args: [getMcpScriptPath()],
-        env: { ELECTRON_RUN_AS_NODE: '1' },
-      },
-    },
+ipcMain.handle('mcp:getConfigSnippet', async (_event, target: McpTarget = 'claude') => {
+  const entry = buildGitSuiteEntry(process.execPath, getMcpScriptPath())
+  switch (target) {
+    case 'opencode': return getOpenCodeMcpSnippet(entry)
+    case 'gemini':   return getGeminiMcpSnippet(entry)
+    case 'codex':    return getCodexMcpSnippet(entry)
+    case 'claude':
+    default:         return getClaudeMcpSnippet(entry)
   }
-  return JSON.stringify(snippet, null, 2)
 })
 
 ipcMain.handle('mcp:testConnection', async () => {

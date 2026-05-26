@@ -194,6 +194,70 @@ contextBridge.exposeInMainWorld('api', {
     },
   },
 
+  gemini: {
+    detect: () => ipcRenderer.invoke('gemini:detect') as Promise<boolean>,
+    checkAuthStatus: () => ipcRenderer.invoke('gemini:checkAuthStatus') as Promise<boolean>,
+    setup: () => ipcRenderer.invoke('gemini:setup') as Promise<{ ok: boolean; error?: string }>,
+    loginGemini: () => ipcRenderer.invoke('gemini:loginGemini') as Promise<{ ok: boolean; error?: string }>,
+    logoutGemini: () => ipcRenderer.invoke('gemini:logoutGemini') as Promise<void>,
+    onSetupProgress: (cb: (event: { phase: string; line?: string }) => void) => {
+      const wrapper = (_: unknown, data: { phase: string; line?: string }) => cb(data)
+      callbackWrappers.set(cb, wrapper)
+      ipcRenderer.on('gemini:setup-progress', wrapper)
+    },
+    offSetupProgress: (cb: (event: { phase: string; line?: string }) => void) => {
+      const wrapper = callbackWrappers.get(cb)
+      if (wrapper) {
+        ipcRenderer.removeListener('gemini:setup-progress', wrapper)
+        callbackWrappers.delete(cb)
+      }
+    },
+    onLoginProgress: (cb: (event: { message: string; isError?: boolean; done?: boolean }) => void) => {
+      const wrapper = (_: unknown, data: { message: string; isError?: boolean; done?: boolean }) => cb(data)
+      callbackWrappers.set(cb, wrapper)
+      ipcRenderer.on('gemini:login-progress', wrapper)
+    },
+    offLoginProgress: (cb: (event: { message: string; isError?: boolean; done?: boolean }) => void) => {
+      const wrapper = callbackWrappers.get(cb)
+      if (wrapper) {
+        ipcRenderer.removeListener('gemini:login-progress', wrapper)
+        callbackWrappers.delete(cb)
+      }
+    },
+  },
+
+  codex: {
+    detect: () => ipcRenderer.invoke('codex:detect') as Promise<boolean>,
+    checkAuthStatus: () => ipcRenderer.invoke('codex:checkAuthStatus') as Promise<boolean>,
+    setup: () => ipcRenderer.invoke('codex:setup') as Promise<{ ok: boolean; error?: string }>,
+    loginCodex: () => ipcRenderer.invoke('codex:loginCodex') as Promise<{ ok: boolean; error?: string }>,
+    logoutCodex: () => ipcRenderer.invoke('codex:logoutCodex') as Promise<void>,
+    onSetupProgress: (cb: (event: { phase: string; line?: string }) => void) => {
+      const wrapper = (_: unknown, data: { phase: string; line?: string }) => cb(data)
+      callbackWrappers.set(cb, wrapper)
+      ipcRenderer.on('codex:setup-progress', wrapper)
+    },
+    offSetupProgress: (cb: (event: { phase: string; line?: string }) => void) => {
+      const wrapper = callbackWrappers.get(cb)
+      if (wrapper) {
+        ipcRenderer.removeListener('codex:setup-progress', wrapper)
+        callbackWrappers.delete(cb)
+      }
+    },
+    onLoginProgress: (cb: (event: { message: string; isError?: boolean; done?: boolean }) => void) => {
+      const wrapper = (_: unknown, data: { message: string; isError?: boolean; done?: boolean }) => cb(data)
+      callbackWrappers.set(cb, wrapper)
+      ipcRenderer.on('codex:login-progress', wrapper)
+    },
+    offLoginProgress: (cb: (event: { message: string; isError?: boolean; done?: boolean }) => void) => {
+      const wrapper = callbackWrappers.get(cb)
+      if (wrapper) {
+        ipcRenderer.removeListener('codex:login-progress', wrapper)
+        callbackWrappers.delete(cb)
+      }
+    },
+  },
+
   library: {
     getAll: () => ipcRenderer.invoke('library:getAll'),
     getCollections: (repoId: string) => ipcRenderer.invoke('library:getCollections', repoId),
@@ -399,9 +463,12 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   mcp: {
-    getStatus:        () => ipcRenderer.invoke('mcp:getStatus'),
-    autoConfigure:    () => ipcRenderer.invoke('mcp:autoConfigure'),
-    getConfigSnippet: () => ipcRenderer.invoke('mcp:getConfigSnippet'),
+    getStatus:        (target: 'claude' | 'opencode' | 'gemini' | 'codex' = 'claude') =>
+      ipcRenderer.invoke('mcp:getStatus', target) as Promise<{ configured: boolean; configPath: string | null }>,
+    autoConfigure:    (target: 'claude' | 'opencode' | 'gemini' | 'codex' = 'claude') =>
+      ipcRenderer.invoke('mcp:autoConfigure', target) as Promise<{ success: boolean; error?: string }>,
+    getConfigSnippet: (target: 'claude' | 'opencode' | 'gemini' | 'codex' = 'claude') =>
+      ipcRenderer.invoke('mcp:getConfigSnippet', target) as Promise<string>,
     testConnection:   () => ipcRenderer.invoke('mcp:testConnection'),
     scanTools:        (owner: string, name: string) =>
       ipcRenderer.invoke('mcp:scanTools', owner, name),

@@ -58,6 +58,28 @@ function setupApi(opts: {
         onLoginProgress: vi.fn(),
         offLoginProgress: vi.fn(),
       },
+      gemini: {
+        detect: vi.fn().mockResolvedValue(false),
+        checkAuthStatus: vi.fn().mockResolvedValue(false),
+        setup: vi.fn().mockResolvedValue({ ok: true }),
+        loginGemini: vi.fn().mockResolvedValue({ ok: true }),
+        logoutGemini: vi.fn().mockResolvedValue(undefined),
+        onSetupProgress: vi.fn(),
+        offSetupProgress: vi.fn(),
+        onLoginProgress: vi.fn(),
+        offLoginProgress: vi.fn(),
+      },
+      codex: {
+        detect: vi.fn().mockResolvedValue(false),
+        checkAuthStatus: vi.fn().mockResolvedValue(false),
+        setup: vi.fn().mockResolvedValue({ ok: true }),
+        loginCodex: vi.fn().mockResolvedValue({ ok: true }),
+        logoutCodex: vi.fn().mockResolvedValue(undefined),
+        onSetupProgress: vi.fn(),
+        offSetupProgress: vi.fn(),
+        onLoginProgress: vi.fn(),
+        offLoginProgress: vi.fn(),
+      },
       github: {
         disconnect: vi.fn().mockResolvedValue(undefined),
         openLoginPopup: vi.fn().mockResolvedValue(undefined),
@@ -180,10 +202,10 @@ describe('Settings — AI panel', () => {
   it('MCP tab content is hidden until the MCP tab is selected', async () => {
     render(<Settings />)
     await waitFor(() => screen.getByRole('tab', { name: /^MCP$/ }))
-    expect(screen.queryByText(/Manual configuration/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Claude Code MCP/i)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: /^MCP$/ }))
     await waitFor(() => {
-      expect(screen.getByText(/Manual configuration/i)).toBeInTheDocument()
+      expect(screen.getByText(/Claude Code MCP/i)).toBeInTheDocument()
     })
   })
 
@@ -204,13 +226,29 @@ describe('Settings — AI panel', () => {
     })
   })
 
-  it('MCP tab shows the Claude Code MCP card and a Manual configuration toggle', async () => {
+  it('MCP tab shows all four MCP cards (Claude / OpenCode / Gemini / Codex), each with a Manual configuration toggle', async () => {
     render(<Settings />)
     await waitFor(() => screen.getByRole('tab', { name: /^MCP$/ }))
     fireEvent.click(screen.getByRole('tab', { name: /^MCP$/ }))
     await waitFor(() => {
       expect(screen.getByText(/Claude Code MCP/i)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Manual configuration/i })).toBeInTheDocument()
+      expect(screen.getByText(/OpenCode MCP/i)).toBeInTheDocument()
+      expect(screen.getByText(/Gemini CLI MCP/i)).toBeInTheDocument()
+      expect(screen.getByText(/Codex CLI MCP/i)).toBeInTheDocument()
+      // One Manual-configuration toggle per card.
+      expect(screen.getAllByRole('button', { name: /Manual configuration/i })).toHaveLength(4)
+    })
+  })
+
+  it('CLI tab includes Gemini CLI and Codex CLI cards alongside Claude Code and OpenCode', async () => {
+    render(<Settings />)
+    await waitFor(() => screen.getByRole('tab', { name: /^CLI$/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /^CLI$/ }))
+    await waitFor(() => {
+      expect(screen.getByText(/Anthropic's Claude Code/)).toBeInTheDocument()
+      expect(screen.getByText(/^OpenCode$/)).toBeInTheDocument()
+      expect(screen.getByText(/^Gemini CLI$/)).toBeInTheDocument()
+      expect(screen.getByText(/^Codex CLI$/)).toBeInTheDocument()
     })
   })
 

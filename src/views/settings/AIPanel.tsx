@@ -140,6 +140,15 @@ function OpenAICompatibleSection(props: {
 }
 
 type AITabId = 'api' | 'cli' | 'mcp'
+type McpTarget = 'claude' | 'opencode' | 'gemini' | 'codex'
+
+const MCP_TARGETS: McpTarget[] = ['claude', 'opencode', 'gemini', 'codex']
+const emptyTargetMap = <T,>(value: T): Record<McpTarget, T> => ({
+  claude:   value,
+  opencode: value,
+  gemini:   value,
+  codex:    value,
+})
 
 export default function AIPanel() {
   const [activeAITab, setActiveAITab] = useState<AITabId>('api')
@@ -169,6 +178,22 @@ export default function AIPanel() {
   const [opencodeLoginPhase, setOpencodeLoginPhase] = useState<LoginPhase>('idle')
   const [opencodeLoginLines, setOpencodeLoginLines] = useState<string[]>([])
 
+  // Gemini CLI state
+  const [geminiInstalled, setGeminiInstalled] = useState<boolean | null>(null)
+  const [geminiLoggedIn, setGeminiLoggedIn]   = useState<boolean | null>(null)
+  const [geminiSetupPhase, setGeminiSetupPhase] = useState<SetupPhase>('idle')
+  const [geminiSetupLines, setGeminiSetupLines] = useState<string[]>([])
+  const [geminiLoginPhase, setGeminiLoginPhase] = useState<LoginPhase>('idle')
+  const [geminiLoginLines, setGeminiLoginLines] = useState<string[]>([])
+
+  // Codex CLI state
+  const [codexInstalled, setCodexInstalled] = useState<boolean | null>(null)
+  const [codexLoggedIn, setCodexLoggedIn]   = useState<boolean | null>(null)
+  const [codexSetupPhase, setCodexSetupPhase] = useState<SetupPhase>('idle')
+  const [codexSetupLines, setCodexSetupLines] = useState<string[]>([])
+  const [codexLoginPhase, setCodexLoginPhase] = useState<LoginPhase>('idle')
+  const [codexLoginLines, setCodexLoginLines] = useState<string[]>([])
+
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   useEffect(() => () => { timers.current.forEach(clearTimeout) }, [])
 
@@ -180,6 +205,10 @@ export default function AIPanel() {
     })
     window.api.opencode.detect().then(setOpencodeInstalled).catch(() => setOpencodeInstalled(false))
     window.api.opencode.checkAuthStatus().then(setOpencodeLoggedIn).catch(() => setOpencodeLoggedIn(false))
+    window.api.gemini.detect().then(setGeminiInstalled).catch(() => setGeminiInstalled(false))
+    window.api.gemini.checkAuthStatus().then(setGeminiLoggedIn).catch(() => setGeminiLoggedIn(false))
+    window.api.codex.detect().then(setCodexInstalled).catch(() => setCodexInstalled(false))
+    window.api.codex.checkAuthStatus().then(setCodexLoggedIn).catch(() => setCodexLoggedIn(false))
   }, [])
 
   const handleSetup = useCallback(async () => {
@@ -284,60 +313,167 @@ export default function AIPanel() {
     setOpencodeLoggedIn(false)
   }
 
-  // MCP exposure state
-  const [mcpConfigured, setMcpConfigured] = useState(false)
-  const [mcpConfigPath, setMcpConfigPath] = useState<string | null>(null)
+  const handleGeminiSetup = async () => {
+    setGeminiSetupPhase('installing')
+    setGeminiSetupLines([])
+    const cb = (payload: { phase: string; line?: string }) => {
+      if (payload.line) setGeminiSetupLines(prev => [...prev, payload.line!])
+      if (payload.phase === 'done') setGeminiSetupPhase('done')
+      if (payload.phase === 'error') setGeminiSetupPhase('error')
+    }
+    window.api.gemini.onSetupProgress(cb)
+    try {
+      const result = await window.api.gemini.setup()
+      if (result.ok) {
+        setGeminiInstalled(true)
+        setGeminiSetupPhase('done')
+      } else {
+        setGeminiSetupPhase('error')
+      }
+    } finally {
+      window.api.gemini.offSetupProgress(cb)
+    }
+  }
+
+  const handleGeminiLogin = async () => {
+    setGeminiLoginPhase('logging-in')
+    setGeminiLoginLines([])
+    const cb = (payload: { message: string; isError?: boolean; done?: boolean }) => {
+      setGeminiLoginLines(prev => [...prev, payload.message])
+      if (payload.done) setGeminiLoginPhase(payload.isError ? 'error' : 'done')
+    }
+    window.api.gemini.onLoginProgress(cb)
+    try {
+      const result = await window.api.gemini.loginGemini()
+      if (result.ok) {
+        setGeminiLoggedIn(true)
+        setGeminiLoginPhase('done')
+      } else if (geminiLoginPhase !== 'error') {
+        setGeminiLoginPhase('error')
+      }
+    } finally {
+      window.api.gemini.offLoginProgress(cb)
+    }
+  }
+
+  const handleGeminiLogout = async () => {
+    await window.api.gemini.logoutGemini()
+    setGeminiLoggedIn(false)
+  }
+
+  const handleCodexSetup = async () => {
+    setCodexSetupPhase('installing')
+    setCodexSetupLines([])
+    const cb = (payload: { phase: string; line?: string }) => {
+      if (payload.line) setCodexSetupLines(prev => [...prev, payload.line!])
+      if (payload.phase === 'done') setCodexSetupPhase('done')
+      if (payload.phase === 'error') setCodexSetupPhase('error')
+    }
+    window.api.codex.onSetupProgress(cb)
+    try {
+      const result = await window.api.codex.setup()
+      if (result.ok) {
+        setCodexInstalled(true)
+        setCodexSetupPhase('done')
+      } else {
+        setCodexSetupPhase('error')
+      }
+    } finally {
+      window.api.codex.offSetupProgress(cb)
+    }
+  }
+
+  const handleCodexLogin = async () => {
+    setCodexLoginPhase('logging-in')
+    setCodexLoginLines([])
+    const cb = (payload: { message: string; isError?: boolean; done?: boolean }) => {
+      setCodexLoginLines(prev => [...prev, payload.message])
+      if (payload.done) setCodexLoginPhase(payload.isError ? 'error' : 'done')
+    }
+    window.api.codex.onLoginProgress(cb)
+    try {
+      const result = await window.api.codex.loginCodex()
+      if (result.ok) {
+        setCodexLoggedIn(true)
+        setCodexLoginPhase('done')
+      } else if (codexLoginPhase !== 'error') {
+        setCodexLoginPhase('error')
+      }
+    } finally {
+      window.api.codex.offLoginProgress(cb)
+    }
+  }
+
+  const handleCodexLogout = async () => {
+    await window.api.codex.logoutCodex()
+    setCodexLoggedIn(false)
+  }
+
+  // MCP exposure state (per-target: claude / opencode / gemini / codex)
+  const [mcpStatus, setMcpStatus] = useState<Record<McpTarget, { configured: boolean; configPath: string | null }>>(
+    emptyTargetMap({ configured: false, configPath: null }),
+  )
+  const [mcpSnippets, setMcpSnippets] = useState<Record<McpTarget, string>>(emptyTargetMap(''))
   const [mcpStatusLoaded, setMcpStatusLoaded] = useState(false)
-  const [configSnippet, setConfigSnippet]   = useState('')
-  const [copied, setCopied]                 = useState(false)
-  const [autoConfigStatus, setAutoConfigStatus] = useState<string | null>(null)
-  const [autoConfigIsError, setAutoConfigIsError] = useState(false)
-  const [testResult, setTestResult]         = useState<{ ok: boolean; text: string } | null>(null)
-  const [manualConfigOpen, setManualConfigOpen] = useState(false)
-  const [configPathOpen, setConfigPathOpen]     = useState(false)
+  const [mcpCopied, setMcpCopied] = useState<Record<McpTarget, boolean>>(emptyTargetMap(false))
+  const [mcpAutoConfig, setMcpAutoConfig] = useState<Record<McpTarget, { text: string; isError: boolean } | null>>(
+    emptyTargetMap<{ text: string; isError: boolean } | null>(null),
+  )
+  const [mcpTestResult, setMcpTestResult] = useState<{ target: McpTarget; ok: boolean; text: string } | null>(null)
+  const [mcpManualOpen, setMcpManualOpen] = useState<Record<McpTarget, boolean>>(emptyTargetMap(false))
+  const [mcpPathOpen, setMcpPathOpen]     = useState<Record<McpTarget, boolean>>(emptyTargetMap(false))
 
   const loadMcpStatus = useCallback(async () => {
-    const [status, snippet] = await Promise.all([
-      window.api.mcp.getStatus(),
-      window.api.mcp.getConfigSnippet(),
-    ])
-    setMcpConfigured(status.configured)
-    setMcpConfigPath(status.configPath)
-    setConfigSnippet(snippet)
+    const results = await Promise.all(
+      MCP_TARGETS.flatMap(target => [
+        window.api.mcp.getStatus(target).then(status => ({ target, status })),
+        window.api.mcp.getConfigSnippet(target).then(snippet => ({ target, snippet })),
+      ]),
+    )
+    const status = emptyTargetMap<{ configured: boolean; configPath: string | null }>({ configured: false, configPath: null })
+    const snippets = emptyTargetMap('')
+    for (const r of results) {
+      if ('status' in r)  status[r.target]   = r.status
+      if ('snippet' in r) snippets[r.target] = r.snippet
+    }
+    setMcpStatus(status)
+    setMcpSnippets(snippets)
     setMcpStatusLoaded(true)
   }, [])
 
   useEffect(() => { loadMcpStatus() }, [loadMcpStatus])
 
-  const handleAutoConfigure = async () => {
-    setAutoConfigStatus(null)
-    const result = await window.api.mcp.autoConfigure()
+  const handleAutoConfigure = async (target: McpTarget) => {
+    setMcpAutoConfig(prev => ({ ...prev, [target]: null }))
+    const result = await window.api.mcp.autoConfigure(target)
     if (result.success) {
-      setAutoConfigStatus('Configured!')
-      setAutoConfigIsError(false)
+      setMcpAutoConfig(prev => ({ ...prev, [target]: { text: 'Configured!', isError: false } }))
       await loadMcpStatus()
     } else {
-      setAutoConfigStatus(`Failed: ${result.error ?? 'unknown error'}`)
-      setAutoConfigIsError(true)
+      setMcpAutoConfig(prev => ({ ...prev, [target]: { text: `Failed: ${result.error ?? 'unknown error'}`, isError: true } }))
     }
-    timers.current.push(setTimeout(() => { setAutoConfigStatus(null); setAutoConfigIsError(false) }, 3000))
+    timers.current.push(setTimeout(() => {
+      setMcpAutoConfig(prev => ({ ...prev, [target]: null }))
+    }, 3000))
   }
 
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(configSnippet)
-    setCopied(true)
-    timers.current.push(setTimeout(() => setCopied(false), 2000))
+  const handleCopy = async (target: McpTarget) => {
+    await navigator.clipboard.writeText(mcpSnippets[target])
+    setMcpCopied(prev => ({ ...prev, [target]: true }))
+    timers.current.push(setTimeout(() => {
+      setMcpCopied(prev => ({ ...prev, [target]: false }))
+    }, 2000))
   }
 
-  const handleTestConnection = async () => {
-    setTestResult(null)
+  const handleTestConnection = async (target: McpTarget) => {
+    setMcpTestResult(null)
     const result = await window.api.mcp.testConnection()
     if (result.running) {
-      setTestResult({ ok: true, text: `Running — ${result.skillCount} active skill${result.skillCount !== 1 ? 's' : ''}` })
+      setMcpTestResult({ target, ok: true, text: `Running — ${result.skillCount} active skill${result.skillCount !== 1 ? 's' : ''}` })
     } else {
-      setTestResult({ ok: false, text: 'Not running' })
+      setMcpTestResult({ target, ok: false, text: 'Not running' })
     }
-    timers.current.push(setTimeout(() => setTestResult(null), 4000))
+    timers.current.push(setTimeout(() => setMcpTestResult(null), 4000))
   }
 
   // Custom MCP state
@@ -448,6 +584,100 @@ export default function AIPanel() {
     { id: 'cli', label: 'CLI' },
     { id: 'mcp', label: 'MCP' },
   ]
+
+  const MCP_CARD_INFO: Record<McpTarget, { name: string; description: string; configFile: string; icon: ReactNode }> = {
+    claude:   { name: 'Claude Code MCP', description: "Let the Claude Code CLI call Git Suite's tools.", configFile: 'claude_desktop_config.json', icon: <IconClaude  width={20} height={20} style={{ color: 'var(--text)' }} /> },
+    opencode: { name: 'OpenCode MCP',    description: "Let the OpenCode CLI call Git Suite's tools.",    configFile: 'opencode.json',              icon: <OpenCodeIcon /> },
+    gemini:   { name: 'Gemini CLI MCP',  description: "Let the Gemini CLI call Git Suite's tools.",      configFile: 'settings.json',              icon: <IconGemini  width={20} height={20} style={{ color: 'var(--text)' }} /> },
+    codex:    { name: 'Codex CLI MCP',   description: "Let the Codex CLI call Git Suite's tools.",       configFile: 'config.toml',                icon: <IconOpenAI  width={20} height={20} style={{ color: 'var(--text)' }} /> },
+  }
+
+  const renderMcpCard = (target: McpTarget): ReactNode => {
+    const info        = MCP_CARD_INFO[target]
+    const status      = mcpStatus[target]
+    const snippet     = mcpSnippets[target]
+    const autoConfig  = mcpAutoConfig[target]
+    const isThisTest  = mcpTestResult?.target === target
+    const isCopied    = mcpCopied[target]
+    const manualOpen  = mcpManualOpen[target]
+    const pathOpen    = mcpPathOpen[target]
+
+    return (
+      <div key={target} style={{ marginBottom: 14 }}>
+        <ProviderCard
+          icon={info.icon}
+          name={info.name}
+          chip="MCP"
+          description={info.description}
+          status={{
+            tone: status.configured ? 'green' : 'gray',
+            text: status.configured ? 'Configured' : 'Not configured',
+          }}
+          actions={<>
+            <button className="settings-btn" onClick={() => handleAutoConfigure(target)}>Auto-configure</button>
+            <button className="settings-btn" onClick={() => handleTestConnection(target)}>Test</button>
+            {isThisTest && mcpTestResult && (
+              mcpTestResult.ok
+                ? <span className="connector-badge connected">{mcpTestResult.text}</span>
+                : <span className="connector-badge" style={{ background: 'var(--accent-red-soft, #fee2e2)', color: 'var(--accent-red, #991b1b)' }}>{mcpTestResult.text}</span>
+            )}
+          </>}
+        />
+
+        {autoConfig && (
+          <p className={`settings-hint${autoConfig.isError ? ' error' : ' success'}`} style={{ margin: '4px 0 0' }}>
+            {autoConfig.text}
+          </p>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+          <button
+            className="connector-advanced-toggle"
+            onClick={() => setMcpManualOpen(prev => ({ ...prev, [target]: !prev[target] }))}
+            type="button"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: manualOpen ? 'rotate(180deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
+              <path d="M2 4l4 4 4-4"/>
+            </svg>
+            Manual configuration
+          </button>
+          {manualOpen && (
+            <div style={{ marginLeft: 18 }}>
+              <p className="settings-hint" style={{ margin: '0 0 4px' }}>
+                Add this to <code>{info.configFile}</code>:
+              </p>
+              <div className="settings-mcp-snippet-row">
+                <pre className="settings-mcp-snippet">{snippet}</pre>
+                <button className="settings-btn settings-mcp-copy-btn" onClick={() => handleCopy(target)}>
+                  {isCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {status.configPath && (
+            <>
+              <button
+                className="connector-advanced-toggle"
+                onClick={() => setMcpPathOpen(prev => ({ ...prev, [target]: !prev[target] }))}
+                type="button"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: pathOpen ? 'rotate(180deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
+                  <path d="M2 4l4 4 4-4"/>
+                </svg>
+                Config file path
+              </button>
+              {pathOpen && (
+                <p className="settings-hint settings-mcp-path" style={{ margin: '0 0 0 18px' }}>
+                  {status.configPath}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -701,6 +931,100 @@ export default function AIPanel() {
             ))}
           </div>
         )}
+
+        <ProviderCard
+          icon={<IconGemini width={20} height={20} style={{ color: 'var(--text)' }} />}
+          name="Gemini CLI"
+          chip="CLI"
+          description="Google's CLI agent for Gemini models, using your Google account."
+          status={
+            geminiInstalled === null || geminiLoggedIn === null
+              ? { tone: 'gray', text: 'Checking…' }
+              : geminiInstalled && geminiLoggedIn
+                ? { tone: 'green', text: 'Installed · Logged in' }
+                : geminiInstalled
+                  ? { tone: 'amber', text: 'Installed · Not logged in' }
+                  : { tone: 'gray', text: 'Not installed' }
+          }
+          actions={
+            geminiInstalled === false ? (
+              <button
+                className="settings-btn"
+                disabled={geminiSetupPhase === 'installing' || geminiSetupPhase === 'checking'}
+                onClick={handleGeminiSetup}
+              >
+                {geminiSetupPhase === 'installing' || geminiSetupPhase === 'checking' ? 'Installing…' : 'Install'}
+              </button>
+            ) : geminiInstalled && geminiLoggedIn === false ? (
+              <button
+                className="settings-btn"
+                disabled={geminiLoginPhase === 'logging-in'}
+                onClick={handleGeminiLogin}
+              >
+                {geminiLoginPhase === 'logging-in' ? 'Waiting for browser…' : 'Login'}
+              </button>
+            ) : geminiInstalled && geminiLoggedIn ? (
+              <button className="settings-btn settings-btn--link" onClick={handleGeminiLogout}>
+                Logout
+              </button>
+            ) : null
+          }
+        />
+
+        {(geminiSetupLines.length > 0 || geminiLoginLines.length > 0) && (
+          <div className="settings-setup-log" style={{ width: '100%', marginTop: 6 }}>
+            {[...geminiSetupLines, ...geminiLoginLines].map((line, i) => (
+              <div key={i} className="settings-setup-line">{line}</div>
+            ))}
+          </div>
+        )}
+
+        <ProviderCard
+          icon={<IconOpenAI width={20} height={20} style={{ color: 'var(--text)' }} />}
+          name="Codex CLI"
+          chip="CLI"
+          description="OpenAI's CLI agent for Codex/GPT models, using your ChatGPT or API account."
+          status={
+            codexInstalled === null || codexLoggedIn === null
+              ? { tone: 'gray', text: 'Checking…' }
+              : codexInstalled && codexLoggedIn
+                ? { tone: 'green', text: 'Installed · Logged in' }
+                : codexInstalled
+                  ? { tone: 'amber', text: 'Installed · Not logged in' }
+                  : { tone: 'gray', text: 'Not installed' }
+          }
+          actions={
+            codexInstalled === false ? (
+              <button
+                className="settings-btn"
+                disabled={codexSetupPhase === 'installing' || codexSetupPhase === 'checking'}
+                onClick={handleCodexSetup}
+              >
+                {codexSetupPhase === 'installing' || codexSetupPhase === 'checking' ? 'Installing…' : 'Install'}
+              </button>
+            ) : codexInstalled && codexLoggedIn === false ? (
+              <button
+                className="settings-btn"
+                disabled={codexLoginPhase === 'logging-in'}
+                onClick={handleCodexLogin}
+              >
+                {codexLoginPhase === 'logging-in' ? 'Waiting for browser…' : 'Login'}
+              </button>
+            ) : codexInstalled && codexLoggedIn ? (
+              <button className="settings-btn settings-btn--link" onClick={handleCodexLogout}>
+                Logout
+              </button>
+            ) : null
+          }
+        />
+
+        {(codexSetupLines.length > 0 || codexLoginLines.length > 0) && (
+          <div className="settings-setup-log" style={{ width: '100%', marginTop: 6 }}>
+            {[...codexSetupLines, ...codexLoginLines].map((line, i) => (
+              <div key={i} className="settings-setup-line">{line}</div>
+            ))}
+          </div>
+        )}
         </div>
       )}
 
@@ -708,73 +1032,12 @@ export default function AIPanel() {
         <div className="ai-tab-panel" role="tabpanel">
           <p className="ai-tab-desc">
             The Model Context Protocol lets AI tools share capabilities with each other. Below, you
-            can expose Git Suite as an MCP server so the Claude Code CLI can call its tools — or
-            register third-party MCP servers as additional tool sources for Git Suite itself.
+            can expose Git Suite as an MCP server so a CLI agent — Claude Code, OpenCode, Gemini, or
+            Codex — can call its tools, or register third-party MCP servers as additional tool
+            sources for Git Suite itself.
           </p>
 
-          <ProviderCard
-            icon={<IconClaude width={20} height={20} style={{ color: 'var(--text)' }} />}
-            name="Claude Code MCP"
-            chip="MCP"
-            description="Let the Claude Code CLI call Git Suite's tools."
-            status={{
-              tone: mcpConfigured ? 'green' : 'gray',
-              text: mcpConfigured ? 'Configured' : 'Not configured',
-            }}
-            actions={<>
-              <button className="settings-btn" onClick={handleAutoConfigure}>Auto-configure</button>
-              <button className="settings-btn" onClick={handleTestConnection}>Test</button>
-              {testResult && (
-                testResult.ok
-                  ? <span className="connector-badge connected">{testResult.text}</span>
-                  : <span className="connector-badge" style={{ background: 'var(--accent-red-soft, #fee2e2)', color: 'var(--accent-red, #991b1b)' }}>{testResult.text}</span>
-              )}
-            </>}
-          />
-
-          {autoConfigStatus && (
-            <p className={`settings-hint${autoConfigIsError ? ' error' : ' success'}`} style={{ margin: '4px 0 0' }}>
-              {autoConfigStatus}
-            </p>
-          )}
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-            <button className="connector-advanced-toggle" onClick={() => setManualConfigOpen(v => !v)} type="button">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: manualConfigOpen ? 'rotate(180deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
-                <path d="M2 4l4 4 4-4"/>
-              </svg>
-              Manual configuration
-            </button>
-            {manualConfigOpen && (
-              <div style={{ marginLeft: 18 }}>
-                <p className="settings-hint" style={{ margin: '0 0 4px' }}>
-                  Add this to <code>claude_desktop_config.json</code>:
-                </p>
-                <div className="settings-mcp-snippet-row">
-                  <pre className="settings-mcp-snippet">{configSnippet}</pre>
-                  <button className="settings-btn settings-mcp-copy-btn" onClick={handleCopy}>
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {mcpConfigPath && (
-              <>
-                <button className="connector-advanced-toggle" onClick={() => setConfigPathOpen(v => !v)} type="button">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transform: configPathOpen ? 'rotate(180deg)' : 'rotate(90deg)', transition: 'transform 0.15s' }}>
-                    <path d="M2 4l4 4 4-4"/>
-                  </svg>
-                  Config file path
-                </button>
-                {configPathOpen && (
-                  <p className="settings-hint settings-mcp-path" style={{ margin: '0 0 0 18px' }}>
-                    {mcpConfigPath}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
+          {MCP_TARGETS.map(target => renderMcpCard(target))}
 
           <div className="ai-tab-section-label" style={{ marginTop: 20 }}>
             Custom MCP <span className="transport-chip beta" style={{ marginLeft: 6 }}>BETA</span>
