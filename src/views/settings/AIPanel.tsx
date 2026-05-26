@@ -1,10 +1,21 @@
-import { useState, useEffect, type ReactNode, type Dispatch, type SetStateAction } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode, type Dispatch, type SetStateAction } from 'react'
 import SectionBlock from './shared/SectionBlock'
 import ProviderCard from './shared/ProviderCard'
 import IconAnthropic from '~icons/simple-icons/anthropic'
+import IconClaude from '~icons/simple-icons/claude'
 import IconOpenAI from '~icons/simple-icons/openai'
 import IconGemini from '~icons/simple-icons/googlegemini'
 import IconOllama from '~icons/simple-icons/ollama'
+
+type SetupPhase = 'idle' | 'checking' | 'installing' | 'auth' | 'done' | 'error'
+type LoginPhase = 'idle' | 'logging-in' | 'done' | 'error'
+
+const OpenCodeIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text)' }} aria-hidden="true">
+    <polyline points="8 6 2 12 8 18" />
+    <polyline points="16 6 22 12 16 18" />
+  </svg>
+)
 
 type ProviderConfig = { enabled: boolean; apiKey?: string; organization?: string }
 type OpenAICompatibleEndpoint = { id: string; label: string; baseUrl: string; apiKey?: string }
@@ -136,6 +147,139 @@ export default function AIPanel() {
   const [endpoints,    setEndpoints]    = useState<OpenAICompatibleEndpoint[]>([])
   const [testStatus,   setTestStatus]   = useState<Record<string, { ok: boolean; message?: string } | 'testing'>>({})
 
+  // Claude Code state
+  const [claudeCodeInstalled, setClaudeCodeInstalled] = useState<boolean | null>(null)
+  const [claudeCodeLoggedIn, setClaudeCodeLoggedIn]   = useState<boolean | null>(null)
+  const [setupPhase, setSetupPhase] = useState<SetupPhase>('idle')
+  const [setupLines, setSetupLines] = useState<string[]>([])
+  const [loginPhase, setLoginPhase] = useState<LoginPhase>('idle')
+  const [loginLines, setLoginLines] = useState<string[]>([])
+  const [claudeLoggingOut, setClaudeLoggingOut] = useState(false)
+  const [claudeDisconnectError, setClaudeDisconnectError] = useState<string | null>(null)
+
+  // OpenCode state
+  const [opencodeInstalled, setOpencodeInstalled] = useState<boolean | null>(null)
+  const [opencodeLoggedIn, setOpencodeLoggedIn]   = useState<boolean | null>(null)
+  const [opencodeSetupPhase, setOpencodeSetupPhase] = useState<SetupPhase>('idle')
+  const [opencodeSetupLines, setOpencodeSetupLines] = useState<string[]>([])
+  const [opencodeLoginPhase, setOpencodeLoginPhase] = useState<LoginPhase>('idle')
+  const [opencodeLoginLines, setOpencodeLoginLines] = useState<string[]>([])
+
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
+  useEffect(() => () => { timers.current.forEach(clearTimeout) }, [])
+
+  useEffect(() => {
+    window.api.skill.detectClaudeCode().then(installed => {
+      setClaudeCodeInstalled(installed)
+      if (installed) window.api.skill.checkAuthStatus().then(setClaudeCodeLoggedIn)
+      else setClaudeCodeLoggedIn(false)
+    })
+    window.api.opencode.detect().then(setOpencodeInstalled).catch(() => setOpencodeInstalled(false))
+    window.api.opencode.checkAuthStatus().then(setOpencodeLoggedIn).catch(() => setOpencodeLoggedIn(false))
+  }, [])
+
+  const handleSetup = useCallback(async () => {
+    setSetupPhase('checking')
+    setSetupLines([])
+    const onProgress = ({ phase, message }: { phase: string; message: string }) => {
+      setSetupPhase(phase as SetupPhase)
+      setSetupLines((prev) => [...prev, message])
+    }
+    window.api.skill.onSetupProgress(onProgress)
+    try {
+      await window.api.skill.setup()
+      const installed = await window.api.skill.detectClaudeCode()
+      setClaudeCodeInstalled(installed)
+      if (installed) window.api.skill.checkAuthStatus().then(setClaudeCodeLoggedIn)
+    } finally {
+      window.api.skill.offSetupProgress(onProgress)
+    }
+  }, [])
+
+  const handleLogin = useCallback(async () => {
+    setLoginPhase('logging-in')
+    setLoginLines([])
+    let hadError = false
+    const onProgress = ({ message, isError, done }: { message: string; isError?: boolean; done?: boolean }) => {
+      setLoginLines((prev) => [...prev, message])
+      if (isError) { hadError = true; setLoginPhase('error') }
+      if (done) {
+        setLoginPhase('done')
+        window.api.skill.checkAuthStatus().then(setClaudeCodeLoggedIn)
+      }
+    }
+    window.api.skill.onLoginProgress(onProgress)
+    try {
+      await window.api.skill.loginClaude()
+      if (!hadError) setLoginPhase('done')
+    } catch {
+      setLoginPhase('error')
+    } finally {
+      window.api.skill.offLoginProgress(onProgress)
+    }
+  }, [])
+
+  const handleClaudeDisconnect = async () => {
+    setClaudeLoggingOut(true)
+    setClaudeDisconnectError(null)
+    try {
+      await window.api.skill.logoutClaude()
+      setClaudeCodeLoggedIn(false)
+    } catch {
+      setClaudeDisconnectError('Logout failed — please try again.')
+    } finally {
+      setClaudeLoggingOut(false)
+    }
+  }
+
+  const handleOpencodeSetup = async () => {
+    setOpencodeSetupPhase('installing')
+    setOpencodeSetupLines([])
+    const cb = (payload: { phase: string; line?: string }) => {
+      if (payload.line) setOpencodeSetupLines(prev => [...prev, payload.line!])
+      if (payload.phase === 'done') setOpencodeSetupPhase('done')
+      if (payload.phase === 'error') setOpencodeSetupPhase('error')
+    }
+    window.api.opencode.onSetupProgress(cb)
+    try {
+      const result = await window.api.opencode.setup()
+      if (result.ok) {
+        setOpencodeInstalled(true)
+        setOpencodeSetupPhase('done')
+      } else {
+        setOpencodeSetupPhase('error')
+      }
+    } finally {
+      window.api.opencode.offSetupProgress(cb)
+    }
+  }
+
+  const handleOpencodeLogin = async () => {
+    setOpencodeLoginPhase('logging-in')
+    setOpencodeLoginLines([])
+    const cb = (payload: { message: string; isError?: boolean; done?: boolean }) => {
+      setOpencodeLoginLines(prev => [...prev, payload.message])
+      if (payload.done) setOpencodeLoginPhase(payload.isError ? 'error' : 'done')
+    }
+    window.api.opencode.onLoginProgress(cb)
+    try {
+      const result = await window.api.opencode.loginOpenCode()
+      if (result.ok) {
+        setOpencodeLoggedIn(true)
+        setOpencodeLoginPhase('done')
+      } else if (opencodeLoginPhase !== 'error') {
+        setOpencodeLoginPhase('error')
+      }
+    } finally {
+      window.api.opencode.offLoginProgress(cb)
+    }
+  }
+
+  const handleOpencodeLogout = async () => {
+    await window.api.opencode.logoutOpenCode()
+    setOpencodeLoggedIn(false)
+  }
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -263,8 +407,138 @@ export default function AIPanel() {
         />
       </SectionBlock>
 
-      <SectionBlock title="CLI" defaultExpanded>
-        <div style={{ opacity: 0.5, fontSize: 12 }}>CLI providers coming in Task 7.</div>
+      <SectionBlock title="CLI" count={2} defaultExpanded>
+        <div className="section-block-body-desc">
+          Git Suite spawns the CLI tool and talks to it via stdio. Uses your subscription.
+        </div>
+
+        <ProviderCard
+          icon={<IconClaude width={20} height={20} style={{ color: 'var(--text)' }} />}
+          name="Anthropic's Claude Code"
+          chip="CLI"
+          description="Anthropic's CLI agent. Runs Claude via your Claude.ai subscription."
+          status={
+            claudeCodeLoggedIn === true
+              ? { tone: 'green', text: 'Installed · Logged in' }
+              : claudeCodeInstalled === false
+                ? { tone: 'gray', text: 'Not installed' }
+                : { tone: 'amber', text: 'Installed · Not logged in' }
+          }
+          actions={
+            (setupPhase !== 'idle' && setupPhase !== 'done') || loginPhase === 'logging-in' ? (
+              <span className="connector-status-text">
+                {setupPhase !== 'idle' && setupPhase !== 'done' ? 'Installing…' : 'Connecting…'}
+              </span>
+            ) : claudeCodeLoggedIn === true ? (
+              <button
+                className="settings-btn settings-btn--link connector-disconnect-btn"
+                disabled={claudeLoggingOut}
+                onClick={handleClaudeDisconnect}
+              >
+                {claudeLoggingOut ? 'Logging out…' : 'Disconnect'}
+              </button>
+            ) : claudeCodeInstalled === false && setupPhase === 'idle' ? (
+              <button className="settings-btn" onClick={handleSetup}>Install</button>
+            ) : claudeCodeLoggedIn === false && loginPhase === 'idle' ? (
+              <button className="settings-btn" onClick={handleLogin}>Connect</button>
+            ) : (
+              <span className="connector-status-text">Checking…</span>
+            )
+          }
+        />
+
+        {claudeDisconnectError && (
+          <p className="settings-hint error" style={{ margin: '4px 0' }}>{claudeDisconnectError}</p>
+        )}
+
+        {setupPhase !== 'idle' && setupPhase !== 'done' && (
+          <div className="settings-setup-log" style={{ width: '100%', marginTop: 6 }}>
+            {setupLines.map((line, i) => (
+              <div key={i} className={`settings-setup-line${setupPhase === 'error' && i === setupLines.length - 1 ? ' error' : ''}`}>{line}</div>
+            ))}
+            {setupPhase !== 'error' && <div className="settings-setup-line muted">…</div>}
+          </div>
+        )}
+        {setupPhase === 'done' && (
+          <p className="settings-hint success">Claude installed and authenticated.</p>
+        )}
+        {loginPhase === 'logging-in' && (
+          <div className="settings-setup-log" style={{ width: '100%', marginTop: 6 }}>
+            {loginLines.map((line, i) => {
+              const urlMatch = line.match(/(https:\/\/\S+)/)
+              return (
+                <div key={i} className="settings-setup-line">
+                  {urlMatch ? (
+                    <>
+                      <span>{line.slice(0, urlMatch.index)}</span>
+                      <a href="#" style={{ color: 'var(--accent)', wordBreak: 'break-all' }} onClick={e => { e.preventDefault(); window.api.openExternal(urlMatch[1]) }}>{urlMatch[1]}</a>
+                      <span>{line.slice((urlMatch.index ?? 0) + urlMatch[1].length)}</span>
+                    </>
+                  ) : line}
+                </div>
+              )
+            })}
+            <div className="settings-setup-line muted">Waiting for browser login…</div>
+          </div>
+        )}
+        {loginPhase === 'error' && (
+          <div className="settings-setup-log" style={{ width: '100%', marginTop: 6 }}>
+            {loginLines.map((line, i) => <div key={i} className={`settings-setup-line${i === loginLines.length - 1 ? ' error' : ''}`}>{line}</div>)}
+            <div className="settings-inline-row" style={{ marginTop: 8 }}>
+              <button className="settings-btn" onClick={() => { setLoginPhase('idle'); setLoginLines([]) }}>Try again</button>
+            </div>
+          </div>
+        )}
+        {loginPhase === 'done' && (
+          <p className="settings-hint success">Logged in — skill generation now uses your Claude subscription.</p>
+        )}
+
+        <ProviderCard
+          icon={<OpenCodeIcon />}
+          name="OpenCode"
+          chip="CLI"
+          description="CLI fork supporting Claude, GPT, Gemini, and local models via one OAuth login."
+          status={
+            opencodeInstalled === null || opencodeLoggedIn === null
+              ? { tone: 'gray', text: 'Checking…' }
+              : opencodeInstalled && opencodeLoggedIn
+                ? { tone: 'green', text: 'Installed · Logged in' }
+                : opencodeInstalled
+                  ? { tone: 'amber', text: 'Installed · Not logged in' }
+                  : { tone: 'gray', text: 'Not installed' }
+          }
+          actions={
+            opencodeInstalled === false ? (
+              <button
+                className="settings-btn"
+                disabled={opencodeSetupPhase === 'installing' || opencodeSetupPhase === 'checking'}
+                onClick={handleOpencodeSetup}
+              >
+                {opencodeSetupPhase === 'installing' || opencodeSetupPhase === 'checking' ? 'Installing…' : 'Install'}
+              </button>
+            ) : opencodeInstalled && opencodeLoggedIn === false ? (
+              <button
+                className="settings-btn"
+                disabled={opencodeLoginPhase === 'logging-in'}
+                onClick={handleOpencodeLogin}
+              >
+                {opencodeLoginPhase === 'logging-in' ? 'Waiting for browser…' : 'Login'}
+              </button>
+            ) : opencodeInstalled && opencodeLoggedIn ? (
+              <button className="settings-btn settings-btn--link" onClick={handleOpencodeLogout}>
+                Logout
+              </button>
+            ) : null
+          }
+        />
+
+        {(opencodeSetupLines.length > 0 || opencodeLoginLines.length > 0) && (
+          <div className="settings-setup-log" style={{ width: '100%', marginTop: 6 }}>
+            {[...opencodeSetupLines, ...opencodeLoginLines].map((line, i) => (
+              <div key={i} className="settings-setup-line">{line}</div>
+            ))}
+          </div>
+        )}
       </SectionBlock>
 
       <SectionBlock title="MCP" defaultExpanded={false}>
