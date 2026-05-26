@@ -252,6 +252,32 @@ describe('Settings — AI panel', () => {
     })
   })
 
+  it('Auto-configure on each MCP card dispatches with the correct target', async () => {
+    render(<Settings />)
+    await waitFor(() => screen.getByRole('tab', { name: /^MCP$/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /^MCP$/ }))
+    await waitFor(() => screen.getByText(/Codex CLI MCP/i))
+
+    // Cards render in MCP_TARGETS order: claude, opencode, gemini, codex.
+    const autoButtons = screen.getAllByRole('button', { name: /Auto-configure/i })
+    expect(autoButtons).toHaveLength(4)
+
+    fireEvent.click(autoButtons[1]) // OpenCode
+    await waitFor(() => {
+      expect(window.api.mcp.autoConfigure).toHaveBeenCalledWith('opencode')
+    })
+
+    fireEvent.click(autoButtons[2]) // Gemini
+    await waitFor(() => {
+      expect(window.api.mcp.autoConfigure).toHaveBeenCalledWith('gemini')
+    })
+
+    fireEvent.click(autoButtons[3]) // Codex
+    await waitFor(() => {
+      expect(window.api.mcp.autoConfigure).toHaveBeenCalledWith('codex')
+    })
+  })
+
   it('clicking Test on Anthropic card calls llm.testConnection', async () => {
     setupApi({ anthropicKey: 'sk-ant-test' })
     render(<Settings />)
