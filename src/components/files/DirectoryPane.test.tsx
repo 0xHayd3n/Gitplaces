@@ -25,11 +25,20 @@ describe('DirectoryPane', () => {
   })
 
   it('renders each entry as a row', () => {
-    render(<DirectoryPane {...baseProps}
+    const { container } = render(<DirectoryPane {...baseProps}
       entries={[file('README.md', 'r-sha'), file('LICENSE', 'l-sha')]}
       basePath="" />)
-    expect(screen.getByText('README.md')).toBeInTheDocument()
-    expect(screen.getByText('LICENSE')).toBeInTheDocument()
+    const names = container.querySelectorAll('.file-row__name')
+    const nameTexts = Array.from(names).map(n => n.textContent)
+    expect(nameTexts).toContain('README.md')
+    expect(nameTexts).toContain('LICENSE')
+  })
+
+  it('renders a column header row', () => {
+    const { container } = render(<DirectoryPane {...baseProps}
+      entries={[file('README.md', 'r-sha')]}
+      basePath="" />)
+    expect(container.querySelector('.directory-pane__header')).toBeInTheDocument()
   })
 
   it('sorts directories before files', () => {

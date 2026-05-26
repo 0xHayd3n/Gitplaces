@@ -31,6 +31,14 @@ export default function DirectoryPane(props: Props) {
 
   return (
     <div className="directory-pane">
+      <div className="directory-pane__header">
+        <span className="directory-pane__h-name">Name</span>
+        <span className="directory-pane__h-desc">Description</span>
+        <span className="directory-pane__h-type">Type</span>
+        <span className="directory-pane__h-size">Size</span>
+        <span className="directory-pane__h-author">Author</span>
+        <span className="directory-pane__h-age">Age</span>
+      </div>
       {sorted.map((entry, i) => {
         const fullPath = props.basePath ? `${props.basePath}/${entry.path}` : entry.path
         const row: VisibleRow = {
@@ -50,6 +58,7 @@ export default function DirectoryPane(props: Props) {
           <FileTreeRow
             key={entry.sha + entry.path}
             row={row}
+            variant="listing"
             density={props.density}
             isFocused={false}
             isSelected={props.selected.has(fullPath)}

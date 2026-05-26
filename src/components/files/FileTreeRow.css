@@ -13,9 +13,10 @@
   text-align: left;
   position: relative;
 }
-.file-row:hover { background: var(--bg-hover); }
-.file-row--focused { outline: 1px solid var(--accent); outline-offset: -1px; }
-.file-row--selected { background: var(--bg-selected); }
+.file-row:hover { background: var(--hover-bg, rgba(255,255,255,0.08)); }
+.file-row--focused { outline: 1px solid var(--accent, #38bdf8); outline-offset: -1px; }
+.file-row--selected { background: var(--hover-bg, rgba(255,255,255,0.08)); }
+.file-row--selected:hover { background: rgba(255,255,255,0.14); }
 
 .file-row__status-dot {
   position: absolute;
@@ -36,6 +37,16 @@
 
 .file-row__icon { flex-shrink: 0; }
 .file-row__icon--folder { color: #f59e0b; }
+
+/* namecol wraps chevron + icon + name for tree variant (flex default) */
+.file-row__namecol {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
 
 .file-row__name {
   flex: 0 1 auto;
@@ -90,4 +101,68 @@
   font-variant-numeric: tabular-nums;
   min-width: 48px;
   text-align: right;
+}
+
+/* ── Listing variant: CSS grid aligned with DirectoryPane header ── */
+.file-row[data-variant='listing'] {
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 2fr)
+    minmax(140px, 1.4fr)
+    72px
+    72px
+    minmax(80px, 140px)
+    64px;
+  gap: 12px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* In listing variant, namecol is the first grid cell — no grow needed */
+.file-row[data-variant='listing'] .file-row__namecol {
+  flex: none;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.file-row[data-variant='listing'] .file-row__message {
+  flex: none;
+  margin-left: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-row[data-variant='listing'] .file-row__type {
+  color: var(--t3);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-row[data-variant='listing'] .file-row__size {
+  text-align: right;
+  margin-left: 0;
+}
+
+.file-row[data-variant='listing'] .file-row__author {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.file-row[data-variant='listing'] .file-row__author-name {
+  font-size: 11px;
+  color: var(--t2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-row[data-variant='listing'] .file-row__age {
+  text-align: right;
+  min-width: 0;
 }

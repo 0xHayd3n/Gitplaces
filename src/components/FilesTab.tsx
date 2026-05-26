@@ -206,7 +206,7 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
     const row = visibleRows.find(r => r.path === path)
     if (!row) return
     if (row.type === 'tree') {
-      if (!expanded.has(path)) await handleToggleExpand(path)
+      await handleToggleExpand(path)
       setSelectedEntry({ path: row.name, mode: '', type: 'tree', sha: row.sha })
       setBlobContent(null)
       pushHistory(path)
@@ -548,17 +548,6 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
 
   return (
     <div className="files-tab">
-      <FilesToolbar
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
-        searchMode={searchMode}
-        onSearchModeChange={setSearchMode}
-        density={density}
-        onDensityChange={setDensity}
-        diffBase={diffBase}
-        onDiffBaseChange={setDiffBase}
-        diffBaseOptions={diffBaseOptions}
-      />
       {gitStatus.error && (
         <div className="files-tab__compare-error">
           Compare failed · <button onClick={() => gitStatus.retry()}>Retry</button>
@@ -567,6 +556,17 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
       <div className="files-tab__body">
         {!isCollapsed ? (
           <div className="files-tab__tree" style={{ width: sidebarWidth }}>
+            <FilesToolbar
+              searchValue={searchQuery}
+              onSearchChange={setSearchQuery}
+              searchMode={searchMode}
+              onSearchModeChange={setSearchMode}
+              density={density}
+              onDensityChange={setDensity}
+              diffBase={diffBase}
+              onDiffBaseChange={setDiffBase}
+              diffBaseOptions={diffBaseOptions}
+            />
             <FileTreeView
               rows={visibleRows}
               density={density}

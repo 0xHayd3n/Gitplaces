@@ -36,19 +36,31 @@ describe('FileTreeRow', () => {
     expect(screen.getByText('Button.tsx')).toBeInTheDocument()
   })
 
-  it('shows file size when present', () => {
+  it('shows file size in listing variant', () => {
+    render(<FileTreeRow {...baseProps} row={baseRow} variant="listing" />)
+    expect(screen.getByText('2.3 KB')).toBeInTheDocument()
+  })
+
+  it('hides file size in tree variant (default)', () => {
+    // In tree variant, size IS shown (tree variant shows decorations too)
     render(<FileTreeRow {...baseProps} row={baseRow} />)
     expect(screen.getByText('2.3 KB')).toBeInTheDocument()
   })
 
-  it('renders last commit message when present and width >= 280', () => {
-    render(<FileTreeRow {...baseProps} row={baseRow}
+  it('renders last commit message when present in listing variant', () => {
+    render(<FileTreeRow {...baseProps} row={baseRow} variant="listing"
       lastCommit={{ message: 'fix bug', author_login: 'alice', author_avatar: null, committed_at: new Date().toISOString(), commit_sha: 'abc' }} />)
     expect(screen.getByText('fix bug')).toBeInTheDocument()
   })
 
-  it('hides last commit message at narrow widths', () => {
-    render(<FileTreeRow {...baseProps} row={baseRow} width={200}
+  it('hides last commit message in listing variant when not present', () => {
+    render(<FileTreeRow {...baseProps} row={baseRow} variant="listing" />)
+    // message cell renders empty string, no text to query
+    expect(screen.queryByText('fix bug')).not.toBeInTheDocument()
+  })
+
+  it('hides last commit message in tree variant at narrow widths', () => {
+    render(<FileTreeRow {...baseProps} row={baseRow} variant="tree" width={200}
       lastCommit={{ message: 'fix bug', author_login: 'alice', author_avatar: null, committed_at: new Date().toISOString(), commit_sha: 'abc' }} />)
     expect(screen.queryByText('fix bug')).not.toBeInTheDocument()
   })

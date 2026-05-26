@@ -16,6 +16,7 @@ interface Props {
   owner: string
   name: string
   width: number
+  variant?: 'tree' | 'listing'  // 'tree' = icon + name only; 'listing' = full columns. Default 'tree'.
   onClick: (e: React.MouseEvent) => void
   onContextMenu: (e: React.MouseEvent) => void
   onSegmentClick?: (depth: number) => void
@@ -40,6 +41,12 @@ function relativeAge(iso: string): string {
   return `${Math.floor(months / 12)}y ago`
 }
 
+function fileTypeLabel(path: string, isDir: boolean): string {
+  if (isDir) return 'Folder'
+  const ext = path.split('.').pop()?.toUpperCase() ?? ''
+  return ext || 'File'
+}
+
 const STATUS_COLOR: Record<GitFileStatus, string> = {
   added: '#22c55e',
   modified: '#f59e0b',
@@ -49,7 +56,7 @@ const STATUS_COLOR: Record<GitFileStatus, string> = {
 
 function FileTreeRow({
   row, density, isFocused, isSelected, lastCommit, gitStatus,
-  owner, name, width, onClick, onContextMenu, onSegmentClick,
+  owner, name, width, variant = 'tree', onClick, onContextMenu, onSegmentClick,
 }: Props) {
   const height = DENSITY_PX[density]
   const isDir = row.type === 'tree'
@@ -57,32 +64,8 @@ function FileTreeRow({
   const showAuthor = width >= 320
   const showMessage = width >= 280
 
-  return (
-    <div
-      role="treeitem"
-      tabIndex={isFocused ? 0 : -1}
-      aria-level={row.level}
-      aria-posinset={row.posInSet}
-      aria-setsize={row.setSize}
-      aria-expanded={isDir ? row.isExpanded : undefined}
-      aria-selected={isSelected}
-      data-path={row.path}
-      className={
-        'file-row' +
-        (isFocused ? ' file-row--focused' : '') +
-        (isSelected ? ' file-row--selected' : '')
-      }
-      style={{ height, paddingLeft: 8 + row.depth * 16 }}
-      onClick={onClick}
-      onContextMenu={onContextMenu}
-    >
-      {gitStatus && (
-        <span
-          className="file-row__status-dot"
-          title={gitStatus}
-          style={{ backgroundColor: STATUS_COLOR[gitStatus] }}
-        />
-      )}
+  const nameContent = (
+    <span className="file-row__namecol">
       {isDir ? (
         <ChevronRight
           size={12}
@@ -113,18 +96,63 @@ function FileTreeRow({
             ))
           : renderWithHighlight(row.name, row.matchRanges)}
       </span>
-      {row.size != null && !isDir && (
+    </span>
+  )
+
+  return (
+    <div
+      role="treeitem"
+      tabIndex={isFocused ? 0 : -1}
+      aria-level={row.level}
+      aria-posinset={row.posInSet}
+      aria-setsize={row.setSize}
+      aria-expanded={isDir ? row.isExpanded : undefined}
+      aria-selected={isSelected}
+      data-path={row.path}
+      data-variant={variant}
+      className={
+        'file-row' +
+        (isFocused ? ' file-row--focused' : '') +
+        (isSelected ? ' file-row--selected' : '')
+      }
+      style={{ height, paddingLeft: variant === 'listing' ? undefined : 8 + row.depth * 16 }}
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+    >
+      {gitStatus && (
+        <span
+          className="file-row__status-dot"
+          title={gitStatus}
+          style={{ backgroundColor: STATUS_COLOR[gitStatus] }}
+        />
+      )}
+      {nameContent}
+      {variant === 'listing' && (
+        <>
+          <span className="file-row__message">{lastCommit?.message ?? ''}</span>
+          <span className="file-row__type">{fileTypeLabel(row.path, isDir)}</span>
+          <span className="file-row__size">{!isDir && row.size != null ? formatBytes(row.size) : ''}</span>
+          <span className="file-row__author">
+            {lastCommit?.author_avatar && (
+              <img className="file-row__avatar" src={lastCommit.author_avatar} alt="" />
+            )}
+            <span className="file-row__author-name">{lastCommit?.author_login ?? ''}</span>
+          </span>
+          <span className="file-row__age">{lastCommit ? relativeAge(lastCommit.committed_at) : ''}</span>
+        </>
+      )}
+      {variant === 'tree' && row.size != null && !isDir && (
         <span className="file-row__size">{formatBytes(row.size)}</span>
       )}
-      {showMessage && lastCommit && (
+      {variant === 'tree' && showMessage && lastCommit && (
         <span className="file-row__message" title={lastCommit.message}>
           {lastCommit.message}
         </span>
       )}
-      {showAuthor && lastCommit?.author_avatar && (
+      {variant === 'tree' && showAuthor && lastCommit?.author_avatar && (
         <img className="file-row__avatar" src={lastCommit.author_avatar} alt={lastCommit.author_login ?? ''} />
       )}
-      {lastCommit && (
+      {variant === 'tree' && lastCommit && (
         <span className="file-row__age">{relativeAge(lastCommit.committed_at)}</span>
       )}
     </div>

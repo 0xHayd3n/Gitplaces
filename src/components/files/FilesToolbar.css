@@ -1,19 +1,20 @@
 .files-toolbar {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg1);
+  background: var(--bg2);
   font-family: 'Inter', sans-serif;
   font-size: 11px;
 }
 
 .files-toolbar__search {
   position: relative;
-  flex: 1 1 auto;
-  min-width: 120px;
-  max-width: 280px;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
 }
 .files-toolbar__search-icon {
   position: absolute;
@@ -38,10 +39,10 @@
 }
 
 .files-toolbar__select {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
-  position: relative;
+  justify-content: space-between;
+  gap: 6px;
 }
 .files-toolbar__select-label {
   color: var(--t3);
@@ -50,6 +51,8 @@
   letter-spacing: 0.05em;
 }
 .files-toolbar__select select {
+  flex: 1 1 auto;
+  min-width: 0;
   appearance: none;
   background: var(--bg0);
   border: 1px solid var(--border);

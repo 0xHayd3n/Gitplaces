@@ -3062,11 +3062,12 @@ a {
   overflow: hidden;
 }
 .files-tab__tree {
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
   max-width: 50%;
   border-right: 1px solid var(--border);
-  overflow-y: overlay;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 /* ── Resize handle ──────────────────────────────────────────────────── */
 .files-tab__resize-handle {
@@ -3110,6 +3111,7 @@ a {
   flex: 1;
   overflow-y: overlay;
   min-width: 0;
+  overflow: hidden;
 }
 .files-tab__loading,
 .files-tab__error {
