@@ -310,7 +310,6 @@ export default function TemplateGallery() {
                     recordRecentVisit({ owner: row.owner, name: row.name, avatar_url: row.avatar_url, navigatePath: actualPath })
                     navigate(actualPath)
                   }}
-                  onTagClick={() => {}}
                 />
               </div>
             ))}

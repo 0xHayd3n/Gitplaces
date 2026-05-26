@@ -273,7 +273,7 @@ function ReposTab({ login }: { login: string }) {
           <div className="repo-grid">
             {repos.map(r => {
               const row = apiRepoToRow(r)
-              return <RepoCard key={row.id} repo={row} onNavigate={navigate} onTagClick={() => {}} />
+              return <RepoCard key={row.id} repo={row} onNavigate={navigate} />
             })}
           </div>
         )}
@@ -328,7 +328,7 @@ function StarredTab({ login }: { login: string }) {
           <div className="repo-grid">
             {sorted.map(r => {
               const row = apiRepoToRow(r)
-              return <RepoCard key={row.id} repo={row} onNavigate={navigate} onTagClick={() => {}} />
+              return <RepoCard key={row.id} repo={row} onNavigate={navigate} />
             })}
           </div>
         )}

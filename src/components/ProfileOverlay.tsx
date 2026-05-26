@@ -306,7 +306,6 @@ function ReposTab({ username }: { username: string }) {
                   key={row.id}
                   repo={row}
                   onNavigate={navigate}
-                  onTagClick={() => {}}
                 />
               )
             })}
@@ -354,7 +353,7 @@ function StarredTab({ username }: { username: string }) {
             {sorted.map(r => {
               const row = apiRepoToRow(r)
               return (
-                <RepoCard key={row.id} repo={row} onNavigate={navigate} onTagClick={() => {}} />
+                <RepoCard key={row.id} repo={row} onNavigate={navigate} />
               )
             })}
           </div>
