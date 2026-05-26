@@ -387,9 +387,18 @@ declare global {
         getChat: (id: number) => Promise<{ id: number; title: string; messages: AiChatMessage[]; created_at: string; updated_at: string } | null>
         saveChat: (chat: { id?: number; title: string; messages: AiChatMessage[] }) => Promise<number>
         deleteChat: (id: number) => Promise<void>
-        sendMessage: (payload: { messages: AiChatMessage[]; starredRepos: string[]; installedSkills: string[]; pageContext?: string }) => Promise<{ text: string; html: string }>
+        sendMessage: (payload: {
+          messages: AiChatMessage[]
+          starredRepos: string[]
+          installedSkills: string[]
+          pageContext?: string
+          agentId?: number | null
+          modelRef?: { provider: string; model: string; endpoint?: string }
+        }) => Promise<{ text: string; html: string }>
         onStreamToken: (cb: (token: string) => void) => void
         offStreamToken: (cb: (token: string) => void) => void
+        onStreamEvent: (cb: (event: { type: string; [k: string]: unknown }) => void) => void
+        offStreamEvent: (cb: (event: { type: string; [k: string]: unknown }) => void) => void
       }
       create: {
         getTemplates: () => Promise<import('./types/create').CreateTemplate[]>

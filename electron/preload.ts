@@ -495,7 +495,14 @@ contextBridge.exposeInMainWorld('api', {
     saveChat: (chat: { id?: number; title: string; messages: unknown[] }) =>
       ipcRenderer.invoke('ai:saveChat', chat),
     deleteChat: (id: number) => ipcRenderer.invoke('ai:deleteChat', id),
-    sendMessage: (payload: { messages: unknown[]; starredRepos: string[]; installedSkills: string[]; pageContext?: string }) =>
+    sendMessage: (payload: {
+      messages: unknown[]
+      starredRepos: string[]
+      installedSkills: string[]
+      pageContext?: string
+      agentId?: number | null
+      modelRef?: { provider: string; model: string; endpoint?: string }
+    }) =>
       ipcRenderer.invoke('ai:sendMessage', payload) as Promise<{ text: string; html: string }>,
     onStreamToken: (cb: (token: string) => void) => {
       const wrapper = (_event: unknown, token: string) => cb(token)
@@ -506,6 +513,18 @@ contextBridge.exposeInMainWorld('api', {
       const wrapper = callbackWrappers.get(cb)
       if (wrapper) {
         ipcRenderer.removeListener('ai:stream-token', wrapper)
+        callbackWrappers.delete(cb)
+      }
+    },
+    onStreamEvent: (cb: (event: { type: string; [k: string]: unknown }) => void) => {
+      const wrapper = (_event: unknown, ev: { type: string; [k: string]: unknown }) => cb(ev)
+      callbackWrappers.set(cb, wrapper)
+      ipcRenderer.on('ai:stream-event', wrapper)
+    },
+    offStreamEvent: (cb: (event: { type: string; [k: string]: unknown }) => void) => {
+      const wrapper = callbackWrappers.get(cb)
+      if (wrapper) {
+        ipcRenderer.removeListener('ai:stream-event', wrapper)
         callbackWrappers.delete(cb)
       }
     },

@@ -1,6 +1,7 @@
 import { ipcMain, app, BrowserWindow } from 'electron'
 import { getDb } from '../db'
-import { sendMessageStream, parseAssistantMessage, AiChatMessage, renderContentHtml } from '../services/aiChatService'
+import { runChat, parseAssistantMessage, AiChatMessage, renderContentHtml } from '../services/aiChatService'
+import type { AgentEvent, ModelRef } from '../llm/types'
 
 export function registerAiChatHandlers(): void {
   ipcMain.handle('ai:getChats', () => {
@@ -51,22 +52,32 @@ export function registerAiChatHandlers(): void {
     starredRepos: string[]
     installedSkills: string[]
     pageContext?: string
+    agentId?: number | null
+    modelRef?: ModelRef
   }) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) {
       throw new Error('Browser window not found')
     }
     return new Promise<{ text: string; html: string }>((resolve, reject) => {
-      sendMessageStream(
-        payload.messages,
-        payload.starredRepos,
-        payload.installedSkills,
-        payload.pageContext,
+      runChat(
+        {
+          messages: payload.messages,
+          starredRepos: payload.starredRepos,
+          installedSkills: payload.installedSkills,
+          pageContext: payload.pageContext,
+          agentId: payload.agentId ?? null,
+          modelRef: payload.modelRef,
+        },
         {
           onToken: (token) => {
             if (!win.isDestroyed()) {
-              // Send raw text — renderer handles markdown-to-HTML conversion
               win.webContents.send('ai:stream-token', token)
+            }
+          },
+          onEvent: (ev: AgentEvent) => {
+            if (!win.isDestroyed()) {
+              win.webContents.send('ai:stream-event', ev)
             }
           },
           onDone: (fullText) => {
@@ -77,7 +88,7 @@ export function registerAiChatHandlers(): void {
           },
         }
       ).catch((err) => {
-        console.error('[ai-chat] sendMessageStream unhandled error:', err)
+        console.error('[ai-chat] runChat unhandled error:', err)
         reject(err instanceof Error ? err : new Error(String(err)))
       })
     })
