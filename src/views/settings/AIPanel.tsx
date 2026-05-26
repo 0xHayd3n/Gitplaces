@@ -642,7 +642,7 @@ export default function AIPanel() {
         onBlur={() => setMcpPathShownAsTitle(prev => ({ ...prev, [target]: false }))}
         style={{
           background: 'transparent', border: 'none', padding: 0,
-          color: 'var(--accent)', cursor: 'pointer',
+          color: 'inherit', cursor: 'pointer',
           font: 'inherit', wordBreak: 'break-all', textAlign: 'left',
         }}
         title="Click to copy"
