@@ -7,21 +7,37 @@ import type { RepoRow } from '../types/repo'
 vi.mock('./DitherBackground', () => ({
   default: () => <div data-testid="dither-bg" />,
 }))
+vi.mock('./LanguageIcon', () => ({
+  default: ({ lang }: { lang: string }) => <span data-testid="lang-icon">{lang}</span>,
+}))
 
 vi.mock('../hooks/useBayerDither', () => ({ useBayerDither: vi.fn() }))
 
 beforeAll(() => {
+  // ResizeObserver is already stubbed in src/test/setup.ts, but the existing
+  // test set it locally too — keep that for parity with prior behaviour.
   globalThis.ResizeObserver = class {
     observe() {}
     unobserve() {}
     disconnect() {}
   } as unknown as typeof ResizeObserver
+  const w = globalThis as unknown as { window: { api: Record<string, unknown> } }
+  w.window.api = {
+    ...(w.window.api ?? {}),
+    settings: { getPreferredLanguage: vi.fn().mockResolvedValue('en') },
+    translate: {
+      check:     vi.fn().mockResolvedValue(null),
+      translate: vi.fn().mockResolvedValue(null),
+    },
+    db: { cacheTranslatedDescription: vi.fn().mockResolvedValue(undefined) },
+  }
 })
 
-function makeRepo(owner: string, name: string): RepoRow {
+function makeRepo(owner: string, name: string, overrides: Partial<RepoRow> = {}): RepoRow {
   return {
     id: `${owner}/${name}`, owner, name,
-    description: null, language: 'TypeScript', stars: 1000, forks: 100,
+    description: 'Sample description text.',
+    language: 'TypeScript', stars: 1000, forks: 100,
     topics: '[]', avatar_url: null, starred_at: null, unstarred_at: null, pushed_at: null,
     license: null, homepage: null, updated_at: null, saved_at: null,
     type: null, banner_svg: null, discovered_at: null, discover_query: null,
@@ -33,6 +49,7 @@ function makeRepo(owner: string, name: string): RepoRow {
     verification_checked_at: null, type_bucket: null, type_sub: null,
     is_forked: null, update_available: null, update_checked_at: null,
     upstream_version: null, stored_version: null,
+    ...overrides,
   }
 }
 
@@ -74,5 +91,29 @@ describe('DiscoverRow', () => {
     render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={onNavigate} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />)
     await userEvent.click(screen.getByRole('button', { name: 'facebook/react' }))
     expect(onNavigate).toHaveBeenCalledWith('/repo/facebook/react')
+  })
+
+  it('renders the new card structure (title, author, description, language overlay)', () => {
+    const { container } = render(
+      <DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />,
+    )
+    // Pick the active card (first non-peek slot)
+    expect(container.querySelector('.repo-card-title')).toBeTruthy()
+    expect(container.querySelector('.repo-card-author')).toBeTruthy()
+    expect(container.querySelector('.repo-card-description')).toBeTruthy()
+    expect(container.querySelector('.repo-card-lang-overlay')).toBeTruthy()
+  })
+
+  it('does NOT render star button, license chip, recency stat, or tag chips', () => {
+    const { container } = render(
+      <DiscoverRow
+        repos={[makeRepo('facebook', 'react', { topics: '["ui","library"]', license: 'MIT', pushed_at: new Date().toISOString() })]}
+        activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onAdvance={vi.fn()} columns={3}
+      />,
+    )
+    expect(container.querySelector('.repo-card-badge-br')).toBeNull()
+    expect(container.querySelector('.discover-row-card-license')).toBeNull()
+    expect(container.querySelector('.discover-row-card-stat')).toBeNull()
+    expect(container.querySelector('.discover-row-card-tag')).toBeNull()
   })
 })
