@@ -76,8 +76,6 @@ function normalizeError(err: unknown): LLMError {
   else if (e?.statusCode === 429) kind = 'rate_limit'
   else if (e?.statusCode === 404) kind = 'model_unavailable'
   else if (e?.statusCode === 413) kind = 'context_overflow'
-  // TODO(Phase 4): add `network` kind detection (ECONNREFUSED, ETIMEDOUT, ENOTFOUND,
-  // fetch's NetworkError) — load-bearing once openai-compatible local endpoints
-  // land, where the most common failure is "Ollama isn't running."
+  else if (e?.code === 'ECONNREFUSED' || e?.code === 'ETIMEDOUT' || e?.code === 'ENOTFOUND') kind = 'network'
   return new LLMError(kind, e?.message ?? 'Anthropic adapter failed', err)
 }

@@ -143,4 +143,16 @@ describe('AnthropicAdapter.generateText', () => {
     const call = mockGenerateText.mock.calls[0][0]
     expect(call.system).toBeUndefined()
   })
+
+  it('normalizes ECONNREFUSED into LLMError kind=network', async () => {
+    const netErr: any = new Error('connect ECONNREFUSED 127.0.0.1:443')
+    netErr.code = 'ECONNREFUSED'
+    mockGenerateText.mockRejectedValue(netErr)
+
+    const adapter = new AnthropicAdapter()
+    await expect(adapter.generateText(
+      { provider: 'anthropic', model: 'claude-sonnet-4-6' },
+      { messages: [{ role: 'user', content: 'hi' }] },
+    )).rejects.toMatchObject({ name: 'LLMError', kind: 'network' })
+  })
 })
