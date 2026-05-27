@@ -1,0 +1,70 @@
+.filter-overlay {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(720px, calc(100vw - 40px));
+  max-height: calc(100vh - 200px);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.filter-overlay-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 14px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.filter-overlay-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.4);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+}
+
+.filter-overlay-tab:hover { color: rgba(255, 255, 255, 0.75); }
+
+.filter-overlay-tab.active {
+  color: var(--t1);
+  border-bottom-color: rgba(255, 255, 255, 0.55);
+}
+
+.filter-overlay-tab-badge {
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--t1);
+  font-size: 8px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+}
+
+.filter-overlay-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: overlay;
+  overflow-x: hidden;
+  padding: 0 14px;
+}
