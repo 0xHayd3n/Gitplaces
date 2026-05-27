@@ -46,6 +46,7 @@ export default function DiscoverTopNav({
 
   return (
     <div className="discover-top-nav">
+      <div className="dtn-drag-region" aria-hidden="true" />
       <div className="dtn-pill-bar">
         {!searchOpen && (
           <button
@@ -92,6 +93,7 @@ export default function DiscoverTopNav({
           </div>
         )}
       </div>
+      <div className="dtn-drag-region" aria-hidden="true" />
     </div>
   )
 }

@@ -1,14 +1,11 @@
 /* ── Wrapper ─────────────────────────────────────────────────── */
-/* Full-width strip at the top of the viewport so the area around the pill
-   bar acts as the OS-level drag region for window movement (replacing
-   .discover-drag-strip, which is hidden when the nav is present).
-   Note: pointer-events MUST stay at the default `auto` — Chromium hangs
-   -webkit-app-region: drag off normal hit-testing, so pointer-events:none
-   kills the drag region. The trade-off is that clicks in the empty area
-   of the strip are swallowed by the wrapper instead of passing through to
-   the hero below; the hero is 504px tall so the top ~56px is acceptable
-   collateral. The pill itself is still clickable via its own no-drag /
-   pointer-events:auto rules below. */
+/* Full-width strip across the top of the viewport. The wrapper itself has
+   no drag region — drag lives on the two .dtn-drag-region leaf children
+   that flank the pill bar via flex. The codebase's proven drag-region
+   pattern (.discover-drag-strip, see globals.css:1526) uses leaf elements
+   because Chromium's drag-region hit-test relies on elementFromPoint and
+   doesn't reliably resolve parent-drag / child-no-drag overlays inside
+   compositor-promoted ancestors like .main-content (will-change:transform). */
 .discover-top-nav {
   position: fixed;
   top: 0;
@@ -18,12 +15,21 @@
   z-index: 200;
   display: flex;
   align-items: center;
-  justify-content: center;
+  /* No -webkit-app-region on the wrapper. */
+}
+
+/* Leaf drag regions, one on each side of the pill. flex:1 lets them grow
+   to fill remaining space, so the search-input expansion (pill widening)
+   automatically shrinks the strips without code changes. */
+.dtn-drag-region {
+  flex: 1 1 0;
+  align-self: stretch;
   -webkit-app-region: drag;
 }
 
 /* ── Pill bar ────────────────────────────────────────────────── */
 .dtn-pill-bar {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 6px;
