@@ -154,6 +154,11 @@ export default function Discover() {
   const [heroIndex, setHeroIndex] = useState(0)
   const [heroPaused, setHeroPaused] = useState(false)
   const [rankedAgents, setRankedAgents] = useState<AgentRow[]>([])
+  const [agentsIndex, setAgentsIndex] = useState(0)
+  const [hotTodayIndex, setHotTodayIndex] = useState(0)
+  const [trendingWeekIndex, setTrendingWeekIndex] = useState(0)
+  const [mostPopularIndex, setMostPopularIndex] = useState(0)
+  const [hiddenGemsIndex, setHiddenGemsIndex] = useState(0)
   const viewMode: ViewModeKey = (() => {
     const v = searchParams.get('view')
     if (v === 'recommended') return 'recommended'
@@ -1225,7 +1230,7 @@ export default function Discover() {
                       <DiscoverRow<AgentRow>
                         title="Agents"
                         items={rankedAgents}
-                        activeIndex={0}
+                        activeIndex={agentsIndex}
                         columns={effectiveCols}
                         getItemKey={a => a.id}
                         renderCard={({ item, posIndex, columns, visible }) => (
@@ -1238,7 +1243,11 @@ export default function Discover() {
                           />
                         )}
                         onMore={() => setViewMode('agents')}
-                        onAdvance={() => {/* static list; horizontal scroll deferred */}}
+                        onAdvance={(delta) => {
+                          const visible = Math.min(effectiveCols, rankedAgents.length)
+                          const max = Math.max(0, rankedAgents.length - visible)
+                          setAgentsIndex((i) => Math.max(0, Math.min(max, i + delta)))
+                        }}
                       />
                     )}
 
@@ -1246,7 +1255,7 @@ export default function Discover() {
                       <DiscoverRow<RepoRow>
                         title="Hot today"
                         items={hotTodayRowRepos}
-                        activeIndex={0}
+                        activeIndex={hotTodayIndex}
                         columns={effectiveCols}
                         getItemKey={r => r.id}
                         renderCard={({ item, posIndex, columns, visible }) => (
@@ -1260,7 +1269,11 @@ export default function Discover() {
                           />
                         )}
                         onMore={() => setViewMode('hot-today')}
-                        onAdvance={() => {/* static list; horizontal scroll deferred */}}
+                        onAdvance={(delta) => {
+                          const visible = Math.min(effectiveCols, hotTodayRowRepos.length)
+                          const max = Math.max(0, hotTodayRowRepos.length - visible)
+                          setHotTodayIndex((i) => Math.max(0, Math.min(max, i + delta)))
+                        }}
                       />
                     )}
 
@@ -1268,7 +1281,7 @@ export default function Discover() {
                       <DiscoverRow<RepoRow>
                         title="Trending this week"
                         items={trendingWeekRowRepos}
-                        activeIndex={0}
+                        activeIndex={trendingWeekIndex}
                         columns={effectiveCols}
                         getItemKey={r => r.id}
                         renderCard={({ item, posIndex, columns, visible }) => (
@@ -1282,7 +1295,11 @@ export default function Discover() {
                           />
                         )}
                         onMore={() => setViewMode('trending-week')}
-                        onAdvance={() => {/* static list; horizontal scroll deferred */}}
+                        onAdvance={(delta) => {
+                          const visible = Math.min(effectiveCols, trendingWeekRowRepos.length)
+                          const max = Math.max(0, trendingWeekRowRepos.length - visible)
+                          setTrendingWeekIndex((i) => Math.max(0, Math.min(max, i + delta)))
+                        }}
                       />
                     )}
 
@@ -1290,7 +1307,7 @@ export default function Discover() {
                       <DiscoverRow<RepoRow>
                         title="Most Popular"
                         items={repos.slice(0, 30)}
-                        activeIndex={0}
+                        activeIndex={mostPopularIndex}
                         columns={effectiveCols}
                         getItemKey={r => r.id}
                         renderCard={({ item, posIndex, columns, visible }) => (
@@ -1303,7 +1320,12 @@ export default function Discover() {
                             onLanguageClick={handleLanguageClick}
                           />
                         )}
-                        onAdvance={() => {/* static list; horizontal scroll deferred */}}
+                        onAdvance={(delta) => {
+                          const len = Math.min(repos.length, 30)
+                          const visible = Math.min(effectiveCols, len)
+                          const max = Math.max(0, len - visible)
+                          setMostPopularIndex((i) => Math.max(0, Math.min(max, i + delta)))
+                        }}
                       />
                     )}
 
@@ -1311,7 +1333,7 @@ export default function Discover() {
                       <DiscoverRow<RepoRow>
                         title="Hidden gems"
                         items={hiddenGemsRowRepos}
-                        activeIndex={0}
+                        activeIndex={hiddenGemsIndex}
                         columns={effectiveCols}
                         getItemKey={r => r.id}
                         renderCard={({ item, posIndex, columns, visible }) => (
@@ -1325,7 +1347,11 @@ export default function Discover() {
                           />
                         )}
                         onMore={() => setViewMode('hidden-gems')}
-                        onAdvance={() => {/* static list; horizontal scroll deferred */}}
+                        onAdvance={(delta) => {
+                          const visible = Math.min(effectiveCols, hiddenGemsRowRepos.length)
+                          const max = Math.max(0, hiddenGemsRowRepos.length - visible)
+                          setHiddenGemsIndex((i) => Math.max(0, Math.min(max, i + delta)))
+                        }}
                       />
                     )}
                   </>
