@@ -1406,7 +1406,6 @@ export default function Discover() {
                       loadingMore={loadingMore}
                       error={error}
                       visibleRepos={visibleRepos}
-                      agents={undefined}
                       discoverQuery={discoverQuery}
                       layoutPrefs={effectiveLayoutPrefs}
                       sentinelRef={sentinelRef}

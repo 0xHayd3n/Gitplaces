@@ -1,13 +1,11 @@
 import { useState, type RefObject } from 'react'
 import type { RepoRow } from '../types/repo'
-import type { AgentRow } from '../types/agent'
 import type { Anchor } from '../types/recommendation'
 import type { LayoutPrefs } from './LayoutDropdown'
 import type { useVerification } from '../hooks/useVerification'
 import type { ViewModeKey } from '../lib/discoverQueries'
 import RepoCard from './RepoCard'
 import RepoListRow from './RepoListRow'
-import AgentCard from './AgentCard'
 import ViewportWindow from './ViewportWindow'
 
 export interface DiscoverGridProps {
@@ -29,7 +27,6 @@ export interface DiscoverGridProps {
   onLanguageClick?: (lang: string) => void
   onSubtypeClick?: (subtypeId: string) => void
   anchorsByRepoId?: Map<string, Anchor[]>
-  agents?: AgentRow[]
 }
 
 export default function DiscoverGrid({
@@ -51,7 +48,6 @@ export default function DiscoverGrid({
   onLanguageClick,
   onSubtypeClick,
   anchorsByRepoId,
-  agents,
 }: DiscoverGridProps) {
   const [expandedTagsRepo, setExpandedTagsRepo] = useState<string | null>(null)
 
@@ -158,34 +154,6 @@ export default function DiscoverGrid({
       </div>
       <div ref={sentinelRef} style={{ height: 1 }} />
     </>
-    )
-  }
-
-  // Agents grid — short-circuits before the repo grid render
-  if (viewMode === 'agents' && agents) {
-    if (agents.length === 0) {
-      return (
-        <div style={{ gridColumn: '1 / -1', padding: '48px 0', textAlign: 'center', color: 'var(--t3)', fontSize: 13 }}>
-          No agents yet — create one from the Library.
-        </div>
-      )
-    }
-    return (
-      <>
-        <div
-          ref={gridRef}
-          className="discover-grid"
-          data-cols={effectiveCols}
-          style={{ gridTemplateColumns: `repeat(${effectiveCols}, minmax(0, 1fr))` }}
-        >
-          {agents.map((a, i) => (
-            <ViewportWindow key={a.id} placeholderHeight={230}>
-              <AgentCard agent={a} focused={i === focusIndex} />
-            </ViewportWindow>
-          ))}
-        </div>
-        <div ref={sentinelRef} style={{ height: 1 }} />
-      </>
     )
   }
 
