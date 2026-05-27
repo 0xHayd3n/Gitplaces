@@ -14,8 +14,12 @@ import { type SearchFilters } from '../components/DiscoverSidebar'
 import DiscoverTopNav from '../components/DiscoverTopNav'
 import DiscoverHero from '../components/DiscoverHero'
 import DiscoverRow from '../components/DiscoverRow'
-import GridHeader from '../components/GridHeader'
+import DiscoverRowRepoCard from '../components/DiscoverRowRepoCard'
+import DiscoverRowAgentCard from '../components/DiscoverRowAgentCard'
+import FilterChipRow from '../components/FilterChipRow'
 import AiChatOverlay from '../components/AiChatOverlay'
+import { rankAgents } from '../lib/agentRanking'
+import type { AgentRow } from '../types/agent'
 import { useVerification } from '../hooks/useVerification'
 import { useSearchHistory } from '../hooks/useSearchHistory'
 import {
@@ -86,7 +90,7 @@ function isPopularDefaultState(
   selectedSubtypes: string[],
   filters: SearchFilters,
 ): boolean {
-  return viewMode === 'all'
+  return viewMode === 'home'
     && selectedLanguages.length === 0
     && selectedSubtypes.length === 0
     && !filters.activity
@@ -110,7 +114,8 @@ export default function Discover() {
     // landing — any filter param means the cache is for the wrong query.
     // Use the router-aware searchParams (not window.location) so any non-browser
     // router setup wouldn't silently disagree with the rest of the component.
-    const isDefaultUrl = (searchParams.get('view') ?? 'all') === 'all' && !searchParams.get('lang')
+    const view = searchParams.get('view')
+    const isDefaultUrl = (view === null || view === 'home') && !searchParams.get('lang')
     if (isDefaultUrl && _popularModuleCache) return _popularModuleCache.repos
     return []
   })
@@ -121,13 +126,12 @@ export default function Discover() {
   const [rowRepos, setRowRepos] = useState<RepoRow[]>([])
   const [heroIndex, setHeroIndex] = useState(0)
   const [heroPaused, setHeroPaused] = useState(false)
-  const [recentlyVisited, setRecentlyVisited] = useState<RepoRow[]>([])
-  const [recentlyVisitedIndex, setRecentlyVisitedIndex] = useState(0)
+  const [rankedAgents, setRankedAgents] = useState<AgentRow[]>([])
   const viewMode: ViewModeKey = (() => {
     const v = searchParams.get('view')
     if (v === 'recommended') return 'recommended'
-    if (v === 'last-visited') return 'last-visited'
-    return 'all'
+    if (v === 'agents') return 'agents'
+    return 'home'
   })()
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(() => {
     const snap = restoredSnapshot.current
@@ -303,15 +307,10 @@ export default function Discover() {
   }, [heroPaused, rowRepos.length])
 
   useEffect(() => {
-    window.api.engagement.getRecentlyVisited(16)
-      .then(rows => {
-        setRecentlyVisited(rows)
-        setRecentlyVisitedIndex(0)
-        ensureClassified(rows)
-        extractMissingColors(rows)
-      })
-      .catch(() => {})
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    window.api.agents.getAll()
+      .then(({ agents }) => setRankedAgents(rankAgents(agents)))
+      .catch(() => setRankedAgents([]))
+  }, [])
 
   // Always-current snapshot data — updated after every render so the unmount
   // cleanup can save accurate state regardless of how we leave the page.
@@ -344,12 +343,19 @@ export default function Discover() {
   // On back-navigation, restore viewMode from snapshot into URL param
   useEffect(() => {
     if (restoredSnapshot.current?.viewMode) {
-      const snapshotView = restoredSnapshot.current.viewMode
-      const urlView = searchParams.get('view') ?? 'recommended'
+      // Legacy snapshots may carry the dropped 'all' or 'last-visited' view
+      // modes — normalise to the new 'home' default before mirroring into URL.
+      const raw = restoredSnapshot.current.viewMode as ViewModeKey | 'all' | 'last-visited'
+      const snapshotView: ViewModeKey =
+          raw === 'recommended' ? 'recommended'
+        : raw === 'agents'      ? 'agents'
+        : 'home'
+      const urlView = searchParams.get('view') ?? 'home'
       if (snapshotView !== urlView) {
         setSearchParams(prev => {
           const next = new URLSearchParams(prev)
-          next.set('view', snapshotView)
+          if (snapshotView === 'home') next.delete('view')
+          else next.set('view', snapshotView)
           return next
         }, { replace: true })
       }
@@ -359,7 +365,7 @@ export default function Discover() {
   const setViewMode = (mode: ViewModeKey) => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
-      if (mode === 'all') next.delete('view')
+      if (mode === 'home') next.delete('view')
       else next.set('view', mode)
       return next
     }, { replace: true })
@@ -485,9 +491,11 @@ export default function Discover() {
     const gen = ++fetchGeneration.current
     try {
       let data: RepoRow[]
-      if (viewMode === 'last-visited') {
-        data = await window.api.engagement.getRecentlyVisited(200)
-        setHasMore(false) // local DB query — no pagination
+      if (viewMode === 'agents') {
+        // Agents come from window.api.agents.getAll(); the rankedAgents state
+        // is hydrated separately so no GitHub fetch is needed here.
+        data = []
+        setHasMore(false)
       } else if (viewMode === 'recommended' && selectedSubtypes.length === 0) {
         if (recommendedCache.current) {
           data = recommendedCache.current
@@ -507,7 +515,7 @@ export default function Discover() {
         const subKw = selectedSubtypes.length === 1
           ? getSubTypeKeyword(selectedSubtypes[0])
           : undefined
-        const vm = viewMode === 'recommended' ? 'all' : viewMode
+        const vm = viewMode === 'recommended' ? 'home' : viewMode
         const langKey = selectedLanguages.length === 1 ? selectedLanguages[0] : ''
         const q = buildTrendingQuery(vm, langKey, filters ?? {}, subKw)
         const { sort: s, order: o } = getViewModeSort(vm)
@@ -832,7 +840,7 @@ export default function Discover() {
           const subKw = selectedSubtypes.length === 1
             ? getSubTypeKeyword(selectedSubtypes[0])
             : undefined
-          const vm = viewMode === 'recommended' ? 'all' : viewMode
+          const vm = viewMode === 'recommended' ? 'home' : viewMode
           const langKey = selectedLanguages.length === 1 ? selectedLanguages[0] : ''
           const q = buildTrendingQuery(vm, langKey, appliedFilters, subKw)
           const { sort: s, order: o } = getViewModeSort(vm)
@@ -1078,122 +1086,120 @@ export default function Discover() {
           onVerificationToggle={handleVerificationToggle}
           activePanel={activePanel}
           onActivePanelChange={setActivePanel}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
           query={discoverQuery}
           onQueryChange={(q) => { setDiscoverQuery(q); setContextQuery(q) }}
           onSearch={handleSearch}
           inputRef={topNavInputRef}
           layoutPrefs={layoutPrefs}
           onLayoutChange={handleLayoutChange}
-          compact={navCompact || viewMode !== 'all' || topicMode || selectedSubtypes.length > 0 || inSearchResults}
+          compact={navCompact || viewMode !== 'home' || topicMode || selectedSubtypes.length > 0 || inSearchResults}
         />
         <div className="discover-main">
           <div ref={scrollRef} className={`discover-content ${aiChatVisible ? 'discover-content-dimmed' : ''}`} onKeyDown={kbNav.containerProps.onKeyDown} tabIndex={-1}>
-                {viewMode === 'all' && !topicMode && selectedSubtypes.length === 0 && !inSearchResults && (
-                  rowRepos.length > 0
-                    ? <DiscoverHero repo={rowRepos[heroIndex] ?? null} onNavigate={navigateToRepo} />
-                    : <div className="discover-hero discover-hero--skeleton" />
-                )}
-                {viewMode === 'all' && !topicMode && selectedSubtypes.length === 0 && !inSearchResults && (
-                  rowRepos.length > 0
-                    ? <DiscoverRow
-                        repos={rowRepos}
+                {viewMode === 'home' && !topicMode && selectedSubtypes.length === 0 && !inSearchResults && (
+                  <>
+                    {rowRepos.length > 0
+                      ? <DiscoverHero repo={rowRepos[heroIndex] ?? null} onNavigate={navigateToRepo} />
+                      : <div className="discover-hero discover-hero--skeleton" />}
+
+                    {rowRepos.length > 0 && (
+                      <DiscoverRow<RepoRow>
+                        title="Recommended for You"
+                        items={rowRepos}
                         activeIndex={heroIndex}
                         columns={effectiveCols}
-                        onNavigate={navigateToRepo}
+                        getItemKey={r => r.id}
+                        renderCard={({ item, posIndex, columns, visible }) => (
+                          <DiscoverRowRepoCard
+                            repo={item}
+                            posIndex={posIndex}
+                            columns={columns}
+                            visible={visible}
+                            onNavigate={navigateToRepo}
+                            onLanguageClick={handleLanguageClick}
+                          />
+                        )}
                         onMore={() => setViewMode('recommended')}
                         onPause={setHeroPaused}
-                        onLanguageClick={handleLanguageClick}
                         onAdvance={(delta) => {
                           const visible = Math.min(effectiveCols, rowRepos.length)
                           const max = Math.max(0, rowRepos.length - visible)
                           setHeroIndex((i) => Math.max(0, Math.min(max, i + delta)))
                         }}
                       />
-                    : <div className="discover-row discover-row--skeleton">
-                        <div className="discover-row-header">
-                          <span className="discover-row-skeleton-title" />
-                        </div>
-                        <div className="discover-row-carousel discover-row-skeleton-carousel" />
-                      </div>
-                )}
-                {viewMode === 'all' && !topicMode && selectedSubtypes.length === 0 && !inSearchResults && recentlyVisited.length > 0 && (
-                  <DiscoverRow
-                    title="Last Visited"
-                    repos={recentlyVisited}
-                    activeIndex={recentlyVisitedIndex}
-                    columns={effectiveCols}
-                    onNavigate={navigateToRepo}
-                    onMore={() => setViewMode('last-visited')}
-                    onLanguageClick={handleLanguageClick}
-                    onAdvance={(delta) => {
-                      const visible = Math.min(effectiveCols, recentlyVisited.length)
-                      const max = Math.max(0, recentlyVisited.length - visible)
-                      setRecentlyVisitedIndex((i) => Math.max(0, Math.min(max, i + delta)))
-                    }}
-                  />
+                    )}
+
+                    {rankedAgents.length > 0 && (
+                      <DiscoverRow<AgentRow>
+                        title="Agents"
+                        items={rankedAgents}
+                        activeIndex={0}
+                        columns={effectiveCols}
+                        getItemKey={a => a.id}
+                        renderCard={({ item, posIndex, columns, visible }) => (
+                          <DiscoverRowAgentCard
+                            agent={item}
+                            posIndex={posIndex}
+                            columns={columns}
+                            visible={visible}
+                            onNavigate={navigateToRepo}
+                          />
+                        )}
+                        onMore={() => setViewMode('agents')}
+                        onAdvance={() => {/* static list; horizontal scroll deferred */}}
+                      />
+                    )}
+
+                    {repos.length > 0 && (
+                      <DiscoverRow<RepoRow>
+                        title="Most Popular"
+                        items={repos.slice(0, 30)}
+                        activeIndex={0}
+                        columns={effectiveCols}
+                        getItemKey={r => r.id}
+                        renderCard={({ item, posIndex, columns, visible }) => (
+                          <DiscoverRowRepoCard
+                            repo={item}
+                            posIndex={posIndex}
+                            columns={columns}
+                            visible={visible}
+                            onNavigate={navigateToRepo}
+                            onLanguageClick={handleLanguageClick}
+                          />
+                        )}
+                        onAdvance={() => {/* static list; horizontal scroll deferred */}}
+                      />
+                    )}
+                  </>
                 )}
                 <div className="discover-content-inner">
-                  <GridHeader
-                    hideViewMode
-                    title={
-                      topicMode
-                        ? (activeTags.length === 1 ? activeTags[0] : 'Custom Search')
-                        : selectedSubtypes.length > 0
-                          ? (selectedSubtypes.length === 1 && selectedLanguages.length === 0
-                              ? (getSubTypeConfig(selectedSubtypes[0])?.label ?? 'Custom Search')
-                              : 'Custom Search')
-                          : inSearchResults
-                            ? `Searched '${discoverQuery.trim()}'`
-                            : viewMode === 'recommended'
-                              ? 'Recommended for You'
-                              : viewMode === 'last-visited'
-                                ? 'Last Visited'
-                                : 'Most Popular'
-                    }
-                    onBack={
-                      topicMode
-                        ? handleBackFromTopicMode
-                        : selectedSubtypes.length > 0
-                          ? handleBackFromSubtypeMode
-                          : inSearchResults
-                            ? handleBackFromSearch
-                            : (viewMode !== 'all' ? () => setViewMode('all') : undefined)
-                    }
-                    onTitleClick={!topicMode && selectedSubtypes.length === 0 && !inSearchResults && viewMode === 'all' ? () => setViewMode('all') : undefined}
-                    viewMode={viewMode}
-                    onViewModeChange={setViewMode}
-                    activeFilters={{
-                      languages: selectedLanguages.length ? selectedLanguages : undefined,
-                      subtypes: selectedSubtypes.length ? selectedSubtypes : undefined,
-                      tags: (!topicMode || activeTags.length > 1) && activeTags.length ? activeTags : undefined,
-                    }}
-                    onRemoveLanguage={(lang) => setSelectedLanguages(prev => prev.filter(l => l !== lang))}
-                    onRemoveSubtype={(id) => setSelectedSubtypes(prev => prev.filter(s => s !== id))}
-                    onRemoveTag={(tag) => {
-                      const next = activeTags.filter(t => t !== tag)
-                      setActiveTags(next)
-                      if (next.length === 0) {
-                        setTopicMode(false)
-                        loadTrending(appliedFilters)
-                      } else {
-                        runTagSearch(next)
-                      }
-                    }}
-                  />
-                  {/* Related tags row */}
-                  {relatedTags.length > 0 && !loading && (
-                    <div className="related-tags-row">
-                      <span className="related-tags-label">Related:</span>
-                      {relatedTags.map(tag => (
-                        <button
-                          key={tag}
-                          className="related-tag-chip"
-                          onClick={() => addTag(tag)}
-                        >
-                          + {tag}
-                        </button>
-                      ))}
-                    </div>
+                  {viewMode !== 'home' && (
+                    <FilterChipRow
+                      selectedLanguages={selectedLanguages}
+                      selectedSubtypes={selectedSubtypes}
+                      activeTags={activeTags}
+                      filters={appliedFilters}
+                      activeVerification={activeVerification}
+                      onRemoveLanguage={(lang) => setSelectedLanguages(prev => prev.filter(l => l !== lang))}
+                      onRemoveSubtype={(id) => setSelectedSubtypes(prev => prev.filter(s => s !== id))}
+                      onRemoveTag={(tag) => {
+                        const next = activeTags.filter(t => t !== tag)
+                        setActiveTags(next)
+                        if (next.length === 0) {
+                          setTopicMode(false)
+                          loadTrending(appliedFilters)
+                        } else {
+                          runTagSearch(next)
+                        }
+                      }}
+                      onClearAdvanced={(key) => setAppliedFilters(prev => ({ ...prev, [key]: undefined }))}
+                      onVerificationToggle={handleVerificationToggle}
+                      onSelectedLanguagesChange={setSelectedLanguages}
+                      onSelectedSubtypesChange={setSelectedSubtypes}
+                      onFilterChange={setAppliedFilters}
+                    />
                   )}
 
                   {error && <div className="discover-status">Failed to load — {error}</div>}
@@ -1203,6 +1209,7 @@ export default function Discover() {
                     loadingMore={loadingMore}
                     error={error}
                     visibleRepos={visibleRepos}
+                    agents={viewMode === 'agents' ? rankedAgents : undefined}
                     discoverQuery={discoverQuery}
                     layoutPrefs={effectiveLayoutPrefs}
                     sentinelRef={sentinelRef}

@@ -87,7 +87,7 @@ export default function FilterOverlay(props: FilterOverlayProps) {
             activeVerification={rest.activeVerification}
             onFilterChange={rest.onFilterChange}
             onVerificationToggle={rest.onVerificationToggle}
-            mode={rest.mode}
+            mode={rest.mode ?? 'discover'}
             skillStatus={rest.skillStatus}
             onSkillStatusChange={rest.onSkillStatusChange}
           />

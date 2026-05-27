@@ -29,8 +29,17 @@ export function LastVisitedIcon({ size = 14 }: { size?: number }) {
   )
 }
 
+function AgentsIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" className="view-mode-icon">
+      <circle cx="8" cy="5.5" r="2.5"/>
+      <path d="M3 13.5 C3 11 5 9.5 8 9.5 C11 9.5 13 11 13 13.5"/>
+    </svg>
+  )
+}
+
 export const VIEW_MODE_ICONS: Record<ViewModeKey, (props: { size?: number }) => JSX.Element> = {
   recommended: RecommendedIcon,
-  all: BrowseIcon,
-  'last-visited': LastVisitedIcon,
+  home: BrowseIcon,
+  agents: AgentsIcon,
 }

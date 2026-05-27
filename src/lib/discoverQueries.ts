@@ -1,14 +1,12 @@
 // ── View mode data ─────────────────────────────────────────────────
 
 export const VIEW_MODES = [
-  { key: 'all',         label: 'All',         accent: '#60a5fa' },
+  { key: 'home',        label: 'Home',        accent: '#60a5fa' },
   { key: 'recommended', label: 'Recommended', accent: '#8b5cf6' },
+  { key: 'agents',      label: 'Agents',      accent: '#f59e0b' },
 ] as const
 
-// 'last-visited' is a valid expanded view but is intentionally NOT in VIEW_MODES
-// — that array drives the All/Recommended toggle UI, and Last Visited is reached
-// only via the row's "see all" chevron.
-export type ViewModeKey = (typeof VIEW_MODES)[number]['key'] | 'last-visited'
+export type ViewModeKey = (typeof VIEW_MODES)[number]['key']
 
 export function getViewModeAccent(key: ViewModeKey): string {
   return VIEW_MODES.find(vm => vm.key === key)?.accent ?? '#8b5cf6'
@@ -24,9 +22,10 @@ export function buildViewModeQuery(viewMode: ViewModeKey, langKey: string, searc
 
   switch (viewMode) {
     case 'recommended':
-    case 'last-visited':
       return '' // handled by separate IPC handler
-    case 'all':
+    case 'agents':
+      return '' // agents come from window.api.agents.getAll(), not GitHub search
+    case 'home':
       return langFilter
         ? `stars:>0 ${langFilter}`
         : 'stars:>100'

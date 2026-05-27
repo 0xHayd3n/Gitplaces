@@ -25,7 +25,7 @@ export interface FilterChipRowProps {
 }
 
 function langLabel(key: string): string {
-  return LANG_MAP[key]?.name ?? key
+  return LANG_MAP.get(key)?.name ?? key
 }
 
 function subtypeLabel(id: string): string {
