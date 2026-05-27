@@ -84,7 +84,9 @@ export default function DiscoverRowRepoCard({
       aria-hidden={isPeek}
     >
       <div className="repo-card-image">
-        <DitherBackground avatarUrl={repo.avatar_url} fallbackGradient={gradient} />
+        <div className="repo-card-image-canvas">
+          <DitherBackground avatarUrl={repo.avatar_url} fallbackGradient={gradient} />
+        </div>
         {repo.language && (
           <span
             className="repo-card-lang-overlay"
@@ -96,10 +98,8 @@ export default function DiscoverRowRepoCard({
         )}
       </div>
       <div className="repo-card-body">
-        <div className="repo-card-title-block">
-          <div className="repo-card-title">{repo.name}</div>
-          <span className="repo-card-author">by {repo.owner}</span>
-        </div>
+        <div className="repo-card-title">{repo.name}</div>
+        <span className="repo-card-author">by {repo.owner}</span>
         <div className="repo-card-pill-row">
           {typeConfig && pillAccent && repo.type_sub && (
             <span

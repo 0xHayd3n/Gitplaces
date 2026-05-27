@@ -62,6 +62,7 @@ function HeroLayer({ repo, animClass }: LayerProps) {
   return (
     <div className={`discover-hero-layer ${animClass}`}>
       <DitherBackground avatarUrl={repo.avatar_url} />
+      <div className="discover-hero-fade-top" />
       <div className="discover-hero-fade" />
       <div className="discover-hero-content">
         <div className="discover-hero-text">

@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom'
+import logoTransparent from '../assets/logo-transparent.png'
 
 /**
  * Custom min/max/close rendered as three rounded buttons styled to match
@@ -15,7 +16,9 @@ export default function Titlebar() {
   return (
     <>
       <header className="titlebar">
-        <div className="titlebar-left" />
+        <div className="titlebar-left">
+          <img src={logoTransparent} alt="GitSuite" className="titlebar-logo" />
+        </div>
       </header>
       {createPortal(
         <div className="titlebar-controls">

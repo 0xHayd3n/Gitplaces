@@ -124,7 +124,9 @@ const RepoCard = memo(function RepoCard({
       onClick={() => onNavigate(`/repo/${repo.owner}/${repo.name}`)}
     >
       <div className="repo-card-image">
-        <DitherBackground avatarUrl={repo.avatar_url} fallbackGradient={gradient} />
+        <div className="repo-card-image-canvas">
+          <DitherBackground avatarUrl={repo.avatar_url} fallbackGradient={gradient} />
+        </div>
         {repo.language && (
           <span
             className="repo-card-lang-overlay"
@@ -136,16 +138,14 @@ const RepoCard = memo(function RepoCard({
         )}
       </div>
       <div className="repo-card-body">
-        <div className="repo-card-title-block">
-          <div className="repo-card-title">{repo.name}</div>
-          <button
-            type="button"
-            className="repo-card-author"
-            onClick={e => { e.stopPropagation(); onOwnerClick?.(repo.owner) }}
-          >
-            by {repo.owner}
-          </button>
-        </div>
+        <div className="repo-card-title">{repo.name}</div>
+        <button
+          type="button"
+          className="repo-card-author"
+          onClick={e => { e.stopPropagation(); onOwnerClick?.(repo.owner) }}
+        >
+          by {repo.owner}
+        </button>
         <div className="repo-card-pill-row">
           {typeConfig && pillAccent && typeSub && (
             <button

@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import './DiscoverRow.css'
 
 interface DiscoverRowSlot<T> {
@@ -22,6 +22,35 @@ export default function DiscoverRow<T>({
   items, activeIndex, columns, getItemKey, renderCard,
   onAdvance, title = 'Recommended for You', onMore, onPause,
 }: DiscoverRowProps<T>) {
+  // ── Scroll-driven row focus ──
+  // The row enters "focused" state when it crosses a narrow band sitting
+  // where the snap line lands (the container's scroll-padding-top zone).
+  // Rows use scroll-snap-align: start, so a snapped row's top edge lands
+  // at that line — the focus band sits just below it, fully inside the
+  // snapped row's body. The 10% band is narrow enough that only one row
+  // (always ≥30% of viewport) can intersect at a time, eliminating focus
+  // flicker between rows.
+  const rowRef = useRef<HTMLDivElement>(null)
+  const [focused, setFocused] = useState(false)
+
+  useEffect(() => {
+    const row = rowRef.current
+    if (!row) return
+    const scrollContainer = row.closest('.discover-content') as HTMLElement | null
+    if (!scrollContainer) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setFocused(entry.isIntersecting),
+      {
+        root: scrollContainer,
+        rootMargin: '-25% 0px -65% 0px',
+        threshold: 0,
+      },
+    )
+    observer.observe(row)
+    return () => observer.disconnect()
+  }, [])
+
   if (items.length === 0) return null
 
   const visible = Math.min(columns, items.length)
@@ -47,7 +76,7 @@ export default function DiscoverRow<T>({
   const atEnd = activeIndex >= Math.max(0, items.length - visible)
 
   return (
-    <div className="discover-row">
+    <div ref={rowRef} className="discover-row" data-focused={focused ? 'true' : undefined}>
       <div className="discover-row-header">
         {onMore ? (
           <button className="discover-row-title-btn" onClick={onMore} aria-label={`See all ${title}`}>

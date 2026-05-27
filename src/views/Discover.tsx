@@ -1214,7 +1214,7 @@ export default function Discover() {
 
                     {rowRepos.length > 0 && (
                       <DiscoverRow<RepoRow>
-                        title="Recommended for You"
+                        title="Recommended"
                         items={rowRepos}
                         activeIndex={heroIndex}
                         columns={effectiveCols}

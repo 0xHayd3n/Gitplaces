@@ -26,20 +26,20 @@
 /* ── Design tokens ── */
 :root {
   /* Backgrounds — dark theme */
-  --bg:      #121214;
-  --bg2:     #1a1a1e;
-  --bg3:     #222226;
-  --bg4:     #2a2a30;
+  --bg:      #08080a;
+  --bg2:     #0f0f12;
+  --bg3:     #18181c;
+  --bg4:     #202028;
 
   /* Glass surfaces — sidebar, dock, landing search/Browse */
-  --glass-bg:     rgba(20, 20, 20, 0.85);
+  --glass-bg:     rgba(9, 9, 9, 0.85);
   --glass-border: rgba(255, 255, 255, 0.08);
 
   /* Solid equivalent of --glass-bg blended over the body bg (--bg).
      Use for surfaces that must opaquely match the glass-rendered color
      (e.g. sticky tabs over scrolling content, gradient stops).
-     Math: 0.85*20 + 0.15*18 ≈ 19.7 → 20 per channel = #141414. */
-  --surface-1:    #141414;
+     Math: 0.85*9 + 0.15*8 ≈ 8.85 → 9 per channel = #090909. */
+  --surface-1:    #090909;
 
   /* Borders */
   --border:  rgba(255,255,255,0.07);
@@ -262,6 +262,22 @@ a {
 }
 .titlebar-left > * {
   -webkit-app-region: no-drag;
+}
+
+/* Absolute-positioned so the logo still anchors at top-left on the Discover
+   view, where .titlebar collapses to height: 0 (overflow: visible). On other
+   views the titlebar is 32px tall and the logo sits naturally inside it. */
+.titlebar-logo {
+  position: absolute;
+  top: 6px;
+  left: 14px;
+  height: 22px;
+  width: auto;
+  display: block;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+  opacity: 0.95;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
 }
 
 .titlebar-back-btn {
@@ -1804,6 +1820,18 @@ a {
 .discover-content {
   flex: 1;
   overflow-y: overlay;
+  /* Mandatory vertical snap. Hero aligns to start (top); rows align to
+     start with scroll-padding-top that pushes the snap line down — the
+     focused row's TOP lands at that line and stays put when the carousel
+     grows downward, so the snap engine never has to re-correct mid-
+     transition. The result: rows "click" in cleanly without nudging.
+     padding-bottom gives the last rows enough room to scroll up into the
+     focus zone — without it, the bottom row can never reach the snap line
+     because there's nothing below it to scroll into. */
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  scroll-padding-top: max(0px, calc((100% - 540px) / 2));
+  padding-bottom: 50vh;
 }
 
 .discover-content-inner {
@@ -1970,8 +1998,7 @@ a {
 .repo-card {
   border-radius: 10px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.03);
+  background: transparent;
   cursor: pointer;
   animation: card-in 0.18s ease forwards;
   display: flex;
@@ -1979,8 +2006,6 @@ a {
 }
 .repo-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.25);
-  background: rgba(0, 0, 0, 0.7);
 }
 
 /* ── Card hover: elevate all content ───────────────────────────── */
@@ -1993,14 +2018,15 @@ a {
 }
 .repo-card:hover .repo-card-footer { border-top-color: rgba(255, 255, 255, 0.15); }
 .repo-card:hover .repo-card-stat { color: rgba(255, 255, 255, 0.8); }
-/* Golden glow for starred cards */
-.repo-card-starred { border-color: rgba(245,158,11,0.35); box-shadow: 0 0 12px rgba(245,158,11,0.15), inset 0 0 12px rgba(245,158,11,0.04); }
-.repo-card-starred:hover { border-color: rgba(245,158,11,0.55); box-shadow: 0 0 18px rgba(245,158,11,0.25), inset 0 0 12px rgba(245,158,11,0.06); }
-/* Purple glow for learned cards — overrides gold */
-.repo-card-learned { border-color: rgba(139,92,246,0.35); box-shadow: 0 0 12px rgba(139,92,246,0.2), inset 0 0 12px rgba(139,92,246,0.06); }
-.repo-card-learned:hover { border-color: rgba(139,92,246,0.55); box-shadow: 0 0 18px rgba(139,92,246,0.3), inset 0 0 12px rgba(139,92,246,0.08); }
-.repo-card-starred.repo-card-learned { border-color: rgba(139,92,246,0.35); box-shadow: 0 0 12px rgba(139,92,246,0.2), inset 0 0 12px rgba(139,92,246,0.06); }
-.repo-card-starred.repo-card-learned:hover { border-color: rgba(139,92,246,0.55); box-shadow: 0 0 18px rgba(139,92,246,0.3), inset 0 0 12px rgba(139,92,246,0.08); }
+/* Inset glow now scoped to the banner image only (the card itself has no
+   background to glow against). */
+.repo-card-starred .repo-card-image { box-shadow: inset 0 0 20px rgba(245,158,11,0.16); }
+.repo-card-starred:hover .repo-card-image { box-shadow: inset 0 0 22px rgba(245,158,11,0.22); }
+/* Purple inset glow for learned cards — overrides gold */
+.repo-card-learned .repo-card-image { box-shadow: inset 0 0 20px rgba(139,92,246,0.18); }
+.repo-card-learned:hover .repo-card-image { box-shadow: inset 0 0 22px rgba(139,92,246,0.26); }
+.repo-card-starred.repo-card-learned .repo-card-image { box-shadow: inset 0 0 20px rgba(139,92,246,0.18); }
+.repo-card-starred.repo-card-learned:hover .repo-card-image { box-shadow: inset 0 0 22px rgba(139,92,246,0.26); }
 /* ── Dither background ────────────────────────────────────────── */
 .dither-canvas {
   position: absolute;
@@ -2285,12 +2311,41 @@ a {
   background: rgba(255,255,255,0.3);
 }
 
-/* ── New card design (Nexus-style) ─────────────────────────────── */
+/* ── New card design (Netflix-style) ───────────────────────────── */
 .repo-card-image {
   position: relative;
-  height: 80px;
+  height: 90px;
   overflow: hidden;
   flex-shrink: 0;
+  border-radius: 8px;
+}
+
+/* Fixed-size canvas wrapper: always sized to the focused-state height so
+   the DitherBackground's ResizeObserver fires once at mount and never
+   again as the outer .repo-card-image clips it during focus transitions.
+   Without this, the dither canvas re-renders at every intermediate height
+   during the 0.18s height transition, causing a visible flicker. */
+.repo-card-image-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 280px;
+}
+
+/* Geometric Chakra Petch title — sits below the banner image, flush on
+   the page background. No shadow needed since it's not over a busy dither. */
+.repo-card-title {
+  font-family: 'Chakra Petch', 'Inter', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.95);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .repo-card-lang-overlay {
@@ -2315,36 +2370,14 @@ a {
 }
 
 .repo-card-body {
-  padding: 12px 14px 14px;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  padding: 10px 2px 8px;
+  background: transparent;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   overflow: hidden;
-  transition: background 0.2s;
 }
-.repo-card:hover .repo-card-body { background: rgba(0, 0, 0, 0.88); }
-
-.repo-card-title-block {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.repo-card-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.95);
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.repo-card-title::first-letter { text-transform: uppercase; }
 
 .repo-card-author {
   font-size: 12.5px;
@@ -2413,7 +2446,7 @@ a {
 }
 
 /* Skeleton variant for the new image area (used by DiscoverGrid) */
-.repo-card-skeleton-image { height: 80px; background: var(--bg3); }
+.repo-card-skeleton-image { height: 90px; background: var(--bg3); border-radius: 8px; }
 
 /* Topics row in RepoDetail */
 .repo-detail-topics {

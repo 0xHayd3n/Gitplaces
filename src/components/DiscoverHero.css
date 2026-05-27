@@ -1,10 +1,12 @@
 .discover-hero {
   position: relative;
-  height: 504px;
+  height: 70vh;
+  min-height: 460px;
   flex-shrink: 0;
   overflow: hidden;
   cursor: default;
   -webkit-app-region: no-drag;
+  scroll-snap-align: start;
 }
 
 /* ── Crossfade layers ── */
@@ -47,6 +49,17 @@
   right: 0;
   height: 260px;
   background: linear-gradient(to bottom, transparent, var(--bg));
+  z-index: 1;
+  pointer-events: none;
+}
+
+.discover-hero-fade-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 140px;
+  background: linear-gradient(to bottom, var(--bg), transparent);
   z-index: 1;
   pointer-events: none;
 }

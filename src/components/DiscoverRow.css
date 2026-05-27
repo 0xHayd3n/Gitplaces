@@ -1,25 +1,32 @@
 .discover-row {
   flex-shrink: 0;
-  padding: 10px 20px 0;
+  padding: 18px 20px 0;
+  /* Start-aligned snap with scroll-padding-top on the container — the
+     row's TOP edge lands at the snap line. The top doesn't move when
+     the carousel grows down, so the snap engine doesn't fight the
+     focus-expansion transition. Adjacent rows still preview above
+     (in the padding zone) and below (in the remaining viewport). */
+  scroll-snap-align: start;
 }
 
 .discover-row-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .discover-row-title-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   background: transparent;
   border: none;
   padding: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--t2);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--t1);
   cursor: pointer;
   transition: color 0.15s;
   -webkit-app-region: no-drag;
@@ -30,7 +37,7 @@
 }
 
 .discover-row-title-chevron {
-  font-size: 16px;
+  font-size: 22px;
   font-weight: 400;
   line-height: 1;
   margin-top: -1px;
@@ -42,18 +49,50 @@
 }
 
 .discover-row-title-static {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--t2);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--t1);
 }
 
 /* ── Carousel container ──
-   Height must fit the Nexus-style card: 80px image + ~150px body
-   (title + author + pill + 2-line description with paddings/gaps). */
+   Default (non-focused) height fits the compact card preview. When the
+   row is in the scroll-focus band (driven by IntersectionObserver in
+   DiscoverRow.tsx), the carousel expands and its cards grow. */
 .discover-row-carousel {
   position: relative;
   height: 230px;
   overflow: hidden;
+  transition: height 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Scroll-driven row focus expansion ────────────────────────
+   Triggered when this row crosses the central focus band of the
+   scrolling container. Card image grows, body description reveals more
+   lines, title gets larger. Snappy transition (0.18s) leaves the snap
+   engine little time to fight a moving target. */
+.discover-row[data-focused="true"] .discover-row-carousel {
+  height: 480px;
+}
+
+.discover-row .repo-card-image {
+  transition: height 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.discover-row[data-focused="true"] .repo-card-image {
+  height: 280px;
+}
+
+.discover-row[data-focused="true"] .repo-card-description {
+  -webkit-line-clamp: 5;
+}
+
+.discover-row .repo-card-title {
+  transition: font-size 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.discover-row[data-focused="true"] .repo-card-title {
+  font-size: 26px;
 }
 
 /* ── Card base ── */
@@ -64,8 +103,7 @@
   left: 0;
   height: 100%;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: transparent;
   overflow: hidden;
   cursor: pointer;
   text-align: left;
@@ -73,9 +111,7 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.25s,
-              background 0.2s;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
 }
 
@@ -86,21 +122,13 @@
   pointer-events: none;
 }
 
-.discover-row-card--p0 {
-  border-color: rgba(255, 255, 255, 0.45);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 0 16px rgba(255, 255, 255, 0.12), 0 0 32px rgba(255, 255, 255, 0.06);
-}
-
 .discover-row-card:hover {
-  border-color: rgba(255, 255, 255, 0.35) !important;
   opacity: 1 !important;
-  background: rgba(0, 0, 0, 0.7);
   z-index: 5;
 }
 
-.discover-row-card--starred {
-  border-color: rgba(245,158,11,0.35);
-  box-shadow: 0 0 12px rgba(245,158,11,0.15), inset 0 0 12px rgba(245,158,11,0.04);
+.discover-row-card--starred .repo-card-image {
+  box-shadow: inset 0 0 20px rgba(245,158,11,0.16);
 }
 
 /* ── Nav overlay zones ── */
