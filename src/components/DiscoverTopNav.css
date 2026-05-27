@@ -41,6 +41,11 @@
   height: 44px;
   border-radius: 10px;
   flex-shrink: 0;
+  /* Soft dark halo — matches .titlebar-ctrl svg so the logo stays readable
+     against the lighter portions of the dithered hero banner. */
+  filter:
+    drop-shadow(0 0 6px rgba(0, 0, 0, 0.85))
+    drop-shadow(0 0 2px rgba(0, 0, 0, 1));
 }
 
 .dtn-brand-name {
@@ -48,6 +53,9 @@
   font-weight: 800;
   color: rgba(255, 255, 255, 0.92);
   letter-spacing: -0.3px;
+  text-shadow:
+    0 0 6px rgba(0, 0, 0, 0.85),
+    0 0 2px rgba(0, 0, 0, 1);
 }
 
 /* ── Search bar ──────────────────────────────────────────────── */
@@ -55,12 +63,12 @@
 .dtn-search-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 520px;
+  gap: 12px;
+  width: 680px;
   background: #252525;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 9px 6px 9px 14px;
+  border-radius: 14px;
+  padding: 14px 20px;
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
   -webkit-app-region: no-drag;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
@@ -92,7 +100,7 @@
   background: none;
   border: none;
   outline: none;
-  font-size: 13px;
+  font-size: 15px;
   font-family: inherit;
   color: var(--t1);
   caret-color: var(--t1);
@@ -173,7 +181,7 @@
 .dtn-search-panel {
   display: flex;
   flex-direction: column;
-  width: 520px;
+  width: 680px;
   -webkit-app-region: no-drag;
 }
 

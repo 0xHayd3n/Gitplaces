@@ -114,7 +114,7 @@ export default function DiscoverTopNav(props: DiscoverSidebarProps) {
             onChange={e => isCategorySearch ? setFilterSearch(e.target.value) : onQueryChange?.(e.target.value)}
             onKeyDown={e => !isCategorySearch && e.key === 'Enter' && onSearch?.()}
           />
-          {!filterOpen && (
+          {!filterOpen && compact && (
             <button
               type="button"
               className="dtn-search-filter-btn"
@@ -122,7 +122,6 @@ export default function DiscoverTopNav(props: DiscoverSidebarProps) {
               aria-expanded={false}
             >
               <Settings size={13} />
-              {!compact && <span className="dtn-search-filter-label">Filter</span>}
               {totalCount > 0 && <span className="dtn-filter-badge">{totalCount}</span>}
             </button>
           )}
