@@ -5,23 +5,24 @@ import { join } from 'node:path'
 /**
  * Regression coverage for the Discover title-bar drag region.
  *
- * Three CSS contracts must hold for the pill nav to be both clickable AND
- * draggable in the title-bar zone of the frameless Electron window:
+ * After three failed attempts at overlapping the pill nav with the title-bar
+ * drag zone, we landed on the proven non-overlapping layout:
  *
- *   1. .discover-drag-strip must be `display: none` whenever the pill nav is
- *      mounted. Its full-width OS-level drag region would otherwise intercept
- *      clicks on the pill above it (Chromium hangs -webkit-app-region:drag
- *      off elementFromPoint, which runs before DOM z-index resolution).
+ *   y=0..32   .discover-drag-strip  — OS-level drag region (window-move)
+ *   y=36+     .discover-top-nav     — pill nav (clickable tabs + search)
  *
- *   2. Drag region lives on leaf .dtn-drag-region elements (NOT on the
- *      wrapper). The original .discover-drag-strip comment in globals.css
- *      documents that the codebase's drag-region detection requires a leaf
- *      element with no descendants — parent-drag + child-no-drag combinations
- *      don't reliably resolve inside .main-content (will-change:transform).
+ * Three contracts must hold:
+ *
+ *   1. .discover-drag-strip is NOT conditionally hidden when .discover-top-nav
+ *      is mounted. Both render simultaneously and don't overlap by design.
+ *
+ *   2. The pill nav wrapper sits BELOW the 32px-tall drag strip (top >= 32px).
+ *      If a future refactor pushes it back into the title-bar zone, drag
+ *      stops working (Chromium's drag-region hit-test is fragile inside
+ *      .main-content's composite-promoted layer).
  *
  *   3. The pill bar carries -webkit-app-region: no-drag and pointer-events:
- *      auto so its tabs / search input remain interactive between the two
- *      drag-region siblings.
+ *      auto so its tabs / search input are interactive.
  */
 describe('Discover title-bar drag region (regression)', () => {
   const globals = readFileSync(
@@ -32,37 +33,28 @@ describe('Discover title-bar drag region (regression)', () => {
     join(__dirname, '..', 'components', 'DiscoverTopNav.css'),
     'utf8',
   )
-  const dtnTsx = readFileSync(
-    join(__dirname, '..', 'components', 'DiscoverTopNav.tsx'),
-    'utf8',
-  )
 
-  it('hides .discover-drag-strip whenever .discover-top-nav is present', () => {
-    // Must NOT be gated on the removed --compact modifier
+  it('does NOT hide .discover-drag-strip when the pill nav is mounted', () => {
+    expect(globals).not.toMatch(/:has\(\.discover-top-nav\)\s+\.discover-drag-strip\s*\{[^}]*display:\s*none/)
     expect(globals).not.toMatch(/\.discover-top-nav--compact[^{]*\)\s+\.discover-drag-strip/)
-
-    // Must hide via :has(.discover-top-nav) (or an equivalent unconditional rule)
-    expect(globals).toMatch(/:has\(\.discover-top-nav\)\s+\.discover-drag-strip\s*\{[^}]*display:\s*none/)
   })
 
-  it('declares -webkit-app-region: drag on the .dtn-drag-region leaf, NOT on the wrapper', () => {
-    const dragLeafBlock = dtnCss.match(/\.dtn-drag-region\s*\{[^}]*\}/)?.[0] ?? ''
-    expect(dragLeafBlock).toContain('-webkit-app-region: drag')
-
-    // The wrapper itself must NOT carry drag — that combination has historically
-    // broken in Chromium when the pill sits inside as a no-drag child.
+  it('places the pill nav wrapper below the 32px drag strip', () => {
     const wrapperBlock = dtnCss.match(/\.discover-top-nav\s*\{[^}]*\}/)?.[0] ?? ''
-    expect(wrapperBlock).not.toContain('-webkit-app-region: drag')
-  })
-
-  it('renders two .dtn-drag-region siblings flanking the pill bar', () => {
-    const dragMatches = dtnTsx.match(/className="dtn-drag-region"/g) ?? []
-    expect(dragMatches.length).toBe(2)
+    const topMatch = wrapperBlock.match(/top:\s*(\d+)px/)
+    expect(topMatch).not.toBeNull()
+    const topPx = Number(topMatch![1])
+    expect(topPx).toBeGreaterThanOrEqual(32)
   })
 
   it('declares -webkit-app-region: no-drag and pointer-events: auto on the pill bar', () => {
     const pillBlock = dtnCss.match(/\.dtn-pill-bar\s*\{[^}]*\}/)?.[0] ?? ''
     expect(pillBlock).toContain('-webkit-app-region: no-drag')
     expect(pillBlock).toContain('pointer-events: auto')
+  })
+
+  it('does NOT carry -webkit-app-region: drag on the wrapper (drag belongs on .discover-drag-strip)', () => {
+    const wrapperBlock = dtnCss.match(/\.discover-top-nav\s*\{[^}]*\}/)?.[0] ?? ''
+    expect(wrapperBlock).not.toContain('-webkit-app-region: drag')
   })
 })

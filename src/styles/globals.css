@@ -1538,15 +1538,6 @@ a {
   -webkit-app-region: drag;
 }
 
-/* The pill nav lives at top:0..44 and the drag strip's OS-level drag region
-   would otherwise intercept clicks on the nav (Chromium processes
-   -webkit-app-region: drag at the hit-test layer before z-index applies).
-   The wrapper .discover-top-nav itself spans the full width as the drag
-   region, so hiding the strip here loses no window-drag capability. */
-.discover-layout:has(.discover-top-nav) .discover-drag-strip {
-  display: none;
-}
-
 /* Same problem under the repo overlay: the underlying view (Library, Discover,
    TemplateGallery, etc.) still has its .discover-drag-strip mounted at top: 0,
    and its OS-level drag region keeps intercepting clicks for the overlay's

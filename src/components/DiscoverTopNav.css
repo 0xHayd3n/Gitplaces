@@ -1,35 +1,22 @@
 /* ── Wrapper ─────────────────────────────────────────────────── */
-/* Full-width strip across the top of the viewport. The wrapper itself has
-   no drag region — drag lives on the two .dtn-drag-region leaf children
-   that flank the pill bar via flex. The codebase's proven drag-region
-   pattern (.discover-drag-strip, see globals.css:1526) uses leaf elements
-   because Chromium's drag-region hit-test relies on elementFromPoint and
-   doesn't reliably resolve parent-drag / child-no-drag overlays inside
-   compositor-promoted ancestors like .main-content (will-change:transform). */
+/* Pill nav sits just BELOW the .discover-drag-strip (0..32px) so they
+   don't overlap. This is the codebase's long-proven layout — the strip
+   provides the OS-level drag region for window movement, and the pill
+   stays in its own non-overlapping zone where it can be freely clicked.
+   Earlier attempts to put the pill INSIDE the title-bar drag zone all
+   failed in different ways because Chromium's drag-region hit-test is
+   fragile inside .main-content (which is composite-promoted via
+   will-change:transform). Keep them disjoint. */
 .discover-top-nav {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 56px;
+  top: 36px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 200;
-  display: flex;
-  align-items: center;
-  /* No -webkit-app-region on the wrapper. */
-}
-
-/* Leaf drag regions, one on each side of the pill. flex:1 lets them grow
-   to fill remaining space, so the search-input expansion (pill widening)
-   automatically shrinks the strips without code changes. */
-.dtn-drag-region {
-  flex: 1 1 0;
-  align-self: stretch;
-  -webkit-app-region: drag;
 }
 
 /* ── Pill bar ────────────────────────────────────────────────── */
 .dtn-pill-bar {
-  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 6px;
