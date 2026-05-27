@@ -6,6 +6,7 @@ export const VIEW_MODES = [
   { key: 'agents',         label: 'Agents',              accent: '#f59e0b' },
   { key: 'hot-today',      label: 'Hot today',           accent: '#ef4444' },
   { key: 'trending-week',  label: 'Trending this week',  accent: '#f97316' },
+  { key: 'popular',        label: 'Most Popular',        accent: '#3b82f6' },
   { key: 'hidden-gems',    label: 'Hidden gems',         accent: '#10b981' },
 ] as const
 
@@ -35,6 +36,9 @@ export function buildViewModeQuery(viewMode: ViewModeKey, langKey: string, searc
     case 'agents':
       return '' // agents come from window.api.agents.getAll(), not GitHub search
     case 'home':
+    case 'popular':
+      // 'popular' is the grid-form of the Home dataset — same query, different
+      // presentation (full grid with pagination instead of a single row).
       return langFilter
         ? `stars:>0 ${langFilter}`
         : 'stars:>100'

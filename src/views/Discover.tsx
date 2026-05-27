@@ -27,6 +27,7 @@ import {
   type LayoutPrefs,
 } from '../components/LayoutDropdown'
 import {
+  VIEW_MODES,
   type ViewModeKey,
   buildViewModeQuery, getViewModeSort, getSubTypeKeyword,
 } from '../lib/discoverQueries'
@@ -161,9 +162,8 @@ export default function Discover() {
   const [hiddenGemsIndex, setHiddenGemsIndex] = useState(0)
   const viewMode: ViewModeKey = (() => {
     const v = searchParams.get('view')
-    if (v === 'recommended') return 'recommended'
-    if (v === 'agents') return 'agents'
-    return 'home'
+    const match = VIEW_MODES.find(vm => vm.key === v)
+    return match ? match.key : 'home'
   })()
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(() => {
     const snap = restoredSnapshot.current
@@ -434,13 +434,8 @@ export default function Discover() {
       // Legacy snapshots may carry the dropped 'all' or 'last-visited' view
       // modes — normalise to the new 'home' default before mirroring into URL.
       const raw = restoredSnapshot.current.viewMode as ViewModeKey | 'all' | 'last-visited'
-      const snapshotView: ViewModeKey =
-          raw === 'recommended'    ? 'recommended'
-        : raw === 'agents'         ? 'agents'
-        : raw === 'hot-today'      ? 'hot-today'
-        : raw === 'trending-week'  ? 'trending-week'
-        : raw === 'hidden-gems'    ? 'hidden-gems'
-        : 'home'
+      const match = VIEW_MODES.find(vm => vm.key === raw)
+      const snapshotView: ViewModeKey = match ? match.key : 'home'
       const urlView = searchParams.get('view') ?? 'home'
       if (snapshotView !== urlView) {
         setSearchParams(prev => {
@@ -1320,6 +1315,7 @@ export default function Discover() {
                             onLanguageClick={handleLanguageClick}
                           />
                         )}
+                        onMore={() => setViewMode('popular')}
                         onAdvance={(delta) => {
                           const len = Math.min(repos.length, 30)
                           const visible = Math.min(effectiveCols, len)

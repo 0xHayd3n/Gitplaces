@@ -62,3 +62,15 @@ describe('buildViewModeQuery — existing modes unchanged', () => {
     expect(buildViewModeQuery('hot-today', '', 'react')).toBe('react')
   })
 })
+
+describe('buildViewModeQuery — popular (Most Popular expansion)', () => {
+  it('mirrors home query with no langKey', () => {
+    expect(buildViewModeQuery('popular', '', '')).toBe('stars:>100')
+  })
+  it('mirrors home query with langKey', () => {
+    expect(buildViewModeQuery('popular', 'rust', '')).toBe('stars:>0 language:rust')
+  })
+  it('uses stars desc sort like home', () => {
+    expect(getViewModeSort('popular')).toEqual({ sort: 'stars', order: 'desc' })
+  })
+})
