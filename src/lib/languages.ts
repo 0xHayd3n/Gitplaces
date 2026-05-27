@@ -179,7 +179,7 @@ export type EcosystemCategory =
   | 'Editor'
   | 'UI'
 
-/** Backward-compat alias — all existing consumers (GridHeader, RepoCard, etc.) require zero changes */
+/** Backward-compat alias — existing consumers (RepoCard, etc.) require zero changes */
 export type LangCategory = EcosystemCategory
 
 export interface LangDef {

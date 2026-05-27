@@ -191,7 +191,7 @@ export function FilterPanel({
   const [draftLanguages, setDraftLanguages] = useState(selectedLanguages)
   const [draftSubtypes, setDraftSubtypes] = useState(selectedSubtypes)
 
-  // Sync draft when committed values change externally (e.g. chip removal from GridHeader)
+  // Sync draft when committed values change externally (e.g. chip removal from FilterChipRow)
   const committedLangsKey = selectedLanguages.slice().sort().join(',')
   const committedTypesKey = selectedSubtypes.slice().sort().join(',')
   useEffect(() => { setDraftLanguages(selectedLanguages) }, [committedLangsKey]) // eslint-disable-line react-hooks/exhaustive-deps
