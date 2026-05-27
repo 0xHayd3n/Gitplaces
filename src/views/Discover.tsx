@@ -196,7 +196,6 @@ export default function Discover() {
   // unlike window.resize which can miss Electron snap events.
   const screenHalf = Math.round(window.screen.availWidth / 2)
   const narrowThreshold = Math.max(1200, screenHalf + 50)
-  const [navCompact, setNavCompact] = useState(false)
   const [searchFocused, setSearchFocused] = useState(false)
   const [containerWidth, setContainerWidth] = useState(window.innerWidth)
   useEffect(() => {
@@ -606,7 +605,6 @@ export default function Discover() {
     let timer: ReturnType<typeof setTimeout>
     const onScroll = () => {
       setDitherScrollHint(true)
-      setNavCompact(scroller.scrollTop > 150)
       clearTimeout(timer)
       timer = setTimeout(() => {
         const ids = repos.map(r => r.id).filter(Boolean)
@@ -1094,7 +1092,6 @@ export default function Discover() {
           inputRef={topNavInputRef}
           layoutPrefs={layoutPrefs}
           onLayoutChange={handleLayoutChange}
-          compact={navCompact || viewMode !== 'home' || topicMode || selectedSubtypes.length > 0 || inSearchResults}
         />
         <div className="discover-main">
           <div ref={scrollRef} className={`discover-content ${aiChatVisible ? 'discover-content-dimmed' : ''}`} onKeyDown={kbNav.containerProps.onKeyDown} tabIndex={-1}>

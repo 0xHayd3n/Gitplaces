@@ -14,13 +14,11 @@ const TABS: { key: TopNavTab; label: string }[] = [
 export interface DiscoverTopNavProps extends DiscoverSidebarProps {
   viewMode: ViewModeKey
   onViewModeChange: (key: ViewModeKey) => void
-  compact?: boolean
 }
 
 export default function DiscoverTopNav({
   viewMode, onViewModeChange,
   query = '', onQueryChange, onSearch, inputRef,
-  compact = false,
 }: DiscoverTopNavProps) {
   const [searchOpen, setSearchOpen] = useState(false)
   const localInputRef = useRef<HTMLInputElement>(null)
@@ -47,7 +45,7 @@ export default function DiscoverTopNav({
     : 'home'
 
   return (
-    <div className={`discover-top-nav${compact ? ' discover-top-nav--compact' : ''}`}>
+    <div className="discover-top-nav">
       <div className="dtn-pill-bar">
         {!searchOpen && (
           <button
