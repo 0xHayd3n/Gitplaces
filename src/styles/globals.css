@@ -1538,14 +1538,12 @@ a {
   -webkit-app-region: drag;
 }
 
-/* When the top-nav is docked into the title-bar strip (compact mode), the
-   nav and the drag strip would otherwise compete for the same area and the
-   drag region wins via Chromium's hit-test, making the buttons unclickable.
-   Hide the strip in compact mode — on Windows the OS-level titleBarOverlay
-   still provides the drag area for window movement; on macOS the user can
-   drag from the empty parts of the compact nav itself (which has
-   -webkit-app-region: drag on the wrapper). */
-.discover-layout:has(.discover-top-nav--compact) .discover-drag-strip {
+/* The pill nav lives at top:0..44 and the drag strip's OS-level drag region
+   would otherwise intercept clicks on the nav (Chromium processes
+   -webkit-app-region: drag at the hit-test layer before z-index applies).
+   The wrapper .discover-top-nav itself spans the full width as the drag
+   region, so hiding the strip here loses no window-drag capability. */
+.discover-layout:has(.discover-top-nav) .discover-drag-strip {
   display: none;
 }
 

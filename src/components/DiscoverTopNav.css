@@ -1,12 +1,22 @@
 /* ── Wrapper ─────────────────────────────────────────────────── */
-/* Netflix-style: nav is permanently docked at the top, identical at every
-   scroll position and on every tab. No transitions, no shrink, no shift. */
+/* Full-width strip at the top of the viewport so the area around the pill
+   bar acts as the OS-level drag region for window movement. The wrapper
+   has pointer-events:none so DOM clicks pass through to the hero / rows
+   underneath everywhere except the pill bar itself, which re-enables
+   pointer-events. This replaces the now-hidden .discover-drag-strip and
+   keeps the pill bar clickable instead of being eaten by an overlapping
+   drag region. */
 .discover-top-nav {
   position: fixed;
-  top: 4px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
   z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
   -webkit-app-region: drag;
 }
 
@@ -22,6 +32,7 @@
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  pointer-events: auto;
   -webkit-app-region: no-drag;
 }
 
