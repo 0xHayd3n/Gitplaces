@@ -1,22 +1,24 @@
 /* ── Wrapper ─────────────────────────────────────────────────── */
 /* Full-width strip at the top of the viewport so the area around the pill
-   bar acts as the OS-level drag region for window movement. The wrapper
-   has pointer-events:none so DOM clicks pass through to the hero / rows
-   underneath everywhere except the pill bar itself, which re-enables
-   pointer-events. This replaces the now-hidden .discover-drag-strip and
-   keeps the pill bar clickable instead of being eaten by an overlapping
-   drag region. */
+   bar acts as the OS-level drag region for window movement (replacing
+   .discover-drag-strip, which is hidden when the nav is present).
+   Note: pointer-events MUST stay at the default `auto` — Chromium hangs
+   -webkit-app-region: drag off normal hit-testing, so pointer-events:none
+   kills the drag region. The trade-off is that clicks in the empty area
+   of the strip are swallowed by the wrapper instead of passing through to
+   the hero below; the hero is 504px tall so the top ~56px is acceptable
+   collateral. The pill itself is still clickable via its own no-drag /
+   pointer-events:auto rules below. */
 .discover-top-nav {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: 44px;
+  height: 56px;
   z-index: 200;
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
   -webkit-app-region: drag;
 }
 
