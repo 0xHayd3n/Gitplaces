@@ -15,11 +15,8 @@ import DiscoverTopNav from '../components/DiscoverTopNav'
 import DiscoverHero from '../components/DiscoverHero'
 import DiscoverRow from '../components/DiscoverRow'
 import DiscoverRowRepoCard from '../components/DiscoverRowRepoCard'
-import DiscoverRowAgentCard from '../components/DiscoverRowAgentCard'
 import FilterChipRow from '../components/FilterChipRow'
 import AiChatOverlay from '../components/AiChatOverlay'
-import { rankAgents } from '../lib/agentRanking'
-import type { AgentRow } from '../types/agent'
 import { useVerification } from '../hooks/useVerification'
 import { useSearchHistory } from '../hooks/useSearchHistory'
 import {
@@ -41,6 +38,7 @@ import {
   loadCachedHotToday, saveCachedHotToday,
   loadCachedTrendingWeek, saveCachedTrendingWeek,
   loadCachedHiddenGems, saveCachedHiddenGems,
+  loadCachedAgents, saveCachedAgents,
 } from '../lib/discoverCache'
 
 // ── Layout prefs loader ───────────────────────────────────────────
@@ -75,6 +73,11 @@ function loadLayoutPrefs(): LayoutPrefs {
 // (SWR-style) but triggers a background refetch.
 const RECOMMENDED_TTL_MS = 60 * 60 * 1000
 
+// Trending this week reflects a 7-day signal; weekly trends shift slowly so a
+// longer in-session TTL still serves accurate-enough cards without re-fetching
+// every hour. Other rows keep the 1h default.
+const TRENDING_WEEK_TTL_MS = 6 * 60 * 60 * 1000
+
 let _recommendedModuleCache: { items: RecommendationItem[]; fetchedAt: number } | null = (() => {
   const persisted = loadCachedRecommended()
   return persisted ? { items: persisted.items, fetchedAt: persisted.fetchedAt } : null
@@ -97,6 +100,11 @@ let _trendingWeekModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (
 
 let _hiddenGemsModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
   const persisted = loadCachedHiddenGems()
+  return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
+})()
+
+let _agentsModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
+  const persisted = loadCachedAgents()
   return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
 })()
 
@@ -154,7 +162,9 @@ export default function Discover() {
   )
   const [heroIndex, setHeroIndex] = useState(0)
   const [heroPaused, setHeroPaused] = useState(false)
-  const [rankedAgents, setRankedAgents] = useState<AgentRow[]>([])
+  const [agentsRowRepos, setAgentsRowRepos] = useState<RepoRow[]>(
+    () => _agentsModuleCache?.repos ?? []
+  )
   const [agentsIndex, setAgentsIndex] = useState(0)
   const [hotTodayIndex, setHotTodayIndex] = useState(0)
   const [trendingWeekIndex, setTrendingWeekIndex] = useState(0)
@@ -350,7 +360,7 @@ export default function Discover() {
 
   useEffect(() => {
     async function loadTrendingWeekRow() {
-      if (_trendingWeekModuleCache && Date.now() - _trendingWeekModuleCache.fetchedAt < RECOMMENDED_TTL_MS) {
+      if (_trendingWeekModuleCache && Date.now() - _trendingWeekModuleCache.fetchedAt < TRENDING_WEEK_TTL_MS) {
         return
       }
       try {
@@ -395,9 +405,22 @@ export default function Discover() {
   }, [heroPaused, rowRepos.length])
 
   useEffect(() => {
-    window.api.agents.getAll()
-      .then(({ agents }) => setRankedAgents(rankAgents(agents)))
-      .catch(() => setRankedAgents([]))
+    async function loadAgentsRow() {
+      if (_agentsModuleCache && Date.now() - _agentsModuleCache.fetchedAt < RECOMMENDED_TTL_MS) {
+        return
+      }
+      try {
+        const q = buildViewModeQuery('agents', '', '')
+        const { sort, order } = getViewModeSort('agents')
+        const data = await window.api.github.searchRepos(q, sort, order)
+        _agentsModuleCache = { repos: data, fetchedAt: Date.now() }
+        saveCachedAgents(data)
+        setAgentsRowRepos(data)
+      } catch {
+        // non-critical
+      }
+    }
+    loadAgentsRow()
   }, [])
 
   // Always-current snapshot data — updated after every render so the unmount
@@ -577,12 +600,7 @@ export default function Discover() {
     const gen = ++fetchGeneration.current
     try {
       let data: RepoRow[]
-      if (viewMode === 'agents') {
-        // Agents come from window.api.agents.getAll(); the rankedAgents state
-        // is hydrated separately so no GitHub fetch is needed here.
-        data = []
-        setHasMore(false)
-      } else if (viewMode === 'recommended' && selectedSubtypes.length === 0) {
+      if (viewMode === 'recommended' && selectedSubtypes.length === 0) {
         if (recommendedCache.current) {
           data = recommendedCache.current
         } else if (_recommendedModuleCache && Date.now() - _recommendedModuleCache.fetchedAt < RECOMMENDED_TTL_MS) {
@@ -1221,26 +1239,27 @@ export default function Discover() {
                       />
                     )}
 
-                    {rankedAgents.length > 0 && (
-                      <DiscoverRow<AgentRow>
+                    {agentsRowRepos.length > 0 && (
+                      <DiscoverRow<RepoRow>
                         title="Agents"
-                        items={rankedAgents}
+                        items={agentsRowRepos}
                         activeIndex={agentsIndex}
                         columns={effectiveCols}
-                        getItemKey={a => a.id}
+                        getItemKey={r => r.id}
                         renderCard={({ item, posIndex, columns, visible }) => (
-                          <DiscoverRowAgentCard
-                            agent={item}
+                          <DiscoverRowRepoCard
+                            repo={item}
                             posIndex={posIndex}
                             columns={columns}
                             visible={visible}
                             onNavigate={navigateToRepo}
+                            onLanguageClick={handleLanguageClick}
                           />
                         )}
                         onMore={() => setViewMode('agents')}
                         onAdvance={(delta) => {
-                          const visible = Math.min(effectiveCols, rankedAgents.length)
-                          const max = Math.max(0, rankedAgents.length - visible)
+                          const visible = Math.min(effectiveCols, agentsRowRepos.length)
+                          const max = Math.max(0, agentsRowRepos.length - visible)
                           setAgentsIndex((i) => Math.max(0, Math.min(max, i + delta)))
                         }}
                       />
@@ -1387,7 +1406,7 @@ export default function Discover() {
                       loadingMore={loadingMore}
                       error={error}
                       visibleRepos={visibleRepos}
-                      agents={viewMode === 'agents' ? rankedAgents : undefined}
+                      agents={undefined}
                       discoverQuery={discoverQuery}
                       layoutPrefs={effectiveLayoutPrefs}
                       sentinelRef={sentinelRef}

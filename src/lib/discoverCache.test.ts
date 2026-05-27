@@ -5,6 +5,7 @@ import {
   loadCachedHotToday, saveCachedHotToday,
   loadCachedTrendingWeek, saveCachedTrendingWeek,
   loadCachedHiddenGems, saveCachedHiddenGems,
+  loadCachedAgents, saveCachedAgents,
   POPULAR_CACHE_TTL_MS,
 } from './discoverCache'
 import type { RepoRow } from '../types/repo'
@@ -15,6 +16,7 @@ const KEY_RECOMMENDED = 'discover-cache.recommended.v1'
 const KEY_HOT_TODAY = 'discover-cache.hot-today.v2'
 const KEY_TRENDING_WEEK = 'discover-cache.trending-week.v1'
 const KEY_HIDDEN_GEMS = 'discover-cache.hidden-gems.v1'
+const KEY_AGENTS = 'discover-cache.agents.v1'
 
 function makeRepo(name: string): RepoRow {
   return {
@@ -201,5 +203,20 @@ describe('loadCachedHiddenGems', () => {
     const stale = { repos: [makeRepo('a')], fetchedAt: Date.now() - POPULAR_CACHE_TTL_MS - 1 }
     localStorage.setItem(KEY_HIDDEN_GEMS, JSON.stringify(stale))
     expect(loadCachedHiddenGems()).toBeNull()
+  })
+})
+
+describe('loadCachedAgents', () => {
+  it('returns null when nothing stored', () => {
+    expect(loadCachedAgents()).toBeNull()
+  })
+  it('round-trips repos within TTL', () => {
+    saveCachedAgents([makeRepo('a')])
+    expect(loadCachedAgents()!.repos[0].name).toBe('a')
+  })
+  it('returns null when older than TTL', () => {
+    const stale = { repos: [makeRepo('a')], fetchedAt: Date.now() - POPULAR_CACHE_TTL_MS - 1 }
+    localStorage.setItem(KEY_AGENTS, JSON.stringify(stale))
+    expect(loadCachedAgents()).toBeNull()
   })
 })

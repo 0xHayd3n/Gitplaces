@@ -34,7 +34,10 @@ export function buildViewModeQuery(viewMode: ViewModeKey, langKey: string, searc
     case 'recommended':
       return '' // handled by separate IPC handler
     case 'agents':
-      return '' // agents come from window.api.agents.getAll(), not GitHub search
+      // Agent repos on GitHub use the `ai-agent` topic — same keyword the
+      // ai-agent sub-type classification uses. Lang filter composes on top so
+      // users can narrow to e.g. Python or TypeScript agent frameworks.
+      return [`topic:ai-agent`, langFilter].filter(Boolean).join(' ')
     case 'home':
     case 'popular':
       // 'popular' is the grid-form of the Home dataset — same query, different

@@ -16,6 +16,7 @@ const KEY_RECOMMENDED = 'discover-cache.recommended.v1'
 const KEY_HOT_TODAY = 'discover-cache.hot-today.v2'
 const KEY_TRENDING_WEEK = 'discover-cache.trending-week.v1'
 const KEY_HIDDEN_GEMS = 'discover-cache.hidden-gems.v1'
+const KEY_AGENTS = 'discover-cache.agents.v1'
 
 // 24h: trending repos shift slowly day-to-day, and SWR refresh runs in the
 // background on every mount, so cache age is bounded by the user's session
@@ -124,6 +125,22 @@ export function saveCachedHiddenGems(repos: RepoRow[]): void {
       fetchedAt: Date.now(),
     }
     localStorage.setItem(KEY_HIDDEN_GEMS, JSON.stringify(payload))
+  } catch {
+    // non-critical
+  }
+}
+
+export function loadCachedAgents(): CachedPopular | null {
+  return loadCache<CachedPopular>(KEY_AGENTS)
+}
+
+export function saveCachedAgents(repos: RepoRow[]): void {
+  try {
+    const payload: CachedPopular = {
+      repos: repos.slice(0, MAX_CACHED_ENTRIES),
+      fetchedAt: Date.now(),
+    }
+    localStorage.setItem(KEY_AGENTS, JSON.stringify(payload))
   } catch {
     // non-critical
   }

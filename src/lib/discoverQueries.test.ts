@@ -63,6 +63,18 @@ describe('buildViewModeQuery — existing modes unchanged', () => {
   })
 })
 
+describe('buildViewModeQuery — agents', () => {
+  it('returns topic:ai-agent with no langKey', () => {
+    expect(buildViewModeQuery('agents', '', '')).toBe('topic:ai-agent')
+  })
+  it('appends language filter while keeping the topic', () => {
+    expect(buildViewModeQuery('agents', 'python', '')).toBe('topic:ai-agent language:python')
+  })
+  it('uses stars desc sort', () => {
+    expect(getViewModeSort('agents')).toEqual({ sort: 'stars', order: 'desc' })
+  })
+})
+
 describe('buildViewModeQuery — popular (Most Popular expansion)', () => {
   it('mirrors home query with no langKey', () => {
     expect(buildViewModeQuery('popular', '', '')).toBe('stars:>100')
