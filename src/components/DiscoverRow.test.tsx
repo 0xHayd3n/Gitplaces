@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DiscoverRow from './DiscoverRow'
+import DiscoverRowRepoCard from './DiscoverRowRepoCard'
 import type { RepoRow } from '../types/repo'
 
 vi.mock('./DitherBackground', () => ({
@@ -14,8 +15,6 @@ vi.mock('./LanguageIcon', () => ({
 vi.mock('../hooks/useBayerDither', () => ({ useBayerDither: vi.fn() }))
 
 beforeAll(() => {
-  // ResizeObserver is already stubbed in src/test/setup.ts, but the existing
-  // test set it locally too — keep that for parity with prior behaviour.
   globalThis.ResizeObserver = class {
     observe() {}
     unobserve() {}
@@ -59,45 +58,65 @@ const repos = [
   makeRepo('golang', 'go'),
 ]
 
+function renderRepoRow(props: Partial<Parameters<typeof DiscoverRow<RepoRow>>[0]> & {
+  onNavigate?: (path: string) => void
+} = {}) {
+  const onNavigate = props.onNavigate ?? vi.fn()
+  return render(
+    <DiscoverRow<RepoRow>
+      items={props.items ?? repos}
+      activeIndex={props.activeIndex ?? 0}
+      columns={props.columns ?? 3}
+      getItemKey={r => r.id}
+      onAdvance={props.onAdvance ?? vi.fn()}
+      onMore={props.onMore ?? vi.fn()}
+      renderCard={({ item, posIndex, columns, visible }) => (
+        <DiscoverRowRepoCard
+          repo={item}
+          posIndex={posIndex}
+          columns={columns}
+          visible={visible}
+          onNavigate={onNavigate}
+        />
+      )}
+    />,
+  )
+}
+
 describe('DiscoverRow', () => {
-  it('renders null when repos is empty', () => {
-    const { container } = render(
-      <DiscoverRow repos={[]} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />,
-    )
+  it('renders null when items is empty', () => {
+    const { container } = renderRepoRow({ items: [] })
     expect(container.firstChild).toBeNull()
   })
 
   it('renders a card for each repo', () => {
-    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />)
+    renderRepoRow()
     expect(screen.getByRole('button', { name: 'facebook/react' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'microsoft/vscode' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'golang/go' })).toBeTruthy()
   })
 
-  it('renders "Recommended for You" section heading', () => {
-    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />)
+  it('renders "Recommended for You" section heading by default', () => {
+    renderRepoRow()
     expect(screen.getByText('Recommended for You')).toBeTruthy()
   })
 
-  it('calls onMore when More button is clicked', async () => {
+  it('calls onMore when the title button is clicked', async () => {
     const onMore = vi.fn()
-    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={onMore} onAdvance={vi.fn()} columns={3} />)
+    renderRepoRow({ onMore })
     await userEvent.click(screen.getByRole('button', { name: /see all/i }))
     expect(onMore).toHaveBeenCalledOnce()
   })
 
   it('calls onNavigate with correct path when a card is clicked', async () => {
     const onNavigate = vi.fn()
-    render(<DiscoverRow repos={repos} activeIndex={0} onNavigate={onNavigate} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />)
+    renderRepoRow({ onNavigate })
     await userEvent.click(screen.getByRole('button', { name: 'facebook/react' }))
     expect(onNavigate).toHaveBeenCalledWith('/repo/facebook/react')
   })
 
   it('renders the new card structure (title, author, description, language overlay)', () => {
-    const { container } = render(
-      <DiscoverRow repos={repos} activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onAdvance={vi.fn()} columns={3} />,
-    )
-    // Pick the active card (first non-peek slot)
+    const { container } = renderRepoRow()
     expect(container.querySelector('.repo-card-title')).toBeTruthy()
     expect(container.querySelector('.repo-card-author')).toBeTruthy()
     expect(container.querySelector('.repo-card-description')).toBeTruthy()
@@ -105,12 +124,9 @@ describe('DiscoverRow', () => {
   })
 
   it('does NOT render star button, license chip, recency stat, or tag chips', () => {
-    const { container } = render(
-      <DiscoverRow
-        repos={[makeRepo('facebook', 'react', { topics: '["ui","library"]', license: 'MIT', pushed_at: new Date().toISOString() })]}
-        activeIndex={0} onNavigate={vi.fn()} onMore={vi.fn()} onAdvance={vi.fn()} columns={3}
-      />,
-    )
+    const { container } = renderRepoRow({
+      items: [makeRepo('facebook', 'react', { topics: '["ui","library"]', license: 'MIT', pushed_at: new Date().toISOString() })],
+    })
     expect(container.querySelector('.repo-card-badge-br')).toBeNull()
     expect(container.querySelector('.discover-row-card-license')).toBeNull()
     expect(container.querySelector('.discover-row-card-stat')).toBeNull()
