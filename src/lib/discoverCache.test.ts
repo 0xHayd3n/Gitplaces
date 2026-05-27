@@ -12,7 +12,7 @@ import type { RecommendationItem } from '../types/recommendation'
 
 const KEY_POPULAR = 'discover-cache.popular.v1'
 const KEY_RECOMMENDED = 'discover-cache.recommended.v1'
-const KEY_HOT_TODAY = 'discover-cache.hot-today.v1'
+const KEY_HOT_TODAY = 'discover-cache.hot-today.v2'
 const KEY_TRENDING_WEEK = 'discover-cache.trending-week.v1'
 const KEY_HIDDEN_GEMS = 'discover-cache.hidden-gems.v1'
 

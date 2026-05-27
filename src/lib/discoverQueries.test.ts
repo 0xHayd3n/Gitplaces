@@ -40,8 +40,8 @@ describe('buildViewModeQuery — hidden-gems', () => {
 })
 
 describe('getViewModeSort — new view modes', () => {
-  it('returns stars desc for hot-today', () => {
-    expect(getViewModeSort('hot-today')).toEqual({ sort: 'stars', order: 'desc' })
+  it('returns updated desc for hot-today (sort:stars would clone Trending this week)', () => {
+    expect(getViewModeSort('hot-today')).toEqual({ sort: 'updated', order: 'desc' })
   })
   it('returns stars desc for trending-week', () => {
     expect(getViewModeSort('trending-week')).toEqual({ sort: 'stars', order: 'desc' })

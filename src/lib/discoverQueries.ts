@@ -47,7 +47,11 @@ export function buildViewModeQuery(viewMode: ViewModeKey, langKey: string, searc
   }
 }
 
-export function getViewModeSort(_viewMode: ViewModeKey): { sort: string; order: string } {
+export function getViewModeSort(viewMode: ViewModeKey): { sort: string; order: string } {
+  // Hot today emphasises FRESH activity over absolute popularity. Sorting by
+  // stars would surface the same mega-repos as Trending this week — they're
+  // all pushed-to daily — so we sort by recent updates instead.
+  if (viewMode === 'hot-today') return { sort: 'updated', order: 'desc' }
   return { sort: 'stars', order: 'desc' }
 }
 
