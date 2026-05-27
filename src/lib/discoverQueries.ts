@@ -1,15 +1,24 @@
 // ── View mode data ─────────────────────────────────────────────────
 
 export const VIEW_MODES = [
-  { key: 'home',        label: 'Home',        accent: '#60a5fa' },
-  { key: 'recommended', label: 'Recommended', accent: '#8b5cf6' },
-  { key: 'agents',      label: 'Agents',      accent: '#f59e0b' },
+  { key: 'home',           label: 'Home',                accent: '#60a5fa' },
+  { key: 'recommended',    label: 'Recommended',         accent: '#8b5cf6' },
+  { key: 'agents',         label: 'Agents',              accent: '#f59e0b' },
+  { key: 'hot-today',      label: 'Hot today',           accent: '#ef4444' },
+  { key: 'trending-week',  label: 'Trending this week',  accent: '#f97316' },
+  { key: 'hidden-gems',    label: 'Hidden gems',         accent: '#10b981' },
 ] as const
 
 export type ViewModeKey = (typeof VIEW_MODES)[number]['key']
 
 export function getViewModeAccent(key: ViewModeKey): string {
   return VIEW_MODES.find(vm => vm.key === key)?.accent ?? '#8b5cf6'
+}
+
+function daysAgoIsoDate(days: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  return d.toISOString().split('T')[0]
 }
 
 export function buildViewModeQuery(viewMode: ViewModeKey, langKey: string, search: string): string {
@@ -29,6 +38,12 @@ export function buildViewModeQuery(viewMode: ViewModeKey, langKey: string, searc
       return langFilter
         ? `stars:>0 ${langFilter}`
         : 'stars:>100'
+    case 'hot-today':
+      return [`pushed:>${daysAgoIsoDate(1)}`, langFilter].filter(Boolean).join(' ')
+    case 'trending-week':
+      return [`pushed:>${daysAgoIsoDate(7)}`, langFilter].filter(Boolean).join(' ')
+    case 'hidden-gems':
+      return [`pushed:>${daysAgoIsoDate(30)} stars:50..500`, langFilter].filter(Boolean).join(' ')
   }
 }
 
