@@ -1,16 +1,15 @@
 /* ── Wrapper ─────────────────────────────────────────────────── */
+/* Netflix-style: nav stays docked at the top of the viewport regardless of
+   scroll position. The compact modifier still drives a subtle padding /
+   font shrink (rules below) for a tighter look on non-home tabs and after
+   scrolling, but the vertical position no longer shifts. */
 .discover-top-nav {
   position: fixed;
-  top: 210px;
+  top: 4px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 200;
   -webkit-app-region: drag;
-  transition: top 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.discover-top-nav--compact {
-  top: 4px;
 }
 
 /* ── Pill bar ────────────────────────────────────────────────── */
