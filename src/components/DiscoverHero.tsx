@@ -72,6 +72,28 @@ function HeroLayer({ repo, animClass }: LayerProps) {
             <div className="discover-hero-title">{repo.name}</div>
           </div>
           {desc && <div className="discover-hero-desc">{desc}</div>}
+          {(repo.language || typeConfig) && (
+            <div className="discover-hero-badges">
+              {typeConfig && (
+                <div className="discover-hero-pill" style={{ '--pill-accent': typeConfig.accentColor } as React.CSSProperties}>
+                  {typeConfig.icon && (
+                    <span className="discover-hero-pill-icon">
+                      <typeConfig.icon size={12} fill="currentColor" />
+                    </span>
+                  )}
+                  {typeConfig.label}
+                </div>
+              )}
+              {repo.language && (
+                <div className="discover-hero-pill" style={{ '--pill-accent': langColor } as React.CSSProperties}>
+                  <span className="discover-hero-pill-icon">
+                    <LanguageIcon lang={repo.language} size={14} boxed />
+                  </span>
+                  {repo.language}
+                </div>
+              )}
+            </div>
+          )}
           {repo.owner && (
             <div className="discover-hero-owner-row">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="discover-hero-owner-icon">
@@ -81,26 +103,6 @@ function HeroLayer({ repo, animClass }: LayerProps) {
             </div>
           )}
         </div>
-        {(repo.language || typeConfig) && (
-          <div className="discover-hero-badges">
-            {typeConfig && (
-              <div className="discover-hero-icon-badge" style={{ '--badge-color': typeConfig.accentColor } as React.CSSProperties}>
-                <div className="discover-hero-icon-badge-text">{typeConfig.label}</div>
-                <div className="discover-hero-icon-badge-icon" style={{ backgroundColor: typeConfig.accentColor }}>
-                  {typeConfig.icon && <typeConfig.icon size={18} fill="#fff" stroke="#fff" strokeWidth={0.75} />}
-                </div>
-              </div>
-            )}
-            {repo.language && (
-              <div className="discover-hero-icon-badge" style={{ '--badge-color': langColor } as React.CSSProperties}>
-                <div className="discover-hero-icon-badge-text">{repo.language}</div>
-                <div className="discover-hero-icon-badge-icon">
-                  <LanguageIcon lang={repo.language} size={32} boxed />
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   )

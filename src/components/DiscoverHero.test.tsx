@@ -71,4 +71,13 @@ describe('DiscoverHero', () => {
     render(<DiscoverHero repo={repo} onNavigate={vi.fn()} />)
     expect(screen.getByText('JavaScript')).toBeTruthy()
   })
+
+  it('renders badges inside the text column (not as a right-side sibling)', () => {
+    const { container } = render(<DiscoverHero repo={repo} onNavigate={vi.fn()} />)
+    const text = container.querySelector('.discover-hero-text')
+    expect(text).toBeTruthy()
+    expect(text!.querySelector('.discover-hero-badges')).toBeTruthy()
+    // The two-column layout's right sibling is gone
+    expect(container.querySelector('.discover-hero-content > .discover-hero-badges')).toBeNull()
+  })
 })

@@ -93,8 +93,6 @@
   padding: 0 20px 22px 16px;
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
 }
 
 .discover-hero-text {
@@ -129,50 +127,30 @@
   flex-direction: row;
   gap: 6px;
   align-items: center;
-  flex-shrink: 0;
-  padding-bottom: 2px;
+  margin: 6px 0 10px;
+  flex-wrap: wrap;
 }
 
-.discover-hero-icon-badge {
-  position: relative;
-  display: flex;
+.discover-hero-pill {
+  display: inline-flex;
   align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  background: color-mix(in srgb, var(--pill-accent) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pill-accent) 55%, transparent);
+  width: fit-content;
+  --pill-accent: rgba(255, 255, 255, 0.4);
 }
 
-.discover-hero-icon-badge-icon {
-  width: 36px;
-  height: 36px;
-  overflow: hidden;
-  display: flex;
+.discover-hero-pill-icon {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
-}
-
-.discover-hero-icon-badge-text {
-  position: absolute;
-  right: 100%;
-  top: 0;
-  background: var(--badge-color, rgba(255,255,255,0.15));
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  height: 36px;
-  line-height: 36px;
-  max-width: 0;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
-  transition: max-width 0.25s ease, opacity 0.15s ease, padding 0.25s ease;
-}
-
-.discover-hero-icon-badge:hover .discover-hero-icon-badge-text {
-  max-width: 160px;
-  opacity: 1;
-  padding: 0 9px;
 }
 
 .discover-hero--skeleton {
