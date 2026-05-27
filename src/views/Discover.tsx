@@ -1114,6 +1114,12 @@ export default function Discover() {
     selectedSubtypes.length === 0 &&
     (!!discoverQuery.trim() || activeTags.length > 0)
 
+  const showHomeRows =
+    viewMode === 'home'
+    && !topicMode
+    && selectedSubtypes.length === 0
+    && !inSearchResults
+
   const handleSelectTopic = (label: string) => {
     setShowSuggestions(false)
     setSuggestionIndex(-1)
@@ -1179,7 +1185,7 @@ export default function Discover() {
         />
         <div className="discover-main">
           <div ref={scrollRef} className={`discover-content ${aiChatVisible ? 'discover-content-dimmed' : ''}`} onKeyDown={kbNav.containerProps.onKeyDown} tabIndex={-1}>
-                {viewMode === 'home' && !topicMode && selectedSubtypes.length === 0 && !inSearchResults && (
+                {showHomeRows ? (
                   <>
                     {rowRepos.length > 0
                       ? <DiscoverHero repo={rowRepos[heroIndex] ?? null} onNavigate={navigateToRepo} />
@@ -1233,6 +1239,50 @@ export default function Discover() {
                       />
                     )}
 
+                    {hotTodayRowRepos.length > 0 && (
+                      <DiscoverRow<RepoRow>
+                        title="Hot today"
+                        items={hotTodayRowRepos}
+                        activeIndex={0}
+                        columns={effectiveCols}
+                        getItemKey={r => r.id}
+                        renderCard={({ item, posIndex, columns, visible }) => (
+                          <DiscoverRowRepoCard
+                            repo={item}
+                            posIndex={posIndex}
+                            columns={columns}
+                            visible={visible}
+                            onNavigate={navigateToRepo}
+                            onLanguageClick={handleLanguageClick}
+                          />
+                        )}
+                        onMore={() => setViewMode('hot-today')}
+                        onAdvance={() => {/* static list; horizontal scroll deferred */}}
+                      />
+                    )}
+
+                    {trendingWeekRowRepos.length > 0 && (
+                      <DiscoverRow<RepoRow>
+                        title="Trending this week"
+                        items={trendingWeekRowRepos}
+                        activeIndex={0}
+                        columns={effectiveCols}
+                        getItemKey={r => r.id}
+                        renderCard={({ item, posIndex, columns, visible }) => (
+                          <DiscoverRowRepoCard
+                            repo={item}
+                            posIndex={posIndex}
+                            columns={columns}
+                            visible={visible}
+                            onNavigate={navigateToRepo}
+                            onLanguageClick={handleLanguageClick}
+                          />
+                        )}
+                        onMore={() => setViewMode('trending-week')}
+                        onAdvance={() => {/* static list; horizontal scroll deferred */}}
+                      />
+                    )}
+
                     {repos.length > 0 && (
                       <DiscoverRow<RepoRow>
                         title="Most Popular"
@@ -1253,60 +1303,83 @@ export default function Discover() {
                         onAdvance={() => {/* static list; horizontal scroll deferred */}}
                       />
                     )}
+
+                    {hiddenGemsRowRepos.length > 0 && (
+                      <DiscoverRow<RepoRow>
+                        title="Hidden gems"
+                        items={hiddenGemsRowRepos}
+                        activeIndex={0}
+                        columns={effectiveCols}
+                        getItemKey={r => r.id}
+                        renderCard={({ item, posIndex, columns, visible }) => (
+                          <DiscoverRowRepoCard
+                            repo={item}
+                            posIndex={posIndex}
+                            columns={columns}
+                            visible={visible}
+                            onNavigate={navigateToRepo}
+                            onLanguageClick={handleLanguageClick}
+                          />
+                        )}
+                        onMore={() => setViewMode('hidden-gems')}
+                        onAdvance={() => {/* static list; horizontal scroll deferred */}}
+                      />
+                    )}
                   </>
-                )}
-                <div className="discover-content-inner">
-                  {viewMode !== 'home' && (
-                    <FilterChipRow
-                      selectedLanguages={selectedLanguages}
-                      selectedSubtypes={selectedSubtypes}
-                      activeTags={activeTags}
-                      filters={appliedFilters}
-                      activeVerification={activeVerification}
-                      onRemoveLanguage={(lang) => setSelectedLanguages(prev => prev.filter(l => l !== lang))}
-                      onRemoveSubtype={(id) => setSelectedSubtypes(prev => prev.filter(s => s !== id))}
-                      onRemoveTag={(tag) => {
-                        const next = activeTags.filter(t => t !== tag)
-                        setActiveTags(next)
-                        if (next.length === 0) {
-                          setTopicMode(false)
-                          loadTrending(appliedFilters)
-                        } else {
-                          runTagSearch(next)
-                        }
-                      }}
-                      onClearAdvanced={(key) => setAppliedFilters(prev => ({ ...prev, [key]: undefined }))}
-                      onVerificationToggle={handleVerificationToggle}
-                      onSelectedLanguagesChange={setSelectedLanguages}
-                      onSelectedSubtypesChange={setSelectedSubtypes}
-                      onFilterChange={setAppliedFilters}
+                ) : (
+                  <div className="discover-content-inner">
+                    {viewMode !== 'home' && (
+                      <FilterChipRow
+                        selectedLanguages={selectedLanguages}
+                        selectedSubtypes={selectedSubtypes}
+                        activeTags={activeTags}
+                        filters={appliedFilters}
+                        activeVerification={activeVerification}
+                        onRemoveLanguage={(lang) => setSelectedLanguages(prev => prev.filter(l => l !== lang))}
+                        onRemoveSubtype={(id) => setSelectedSubtypes(prev => prev.filter(s => s !== id))}
+                        onRemoveTag={(tag) => {
+                          const next = activeTags.filter(t => t !== tag)
+                          setActiveTags(next)
+                          if (next.length === 0) {
+                            setTopicMode(false)
+                            loadTrending(appliedFilters)
+                          } else {
+                            runTagSearch(next)
+                          }
+                        }}
+                        onClearAdvanced={(key) => setAppliedFilters(prev => ({ ...prev, [key]: undefined }))}
+                        onVerificationToggle={handleVerificationToggle}
+                        onSelectedLanguagesChange={setSelectedLanguages}
+                        onSelectedSubtypesChange={setSelectedSubtypes}
+                        onFilterChange={setAppliedFilters}
+                      />
+                    )}
+
+                    {error && <div className="discover-status">Failed to load — {error}</div>}
+
+                    <DiscoverGrid
+                      loading={loading}
+                      loadingMore={loadingMore}
+                      error={error}
+                      visibleRepos={visibleRepos}
+                      agents={viewMode === 'agents' ? rankedAgents : undefined}
+                      discoverQuery={discoverQuery}
+                      layoutPrefs={effectiveLayoutPrefs}
+                      sentinelRef={sentinelRef}
+                      gridRef={gridRef}
+                      verification={verification}
+                      onNavigate={navigateToRepo}
+                      onTagClick={addTag}
+                      onOwnerClick={openProfile}
+                      focusIndex={kbFocusIndex}
+                      viewMode={viewMode}
+                      onStar={handleStar}
+                      onLanguageClick={handleLanguageClick}
+                      onSubtypeClick={handleSelectSubtype}
+                      anchorsByRepoId={anchorsByRepoId}
                     />
-                  )}
-
-                  {error && <div className="discover-status">Failed to load — {error}</div>}
-
-                  <DiscoverGrid
-                    loading={loading}
-                    loadingMore={loadingMore}
-                    error={error}
-                    visibleRepos={visibleRepos}
-                    agents={viewMode === 'agents' ? rankedAgents : undefined}
-                    discoverQuery={discoverQuery}
-                    layoutPrefs={effectiveLayoutPrefs}
-                    sentinelRef={sentinelRef}
-                    gridRef={gridRef}
-                    verification={verification}
-                    onNavigate={navigateToRepo}
-                    onTagClick={addTag}
-                    onOwnerClick={openProfile}
-                    focusIndex={kbFocusIndex}
-                    viewMode={viewMode}
-                    onStar={handleStar}
-                    onLanguageClick={handleLanguageClick}
-                    onSubtypeClick={handleSelectSubtype}
-                    anchorsByRepoId={anchorsByRepoId}
-                  />
-                </div>
+                  </div>
+                )}
           </div>
           <div className="discover-drag-strip" aria-hidden="true" />
         </div>
