@@ -1,371 +1,139 @@
 /* ── Wrapper ─────────────────────────────────────────────────── */
-
 .discover-top-nav {
   position: fixed;
   top: 210px;
   left: 50%;
   transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
   z-index: 200;
   -webkit-app-region: drag;
-  transition: top 0.15s cubic-bezier(0.4, 0, 0.2, 1), gap 0.15s ease;
+  transition: top 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Compact: docked into the 32px title-bar strip. Note: when compact is
-   active, .discover-drag-strip is hidden (see globals.css) so this row
-   does NOT overlap any other drag region — its own children carve out
-   no-drag normally, no transform-vs-layout-box mismatch to worry about. */
 .discover-top-nav--compact {
   top: 4px;
-  flex-direction: row;
+}
+
+/* ── Pill bar ────────────────────────────────────────────────── */
+.dtn-pill-bar {
+  display: flex;
   align-items: center;
   gap: 6px;
-}
-
-/* ── Branding ────────────────────────────────────────────────── */
-
-.dtn-brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
-  -webkit-app-region: no-drag;
-  pointer-events: none;
-}
-
-.dtn-brand-logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  flex-shrink: 0;
-  /* Soft dark halo — matches .titlebar-ctrl svg so the logo stays readable
-     against the lighter portions of the dithered hero banner. */
-  filter:
-    drop-shadow(0 0 6px rgba(0, 0, 0, 0.85))
-    drop-shadow(0 0 2px rgba(0, 0, 0, 1));
-}
-
-.dtn-brand-name {
-  font-size: 24px;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.92);
-  letter-spacing: -0.3px;
-  text-shadow:
-    0 0 6px rgba(0, 0, 0, 0.85),
-    0 0 2px rgba(0, 0, 0, 1);
-}
-
-/* ── Search bar ──────────────────────────────────────────────── */
-
-.dtn-search-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 680px;
-  background: #252525;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 14px 20px;
+  border-radius: 999px;
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   -webkit-app-region: no-drag;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              padding 0.3s ease,
-              border-radius 0.3s ease,
-              box-shadow 0.3s ease,
-              background 0.15s ease;
+  transition: padding 0.2s ease;
 }
 
-.dtn-search-bar:hover,
-.dtn-search-bar:focus-within {
-  background: #2d2d2d;
+.discover-top-nav--compact .dtn-pill-bar {
+  padding: 4px 8px;
 }
 
-.discover-top-nav--compact .dtn-search-bar {
-  width: 320px;
-  padding: 3px 3px 3px 10px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+/* ── Search icon (leading) ───────────────────────────────────── */
+.dtn-search-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
-.dtn-search-icon {
-  color: rgba(255, 255, 255, 0.35);
+.dtn-search-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--t1);
+}
+
+/* ── Tabs ────────────────────────────────────────────────────── */
+.dtn-tab {
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.dtn-tab:hover {
+  color: var(--t1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dtn-tab-active {
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--t1);
+}
+
+.dtn-tab-active:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.discover-top-nav--compact .dtn-tab {
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+/* ── Expanded search ─────────────────────────────────────────── */
+.dtn-search-expanded {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 600px;
+  padding: 4px 4px 4px 10px;
+}
+
+.discover-top-nav--compact .dtn-search-expanded {
+  width: 400px;
+}
+
+.dtn-search-expanded-icon {
+  color: rgba(255, 255, 255, 0.5);
   flex-shrink: 0;
 }
 
 .dtn-search-input {
   flex: 1;
+  min-width: 0;
   background: none;
   border: none;
   outline: none;
-  font-size: 15px;
   font-family: inherit;
+  font-size: 14px;
   color: var(--t1);
   caret-color: var(--t1);
-  transition: font-size 0.2s ease;
-  -webkit-app-region: no-drag;
-  min-width: 0;
 }
 
-.discover-top-nav--compact .dtn-search-input {
-  font-size: 12px;
-}
+.dtn-search-input::placeholder { color: rgba(255, 255, 255, 0.35); }
 
-.dtn-search-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-/* ── Filter button embedded in search bar ────────────────────── */
-
-.dtn-search-filter-btn {
-  display: flex;
+.dtn-search-close-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 8px;
-  margin-left: 2px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  background: none;
-  color: rgba(255, 255, 255, 0.4);
-  cursor: pointer;
-  font-family: inherit;
-  border-radius: 0 8px 8px 0;
-  transition: color 0.15s, background 0.15s;
-  flex-shrink: 0;
-  position: relative;
-  -webkit-app-region: no-drag;
-}
-
-.dtn-search-filter-btn:hover {
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.dtn-search-filter-btn.active {
-  color: var(--t1);
   background: rgba(255, 255, 255, 0.07);
-}
-
-.dtn-search-filter-label {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.discover-top-nav--compact .dtn-search-filter-btn {
-  padding: 4px 6px;
-  gap: 4px;
-}
-
-/* ── Filter count badge ──────────────────────────────────────── */
-
-.dtn-filter-badge {
-  min-width: 14px;
-  height: 14px;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.25);
-  color: var(--t1);
-  font-size: 8px;
-  font-weight: 700;
-  font-family: inherit;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 3px;
-  line-height: 1;
-}
-
-/* ── Unified search + filter panel ──────────────────────────── */
-
-.dtn-search-panel {
-  display: flex;
-  flex-direction: column;
-  width: 680px;
-  -webkit-app-region: no-drag;
-}
-
-.discover-top-nav--compact .dtn-search-panel {
-  width: 320px;
-}
-
-.dtn-search-panel.open {
-  width: calc(100vw - 200px);
-  height: calc(100vh - 300px);
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
-}
-
-.discover-top-nav--compact .dtn-search-panel.open {
-  height: calc(100vh - 110px);
-}
-
-/* Search bar becomes the panel header when open */
-.dtn-search-panel.open .dtn-search-bar {
-  width: 100%;
-  background: transparent;
-  box-shadow: none;
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px 14px 0 0;
-  padding: 10px 14px;
-}
-
-/* Panel content scrolls; search bar + tabs stay fixed */
-.dtn-search-panel.open .dtn-panel-content {
-  overflow-y: overlay;
-  overflow-x: hidden;
-  flex: 1;
-  min-height: 0;
-}
-
-/* Force full-width grid layout inside the dropdown panel (Types) */
-.dtn-panel-content .categories-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 8px;
-  align-items: start;
-  column-width: auto;
-  column-count: auto;
-}
-
-/* Languages list — masonry-style packing via explicit row spans + dense
-   auto-flow. Each bucket-group spans (item count + 2) rows of 24px,
-   matching its rendered height (header + items + bottom margin).
-   `grid-auto-flow: dense` lets later, smaller groups tuck under earlier,
-   taller ones in adjacent columns, eliminating the wasted vertical space
-   below short cells in plain auto-fill grids. Works for both Domain and
-   Ecosystem groupings with the same single rule. */
-.dtn-panel-content .categories-grid--lang {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  grid-auto-rows: 24px;
-  grid-auto-flow: dense;
-  column-gap: 8px;
-  row-gap: 0;
-  align-items: start;
-  column-width: auto;
-  column-count: auto;
-}
-
-.dtn-panel-content .categories-grid--lang > .bucket-group {
-  grid-row: span var(--rows, 6);
-}
-
-.dtn-panel-tabs {
-  display: flex;
-  align-items: stretch;
-  padding: 8px 14px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  gap: 2px;
-}
-
-.dtn-panel-collapse-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 6px 0;
-  background: none;
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  transition: color 0.15s;
+  flex-shrink: 0;
 }
 
-.dtn-panel-collapse-btn:hover {
-  color: rgba(255, 255, 255, 0.65);
-}
-
-.dtn-panel-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  font-family: inherit;
-  color: rgba(255, 255, 255, 0.4);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  cursor: pointer;
-  border-radius: 6px 6px 0 0;
-  transition: color 0.15s;
-  white-space: nowrap;
-}
-
-.dtn-panel-tab:hover {
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.dtn-panel-tab.active {
+.dtn-search-close-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
   color: var(--t1);
-  border-bottom-color: rgba(255, 255, 255, 0.55);
-}
-
-.dtn-tab-badge {
-  min-width: 14px;
-  height: 14px;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.18);
-  color: var(--t1);
-  font-size: 8px;
-  font-weight: 700;
-  font-family: inherit;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 3px;
-}
-
-.dtn-panel-content {
-  padding: 0 14px;
-}
-
-.dtn-view-panel {
-  padding: 10px 0;
-}
-
-/* ── Layout mode row (in view tab) ──────────────────────────── */
-
-.dtn-layout-mode-row {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.dtn-layout-mode-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 7px 8px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 500;
-  font-family: inherit;
-  color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--glass-border);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.dtn-layout-mode-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--t1);
-}
-
-.dtn-layout-mode-btn.active {
-  background: rgba(255, 255, 255, 0.13);
-  color: var(--t1);
-  border-color: rgba(255, 255, 255, 0.2);
 }

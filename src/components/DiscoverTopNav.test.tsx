@@ -1,116 +1,65 @@
-import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import DiscoverTopNav from './DiscoverTopNav'
 
 const baseProps = {
   selectedSubtypes: [],
-  onSelectedSubtypesChange: () => {},
+  onSelectedSubtypesChange: vi.fn(),
   filters: {},
   selectedLanguages: [],
   activeVerification: new Set<'verified' | 'likely'>(),
-  onFilterChange: () => {},
-  onSelectedLanguagesChange: () => {},
-  onVerificationToggle: () => {},
+  onFilterChange: vi.fn(),
+  onSelectedLanguagesChange: vi.fn(),
+  onVerificationToggle: vi.fn(),
   activePanel: null as 'buckets' | 'filters' | 'advanced' | null,
-  onActivePanelChange: () => {},
-  showLanding: false,
-  onHomeClick: () => {},
-  onBrowseClick: () => {},
+  onActivePanelChange: vi.fn(),
+  viewMode: 'home' as const,
+  onViewModeChange: vi.fn(),
+  query: '',
+  onQueryChange: vi.fn(),
+  onSearch: vi.fn(),
 }
 
-describe('DiscoverTopNav — rendering', () => {
-  it('renders without crashing', () => {
-    expect(() => render(<DiscoverTopNav {...baseProps} />)).not.toThrow()
-  })
-
-  it('shows Home and Browse buttons', () => {
+describe('DiscoverTopNav', () => {
+  it('renders search icon and three tab buttons by default', () => {
     render(<DiscoverTopNav {...baseProps} />)
-    expect(screen.getByRole('button', { name: /home/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /browse/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /search/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^home$/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^recommended$/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^agents$/i })).toBeTruthy()
   })
 
-  it('shows Blocks and Filters buttons', () => {
+  it('marks the active tab with the active class', () => {
+    render(<DiscoverTopNav {...baseProps} viewMode="recommended" />)
+    expect(screen.getByRole('button', { name: /^recommended$/i })).toHaveClass('dtn-tab-active')
+  })
+
+  it('calls onViewModeChange when a tab is clicked', () => {
+    const onViewModeChange = vi.fn()
+    render(<DiscoverTopNav {...baseProps} onViewModeChange={onViewModeChange} />)
+    fireEvent.click(screen.getByRole('button', { name: /^agents$/i }))
+    expect(onViewModeChange).toHaveBeenCalledWith('agents')
+  })
+
+  it('replaces tabs with a search input when the search icon is clicked', () => {
     render(<DiscoverTopNav {...baseProps} />)
-    expect(screen.getByRole('button', { name: /blocks/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /filters/i })).toBeInTheDocument()
-  })
-})
-
-describe('DiscoverTopNav — active state', () => {
-  it('Home button has active class when showLanding is true', () => {
-    render(<DiscoverTopNav {...baseProps} showLanding={true} />)
-    expect(screen.getByRole('button', { name: /home/i })).toHaveClass('dtn-btn-active')
+    fireEvent.click(screen.getByRole('button', { name: /search/i }))
+    expect(screen.getByPlaceholderText(/search repos/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^home$/i })).toBeNull()
   })
 
-  it('Browse button has active class when showLanding is false', () => {
-    render(<DiscoverTopNav {...baseProps} showLanding={false} />)
-    expect(screen.getByRole('button', { name: /browse/i })).toHaveClass('dtn-btn-active')
-  })
-})
-
-describe('DiscoverTopNav — panel toggle', () => {
-  it('calls onActivePanelChange("filters") when Blocks is clicked and panel is closed', () => {
-    const onActivePanelChange = vi.fn()
-    render(<DiscoverTopNav {...baseProps} onActivePanelChange={onActivePanelChange} />)
-    fireEvent.click(screen.getByRole('button', { name: /blocks/i }))
-    expect(onActivePanelChange).toHaveBeenCalledWith('filters')
-  })
-
-  it('calls onActivePanelChange(null) when Blocks is clicked and filters panel is open', () => {
-    const onActivePanelChange = vi.fn()
-    render(<DiscoverTopNav {...baseProps} activePanel="filters" onActivePanelChange={onActivePanelChange} />)
-    fireEvent.click(screen.getByRole('button', { name: /blocks/i }))
-    expect(onActivePanelChange).toHaveBeenCalledWith(null)
-  })
-
-  it('calls onActivePanelChange("advanced") when Filters is clicked and panel is closed', () => {
-    const onActivePanelChange = vi.fn()
-    render(<DiscoverTopNav {...baseProps} onActivePanelChange={onActivePanelChange} />)
-    fireEvent.click(screen.getByRole('button', { name: /filters/i }))
-    expect(onActivePanelChange).toHaveBeenCalledWith('advanced')
-  })
-
-  it('treats activePanel="buckets" as null (no panel rendered)', () => {
-    render(<DiscoverTopNav {...baseProps} activePanel="buckets" />)
-    expect(screen.getByRole('button', { name: /blocks/i })).toBeInTheDocument()
-    expect(screen.queryByText('Language')).not.toBeInTheDocument()
-    expect(screen.queryByText('Stars')).not.toBeInTheDocument()
-  })
-})
-
-describe('DiscoverTopNav — badges', () => {
-  it('shows Blocks badge when languages are selected', () => {
-    render(<DiscoverTopNav {...baseProps} selectedLanguages={['typescript', 'rust']} />)
-    expect(screen.getByText('2')).toBeInTheDocument()
-  })
-
-  it('shows Blocks badge combining languages and subtypes', () => {
-    render(<DiscoverTopNav {...baseProps} selectedLanguages={['python']} selectedSubtypes={['cli-tool']} />)
-    expect(screen.getByText('2')).toBeInTheDocument()
-  })
-
-  it('shows Filters badge when stars filter is active', () => {
-    render(<DiscoverTopNav {...baseProps} filters={{ stars: 1000 }} />)
-    expect(screen.getByText('1')).toBeInTheDocument()
-  })
-
-  it('shows no badge when nothing is selected', () => {
+  it('collapses back to tabs when Escape is pressed in the input', () => {
     render(<DiscoverTopNav {...baseProps} />)
-    expect(screen.queryByText('1')).not.toBeInTheDocument()
-    expect(screen.queryByText('2')).not.toBeInTheDocument()
-  })
-})
-
-describe('DiscoverTopNav — panel content', () => {
-  it('shows FilterPanel content when activePanel is "filters"', () => {
-    render(<DiscoverTopNav {...baseProps} activePanel="filters" />)
-    expect(screen.getByText('Language')).toBeInTheDocument()
-    expect(screen.getByText('Type')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /search/i }))
+    const input = screen.getByPlaceholderText(/search repos/i)
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(screen.queryByPlaceholderText(/search repos/i)).toBeNull()
+    expect(screen.getByRole('button', { name: /^home$/i })).toBeTruthy()
   })
 
-  it('shows AdvancedPanel content when activePanel is "advanced"', () => {
-    render(<DiscoverTopNav {...baseProps} activePanel="advanced" />)
-    expect(screen.getByText('Stars')).toBeInTheDocument()
-    expect(screen.getByText('Activity')).toBeInTheDocument()
+  it('does NOT render a GitSuite brand or a Filter button', () => {
+    render(<DiscoverTopNav {...baseProps} />)
+    expect(document.querySelector('.dtn-brand')).toBeNull()
+    expect(document.querySelector('.dtn-search-filter-btn')).toBeNull()
   })
 })
