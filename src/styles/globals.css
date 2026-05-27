@@ -2315,7 +2315,7 @@ a {
 /* ── New card design (Nexus-style) ─────────────────────────────── */
 .repo-card-image {
   position: relative;
-  height: 140px;
+  height: 80px;
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -2362,7 +2362,7 @@ a {
 }
 
 .repo-card-title {
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.95);
   line-height: 1.25;
@@ -2371,9 +2371,10 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.repo-card-title::first-letter { text-transform: uppercase; }
 
 .repo-card-author {
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.5);
   white-space: nowrap;
@@ -2403,9 +2404,10 @@ a {
   padding: 3px 10px 3px 6px;
   border-radius: 999px;
   font-size: 10.5px;
+  font-weight: 700;
   color: rgba(255, 255, 255, 0.9);
-  background: color-mix(in srgb, var(--pill-accent) 15%, transparent);
-  border: 1px solid color-mix(in srgb, var(--pill-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--pill-accent) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pill-accent) 55%, transparent);
   width: fit-content;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
@@ -2413,25 +2415,20 @@ a {
   --pill-accent: rgba(255, 255, 255, 0.4);
 }
 .repo-card-pill:hover {
-  background: color-mix(in srgb, var(--pill-accent) 25%, transparent);
-  border-color: color-mix(in srgb, var(--pill-accent) 50%, transparent);
+  background: color-mix(in srgb, var(--pill-accent) 50%, transparent);
+  border-color: color-mix(in srgb, var(--pill-accent) 70%, transparent);
 }
 
 .repo-card-pill-icon {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--pill-accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
   flex-shrink: 0;
 }
-.repo-card-pill-icon svg { width: 10px; height: 10px; }
+.repo-card-pill-icon svg { width: 14px; height: 14px; }
 
 .repo-card-description {
-  font-size: 11.5px;
+  font-size: 14px;
   color: rgba(255, 255, 255, 0.55);
   line-height: 1.45;
   display: -webkit-box;
@@ -2443,7 +2440,7 @@ a {
 }
 
 /* Skeleton variant for the new image area (used by DiscoverGrid) */
-.repo-card-skeleton-image { height: 140px; background: var(--bg3); }
+.repo-card-skeleton-image { height: 80px; background: var(--bg3); }
 
 /* Topics row in RepoDetail */
 .repo-detail-topics {
@@ -10521,7 +10518,7 @@ a {
 /* ── Adaptive Card Scaling (7-8 columns: compact) ───────────────── */
 .discover-grid[data-cols="7"] .repo-card-image,
 .discover-grid[data-cols="8"] .repo-card-image {
-  height: 120px;
+  height: 60px;
 }
 
 .discover-grid[data-cols="8"] .repo-card-desc {

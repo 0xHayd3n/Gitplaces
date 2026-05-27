@@ -156,7 +156,7 @@ const RepoCard = memo(function RepoCard({
             >
               {typeConfig.icon && (
                 <span className="repo-card-pill-icon">
-                  <typeConfig.icon size={10} fill="currentColor" />
+                  <typeConfig.icon size={14} fill="currentColor" />
                 </span>
               )}
               {typeConfig.label}
