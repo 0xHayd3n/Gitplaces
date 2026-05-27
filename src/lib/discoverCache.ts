@@ -11,6 +11,9 @@ import type { RecommendationItem } from '../types/recommendation'
 
 const KEY_POPULAR = 'discover-cache.popular.v1'
 const KEY_RECOMMENDED = 'discover-cache.recommended.v1'
+const KEY_HOT_TODAY = 'discover-cache.hot-today.v1'
+const KEY_TRENDING_WEEK = 'discover-cache.trending-week.v1'
+const KEY_HIDDEN_GEMS = 'discover-cache.hidden-gems.v1'
 
 // 24h: trending repos shift slowly day-to-day, and SWR refresh runs in the
 // background on every mount, so cache age is bounded by the user's session
@@ -71,6 +74,54 @@ export function saveCachedRecommended(items: RecommendationItem[]): void {
       fetchedAt: Date.now(),
     }
     localStorage.setItem(KEY_RECOMMENDED, JSON.stringify(payload))
+  } catch {
+    // non-critical
+  }
+}
+
+export function loadCachedHotToday(): CachedPopular | null {
+  return loadCache<CachedPopular>(KEY_HOT_TODAY)
+}
+
+export function saveCachedHotToday(repos: RepoRow[]): void {
+  try {
+    const payload: CachedPopular = {
+      repos: repos.slice(0, MAX_CACHED_ENTRIES),
+      fetchedAt: Date.now(),
+    }
+    localStorage.setItem(KEY_HOT_TODAY, JSON.stringify(payload))
+  } catch {
+    // non-critical
+  }
+}
+
+export function loadCachedTrendingWeek(): CachedPopular | null {
+  return loadCache<CachedPopular>(KEY_TRENDING_WEEK)
+}
+
+export function saveCachedTrendingWeek(repos: RepoRow[]): void {
+  try {
+    const payload: CachedPopular = {
+      repos: repos.slice(0, MAX_CACHED_ENTRIES),
+      fetchedAt: Date.now(),
+    }
+    localStorage.setItem(KEY_TRENDING_WEEK, JSON.stringify(payload))
+  } catch {
+    // non-critical
+  }
+}
+
+export function loadCachedHiddenGems(): CachedPopular | null {
+  return loadCache<CachedPopular>(KEY_HIDDEN_GEMS)
+}
+
+export function saveCachedHiddenGems(repos: RepoRow[]): void {
+  try {
+    const payload: CachedPopular = {
+      repos: repos.slice(0, MAX_CACHED_ENTRIES),
+      fetchedAt: Date.now(),
+    }
+    localStorage.setItem(KEY_HIDDEN_GEMS, JSON.stringify(payload))
   } catch {
     // non-critical
   }

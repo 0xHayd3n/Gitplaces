@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   loadCachedPopular, saveCachedPopular,
   loadCachedRecommended, saveCachedRecommended,
+  loadCachedHotToday, saveCachedHotToday,
+  loadCachedTrendingWeek, saveCachedTrendingWeek,
+  loadCachedHiddenGems, saveCachedHiddenGems,
   POPULAR_CACHE_TTL_MS,
 } from './discoverCache'
 import type { RepoRow } from '../types/repo'
@@ -9,6 +12,9 @@ import type { RecommendationItem } from '../types/recommendation'
 
 const KEY_POPULAR = 'discover-cache.popular.v1'
 const KEY_RECOMMENDED = 'discover-cache.recommended.v1'
+const KEY_HOT_TODAY = 'discover-cache.hot-today.v1'
+const KEY_TRENDING_WEEK = 'discover-cache.trending-week.v1'
+const KEY_HIDDEN_GEMS = 'discover-cache.hidden-gems.v1'
 
 function makeRepo(name: string): RepoRow {
   return {
@@ -128,5 +134,72 @@ describe('saveCachedRecommended', () => {
     })
     expect(() => saveCachedRecommended([makeRecItem('a')])).not.toThrow()
     spy.mockRestore()
+  })
+})
+
+describe('loadCachedHotToday', () => {
+  it('returns null when nothing stored', () => {
+    expect(loadCachedHotToday()).toBeNull()
+  })
+  it('returns null on corrupt JSON', () => {
+    localStorage.setItem(KEY_HOT_TODAY, 'not-json')
+    expect(loadCachedHotToday()).toBeNull()
+  })
+  it('returns null when older than TTL', () => {
+    const stale = { repos: [makeRepo('a')], fetchedAt: Date.now() - POPULAR_CACHE_TTL_MS - 1 }
+    localStorage.setItem(KEY_HOT_TODAY, JSON.stringify(stale))
+    expect(loadCachedHotToday()).toBeNull()
+  })
+  it('round-trips repos within TTL', () => {
+    saveCachedHotToday([makeRepo('a'), makeRepo('b')])
+    const result = loadCachedHotToday()
+    expect(result).not.toBeNull()
+    expect(result!.repos).toHaveLength(2)
+    expect(result!.repos[0].name).toBe('a')
+  })
+})
+
+describe('saveCachedHotToday', () => {
+  it('caps stored entries at 100', () => {
+    const many = Array.from({ length: 500 }, (_, i) => makeRepo(`r${i}`))
+    saveCachedHotToday(many)
+    expect(loadCachedHotToday()!.repos.length).toBeLessThanOrEqual(100)
+  })
+  it('does not throw on quota errors', () => {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError')
+    })
+    expect(() => saveCachedHotToday([makeRepo('a')])).not.toThrow()
+    spy.mockRestore()
+  })
+})
+
+describe('loadCachedTrendingWeek', () => {
+  it('returns null when nothing stored', () => {
+    expect(loadCachedTrendingWeek()).toBeNull()
+  })
+  it('round-trips repos within TTL', () => {
+    saveCachedTrendingWeek([makeRepo('a')])
+    expect(loadCachedTrendingWeek()!.repos[0].name).toBe('a')
+  })
+  it('returns null when older than TTL', () => {
+    const stale = { repos: [makeRepo('a')], fetchedAt: Date.now() - POPULAR_CACHE_TTL_MS - 1 }
+    localStorage.setItem(KEY_TRENDING_WEEK, JSON.stringify(stale))
+    expect(loadCachedTrendingWeek()).toBeNull()
+  })
+})
+
+describe('loadCachedHiddenGems', () => {
+  it('returns null when nothing stored', () => {
+    expect(loadCachedHiddenGems()).toBeNull()
+  })
+  it('round-trips repos within TTL', () => {
+    saveCachedHiddenGems([makeRepo('a')])
+    expect(loadCachedHiddenGems()!.repos[0].name).toBe('a')
+  })
+  it('returns null when older than TTL', () => {
+    const stale = { repos: [makeRepo('a')], fetchedAt: Date.now() - POPULAR_CACHE_TTL_MS - 1 }
+    localStorage.setItem(KEY_HIDDEN_GEMS, JSON.stringify(stale))
+    expect(loadCachedHiddenGems()).toBeNull()
   })
 })
