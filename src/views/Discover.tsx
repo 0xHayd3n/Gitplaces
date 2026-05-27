@@ -430,8 +430,11 @@ export default function Discover() {
       // modes — normalise to the new 'home' default before mirroring into URL.
       const raw = restoredSnapshot.current.viewMode as ViewModeKey | 'all' | 'last-visited'
       const snapshotView: ViewModeKey =
-          raw === 'recommended' ? 'recommended'
-        : raw === 'agents'      ? 'agents'
+          raw === 'recommended'    ? 'recommended'
+        : raw === 'agents'         ? 'agents'
+        : raw === 'hot-today'      ? 'hot-today'
+        : raw === 'trending-week'  ? 'trending-week'
+        : raw === 'hidden-gems'    ? 'hidden-gems'
         : 'home'
       const urlView = searchParams.get('view') ?? 'home'
       if (snapshotView !== urlView) {
