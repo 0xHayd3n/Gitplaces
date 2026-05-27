@@ -7,7 +7,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(new Date('2026-06-15T12:00:00Z'))
 })
-afterEach(() => vi.useRealTimers())
+afterEach(() => { vi.useRealTimers() })
 
 describe('buildViewModeQuery — hot-today', () => {
   it('returns pushed:>{yesterday} with no language filter', () => {

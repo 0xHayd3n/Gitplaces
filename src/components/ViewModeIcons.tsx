@@ -38,7 +38,10 @@ function AgentsIcon({ size = 14 }: { size?: number }) {
   )
 }
 
-export const VIEW_MODE_ICONS: Record<ViewModeKey, (props: { size?: number }) => JSX.Element> = {
+// Top-nav icons. Only the modes that appear as pills (Home / Recommended /
+// Agents) get icons; deep-link-only modes (hot-today, trending-week,
+// hidden-gems) are entered via row title clicks and never need a nav icon.
+export const VIEW_MODE_ICONS: Partial<Record<ViewModeKey, (props: { size?: number }) => JSX.Element>> = {
   recommended: RecommendedIcon,
   home: BrowseIcon,
   agents: AgentsIcon,

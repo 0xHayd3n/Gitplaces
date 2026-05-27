@@ -37,6 +37,9 @@ import { setDitherScrollHint } from '../hooks/useBayerDither'
 import {
   loadCachedPopular, saveCachedPopular,
   loadCachedRecommended, saveCachedRecommended,
+  loadCachedHotToday, saveCachedHotToday,
+  loadCachedTrendingWeek, saveCachedTrendingWeek,
+  loadCachedHiddenGems, saveCachedHiddenGems,
 } from '../lib/discoverCache'
 
 // ── Layout prefs loader ───────────────────────────────────────────
@@ -78,6 +81,21 @@ let _recommendedModuleCache: { items: RecommendationItem[]; fetchedAt: number } 
 
 let _popularModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
   const persisted = loadCachedPopular()
+  return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
+})()
+
+let _hotTodayModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
+  const persisted = loadCachedHotToday()
+  return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
+})()
+
+let _trendingWeekModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
+  const persisted = loadCachedTrendingWeek()
+  return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
+})()
+
+let _hiddenGemsModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
+  const persisted = loadCachedHiddenGems()
   return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
 })()
 
@@ -124,6 +142,15 @@ export default function Discover() {
   const recommendedCache = useRef<RepoRow[] | null>(null)
   const recommendedItemsCache = useRef<RecommendationItem[] | null>(null)
   const [rowRepos, setRowRepos] = useState<RepoRow[]>([])
+  const [hotTodayRowRepos, setHotTodayRowRepos] = useState<RepoRow[]>(
+    () => _hotTodayModuleCache?.repos ?? []
+  )
+  const [trendingWeekRowRepos, setTrendingWeekRowRepos] = useState<RepoRow[]>(
+    () => _trendingWeekModuleCache?.repos ?? []
+  )
+  const [hiddenGemsRowRepos, setHiddenGemsRowRepos] = useState<RepoRow[]>(
+    () => _hiddenGemsModuleCache?.repos ?? []
+  )
   const [heroIndex, setHeroIndex] = useState(0)
   const [heroPaused, setHeroPaused] = useState(false)
   const [rankedAgents, setRankedAgents] = useState<AgentRow[]>([])
@@ -296,6 +323,63 @@ export default function Discover() {
     }
     loadHeroData()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    async function loadHotTodayRow() {
+      if (_hotTodayModuleCache && Date.now() - _hotTodayModuleCache.fetchedAt < RECOMMENDED_TTL_MS) {
+        return
+      }
+      try {
+        const q = buildViewModeQuery('hot-today', '', '')
+        const { sort, order } = getViewModeSort('hot-today')
+        const data = await window.api.github.searchRepos(q, sort, order)
+        _hotTodayModuleCache = { repos: data, fetchedAt: Date.now() }
+        saveCachedHotToday(data)
+        setHotTodayRowRepos(data)
+      } catch {
+        // non-critical
+      }
+    }
+    loadHotTodayRow()
+  }, [])
+
+  useEffect(() => {
+    async function loadTrendingWeekRow() {
+      if (_trendingWeekModuleCache && Date.now() - _trendingWeekModuleCache.fetchedAt < RECOMMENDED_TTL_MS) {
+        return
+      }
+      try {
+        const q = buildViewModeQuery('trending-week', '', '')
+        const { sort, order } = getViewModeSort('trending-week')
+        const data = await window.api.github.searchRepos(q, sort, order)
+        _trendingWeekModuleCache = { repos: data, fetchedAt: Date.now() }
+        saveCachedTrendingWeek(data)
+        setTrendingWeekRowRepos(data)
+      } catch {
+        // non-critical
+      }
+    }
+    loadTrendingWeekRow()
+  }, [])
+
+  useEffect(() => {
+    async function loadHiddenGemsRow() {
+      if (_hiddenGemsModuleCache && Date.now() - _hiddenGemsModuleCache.fetchedAt < RECOMMENDED_TTL_MS) {
+        return
+      }
+      try {
+        const q = buildViewModeQuery('hidden-gems', '', '')
+        const { sort, order } = getViewModeSort('hidden-gems')
+        const data = await window.api.github.searchRepos(q, sort, order)
+        _hiddenGemsModuleCache = { repos: data, fetchedAt: Date.now() }
+        saveCachedHiddenGems(data)
+        setHiddenGemsRowRepos(data)
+      } catch {
+        // non-critical
+      }
+    }
+    loadHiddenGemsRow()
+  }, [])
 
   useEffect(() => {
     if (heroPaused || rowRepos.length < 2) return
