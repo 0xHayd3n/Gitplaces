@@ -101,6 +101,11 @@ import { cascadeRepoId, readLastCommitCache, writeLastCommitCache, readCompareCa
 import { LRUCache } from './lruCache'
 import { poolAll } from './concurrency'
 
+// Dev only: enable CDP for tooling like Previewer MCP.
+if (!app.isPackaged) {
+  app.commandLine.appendSwitch('remote-debugging-port', '9222')
+}
+
 // ── Community collections seed data ─────────────────────────────
 export const COMMUNITY_COLLECTIONS = [
   {
