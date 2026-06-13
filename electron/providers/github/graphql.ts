@@ -19,7 +19,7 @@
 //   - /secret-scanning/alerts    (not exposed)
 //   - /stats/commit_activity     (not exposed; lazy via getRepoMomentum)
 
-import { etagFetch } from './githubFetch'
+import { etagFetch } from '../../githubFetch'
 import type Database from 'better-sqlite3'
 
 const ENDPOINT = 'https://api.github.com/graphql'
@@ -298,7 +298,7 @@ function mapAlert(a: GqlVulnAlert): SecurityAlert {
 
 // ── Batched last-commit fetcher (Files-tab decoration) ──────────────────────
 
-import type { LastCommitInfo } from './github'
+import type { LastCommitInfo } from './rest'
 
 const BATCH_SIZE = 50
 
