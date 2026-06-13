@@ -4,7 +4,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-import { getUser, getStarred, startDeviceFlow, pollDeviceToken, getRepo, searchRepos, getReadme, getReleases, getReceivedEvents } from './github'
+import { getUser, getStarred, startDeviceFlow, pollDeviceToken, getRepo, searchRepos, getReadme, getReleases, getReceivedEvents } from './rest'
 
 function makeResponse(body: unknown, headers: Record<string, string> = {}, ok = true) {
   return {

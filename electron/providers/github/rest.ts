@@ -256,7 +256,7 @@ export async function getRepo(
   const url = `${BASE}/repos/${owner}/${name}`
   const init = { headers: githubHeaders(token), signal: AbortSignal.timeout(10_000) }
   if (db) {
-    const { etagFetch } = await import('./githubFetch')
+    const { etagFetch } = await import('../../githubFetch')
     const res = await etagFetch(db, url, init)
     if (res.status !== 200 && res.status !== 304) throw new Error(`GitHub API error: ${res.status}`)
     const data = await res.json()
@@ -330,7 +330,7 @@ export async function getReleases(
   const url = `${BASE}/repos/${owner}/${name}/releases?per_page=100`
   const init = { headers: githubHeaders(token), signal: AbortSignal.timeout(10_000) }
   if (db) {
-    const { etagFetch } = await import('./githubFetch')
+    const { etagFetch } = await import('../../githubFetch')
     const res = await etagFetch(db, url, init)
     if (res.status !== 200 && res.status !== 304) throw new Error(`GitHub API error: ${res.status}`)
     return (await res.json()) as GitHubRelease[]
