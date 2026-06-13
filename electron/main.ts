@@ -6,8 +6,30 @@ import os from 'os'
 import Store from 'electron-store'
 import type Database from 'better-sqlite3'
 import { getDb, closeDb } from './db'
-import { getToken, setToken, clearToken, setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner, migrateApiStore } from './store'
-import { startDeviceFlow, pollDeviceToken, getUser, getStarred, getRepo, searchRepos, getReadme, getFileContent, getReleases, starRepo, unstarRepo, isRepoStarred, fetchGitHubTopics, getProfileUser, getUserRepos, getMyRepos, getUserStarred, getUserFollowing, getUserFollowers, checkIsFollowing, followUser, unfollowUser, getOrgVerified, getBranch, getTreeBySha, getBlobBySha, getRawFileBytes, getRepoTree, getReceivedEvents, getCompare, compareRefs, type CompareSummary, type LastCommitInfo } from './github'
+import { setGitHubUser, getGitHubUser, clearGitHubUser, getApiKey, setApiKey, getSyncEnabled, setSyncEnabled, getSyncRepoOwner, migrateApiStore } from './store'
+import { type CompareSummary, type LastCommitInfo } from './providers/github'
+import {
+  HOST_ID_GITHUB,
+} from './providers/types'
+import {
+  setHostConfigBackend,
+  seedDefaultHosts,
+  type HostConfigBackend,
+} from './providers/hostConfig'
+import {
+  setTokenStoreBackend,
+  getToken,
+  setToken,
+  clearToken,
+  migrateLegacyGitHubToken,
+  type TokenStoreBackend,
+} from './providers/tokenStore'
+import { getProvider } from './providers/registry'
+
+// Phase 1 still talks to GitHub exclusively from main.ts; resolving the
+// provider once at module load keeps every IPC handler tidy. Phases 3+ start
+// passing hostId on the wire and this hoist disappears.
+const gh = getProvider(HOST_ID_GITHUB)!
 import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
 import { scanFromSources } from './mcp-scanner'
 import type { McpScanResult } from '../src/types/mcp'
@@ -93,7 +115,7 @@ import { startAgentsBackupSyncService, pushAllPendingAgents } from './services/a
 import { parseOgImage, isGenericGitHubOg } from './services/ogImageService'
 import { getRepoUserEvents } from './services/repoUserEvents'
 import { getRepoStats, getRepoMomentum } from './services/repoStats'
-import { fetchRepoBundle, fetchLastCommitsForPaths, type RepoBundle } from './githubGraphql'
+import { fetchRepoBundle, fetchLastCommitsForPaths, type RepoBundle } from './providers/github/graphql'
 import { sanitiseRef } from './sanitiseRef'
 import type { CollectionRow, CollectionRepoRow } from '../src/types/repo'
 import { classifyRepoBucket } from '../src/lib/classifyRepoType'
@@ -205,7 +227,7 @@ async function initTopicCache(token: string): Promise<void> {
 
   if (count.n === 0 || isStale) {
     try {
-      const topics = await fetchGitHubTopics(token)
+      const topics = await gh.fetchGitHubTopics(token)
       const now = new Date().toISOString()
       const insert = db.prepare('INSERT OR REPLACE INTO topic_cache (topic, fetched_at) VALUES (?, ?)')
       const insertMany = db.transaction((ts: string[]) => {
@@ -393,7 +415,7 @@ ipcMain.handle('shell:showItemInFolder', (_event, fullPath: string) => shell.sho
 ipcMain.handle('github:startDeviceFlow', async () => {
   deviceFlowAbort?.abort()
   deviceFlowAbort = new AbortController()
-  const start = await startDeviceFlow()
+  const start = await gh.startDeviceFlow()
   // Auto-open a small in-app popup at the pre-filled verification page.
   openLoginPopup(start.verificationUriComplete, mainWindow)
   return start
@@ -402,8 +424,8 @@ ipcMain.handle('github:startDeviceFlow', async () => {
 ipcMain.handle('github:pollDeviceToken', async (_event, deviceCode: string, interval: number) => {
   const controller = deviceFlowAbort ?? new AbortController()
   try {
-    const token = await pollDeviceToken(deviceCode, interval, controller.signal)
-    setToken(token)
+    const token = await gh.pollDeviceToken(deviceCode, interval, controller.signal)
+    setToken(HOST_ID_GITHUB, token)
     initTopicCache(token).catch(() => {}) // Non-blocking
   } finally {
     closeLoginPopup()
@@ -422,9 +444,9 @@ ipcMain.handle('github:openLoginPopup', (_event, url: string) => {
 })
 
 ipcMain.handle('github:getUser', async () => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not connected')
-  const user = await getUser(token)
+  const user = await gh.getUser(token)
   setGitHubUser(user.login, user.avatar_url)
   const db = getDb(app.getPath('userData'))
   db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('github_username', user.login)
@@ -432,7 +454,7 @@ ipcMain.handle('github:getUser', async () => {
 })
 
 ipcMain.handle('github:getStarred', async (_, force?: boolean) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) return // no token (user skipped onboarding)
 
   const db = getDb(app.getPath('userData'))
@@ -442,7 +464,7 @@ ipcMain.handle('github:getStarred', async (_, force?: boolean) => {
 
   if (!force && lastRow && Date.now() - Number(lastRow.value) < 3_600_000) return // cache fresh
 
-  const starredItems = await getStarred(token)
+  const starredItems = await gh.getStarred(token)
 
   const upsert = db.prepare(`
     INSERT INTO repos (id, owner, name, description, language, topics, stars, forks,
@@ -519,7 +541,7 @@ ipcMain.handle('github:getStarred', async (_, force?: boolean) => {
 })
 
 ipcMain.handle('github:disconnect', async () => {
-  clearToken()
+  clearToken(HOST_ID_GITHUB)
   clearGitHubUser()
   const db = getDb(app.getPath('userData'))
   db.prepare('DELETE FROM settings WHERE key = ?').run('github_username')
@@ -549,7 +571,7 @@ const searchReposCache = new LRUCache<string, { rows: unknown[]; ts: number }>(2
 const SEARCH_REPOS_TTL = 10 * 60 * 1000 // 10 minutes
 
 ipcMain.handle('github:searchRepos', async (_event, query: string, sort?: string, order?: string, page?: number) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) return [] // GitHub disconnected — skip API call
   const cacheKey = `${query}:${sort ?? 'stars'}:${order ?? 'desc'}:${page ?? 1}`
 
@@ -566,9 +588,9 @@ ipcMain.handle('github:searchRepos', async (_event, query: string, sort?: string
   //   2. language-filtered DB rows when the query carries `language:X`
   //   3. top-100-by-stars DB rows
   //   4. anything in the DB at all (last resort)
-  let items: import('./github').GitHubRepo[]
+  let items: import('./providers/github').GitHubRepo[]
   try {
-    items = await searchRepos(token, query, 100, sort ?? 'stars', order ?? 'desc', page ?? 1)
+    items = await gh.searchRepos(token, query, 100, sort ?? 'stars', order ?? 'desc', page ?? 1)
   } catch (err) {
     const msg = String(err)
     if (/\b(403|429)\b/.test(msg)) {
@@ -671,7 +693,7 @@ ipcMain.handle('github:searchRepos', async (_event, query: string, sort?: string
 // cross-session visit.
 const REPO_FETCH_TTL_MS = 30 * 60 * 1000
 ipcMain.handle('github:getRepo', async (_event, owner: string, name: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) return null // GitHub disconnected — skip API call
   const db = getDb(app.getPath('userData'))
 
@@ -681,9 +703,9 @@ ipcMain.handle('github:getRepo', async (_event, owner: string, name: string) => 
   ).get(owner, name, Date.now() - REPO_FETCH_TTL_MS)
   if (fresh) return fresh
 
-  let repo: Awaited<ReturnType<typeof getRepo>>
+  let repo: Awaited<ReturnType<typeof gh.getRepo>>
   try {
-    repo = await getRepo(token, owner, name, db)
+    repo = await gh.getRepo(token, owner, name, db)
   } catch {
     // On network error, fall back to the (possibly stale) DB row if we have one
     return db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(owner, name) ?? null
@@ -754,20 +776,20 @@ ipcMain.handle('github:getRepo', async (_event, owner: string, name: string) => 
 })
 
 ipcMain.handle('github:getReadme', async (_event, owner: string, name: string) => {
-  const token = getToken() ?? null
-  return getReadme(token, owner, name)
+  const token = getToken(HOST_ID_GITHUB) ?? null
+  return gh.getReadme(token, owner, name)
 })
 
 ipcMain.handle('github:getFileContent', async (_event, owner: string, name: string, path: string) => {
-  const token = getToken() ?? null
-  return getFileContent(token, owner, name, path)
+  const token = getToken(HOST_ID_GITHUB) ?? null
+  return gh.getFileContent(token, owner, name, path)
 })
 
 // 1h DB cache for releases — they publish infrequently. Skips the GitHub call
 // entirely on warm cross-session visits within the TTL.
 const RELEASES_CACHE_TTL_MS = 60 * 60 * 1000
 ipcMain.handle('github:getReleases', async (_event, owner: string, name: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) return [] // GitHub disconnected — skip API call (renders as "no activity")
   const db = getDb(app.getPath('userData'))
 
@@ -779,7 +801,7 @@ ipcMain.handle('github:getReleases', async (_event, owner: string, name: string)
   }
 
   try {
-    const fresh = await getReleases(token, owner, name, db)
+    const fresh = await gh.getReleases(token, owner, name, db)
     db.prepare(
       'INSERT OR REPLACE INTO repo_releases_cache (owner, name, fetched_at, data) VALUES (?,?,?,?)'
     ).run(owner, name, Date.now(), JSON.stringify(fresh))
@@ -804,7 +826,7 @@ ipcMain.handle('github:getRepoStats', async (
   _event, owner: string, name: string
 ) => {
   const db = getDb(app.getPath('userData'))
-  const token = getToken() ?? null
+  const token = getToken(HOST_ID_GITHUB) ?? null
   // Reuse the cached repo row (populated by `github:getRepo`) so the stats
   // service can skip its own /repos/{o}/{n} fetch AND skip the /commits
   // fetch (pushed_at is the same date). Saves up to two GitHub calls per
@@ -821,7 +843,7 @@ ipcMain.handle('github:getRepoStats', async (
 
 ipcMain.handle('github:getRepoMomentum', async (_event, owner: string, name: string) => {
   const db = getDb(app.getPath('userData'))
-  const token = getToken() ?? null
+  const token = getToken(HOST_ID_GITHUB) ?? null
   try {
     return await getRepoMomentum(db, owner, name, token)
   } catch {
@@ -846,12 +868,12 @@ ipcMain.handle('github:getRepoMomentum', async (_event, owner: string, name: str
 //     calls within their TTLs hit the cache
 //   - Caches the releases payload in repo_releases_cache (1h TTL)
 ipcMain.handle('github:fetchRepoBundle', async (_event, owner: string, name: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) return null
   const db = getDb(app.getPath('userData'))
   let bundle: RepoBundle | null
   try {
-    bundle = await fetchRepoBundle(db, token, owner, name)
+    bundle = await gh.fetchRepoBundle(db, token, owner, name)
   } catch {
     return null
   }
@@ -940,9 +962,9 @@ ipcMain.handle('github:setArchivedAt', async (_event, owner: string, name: strin
 })
 
 ipcMain.handle('github:starRepo', async (_event, owner: string, name: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not connected')
-  await starRepo(token, owner, name)
+  await gh.starRepo(token, owner, name)
   const db = getDb(app.getPath('userData'))
   const now = new Date().toISOString()
   // Re-starring also clears unstarred_at so the row leaves the Unstarred filter.
@@ -960,9 +982,9 @@ ipcMain.handle('github:starRepo', async (_event, owner: string, name: string) =>
 })
 
 ipcMain.handle('github:unstarRepo', async (_event, owner: string, name: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not connected')
-  await unstarRepo(token, owner, name)
+  await gh.unstarRepo(token, owner, name)
   const db = getDb(app.getPath('userData'))
   const now = new Date().toISOString()
   db.prepare(
@@ -976,7 +998,7 @@ ipcMain.handle('github:unstarRepo', async (_event, owner: string, name: string) 
 // the cache fresh.
 const STAR_CHECK_TTL_MS = 30 * 60 * 1000
 ipcMain.handle('github:isStarred', async (_event, owner: string, name: string) => {
-  const token = getToken() ?? null
+  const token = getToken(HOST_ID_GITHUB) ?? null
   const db = getDb(app.getPath('userData'))
 
   const cached = db.prepare(
@@ -987,7 +1009,7 @@ ipcMain.handle('github:isStarred', async (_event, owner: string, name: string) =
   }
 
   try {
-    const live = await isRepoStarred(token, owner, name)
+    const live = await gh.isRepoStarred(token, owner, name)
     db.prepare('UPDATE repos SET starred_checked_at = ? WHERE owner=? AND name=?')
       .run(Date.now(), owner, name)
     return live
@@ -1011,7 +1033,7 @@ ipcMain.handle('github:saveRepo', async (_event, owner: string, name: string) =>
   enqueueRepo({ repoId: `${owner}/${name}`, owner, name, language: saved?.language ?? null, priority: 'high' })
   // Set initial stored_version baseline and check if user has forked this repo
   setImmediate(async () => {
-    const token = getToken() ?? null
+    const token = getToken(HOST_ID_GITHUB) ?? null
     const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
     if (token) headers.Authorization = `Bearer ${token}`
     // Determine initial stored_version
@@ -1077,8 +1099,8 @@ ipcMain.handle('github:getRelatedRepos', async (_event, owner: string, name: str
 })
 
 // In-memory caches for Trees/Blobs API (SHA-keyed = immutable, never stale)
-const treeCache = new LRUCache<string, import('./github').TreeEntry[]>(100)
-const blobCache = new LRUCache<string, import('./github').BlobResult>(50)
+const treeCache = new LRUCache<string, import('./providers/github').TreeEntry[]>(100)
+const blobCache = new LRUCache<string, import('./providers/github').BlobResult>(50)
 const branchCache = new LRUCache<string, { rootTreeSha: string; timestamp: number }>(50)
 const BRANCH_TTL = 5 * 60 * 1000 // 5 minutes
 
@@ -1088,8 +1110,8 @@ ipcMain.handle('github:getBranch', async (_event, owner: string, name: string, b
   if (cached && Date.now() - cached.timestamp < BRANCH_TTL) {
     return { rootTreeSha: cached.rootTreeSha }
   }
-  const token = getToken() ?? null
-  const result = await getBranch(token, owner, name, branch)
+  const token = getToken(HOST_ID_GITHUB) ?? null
+  const result = await gh.getBranch(token, owner, name, branch)
   branchCache.set(key, { rootTreeSha: result.rootTreeSha, timestamp: Date.now() })
   return { rootTreeSha: result.rootTreeSha }
 })
@@ -1097,23 +1119,23 @@ ipcMain.handle('github:getBranch', async (_event, owner: string, name: string, b
 ipcMain.handle('github:getTree', async (_event, owner: string, name: string, treeSha: string) => {
   const cached = treeCache.get(treeSha)
   if (cached) return cached
-  const token = getToken() ?? null
-  const entries = await getTreeBySha(token, owner, name, treeSha)
+  const token = getToken(HOST_ID_GITHUB) ?? null
+  const entries = await gh.getTreeBySha(token, owner, name, treeSha)
   treeCache.set(treeSha, entries)
   return entries
 })
 
 ipcMain.handle('github:getRawFile', async (_event, owner: string, name: string, branch: string, path: string) => {
-  const token = getToken() ?? null
-  const buf = await getRawFileBytes(token, owner, name, branch, path)
+  const token = getToken(HOST_ID_GITHUB) ?? null
+  const buf = await gh.getRawFileBytes(token, owner, name, branch, path)
   return buf // Buffer is transferred as Uint8Array over IPC
 })
 
 ipcMain.handle('github:getBlob', async (_event, owner: string, name: string, blobSha: string) => {
   const cached = blobCache.get(blobSha)
   if (cached) return cached
-  const token = getToken() ?? null
-  const result = await getBlobBySha(token, owner, name, blobSha)
+  const token = getToken(HOST_ID_GITHUB) ?? null
+  const result = await gh.getBlobBySha(token, owner, name, blobSha)
   blobCache.set(blobSha, result)
   return result
 })
@@ -1143,7 +1165,7 @@ ipcMain.handle('github:getLastCommitsForPaths', async (
 
   if (missing.length === 0) return result
 
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) {
     // Without a token, GraphQL won't work. Return null for misses.
     for (const { path } of missing) result[path] = null
@@ -1151,7 +1173,7 @@ ipcMain.handle('github:getLastCommitsForPaths', async (
   }
 
   try {
-    const fetched = await fetchLastCommitsForPaths(
+    const fetched = await gh.fetchLastCommitsForPaths(
       token, owner, name, ref,
       missing.map(m => m.path),
     )
@@ -1178,9 +1200,9 @@ ipcMain.handle('github:compareRefs', async (
   const db = getDb(app.getPath('userData'))
   const cached = readCompareCache(db, repoId, base, head)
   if (cached) return cached
-  const token = getToken() ?? null
+  const token = getToken(HOST_ID_GITHUB) ?? null
   try {
-    const files = await compareRefs(token, owner, name, base, head)
+    const files = await gh.compareRefs(token, owner, name, base, head)
     writeCompareCache(db, repoId, base, head, files)
     return files
   } catch {
@@ -1189,9 +1211,9 @@ ipcMain.handle('github:compareRefs', async (
 })
 
 ipcMain.handle('github:getReceivedEvents', async (_event, username: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) return []
-  return getReceivedEvents(token, username)
+  return gh.getReceivedEvents(token, username)
 })
 
 // Persistent disk cache for compare summaries with a 30-day TTL.
@@ -1223,8 +1245,8 @@ ipcMain.handle('github:getCompare', async (_event, owner: string, name: string, 
     }
   }
 
-  const token = getToken() ?? null
-  const summary = await getCompare(token, owner, name, base, head)
+  const token = getToken(HOST_ID_GITHUB) ?? null
+  const summary = await gh.getCompare(token, owner, name, base, head)
   db.prepare('INSERT OR REPLACE INTO compare_cache (cache_key, data, fetched_at) VALUES (?, ?, ?)')
     .run(key, JSON.stringify(summary), new Date().toISOString())
   return summary
@@ -1237,8 +1259,8 @@ function svgCacheFile(owner: string, name: string): string {
 }
 
 ipcMain.handle('svg-cache:prefetch', async (_event, owner: string, name: string, branch: string) => {
-  const token = getToken() ?? null
-  const allFiles = await getRepoTree(token, owner, name, branch).catch(() => [] as { path: string; type: string; sha: string }[])
+  const token = getToken(HOST_ID_GITHUB) ?? null
+  const allFiles = await gh.getRepoTree(token, owner, name, branch).catch(() => [] as { path: string; type: string; sha: string }[])
   const svgFiles = allFiles.filter(f => f.type === 'blob' && f.path.toLowerCase().endsWith('.svg'))
   if (svgFiles.length === 0) return
 
@@ -1254,7 +1276,7 @@ ipcMain.handle('svg-cache:prefetch', async (_event, owner: string, name: string,
   for (let i = 0; i < svgFiles.length && !aborted; i += CONCURRENCY) {
     const batch = svgFiles.slice(i, i + CONCURRENCY)
     const settled = await Promise.allSettled(batch.map(async (file) => {
-      const blob = await getBlobBySha(token, owner, name, file.sha)
+      const blob = await gh.getBlobBySha(token, owner, name, file.sha)
       return { sha: file.sha, blob }
     }))
     for (const r of settled) {
@@ -1552,12 +1574,12 @@ ipcMain.handle('skill:generate', async (event, owner: string, name: string, opti
   const flavour = options?.flavour ?? 'library'
   const apiKey = getApiKey()
 
-  const token = getToken() ?? null
+  const token = getToken(HOST_ID_GITHUB) ?? null
   const ref = options?.ref
-  const readme = await getReadme(token, owner, name, ref)
+  const readme = await gh.getReadme(token, owner, name, ref)
   if (ref && readme === null) throw new Error(`README not found at ref ${ref}`)
   const readmeContent = readme ?? ''
-  const releases = ref ? [] : await getReleases(token, owner, name)
+  const releases = ref ? [] : await gh.getReleases(token, owner, name)
   const version = ref ?? (releases[0]?.tag_name ?? 'unknown')
 
   const db = getDb(app.getPath('userData'))
@@ -2031,7 +2053,7 @@ ipcMain.handle('skill:setEnabledTools', async (_, owner: string, name: string, e
 })
 
 ipcMain.handle('mcp:scanTools', async (_, owner: string, name: string): Promise<McpScanResult> => {
-  const token = getToken() ?? null
+  const token = getToken(HOST_ID_GITHUB) ?? null
 
   const db = getDb(app.getPath('userData'))
   const repo = db.prepare('SELECT id, default_branch FROM repos WHERE owner = ? AND name = ?').get(owner, name) as
@@ -2039,22 +2061,22 @@ ipcMain.handle('mcp:scanTools', async (_, owner: string, name: string): Promise<
   if (!repo) throw new Error(`Repo ${owner}/${name} not found`)
   const branch = repo.default_branch ?? 'main'
 
-  const tree = await getRepoTree(token, owner, name, branch).catch(() => [])
+  const tree = await gh.getRepoTree(token, owner, name, branch).catch(() => [])
   const isSource = (p: string) => /\.(ts|tsx|js|mjs|py)$/.test(p) && (p.startsWith('src/') || !p.includes('/'))
   const sourcePaths = tree.filter(e => e.type === 'blob' && isSource(e.path)).slice(0, 50).map(e => e.path)
 
   const staticSources = (await Promise.all(
-    sourcePaths.map(p => getFileContent(token, owner, name, p).catch(() => null))
+    sourcePaths.map(p => gh.getFileContent(token, owner, name, p).catch(() => null))
   )).filter((s): s is string => typeof s === 'string')
 
   const manifestCandidates = ['tools.json', 'mcp.json', '.mcp/tools.json']
   let manifestSource: string | null = null
   for (const p of manifestCandidates) {
-    const s = await getFileContent(token, owner, name, p).catch(() => null)
+    const s = await gh.getFileContent(token, owner, name, p).catch(() => null)
     if (s) { manifestSource = s; break }
   }
 
-  const readmeSource = await getReadme(token, owner, name).catch(() => null)
+  const readmeSource = await gh.getReadme(token, owner, name).catch(() => null)
 
   const result = scanFromSources({ staticSources, manifestSource, readmeSource })
 
@@ -2269,7 +2291,7 @@ function upsertAndReturnRepoRows(db: Database.Database, results: any[], query: s
 }
 
 ipcMain.handle('search:raw', async (_, query: string, language?: string, filters?: SearchFilters, page?: number) => {
-  const token = getToken() ?? null
+  const token = getToken(HOST_ID_GITHUB) ?? null
   const db = getDb(app.getPath('userData'))
   const p = page ?? 1
   const filterKey = filters ? JSON.stringify(filters) : ''
@@ -2295,7 +2317,7 @@ ipcMain.handle('search:raw', async (_, query: string, language?: string, filters
 })
 
 ipcMain.handle('search:tagged', async (_, tags: string[], originalQuery: string, language?: string, filters?: SearchFilters, page?: number) => {
-  const token = getToken() ?? null
+  const token = getToken(HOST_ID_GITHUB) ?? null
   const db = getDb(app.getPath('userData'))
   const p = page ?? 1
   const filterKey = filters ? JSON.stringify(filters) : ''
@@ -2338,8 +2360,8 @@ ipcMain.handle('org:getVerified', async (_, orgLogin: string) => {
   }
 
   // Cache miss: call GitHub API
-  const token = getToken() ?? null
-  const verified = await getOrgVerified(token, orgLogin)
+  const token = getToken(HOST_ID_GITHUB) ?? null
+  const verified = await gh.getOrgVerified(token, orgLogin)
 
   // Persist result against every repo from this owner
   db.prepare('UPDATE repos SET owner_is_verified = ? WHERE owner = ?')
@@ -2426,7 +2448,7 @@ registerCreateHandlers()
 // ── Profile IPC ──────────────────────────────────────────────────
 
 ipcMain.handle('profile:getUser', async (_, username: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
   const db = getDb(app.getPath('userData'))
   const TTL = 10 * 60 * 1000
@@ -2434,21 +2456,21 @@ ipcMain.handle('profile:getUser', async (_, username: string) => {
   if (cached && Date.now() - new Date(cached.fetched_at).getTime() < TTL) {
     return JSON.parse(cached.data)
   }
-  const user = await getProfileUser(token, username)
+  const user = await gh.getProfileUser(token, username)
   db.prepare('INSERT OR REPLACE INTO profile_cache (username, data, fetched_at) VALUES (?, ?, ?)').run(username, JSON.stringify(user), new Date().toISOString())
   return user
 })
 
 ipcMain.handle('profile:getUserRepos', async (_, username: string, sort?: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return getUserRepos(token, username, sort)
+  return gh.getUserRepos(token, username, sort)
 })
 
 ipcMain.handle('github:getMyRepos', async () => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return getMyRepos(token)
+  return gh.getMyRepos(token)
 })
 
 ipcMain.handle('projects:scanFolder', async (_event, folderPath: string) => {
@@ -2539,39 +2561,39 @@ ipcMain.handle('projects:writeFile', async (_event, folderPath: string, filename
 })
 
 ipcMain.handle('profile:getStarred', async (_, username: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return getUserStarred(token, username)
+  return gh.getUserStarred(token, username)
 })
 
 ipcMain.handle('profile:getFollowing', async (_, username: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return getUserFollowing(token, username)
+  return gh.getUserFollowing(token, username)
 })
 
 ipcMain.handle('profile:getFollowers', async (_, username: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return getUserFollowers(token, username)
+  return gh.getUserFollowers(token, username)
 })
 
 ipcMain.handle('profile:isFollowing', async (_, username: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) return false
-  return checkIsFollowing(token, username)
+  return gh.checkIsFollowing(token, username)
 })
 
 ipcMain.handle('profile:follow', async (_, username: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return followUser(token, username)
+  return gh.followUser(token, username)
 })
 
 ipcMain.handle('profile:unfollow', async (_, username: string) => {
-  const token = getToken()
+  const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return unfollowUser(token, username)
+  return gh.unfollowUser(token, username)
 })
 
 // ── DB helpers IPC ──────────────────────────────────────────────
@@ -2830,6 +2852,31 @@ ipcMain.handle('fetch-link-preview', async (_event, url: string) => {
 
 app.whenReady().then(() => {
   migrateApiStore()
+
+  // ── Provider layer bootstrap ───────────────────────────────────
+  const providerStore = new Store<Record<string, unknown>>({ name: 'providers' })
+  const providerBackend = {
+    get: (k: string) => providerStore.get(k as never),
+    set: (k: string, v: unknown) => providerStore.set(k as never, v as never),
+    delete: (k: string) => providerStore.delete(k as never),
+    has: (k: string) => providerStore.has(k as never),
+  } satisfies HostConfigBackend & TokenStoreBackend
+  setHostConfigBackend(providerBackend)
+  setTokenStoreBackend(providerBackend)
+
+  // One-shot bridge: pull the legacy github.token from the default
+  // electron-store into the providers store so migrateLegacyGitHubToken finds
+  // it. Idempotent — second run finds nothing to copy.
+  const legacyStore = new Store<{ 'github.token'?: string }>()
+  const legacyTok = legacyStore.get('github.token')
+  if (typeof legacyTok === 'string' && legacyTok.length > 0 && !providerStore.has('tokens.gh:api.github.com' as never)) {
+    providerStore.set('tokens.gh:api.github.com' as never, legacyTok as never)
+    legacyStore.delete('github.token')
+  }
+
+  seedDefaultHosts()
+  migrateLegacyGitHubToken()
+
   registerLLMHandlers()
   // Grant permissions (including microphone for speech-to-text)
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
@@ -2883,7 +2930,7 @@ app.whenReady().then(() => {
     // skills to the anatomy engine. Replace-on-success-only.
     void runAnatomyBackfill(db, (repoId) => applySkillRegen(repoId))
   }
-  const existingToken = getToken()
+  const existingToken = getToken(HOST_ID_GITHUB)
   if (existingToken) initTopicCache(existingToken).catch(() => {}) // Non-blocking
 })
 
