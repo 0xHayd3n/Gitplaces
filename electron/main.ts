@@ -124,7 +124,8 @@ import { LRUCache } from './lruCache'
 import { poolAll } from './concurrency'
 
 // Dev only: enable CDP for tooling like Previewer MCP.
-if (!app.isPackaged) {
+// Guarded against vitest's partial-electron mock where app.commandLine is undefined.
+if (app?.commandLine && !app.isPackaged) {
   app.commandLine.appendSwitch('remote-debugging-port', '9222')
 }
 
