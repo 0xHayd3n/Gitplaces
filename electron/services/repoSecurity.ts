@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import { githubHeaders } from '../github'
+import { githubHeaders } from '../providers/github'
 import { etagFetch } from '../githubFetch'
 import type {
   RepoStats, SecurityAlert, SeverityCounts, CodeScanningCounts, SecretScanningCounts,

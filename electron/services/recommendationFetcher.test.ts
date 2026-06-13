@@ -2,12 +2,12 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { UserProfile } from '../../src/types/recommendation'
-import type { GitHubRepo } from '../../electron/github'
+import type { GitHubRepo } from '../../electron/providers/github'
 
-vi.mock('../github', () => ({
+vi.mock('../providers/github', () => ({
   searchRepos: vi.fn(),
 }))
-import { searchRepos } from '../github'
+import { searchRepos } from '../providers/github'
 import { planQueries, fetchCandidates } from './recommendationFetcher'
 import type { QueryPlan } from './recommendationFetcher'
 

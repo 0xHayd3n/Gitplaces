@@ -2,7 +2,7 @@
 import { ipcMain, app } from 'electron'
 import { getDb } from '../db'
 import { getToken } from '../store'
-import { githubHeaders } from '../github'
+import { githubHeaders } from '../providers/github'
 import { checkAll, applyForkSync, applySkillRegen, restartUpdateService } from '../services/updateService'
 
 export function registerUpdateHandlers(): void {

@@ -398,7 +398,7 @@ describe('getReadme with ref parameter', () => {
 
 describe('payload type surface', () => {
   it('GitHubRelease carries prerelease flag', () => {
-    const r: import('./github').GitHubRelease = {
+    const r: import('./rest').GitHubRelease = {
       tag_name: 'v1.0.0',
       name: null,
       published_at: new Date().toISOString(),
@@ -410,7 +410,7 @@ describe('payload type surface', () => {
   })
 
   it('ReleaseEvent payload exposes prerelease flag', () => {
-    const p: import('./github').GitHubEventPayload = {
+    const p: import('./rest').GitHubEventPayload = {
       type: 'ReleaseEvent',
       action: 'published',
       release: { tag_name: 'v2.0.0', name: 'Two', body: null, prerelease: false },
@@ -421,7 +421,7 @@ describe('payload type surface', () => {
   })
 
   it('PullRequestEvent payload exposes number, body, user, base, and head', () => {
-    const p: import('./github').GitHubEventPayload = {
+    const p: import('./rest').GitHubEventPayload = {
       type: 'PullRequestEvent',
       action: 'closed',
       pull_request: {

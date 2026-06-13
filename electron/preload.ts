@@ -73,9 +73,9 @@ contextBridge.exposeInMainWorld('api', {
     compareRefs: (repoId: string, owner: string, name: string, base: string, head: string) =>
       ipcRenderer.invoke('github:compareRefs', repoId, owner, name, base, head),
     getReceivedEvents: (username: string) =>
-      ipcRenderer.invoke('github:getReceivedEvents', username) as Promise<import('./github').GitHubEvent[]>,
+      ipcRenderer.invoke('github:getReceivedEvents', username) as Promise<import('./providers/github').GitHubEvent[]>,
     getCompare: (owner: string, name: string, base: string, head: string) =>
-      ipcRenderer.invoke('github:getCompare', owner, name, base, head) as Promise<import('./github').CompareSummary>,
+      ipcRenderer.invoke('github:getCompare', owner, name, base, head) as Promise<import('./providers/github').CompareSummary>,
   },
 
   settings: {

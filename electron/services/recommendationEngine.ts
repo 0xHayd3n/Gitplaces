@@ -1,6 +1,6 @@
 // electron/services/recommendationEngine.ts
 import type { CorpusStats, UserProfile, ScoreBreakdown, Anchor } from '../../src/types/recommendation'
-import type { GitHubRepo } from '../github'
+import type { GitHubRepo } from '../providers/github'
 import { classifyRepoBucket } from '../../src/lib/classifyRepoType'
 import { scoreTopic } from './signals/topicSignal'
 import { scoreDescription, tokenizeDescription } from './signals/descriptionSignal'

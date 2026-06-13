@@ -184,7 +184,7 @@ interface GqlResponse {
 
 // ── Mapped output (consumed by the renderer) ────────────────────────────────
 
-import type { RepoStats, SecurityAlert } from '../src/types/repoStats'
+import type { RepoStats, SecurityAlert } from '../../../src/types/repoStats'
 
 export interface RepoBundle {
   /** Maps to the existing GitHubRepo / RepoRow shape used in the renderer. */

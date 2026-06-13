@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import { githubHeaders } from '../github'
+import { githubHeaders } from '../providers/github'
 import { etagFetch, type ConditionalResponse } from '../githubFetch'
 import type { RepoStats, HealthStatus, IssueVelocity } from '../../src/types/repoStats'
 import { computeHealthScore } from '../../src/lib/healthScore'

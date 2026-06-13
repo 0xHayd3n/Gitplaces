@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createRepo, putFileContents } from '../github'
+import { createRepo, putFileContents } from '../providers/github'
 
 const mockFetch = vi.fn()
 

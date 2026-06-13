@@ -1,7 +1,8 @@
 import { ipcMain, app } from 'electron'
 import { downloadRawFile, downloadRawFolder, downloadConverted, downloadRepoZip, downloadRepoConverted, exportBookmarks, getTopLevelFolders } from '../services/downloadService'
 import { getDb } from '../db'
-import { getToken } from '../store'
+import { getToken } from '../providers/tokenStore'
+import { HOST_ID_GITHUB } from '../providers/types'
 
 export function registerDownloadHandlers(): void {
   ipcMain.handle('download:rawFile', (_event, params) => {
@@ -22,8 +23,8 @@ export function registerDownloadHandlers(): void {
       | { value: string }
       | undefined
     const downloadFolder = row?.value ?? require('path').join(app.getPath('userData'), 'downloads')
-    const token = getToken()
-    return downloadRepoZip(owner, name, downloadFolder, token ?? null)
+    const token = getToken(HOST_ID_GITHUB)
+    return downloadRepoZip(owner, name, downloadFolder, token)
   })
 
   ipcMain.handle('download:pickFolder', async () => {

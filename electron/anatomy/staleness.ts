@@ -2,7 +2,7 @@
 // Pins staleness to the .anatomy file's last commit (spec D8): a repo is stale
 // only when .anatomy itself changed upstream, not on any push. Pure + injected
 // fetch so it is unit-testable without network (sandbox egress is restricted).
-import { githubHeaders } from '../github'
+import { githubHeaders } from '../providers/github'
 
 export interface StalenessResult { stale: boolean; reason: string; latestSha: string | null }
 

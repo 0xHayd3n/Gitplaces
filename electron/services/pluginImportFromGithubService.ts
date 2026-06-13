@@ -1,6 +1,6 @@
 import path from 'node:path'
 import matter from 'gray-matter'
-import { getRepo, getBranch, getTreeBySha, getRawFileBytes } from '../github'
+import { getRepo, getBranch, getTreeBySha, getRawFileBytes } from '../providers/github'
 import { getToken } from '../store'
 import { slugifyName } from '../../src/utils/agentSlug'
 import type { DiscoveredSkill, ParsedSkill, ParsedImportTarget, ParsedSubagent, ParsedSlashCommand } from './pluginImportService'

@@ -1,4 +1,4 @@
-import { getRepoTree, getFileContent } from '../github'
+import { getRepoTree, getFileContent } from '../providers/github'
 import { detectManifestFile } from './manifest-parser'
 
 const MAX_FILES = 15

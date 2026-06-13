@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('../github')
+vi.mock('../providers/github')
 vi.mock('../store')
 
-import * as github from '../github'
+import * as github from '../providers/github'
 import * as store from '../store'
 import { discoverPluginInRepo, readTargetFromRepo, RepoNotAccessibleError } from './pluginImportFromGithubService'
 

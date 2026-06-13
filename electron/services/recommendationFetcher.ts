@@ -1,6 +1,6 @@
 // electron/services/recommendationFetcher.ts
-import { searchRepos } from '../github'
-import type { GitHubRepo } from '../github'
+import { searchRepos } from '../providers/github'
+import type { GitHubRepo } from '../providers/github'
 import type { CorpusStats, UserProfile } from '../../src/types/recommendation'
 import { getSubTypeKeyword } from '../../src/lib/discoverQueries'
 

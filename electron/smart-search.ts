@@ -1,4 +1,4 @@
-import { searchRepos as githubSearch } from './github'
+import { searchRepos as githubSearch } from './providers/github'
 
 export interface SearchResult {
   id: number

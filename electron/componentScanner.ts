@@ -2,7 +2,7 @@
 import { ipcMain } from 'electron'
 import { createHash } from 'node:crypto'
 import { getToken } from './store'
-import { getRepoTree, getFileContent } from './github'
+import { getRepoTree, getFileContent } from './providers/github'
 import { detectFramework, detectFrameworkFromTree, isComponentFile } from '../src/utils/componentScanner'
 import type { ComponentScanResult, Framework, ScannedComponent, ScannedStory, ScannedHelper } from '../src/types/components'
 

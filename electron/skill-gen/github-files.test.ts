@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
 import { fetchFileTree, fetchRepoFiles, fetchManifest } from './github-files'
 
-vi.mock('../github', () => ({
+vi.mock('../providers/github', () => ({
   getRepoTree: vi.fn(),
   getFileContent: vi.fn(),
 }))
 
-import { getRepoTree, getFileContent } from '../github'
+import { getRepoTree, getFileContent } from '../providers/github'
 
 const mockGetRepoTree = vi.mocked(getRepoTree)
 const mockGetFileContent = vi.mocked(getFileContent)

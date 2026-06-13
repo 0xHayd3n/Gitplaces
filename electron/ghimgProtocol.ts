@@ -1,5 +1,6 @@
 import { protocol, net } from 'electron'
-import { getToken } from './store'
+import { getToken } from './providers/tokenStore'
+import { HOST_ID_GITHUB } from './providers/types'
 import { LRUCache } from './lruCache'
 
 // GitHub asset URLs (github.com/user/repo/assets/ID/UUID) redirect to
@@ -19,7 +20,7 @@ export function registerGhImgProtocol(): void {
       return new Response(cached.buffer, { headers: { 'Content-Type': cached.contentType } })
     }
 
-    const token = getToken()
+    const token = getToken(HOST_ID_GITHUB)
     const headers: Record<string, string> = {
       'User-Agent': 'GitSuite/1.0',
     }

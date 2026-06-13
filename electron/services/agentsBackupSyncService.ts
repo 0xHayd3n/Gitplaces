@@ -1,7 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import type Database from 'better-sqlite3'
 import { getToken, getSyncEnabled, getSyncRepoOwner } from '../store'
-import { putFileContents } from '../github'
+import { putFileContents } from '../providers/github'
 import { SKILLS_BACKUP_REPO } from './skillSyncService'
 import type { AgentRow, AgentFile } from '../../src/types/agent'
 import { previewSubagentFile } from './agentFileSyncService'

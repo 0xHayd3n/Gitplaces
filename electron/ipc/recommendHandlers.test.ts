@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { computeProfileHash } from './recommendHandlers'
-import type { GitHubRepo } from '../github'
+import type { GitHubRepo } from '../providers/github'
 
 // ---------------------------------------------------------------------------
 // Mock electron, DB, store, and external helpers BEFORE importing the handler

@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import { getToken, getSyncEnabled, getSyncRepoOwner } from '../store'
-import { putFileContents, getFileContentWithSha } from '../github'
+import { putFileContents, getFileContentWithSha } from '../providers/github'
 import { SKILLS_BACKUP_REPO } from './skillSyncService'
 
 let _db: Database.Database | null = null

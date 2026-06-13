@@ -1,7 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import type Database from 'better-sqlite3'
 import { getToken, getSyncEnabled, getSyncRepoOwner, setSyncEnabled, setSyncRepoOwner } from '../store'
-import { createRepo, putFileContents, getRepo } from '../github'
+import { createRepo, putFileContents, getRepo } from '../providers/github'
 
 export const SKILLS_BACKUP_REPO = 'gitsuite-skills'
 

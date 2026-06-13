@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('./github', () => ({
+vi.mock('./providers/github', () => ({
   searchRepos: vi.fn().mockResolvedValue([]),
 }))
 
 import { rankResults, rawSearch, tagSearch } from './smart-search'
-import { searchRepos as mockSearchRepos } from './github'
+import { searchRepos as mockSearchRepos } from './providers/github'
 
 const mockFn = mockSearchRepos as ReturnType<typeof vi.fn>
 

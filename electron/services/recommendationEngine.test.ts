@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { rankCandidates, findAnchors } from './recommendationEngine'
 import { computeCorpusStats } from './corpusStats'
 import { buildUserProfile } from './userProfile'
-import type { GitHubRepo } from '../github'
+import type { GitHubRepo } from '../providers/github'
 
 const NOW = Date.UTC(2026, 3, 15)
 const DAY = 24 * 60 * 60 * 1000

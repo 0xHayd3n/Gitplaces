@@ -5,7 +5,7 @@ function getParentWindow(): BrowserWindow | undefined {
 }
 import JSZip from 'jszip'
 import { getToken } from '../store'
-import { getTreeBySha, getBlobBySha, getBranch, githubHeaders } from '../github'
+import { getTreeBySha, getBlobBySha, getBranch, githubHeaders } from '../providers/github'
 
 const MD_EXTENSIONS = new Set(['md', 'mdx', 'markdown'])
 
@@ -259,7 +259,7 @@ export async function downloadRepoConverted(
   const token = getToken() ?? null
 
   // Resolve default branch and fetch full tree
-  const { getDefaultBranch, getRepoTree, getBlobBySha } = await import('../github')
+  const { getDefaultBranch, getRepoTree, getBlobBySha } = await import('../providers/github')
   const branch = await getDefaultBranch(token, owner, name)
 
   let tree: { path: string; type: string; sha: string }[]
@@ -324,7 +324,7 @@ export async function downloadRepoConverted(
 
 export async function exportBookmarks(owner: string, name: string): Promise<void> {
   const token = getToken() ?? null
-  const { getDefaultBranch, getRepoTree, getBlobBySha } = await import('../github')
+  const { getDefaultBranch, getRepoTree, getBlobBySha } = await import('../providers/github')
   const branch = await getDefaultBranch(token, owner, name)
 
   let tree: { path: string; type: string; sha: string }[]
@@ -438,7 +438,7 @@ function walkTokens(
 
 export async function getTopLevelFolders(owner: string, name: string): Promise<string[]> {
   const token = getToken() ?? null
-  const { getDefaultBranch, getBranch, getTreeBySha } = await import('../github')
+  const { getDefaultBranch, getBranch, getTreeBySha } = await import('../providers/github')
   const branch = await getDefaultBranch(token, owner, name)
   const { rootTreeSha } = await getBranch(token, owner, name, branch)
   const entries = await getTreeBySha(token, owner, name, rootTreeSha)

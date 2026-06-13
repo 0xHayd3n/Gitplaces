@@ -16,7 +16,7 @@ import {
   closeAllForSession, closeAllOnQuit
 } from '../services/createPreviewService'
 import { sendMessageStream } from '../services/aiChatService'
-import { githubHeaders } from '../github'
+import { githubHeaders } from '../providers/github'
 import type { CreateMessage, ToolType } from '../../src/types/create'
 
 export function registerCreateHandlers(): void {

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { BrowserWindow } from 'electron'
 import type { Database } from 'better-sqlite3'
 
-vi.mock('../github', () => ({
+vi.mock('../providers/github', () => ({
   createRepo: vi.fn(),
   putFileContents: vi.fn(),
   getRepo: vi.fn()
@@ -17,7 +17,7 @@ vi.mock('../store', () => ({
   getToken: vi.fn()
 }))
 
-import { createRepo, putFileContents, getRepo } from '../github'
+import { createRepo, putFileContents, getRepo } from '../providers/github'
 import { getSyncEnabled, getSyncRepoOwner, getToken, setSyncEnabled, setSyncRepoOwner } from '../store'
 import { startSkillSyncService, push, setupRepo } from './skillSyncService'
 

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { BrowserWindow } from 'electron'
 import type { Database } from 'better-sqlite3'
 
-vi.mock('../github', () => ({
+vi.mock('../providers/github', () => ({
   putFileContents: vi.fn(),
 }))
 
@@ -21,7 +21,7 @@ vi.mock('./agentFileSyncService', () => ({
   previewSubagentFile: vi.fn((_agent, primary) => `--- FRONTMATTER ---\n${primary}`),
 }))
 
-import { putFileContents } from '../github'
+import { putFileContents } from '../providers/github'
 import { getSyncEnabled, getSyncRepoOwner, getToken } from '../store'
 import {
   startAgentsBackupSyncService,

@@ -1,7 +1,7 @@
 // electron/db-helpers.ts
 // Shared DB utilities used by both main.ts and IPC handlers.
 import type Database from 'better-sqlite3'
-import type { LastCommitInfo, CompareFile } from './github'
+import type { LastCommitInfo, CompareFile } from './providers/github'
 
 /**
  * Cascade-update the repo primary key from a synthetic "owner/name" ID to the
