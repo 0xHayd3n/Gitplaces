@@ -16,36 +16,10 @@ vi.mock('electron-store', () => ({
   })),
 }))
 
-import { getToken, setToken, clearToken, getGitHubUser, setGitHubUser, clearGitHubUser } from './store'
+import { getGitHubUser, setGitHubUser, clearGitHubUser } from './store'
 
-describe('token', () => {
-  beforeEach(() => {
-    mockGet.mockReset()
-    mockSet.mockReset()
-    mockDelete.mockReset()
-  })
-
-  it('getToken reads github.token', () => {
-    mockGet.mockReturnValue('tok123')
-    expect(getToken()).toBe('tok123')
-    expect(mockGet).toHaveBeenCalledWith('github.token')
-  })
-
-  it('getToken returns undefined when not set', () => {
-    mockGet.mockReturnValue(undefined)
-    expect(getToken()).toBeUndefined()
-  })
-
-  it('setToken writes github.token', () => {
-    setToken('mytoken')
-    expect(mockSet).toHaveBeenCalledWith('github.token', 'mytoken')
-  })
-
-  it('clearToken deletes github.token', () => {
-    clearToken()
-    expect(mockDelete).toHaveBeenCalledWith('github.token')
-  })
-})
+// Note: getToken/setToken/clearToken moved to electron/providers/tokenStore in
+// Phase 1 of the multi-host effort. Their tests live there now.
 
 describe('gitHubUser', () => {
   beforeEach(() => {

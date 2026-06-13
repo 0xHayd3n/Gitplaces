@@ -2,24 +2,45 @@ import Store from 'electron-store'
 import type { ProviderId } from './llm/types'
 import { parseModelRef, formatModelRef } from './llm/registry'
 
+import {
+  getToken as _getTokenForHost,
+  setToken as _setTokenForHost,
+  clearToken as _clearTokenForHost,
+} from './providers/tokenStore'
+import { HOST_ID_GITHUB } from './providers/types'
+
 interface GitHubStoreSchema {
-  'github.token'?: string
   'github.username'?: string
   'github.avatarUrl'?: string
 }
 
 const githubStore = new Store<GitHubStoreSchema>()
 
+// ── Legacy single-host token API (Phase 1 back-compat shim) ─────
+//
+// Phase 1 moved canonical token storage to electron/providers/tokenStore (one
+// PAT per host instance). The exports below are thin wrappers that pin the
+// host to HOST_ID_GITHUB so the dozen services/handlers that still call
+// `getToken()`/`setToken(t)`/`clearToken()` keep working. Phase 2 migrates
+// those callers off these wrappers as part of the renderer normalization
+// pass, after which this shim is deleted.
+//
+// The legacy `github.token` key in the default electron-store is migrated to
+// `tokens.gh:api.github.com` at app startup (see main.ts whenReady bootstrap).
+
+/** @deprecated Use providers/tokenStore.getToken(hostId) directly. */
 export function getToken(): string | undefined {
-  return githubStore.get('github.token')
+  return _getTokenForHost(HOST_ID_GITHUB) ?? undefined
 }
 
+/** @deprecated Use providers/tokenStore.setToken(hostId, token) directly. */
 export function setToken(token: string): void {
-  githubStore.set('github.token', token)
+  _setTokenForHost(HOST_ID_GITHUB, token)
 }
 
+/** @deprecated Use providers/tokenStore.clearToken(hostId) directly. */
 export function clearToken(): void {
-  githubStore.delete('github.token')
+  _clearTokenForHost(HOST_ID_GITHUB)
 }
 
 export function getGitHubUser(): { username: string; avatarUrl: string } | undefined {
