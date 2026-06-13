@@ -500,6 +500,16 @@ export function initSchema(db: Database.Database): void {
   try { db.exec(`ALTER TABLE agent_files ADD COLUMN backup_synced_at    INTEGER`) } catch {}
   try { db.exec(`ALTER TABLE agent_files ADD COLUMN backup_sync_status  TEXT`) } catch {}
 
+  // Phase 28 — multi-host: tag repo-scoped rows with their host of origin.
+  // Existing rows backfill to 'gh:api.github.com' via the DEFAULT clause.
+  // See docs/superpowers/specs/2026-06-14-multi-host-repo-integration-design.md
+  try { db.exec(`ALTER TABLE repos                ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
+  try { db.exec(`ALTER TABLE profile_cache        ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
+  try { db.exec(`ALTER TABLE repo_security_cache  ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
+  try { db.exec(`ALTER TABLE repo_stats_cache     ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
+  try { db.exec(`ALTER TABLE repo_momentum_cache  ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
+  try { db.exec(`ALTER TABLE repo_releases_cache  ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
+
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`
     CREATE INDEX IF NOT EXISTS repos_starred_at      ON repos(starred_at);
