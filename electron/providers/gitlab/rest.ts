@@ -109,7 +109,7 @@ export interface GitLabBlob {
   sha: string
 }
 
-export interface GitLabStarredProject extends GitLabProject {}
+export type GitLabStarredProject = GitLabProject
 
 // ── Headers ─────────────────────────────────────────────────────────────────
 
@@ -294,6 +294,12 @@ export async function getTreeBySha(
   name: string,
   treeSha: string,
 ): Promise<GitLabTreeEntry[]> {
+  // PHASE 6 FOLLOW-UP: GitLab's tree endpoint caps each page at 100 entries.
+  // Repos with thousands of entries (gitlab-org/gitlab, etc.) silently lose
+  // anything past the first page. GitHub's Git Data API returns the full tree
+  // in one call; GitLab requires Link-header pagination here. Phase 4's UI
+  // never invokes this (renderer doesn't browse non-GitHub repos yet), so we
+  // accept the truncation until Phase 6 wires multi-host repo browsing.
   const url = api(baseUrl, `/projects/${projectId(owner, name)}/repository/tree?ref=${encodeURIComponent(treeSha)}&recursive=true&per_page=100`)
   const res = await fetch(url, { headers: gitlabHeaders(token) })
   if (!res.ok) throw await readError(res, 'getTreeBySha')

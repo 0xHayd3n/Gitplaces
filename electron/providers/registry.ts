@@ -58,3 +58,13 @@ export function getAnyProvider(hostId: string): AnyProvider | null {
 export function getDefaultProvider(): GitHubProvider {
   return githubProvider
 }
+
+/**
+ * Test-only: drop the lazy GitLab provider cache so a subsequent test can
+ * resolve a fresh provider against a freshly-set hostConfig backend. Without
+ * this, cross-file test pollution can keep a provider bound to a previous
+ * test's baseUrl.
+ */
+export function _resetGitLabCacheForTest(): void {
+  gitlabProviders.clear()
+}

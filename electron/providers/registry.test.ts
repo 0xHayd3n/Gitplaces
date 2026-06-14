@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
 import { HOST_ID_GITHUB } from './types'
-import { getProvider, getAnyProvider, getDefaultProvider } from './registry'
+import { getProvider, getAnyProvider, getDefaultProvider, _resetGitLabCacheForTest } from './registry'
 import { GitHubProvider } from './github'
 import { GitLabProvider } from './gitlab'
 import { setHostConfigBackend, seedDefaultHosts, type HostConfigBackend } from './hostConfig'
@@ -17,6 +17,7 @@ function makeMapBackend(): HostConfigBackend {
 
 describe('registry', () => {
   beforeEach(() => {
+    _resetGitLabCacheForTest()
     setHostConfigBackend(makeMapBackend())
     seedDefaultHosts()
   })

@@ -12,10 +12,17 @@ interface HostInstance {
   webUrl?: string
 }
 
-const PAT_DOC_URLS: Record<HostInstance['type'], string> = {
-  github: 'https://github.com/settings/tokens',
-  gitlab: 'https://gitlab.com/-/user_settings/personal_access_tokens',
-  gitea:  'https://docs.gitea.com/development/api-usage#authentication',
+function patDocsUrl(host: HostInstance): string {
+  // For gitlab + gitea, deep-link to the matching path on the host's own
+  // webUrl (or API baseUrl when there's no explicit webUrl). This is what
+  // makes self-hosted instances open *their own* token-settings page in
+  // Phase 7, while gitlab.com still points at gitlab.com/-/user_settings/...
+  const base = (host.webUrl ?? host.baseUrl).replace(/\/+$/, '')
+  switch (host.type) {
+    case 'github': return 'https://github.com/settings/tokens'
+    case 'gitlab': return `${base}/-/user_settings/personal_access_tokens`
+    case 'gitea':  return `${base}/user/settings/applications`
+  }
 }
 
 const HOST_ICONS: Record<HostInstance['type'], ReactNode> = {
@@ -94,14 +101,16 @@ export default function ConnectionsPanel() {
     try {
       await window.api.hosts.clearToken(host.id)
       setStatuses(prev => ({ ...prev, [host.id]: { user: null, loading: false, error: null } }))
+    } catch (e) {
+      const message = (e as Error).message ?? 'Failed to disconnect.'
+      setStatuses(prev => ({ ...prev, [host.id]: { ...(prev[host.id] ?? { user: null, loading: false }), error: message } }))
     } finally {
       setDisconnecting(prev => ({ ...prev, [host.id]: false }))
     }
   }, [])
 
   const handleOpenPatDocs = useCallback((host: HostInstance) => {
-    const url = PAT_DOC_URLS[host.type]
-    if (url) void window.api.openExternal(url)
+    void window.api.openExternal(patDocsUrl(host))
   }, [])
 
   return (
