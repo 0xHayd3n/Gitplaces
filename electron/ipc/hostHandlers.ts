@@ -22,7 +22,7 @@ import {
   setToken,
   clearToken,
 } from '../providers/tokenStore'
-import { getProvider } from '../providers/registry'
+import { getAnyProvider } from '../providers/registry'
 import { HOST_ID_GITHUB, type HostInstance, type HostType } from '../providers/types'
 import { openLoginPopup, closeLoginPopup } from '../githubLoginPopup'
 import { getDeviceFlowAbort, setDeviceFlowAbort } from '../services/deviceFlowState'
@@ -90,7 +90,7 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
   })
 
   ipcMain.handle('hosts:setToken', async (_event, hostId: string, token: string) => {
-    const provider = getProvider(hostId)
+    const provider = getAnyProvider(hostId)
     if (!provider) throw new Error(`Unknown host: ${hostId}`)
     const user = await provider.getCurrentUser(token)
     setToken(hostId, token)
@@ -115,7 +115,7 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
   })
 
   ipcMain.handle('hosts:getConnectedUser', async (_event, hostId: string) => {
-    const provider = getProvider(hostId)
+    const provider = getAnyProvider(hostId)
     if (!provider) return null
     const token = getToken(hostId)
     if (!token) return null
@@ -128,7 +128,7 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
 
   // ── Device flow ─────────────────────────────────────────────────
   ipcMain.handle('hosts:startDeviceFlow', async (_event, hostId: string) => {
-    const provider = getProvider(hostId)
+    const provider = getAnyProvider(hostId)
     if (!provider) throw new Error(`Unknown host: ${hostId}`)
     getDeviceFlowAbort()?.abort()
     setDeviceFlowAbort(new AbortController())
@@ -139,7 +139,7 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
   })
 
   ipcMain.handle('hosts:pollDeviceToken', async (_event, hostId: string, deviceCode: string, interval: number) => {
-    const provider = getProvider(hostId)
+    const provider = getAnyProvider(hostId)
     if (!provider) throw new Error(`Unknown host: ${hostId}`)
     const controller = getDeviceFlowAbort() ?? new AbortController()
     try {

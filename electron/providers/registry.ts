@@ -2,13 +2,24 @@
 //
 // Maps a hostId to its concrete provider instance.
 //
-// Phase 1 added GitHub. Phase 4 widens the union to include GitLab — both
-// gitlab.com (seeded) and any self-hosted instance the user adds later via
-// the Connections pane (Phase 7). GitLab providers are constructed lazily
-// from `HostInstance.baseUrl` so the registry doesn't need a build-time
-// list of self-hosted hosts.
+// Phase 1 added GitHub. Phase 4 widens the registry to also know about GitLab —
+// both gitlab.com (seeded) and any self-hosted instance the user adds later via
+// the Connections pane (Phase 7). GitLab providers are constructed lazily from
+// `HostInstance.baseUrl` so the registry doesn't need a build-time list of
+// self-hosted hosts. Phase 5 will append Gitea the same way.
 //
-// Phase 5 will append Gitea to the union the same way.
+// Two accessors are exposed:
+//   - getProvider(hostId)     → GitHubProvider | null
+//     Legacy callers (electron/main.ts, electron/ipc/repoHandlers.ts) call
+//     GitHub-specific methods (getRepoTree, getProfileUser, getUserFollowing…)
+//     that don't exist on GitLab. This accessor returns null for non-GitHub
+//     hosts so those paths surface "Unknown host" rather than method-not-found
+//     at runtime. Phase 6 widens these paths when multi-host browsing lands.
+//   - getAnyProvider(hostId)  → AnyProvider | null
+//     Host-management code (electron/ipc/hostHandlers.ts) treats every
+//     provider uniformly: getCurrentUser/startDeviceFlow/pollDeviceToken/
+//     capabilities all exist on both classes. This accessor returns whatever
+//     provider matches the hostId.
 
 import { HOST_ID_GITHUB } from './types'
 import { GitHubProvider, githubProvider } from './github'
@@ -19,7 +30,7 @@ export type AnyProvider = GitHubProvider | GitLabProvider
 
 const gitlabProviders = new Map<string, GitLabProvider>()
 
-export function getProvider(hostId: string): AnyProvider | null {
+function resolveAny(hostId: string): AnyProvider | null {
   if (hostId === HOST_ID_GITHUB) return githubProvider
 
   if (hostId.startsWith('gl:')) {
@@ -33,6 +44,15 @@ export function getProvider(hostId: string): AnyProvider | null {
   }
 
   return null
+}
+
+export function getProvider(hostId: string): GitHubProvider | null {
+  const p = resolveAny(hostId)
+  return p instanceof GitHubProvider ? p : null
+}
+
+export function getAnyProvider(hostId: string): AnyProvider | null {
+  return resolveAny(hostId)
 }
 
 export function getDefaultProvider(): GitHubProvider {
