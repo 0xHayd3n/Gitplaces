@@ -11,7 +11,9 @@
 import type Database from 'better-sqlite3'
 import * as rest from './rest'
 import * as graphql from './graphql'
+import { githubUserToUser } from './normalize'
 import { HOST_ID_GITHUB, type ProviderCapabilities } from '../types'
+import type { User } from '../../../src/types/repo'
 
 const CAPS: ProviderCapabilities = {
   vulnerabilityAlerts: true,
@@ -35,6 +37,13 @@ export class GitHubProvider {
   startDeviceFlow = rest.startDeviceFlow
   pollDeviceToken = rest.pollDeviceToken
   getUser = rest.getUser
+
+  /** Canonical-shape current user fetch. Wraps the legacy `getUser` so the
+   *  IPC layer no longer has to know about provider-native shapes. */
+  async getCurrentUser(token: string): Promise<User> {
+    const raw = await rest.getUser(token)
+    return githubUserToUser(raw)
+  }
 
   // ── Repo metadata ──────────────────────────────────────────────
   getRepo(token: string | null, owner: string, name: string, db?: Database.Database) {

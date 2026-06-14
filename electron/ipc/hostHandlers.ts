@@ -23,7 +23,6 @@ import {
   clearToken,
 } from '../providers/tokenStore'
 import { getProvider } from '../providers/registry'
-import { githubUserToUser } from '../providers/github/normalize'
 import { HOST_ID_GITHUB, type HostInstance, type HostType } from '../providers/types'
 import { openLoginPopup, closeLoginPopup } from '../githubLoginPopup'
 import { getDeviceFlowAbort, setDeviceFlowAbort } from '../services/deviceFlowState'
@@ -82,18 +81,17 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
   ipcMain.handle('hosts:setToken', async (_event, hostId: string, token: string) => {
     const provider = getProvider(hostId)
     if (!provider) throw new Error(`Unknown host: ${hostId}`)
-    const rawUser = await provider.getUser(token)
+    const user = await provider.getCurrentUser(token)
     setToken(hostId, token)
     // GitHub remains the canonical identity for legacy consumers (createHandlers,
     // updateService user-filter, skillSync:setup, recommendation owner-filter).
-    // Until Phase 4+ teaches those paths about other hosts, mirror the user
-    // identity into the GitHub-specific slots only for HOST_ID_GITHUB.
+    // Other hosts skip this mirroring until their consumers learn multi-host.
     if (hostId === HOST_ID_GITHUB) {
-      setGitHubUser(rawUser.login, rawUser.avatar_url)
+      setGitHubUser(user.login, user.avatarUrl)
       const db = getDb(app.getPath('userData'))
-      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('github_username', rawUser.login)
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('github_username', user.login)
     }
-    return { user: githubUserToUser(rawUser) }
+    return { user }
   })
 
   ipcMain.handle('hosts:clearToken', (_event, hostId: string) => {
@@ -111,8 +109,7 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
     const token = getToken(hostId)
     if (!token) return null
     try {
-      const rawUser = await provider.getUser(token)
-      return githubUserToUser(rawUser)
+      return await provider.getCurrentUser(token)
     } catch {
       return null
     }
@@ -137,16 +134,16 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
     try {
       const token = await provider.pollDeviceToken(deviceCode, interval, controller.signal)
       setToken(hostId, token)
-      const rawUser = await provider.getUser(token)
+      const user = await provider.getCurrentUser(token)
       // GitHub-specific: mirror identity into legacy slots (see hosts:setToken
       // for the full rationale) and warm the topic cache for Discover.
       if (hostId === HOST_ID_GITHUB) {
-        setGitHubUser(rawUser.login, rawUser.avatar_url)
+        setGitHubUser(user.login, user.avatarUrl)
         const db = getDb(app.getPath('userData'))
-        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('github_username', rawUser.login)
+        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('github_username', user.login)
         initTopicCache(token).catch(() => {}) // Non-blocking
       }
-      return { user: githubUserToUser(rawUser) }
+      return { user }
     } finally {
       closeLoginPopup()
     }
