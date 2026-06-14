@@ -12,16 +12,16 @@ import { MockLearningProgressProvider } from '../contexts/LearningProgressContex
 function makeApi() {
   Object.defineProperty(window, 'api', {
     value: {
-      github: {
-        searchRepos: vi.fn().mockResolvedValue([]),
-        saveRepo: vi.fn().mockResolvedValue(undefined),
-        getRepo: vi.fn().mockResolvedValue({}),
-        getRelatedRepos: vi.fn().mockResolvedValue([]),
+      repo: {
+        search: vi.fn().mockResolvedValue([]),
+        save: vi.fn().mockResolvedValue(undefined),
+        get: vi.fn().mockResolvedValue({}),
+        getRelated: vi.fn().mockResolvedValue([]),
         getReadme: vi.fn().mockResolvedValue(null),
         getReleases: vi.fn().mockResolvedValue([]),
-        getSavedRepos: vi.fn().mockResolvedValue([]),
-        starRepo: vi.fn().mockResolvedValue(undefined),
-        unstarRepo: vi.fn().mockResolvedValue(undefined),
+        getSaved: vi.fn().mockResolvedValue([]),
+        star: vi.fn().mockResolvedValue(undefined),
+        unstar: vi.fn().mockResolvedValue(undefined),
       },
       db: {
         setStarredAt: vi.fn().mockResolvedValue(undefined),

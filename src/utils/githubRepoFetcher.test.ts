@@ -10,7 +10,7 @@ beforeEach(async () => {
 function mockApi(impl: () => Promise<unknown>) {
   Object.defineProperty(window, 'api', {
     writable: true,
-    value: { github: { getRepo: vi.fn(impl) } },
+    value: { repo: { get: vi.fn(impl) } },
   })
 }
 
@@ -42,7 +42,7 @@ describe('fetchRepoPreview', () => {
       hostNativeId: '1', owner: 'facebook', name: 'react',
       description: 'A JS library', stars: 100, ownerAvatarUrl: '',
     })
-    Object.defineProperty(window, 'api', { writable: true, value: { github: { getRepo } } })
+    Object.defineProperty(window, 'api', { writable: true, value: { repo: { get: getRepo } } })
     const { fetchRepoPreview: fetch } = await freshImport()
     await fetch('facebook', 'react')
     await fetch('facebook', 'react')
@@ -54,7 +54,7 @@ describe('fetchRepoPreview', () => {
       hostNativeId: '1', owner: 'vuejs', name: 'vue',
       description: '', stars: 0, ownerAvatarUrl: '',
     })
-    Object.defineProperty(window, 'api', { writable: true, value: { github: { getRepo } } })
+    Object.defineProperty(window, 'api', { writable: true, value: { repo: { get: getRepo } } })
     const { fetchRepoPreview: fetch } = await freshImport()
     await Promise.all([fetch('vuejs', 'vue'), fetch('vuejs', 'vue')])
     expect(getRepo).toHaveBeenCalledTimes(1)
@@ -85,7 +85,7 @@ describe('fetchRepoPreview', () => {
       hostNativeId: '1', owner: 'facebook', name: 'react',
       description: '', stars: 0, ownerAvatarUrl: '',
     })
-    Object.defineProperty(window, 'api', { writable: true, value: { github: { getRepo } } })
+    Object.defineProperty(window, 'api', { writable: true, value: { repo: { get: getRepo } } })
     const { fetchRepoPreview: fetch } = await freshImport()
     await fetch('Facebook', 'React')
     await fetch('facebook', 'react')
