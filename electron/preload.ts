@@ -78,6 +78,127 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('github:getCompare', owner, name, base, head) as Promise<import('./providers/github').CompareSummary>,
   },
 
+  // Host-id-aware mirror of `github:*` channels. Task 13 deletes the legacy
+  // `github` namespace once all renderer files have migrated to this one.
+  // Also includes the pre-Phase-3 `extractColor` + `getOgImage` methods that
+  // previously lived in their own `repo: {...}` namespace below.
+  repo: {
+    extractColor: (avatarUrl: string, repoId: string) =>
+      ipcRenderer.invoke('repo:extractColor', avatarUrl, repoId),
+    getOgImage: (owner: string, name: string) =>
+      ipcRenderer.invoke('repo:getOgImage', owner, name),
+    get: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:get', hostId, owner, name) as Promise<import('../src/types/repo').SavedRepo | null>,
+    search: (hostId: string, query: string, sort?: string, order?: string, page?: number) =>
+      ipcRenderer.invoke('repo:search', hostId, query, sort, order, page) as Promise<import('../src/types/repo').Repo[]>,
+    getReadme: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:getReadme', hostId, owner, name) as Promise<string | null>,
+    getFileContent: (hostId: string, owner: string, name: string, path: string) =>
+      ipcRenderer.invoke('repo:getFileContent', hostId, owner, name, path) as Promise<string | null>,
+    getReleases: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:getReleases', hostId, owner, name) as Promise<import('../src/types/repo').Release[] | null>,
+    getRepoUserEvents: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:getRepoUserEvents', hostId, owner, name) as Promise<import('../src/types/repoUserEvents').RepoUserEvent[]>,
+    getRepoStats: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:getRepoStats', hostId, owner, name) as Promise<import('../src/types/repoStats').RepoStats>,
+    getRepoMomentum: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:getRepoMomentum', hostId, owner, name) as Promise<import('../src/types/repoStats').RepoStats['momentum'] | null>,
+    fetchBundle: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:fetchBundle', hostId, owner, name) as Promise<{
+        repoRow: import('../src/types/repo').SavedRepo | null
+        releases: import('../src/types/repo').Release[]
+        isStarred: boolean
+        vulnerabilities: import('./providers/github').RepoBundle['vulnerabilities']
+        securityPolicyUrl: string | null
+        rootTree: import('./providers/github').RepoBundle['rootTree']
+      } | null>,
+    recordFork: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:recordFork', hostId, owner, name) as Promise<void>,
+    setArchivedAt: (hostId: string, owner: string, name: string, archived: boolean) =>
+      ipcRenderer.invoke('repo:setArchivedAt', hostId, owner, name, archived) as Promise<void>,
+    save: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:save', hostId, owner, name) as Promise<void>,
+    getSaved: () =>
+      ipcRenderer.invoke('repo:getSaved') as Promise<{ owner: string; name: string }[]>,
+    getFeed: () =>
+      ipcRenderer.invoke('repo:getFeed') as Promise<{ owner: string; name: string }[]>,
+    getMyRepos: (hostId: string) =>
+      ipcRenderer.invoke('repo:getMyRepos', hostId) as Promise<import('../src/types/repo').Repo[]>,
+    getRelated: (hostId: string, owner: string, name: string, topicsJson: string) =>
+      ipcRenderer.invoke('repo:getRelated', hostId, owner, name, topicsJson) as Promise<import('../src/types/repo').SavedRepo[]>,
+    star: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:star', hostId, owner, name) as Promise<void>,
+    unstar: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:unstar', hostId, owner, name) as Promise<void>,
+    isStarred: (hostId: string, owner: string, name: string) =>
+      ipcRenderer.invoke('repo:isStarred', hostId, owner, name) as Promise<boolean>,
+    getRecommended: (page?: number, excludeIds?: string[]) =>
+      ipcRenderer.invoke('repo:getRecommended', page, excludeIds) as Promise<import('../src/types/recommendation').RecommendationResponse>,
+    getBranch: (hostId: string, owner: string, name: string, branch: string) =>
+      ipcRenderer.invoke('repo:getBranch', hostId, owner, name, branch) as Promise<{ rootTreeSha: string }>,
+    getTree: (hostId: string, owner: string, name: string, treeSha: string) =>
+      ipcRenderer.invoke('repo:getTree', hostId, owner, name, treeSha) as Promise<import('./providers/github').TreeEntry[]>,
+    getBlob: (hostId: string, owner: string, name: string, blobSha: string) =>
+      ipcRenderer.invoke('repo:getBlob', hostId, owner, name, blobSha) as Promise<import('./providers/github').BlobResult>,
+    getRawFile: (hostId: string, owner: string, name: string, branch: string, path: string) =>
+      ipcRenderer.invoke('repo:getRawFile', hostId, owner, name, branch, path) as Promise<ArrayBuffer>,
+    getLastCommitsForPaths: (
+      hostId: string, repoId: string, owner: string, name: string, ref: string,
+      pathShas: { path: string; sha: string }[],
+    ) =>
+      ipcRenderer.invoke('repo:getLastCommitsForPaths', hostId, repoId, owner, name, ref, pathShas) as Promise<Record<string, {
+        message: string
+        author_login: string | null
+        author_avatar: string | null
+        committed_at: string
+        commit_sha: string
+      } | null>>,
+    compareRefs: (
+      hostId: string, repoId: string, owner: string, name: string, base: string, head: string,
+    ) =>
+      ipcRenderer.invoke('repo:compareRefs', hostId, repoId, owner, name, base, head) as Promise<{ path: string; status: 'added' | 'modified' | 'removed' | 'renamed' }[] | null>,
+    getCompare: (hostId: string, owner: string, name: string, base: string, head: string) =>
+      ipcRenderer.invoke('repo:getCompare', hostId, owner, name, base, head) as Promise<import('./providers/github').CompareSummary>,
+    getMyStarred: (hostId: string, force?: boolean) =>
+      ipcRenderer.invoke('repo:getMyStarred', hostId, force) as Promise<import('../src/types/repo').StarredEntry[]>,
+    getReceivedEvents: (hostId: string, username: string) =>
+      ipcRenderer.invoke('repo:getReceivedEvents', hostId, username) as Promise<import('./providers/github').GitHubEvent[]>,
+  },
+
+  hosts: {
+    list: () =>
+      ipcRenderer.invoke('hosts:list') as Promise<import('./providers/types').HostInstance[]>,
+    get: (hostId: string) =>
+      ipcRenderer.invoke('hosts:get', hostId) as Promise<import('./providers/types').HostInstance | null>,
+    add: (input: { type: import('./providers/types').HostType; baseUrl: string; label: string; webUrl?: string }) =>
+      ipcRenderer.invoke('hosts:add', input) as Promise<import('./providers/types').HostInstance>,
+    remove: (hostId: string) =>
+      ipcRenderer.invoke('hosts:remove', hostId) as Promise<void>,
+    probe: (input: { type: import('./providers/types').HostType; baseUrl: string }) =>
+      ipcRenderer.invoke('hosts:probe', input) as Promise<{ ok: boolean; error?: string }>,
+    setToken: (hostId: string, token: string) =>
+      ipcRenderer.invoke('hosts:setToken', hostId, token) as Promise<{ user: import('../src/types/repo').User }>,
+    clearToken: (hostId: string) =>
+      ipcRenderer.invoke('hosts:clearToken', hostId) as Promise<void>,
+    getConnectedUser: (hostId: string) =>
+      ipcRenderer.invoke('hosts:getConnectedUser', hostId) as Promise<import('../src/types/repo').User | null>,
+    startDeviceFlow: (hostId: string) =>
+      ipcRenderer.invoke('hosts:startDeviceFlow', hostId) as Promise<{
+        deviceCode: string
+        userCode: string
+        verificationUri: string
+        verificationUriComplete: string
+        expiresIn: number
+        interval: number
+      }>,
+    pollDeviceToken: (hostId: string, deviceCode: string, interval: number) =>
+      ipcRenderer.invoke('hosts:pollDeviceToken', hostId, deviceCode, interval) as Promise<{ user: import('../src/types/repo').User }>,
+    cancelDeviceFlow: (hostId: string) =>
+      ipcRenderer.invoke('hosts:cancelDeviceFlow', hostId) as Promise<void>,
+    openLoginPopup: (hostId: string, url: string) =>
+      ipcRenderer.invoke('hosts:openLoginPopup', hostId, url) as Promise<void>,
+  },
+
   settings: {
     get: (key: string) => ipcRenderer.invoke('settings:get', key),
     set: (key: string, value: string) => ipcRenderer.invoke('settings:set', key, value),
@@ -501,13 +622,6 @@ contextBridge.exposeInMainWorld('api', {
 
   org: {
     getVerified: (orgLogin: string) => ipcRenderer.invoke('org:getVerified', orgLogin),
-  },
-
-  repo: {
-    extractColor: (avatarUrl: string, repoId: string) =>
-      ipcRenderer.invoke('repo:extractColor', avatarUrl, repoId),
-    getOgImage: (owner: string, name: string) =>
-      ipcRenderer.invoke('repo:getOgImage', owner, name),
   },
 
   db: {

@@ -125,6 +125,103 @@ declare global {
           repoId: string, owner: string, name: string, base: string, head: string,
         ) => Promise<{ path: string; status: 'added' | 'modified' | 'removed' | 'renamed' }[] | null>
       }
+      repo: {
+        extractColor: (avatarUrl: string, repoId: string) => Promise<{ h: number; s: number; l: number }>
+        getOgImage: (owner: string, name: string) => Promise<string | null>
+        get: (hostId: string, owner: string, name: string) => Promise<SavedRepo | null>
+        search: (hostId: string, query: string, sort?: string, order?: string, page?: number) => Promise<Repo[]>
+        getReadme: (hostId: string, owner: string, name: string) => Promise<string | null>
+        getFileContent: (hostId: string, owner: string, name: string, path: string) => Promise<string | null>
+        getReleases: (hostId: string, owner: string, name: string) => Promise<Release[] | null>
+        getRepoUserEvents: (hostId: string, owner: string, name: string) => Promise<RepoUserEvent[]>
+        getRepoStats: (hostId: string, owner: string, name: string) => Promise<import('./types/repoStats').RepoStats>
+        getRepoMomentum: (hostId: string, owner: string, name: string) => Promise<import('./types/repoStats').RepoStats['momentum'] | null>
+        fetchBundle: (hostId: string, owner: string, name: string) => Promise<{
+          repoRow: SavedRepo | null
+          releases: Release[]
+          isStarred: boolean
+          vulnerabilities: import('../electron/providers/github').RepoBundle['vulnerabilities']
+          securityPolicyUrl: string | null
+          rootTree: import('../electron/providers/github').RepoBundle['rootTree']
+        } | null>
+        recordFork: (hostId: string, owner: string, name: string) => Promise<void>
+        setArchivedAt: (hostId: string, owner: string, name: string, archived: boolean) => Promise<void>
+        save: (hostId: string, owner: string, name: string) => Promise<void>
+        getSaved: () => Promise<{ owner: string; name: string }[]>
+        getFeed: () => Promise<{ owner: string; name: string }[]>
+        getMyRepos: (hostId: string) => Promise<Repo[]>
+        getRelated: (hostId: string, owner: string, name: string, topicsJson: string) => Promise<SavedRepo[]>
+        star: (hostId: string, owner: string, name: string) => Promise<void>
+        unstar: (hostId: string, owner: string, name: string) => Promise<void>
+        isStarred: (hostId: string, owner: string, name: string) => Promise<boolean>
+        getRecommended: (page?: number, excludeIds?: string[]) => Promise<RecommendationResponse>
+        getBranch: (hostId: string, owner: string, name: string, branch: string) => Promise<{ rootTreeSha: string }>
+        getTree: (hostId: string, owner: string, name: string, treeSha: string) => Promise<Array<{ path: string; mode: string; type: 'blob' | 'tree'; sha: string; size?: number }>>
+        getBlob: (hostId: string, owner: string, name: string, blobSha: string) => Promise<{ content: string; rawBase64: string; size: number }>
+        getRawFile: (hostId: string, owner: string, name: string, branch: string, path: string) => Promise<ArrayBuffer>
+        getLastCommitsForPaths: (
+          hostId: string, repoId: string, owner: string, name: string, ref: string,
+          pathShas: { path: string; sha: string }[],
+        ) => Promise<Record<string, {
+          message: string
+          author_login: string | null
+          author_avatar: string | null
+          committed_at: string
+          commit_sha: string
+        } | null>>
+        compareRefs: (
+          hostId: string, repoId: string, owner: string, name: string, base: string, head: string,
+        ) => Promise<{ path: string; status: 'added' | 'modified' | 'removed' | 'renamed' }[] | null>
+        getCompare: (hostId: string, owner: string, name: string, base: string, head: string) => Promise<{
+          base: string
+          head: string
+          htmlUrl: string
+          totalCommits: number
+          filesChanged: number
+          additions: number
+          deletions: number
+          topFiles: { filename: string; status: string; additions: number; deletions: number }[]
+          topAuthors: { login: string; avatarUrl: string; commits: number }[]
+        }>
+        getMyStarred: (hostId: string, force?: boolean) => Promise<import('./types/repo').StarredEntry[]>
+        getReceivedEvents: (hostId: string, username: string) => Promise<Array<{
+          id: string
+          type: 'WatchEvent' | 'ForkEvent' | 'ReleaseEvent' | 'PullRequestEvent'
+          actor: { login: string; avatar_url: string }
+          repo: { full_name: string }
+          payload: Record<string, unknown>
+          created_at: string
+        }>>
+      }
+      hosts: {
+        list: () => Promise<import('../electron/providers/types').HostInstance[]>
+        get: (hostId: string) => Promise<import('../electron/providers/types').HostInstance | null>
+        add: (input: {
+          type: import('../electron/providers/types').HostType
+          baseUrl: string
+          label: string
+          webUrl?: string
+        }) => Promise<import('../electron/providers/types').HostInstance>
+        remove: (hostId: string) => Promise<void>
+        probe: (input: {
+          type: import('../electron/providers/types').HostType
+          baseUrl: string
+        }) => Promise<{ ok: boolean; error?: string }>
+        setToken: (hostId: string, token: string) => Promise<{ user: User }>
+        clearToken: (hostId: string) => Promise<void>
+        getConnectedUser: (hostId: string) => Promise<User | null>
+        startDeviceFlow: (hostId: string) => Promise<{
+          deviceCode: string
+          userCode: string
+          verificationUri: string
+          verificationUriComplete: string
+          expiresIn: number
+          interval: number
+        }>
+        pollDeviceToken: (hostId: string, deviceCode: string, interval: number) => Promise<{ user: User }>
+        cancelDeviceFlow: (hostId: string) => Promise<void>
+        openLoginPopup: (hostId: string, url: string) => Promise<void>
+      }
       settings: {
         get: (key: string) => Promise<string | null>
         set: (key: string, value: string) => Promise<void>
@@ -363,10 +460,6 @@ declare global {
       }
       org: {
         getVerified: (orgLogin: string) => Promise<boolean>
-      }
-      repo: {
-        extractColor: (avatarUrl: string, repoId: string) => Promise<{ h: number; s: number; l: number }>
-        getOgImage: (owner: string, name: string) => Promise<string | null>
       }
       profile: {
         getUser:      (username: string) => Promise<User>
