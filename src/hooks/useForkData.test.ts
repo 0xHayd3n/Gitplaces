@@ -5,7 +5,7 @@ const mockGetRepo = vi.fn()
 
 beforeAll(() => {
   Object.defineProperty(window, 'api', {
-    value: { github: { getRepo: mockGetRepo } },
+    value: { repo: { get: mockGetRepo } },
     configurable: true,
   })
 })
@@ -19,7 +19,7 @@ const { useForkData } = await import('./useForkData')
 
 describe('useForkData', () => {
   it('starts loading and resolves both repos', async () => {
-    mockGetRepo.mockImplementation(async (owner: string, name: string) => ({
+    mockGetRepo.mockImplementation(async (_hostId: string, owner: string, name: string) => ({
       owner, name,
       description: `desc for ${name}`,
       language: 'TypeScript',
@@ -95,7 +95,7 @@ describe('useForkData', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     expect(mockGetRepo).toHaveBeenCalledTimes(1)
-    expect(mockGetRepo).toHaveBeenCalledWith('user', 'fork-f6')
+    expect(mockGetRepo).toHaveBeenCalledWith('gh:api.github.com', 'user', 'fork-f6')
     expect(result.current.original).toMatchObject({ stars: 5 })
     expect(result.current.fork).toMatchObject({ name: 'fork-f6' })
   })

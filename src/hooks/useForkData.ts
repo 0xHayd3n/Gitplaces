@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { SavedRepo } from '../types/repo'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 export interface ForkRepoData {
   owner: string
@@ -41,7 +42,7 @@ export function useRepoData(
       return
     }
     const [owner, name] = fullName.split('/')
-    window.api.github.getRepo(owner, name)
+    window.api.repo.get(HOST_ID_GITHUB, owner, name)
       .then(row => {
         const data = row ? rowToForkData(row) : null
         cache.set(fullName, data)
@@ -79,7 +80,7 @@ export function useForkData(
     if (!cache.has(originalFullName)) {
       const [owner, name] = originalFullName.split('/')
       fetches.push(
-        window.api.github.getRepo(owner, name)
+        window.api.repo.get(HOST_ID_GITHUB, owner, name)
           .then(row => {
             const data = row ? rowToForkData(row) : null
             cache.set(originalFullName, data)
@@ -95,7 +96,7 @@ export function useForkData(
     if (!cache.has(forkFullName)) {
       const [owner, name] = forkFullName.split('/')
       fetches.push(
-        window.api.github.getRepo(owner, name)
+        window.api.repo.get(HOST_ID_GITHUB, owner, name)
           .then(row => {
             const data = row ? rowToForkData(row) : null
             cache.set(forkFullName, data)

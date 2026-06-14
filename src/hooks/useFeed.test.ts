@@ -8,9 +8,9 @@ const mockGetReleases = vi.fn()
 beforeAll(() => {
   Object.defineProperty(window, 'api', {
     value: {
-      github: {
+      repo: {
         getReceivedEvents: mockGetReceivedEvents,
-        getFeedRepos: mockGetFeedRepos,
+        getFeed: mockGetFeedRepos,
         getReleases: mockGetReleases,
       },
     },

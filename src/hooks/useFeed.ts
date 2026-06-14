@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useGitHubAuth } from '../contexts/GitHubAuth'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 export interface GitHubFeedEvent {
   id: string
@@ -109,8 +110,8 @@ export function useFeed(): FeedState & { refresh: () => void } {
     setError(null)
     try {
       const [receivedSettled, feedReposSettled] = await Promise.allSettled([
-        window.api.github.getReceivedEvents(login) as Promise<GitHubFeedEvent[]>,
-        window.api.github.getFeedRepos(),
+        window.api.repo.getReceivedEvents(HOST_ID_GITHUB, login) as Promise<GitHubFeedEvent[]>,
+        window.api.repo.getFeed(),
       ])
 
       const received = receivedSettled.status === 'fulfilled' ? receivedSettled.value : []
@@ -121,7 +122,7 @@ export function useFeed(): FeedState & { refresh: () => void } {
         feedRepos,
         RELEASE_FETCH_CONCURRENCY,
         ({ owner, name }) =>
-          window.api.github.getReleases(owner, name).then(releases =>
+          window.api.repo.getReleases(HOST_ID_GITHUB, owner, name).then(releases =>
             (releases ?? [])
               .filter(r => r.tagName && new Date(r.publishedAt).getTime() > cutoff)
               .map((r): GitHubFeedEvent => ({
