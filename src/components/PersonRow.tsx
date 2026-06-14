@@ -1,15 +1,15 @@
+import type { User } from '../types/repo'
 import VerifiedBadge from './VerifiedBadge'
 
-// GitHubUser is an ambient global from src/env.d.ts — cannot be named-imported
-interface GHUser {
-  login: string
-  name: string | null
-  avatar_url: string
-  bio: string | null
+/** Person-list entries may carry name/bio sourced from a richer profile lookup;
+ *  the base `User` shape from `profile:getFollowing`/`getFollowers` does not. */
+type PersonUser = User & {
+  name?: string | null
+  bio?: string | null
 }
 
 interface PersonRowProps {
-  user: GHUser
+  user: PersonUser
   isFollowing: boolean
   isOwnProfile: boolean
   isVerified?: boolean            // optional — defaults to false; only show if explicitly confirmed
@@ -20,7 +20,7 @@ interface PersonRowProps {
 export default function PersonRow({ user, isFollowing, isOwnProfile, isVerified = false, onOpenProfile, onFollowToggle }: PersonRowProps) {
   return (
     <div className="person-row" onClick={onOpenProfile}>
-      <img src={user.avatar_url} alt={user.login} className="person-row-avatar" />
+      <img src={user.avatarUrl} alt={user.login} className="person-row-avatar" />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <div className="person-row-name">{user.name ?? user.login}</div>

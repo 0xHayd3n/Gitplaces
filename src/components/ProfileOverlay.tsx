@@ -5,6 +5,7 @@ import { useGitHubAuth } from '../contexts/GitHubAuth'
 import RepoCard, { formatCount } from './RepoCard'
 import PersonRow from './PersonRow'
 import VerifiedBadge from './VerifiedBadge'
+import type { Repo, SavedRepo, User } from '../types/repo'
 
 const TABS = ['Repos', 'Starred', 'Following', 'Followers'] as const
 type Tab = typeof TABS[number]
@@ -13,69 +14,56 @@ const REPO_SORTS = ['Stars', 'Updated', 'Name'] as const
 type RepoSort = typeof REPO_SORTS[number]
 
 const SORT_MAP: Record<RepoSort, string> = {
-  Stars: 'stars', Updated: 'updated', Name: 'full_name',
+  Stars: 'stars', Updated: 'updated', Name: 'full_name',  // 'full_name' is GitHub's sort param, not a field access
 }
 
-interface GithubApiRepo {
-  id: number
-  name: string
-  description: string | null
-  language: string | null
-  topics?: string[]
-  stargazers_count: number | null
-  forks_count: number | null
-  watchers_count: number | null
-  size: number | null
-  open_issues_count: number | null
-  homepage: string | null
-  updated_at: string | null
-  pushed_at: string | null
-  default_branch: string | null
-  owner?: { login: string; avatar_url?: string }
-  license?: { spdx_id: string } | null
+/** Full GitHub-profile shape returned by `profile:getUser` (richer than `User`). */
+interface ProfileUser extends User {
+  name: string | null
+  bio: string | null
+  location: string | null
+  company: string | null
+  blog: string | null
+  createdAt: string | null
+  htmlUrl: string
+  followers: number
+  following: number
 }
 
-function apiRepoToRow(r: GithubApiRepo) {
+/** Promote a `Repo` to a `SavedRepo` by filling in the library-extras nulls. */
+function repoToSavedRepo(r: Repo): SavedRepo {
   return {
-    id:             String(r.id),
-    owner:          r.owner?.login ?? '',
-    name:           r.name,
-    description:    r.description ?? null,
-    language:       r.language ?? null,
-    topics:         JSON.stringify(r.topics ?? []),
-    stars:          r.stargazers_count ?? null,
-    forks:          r.forks_count ?? null,
-    license:        r.license?.spdx_id ?? null,
-    homepage:       r.homepage ?? null,
-    updated_at:     r.updated_at ?? null,
-    pushed_at:      r.pushed_at ?? null,
-    saved_at:       null,
-    type:           null,
-    banner_svg:     null,
-    discovered_at:  null,
-    discover_query: null,
-    watchers:       r.watchers_count ?? null,
-    size:           r.size ?? null,
-    open_issues:    r.open_issues_count ?? null,
-    starred_at:     null,
-    unstarred_at:   null,
-    default_branch: r.default_branch ?? 'main',
-    avatar_url:     r.owner?.avatar_url ?? null,
-    banner_color:   null,
-    translated_description:      null,
-    translated_description_lang: null,
-    translated_readme:           null,
-    translated_readme_lang:      null,
-    detected_language:           null,
-    verification_score:          null,
-    verification_tier:           null,
-    verification_signals:        null,
-    verification_checked_at:     null,
-    type_bucket:                 null,
-    type_sub:                    null,
-    og_image_url: null,
-    is_forked: null, update_available: null, update_checked_at: null,
-    upstream_version: null, stored_version: null,
+    ...r,
+    savedAt: null,
+    starredAt: null,
+    unstarredAt: null,
+    discoveredAt: null,
+    discoverQuery: null,
+    bannerSvg: null,
+    bannerColor: null,
+    ogImageUrl: null,
+    type: null,
+    typeBucket: null,
+    typeSub: null,
+    translatedDescription: null,
+    translatedDescriptionLang: null,
+    translatedReadme: null,
+    translatedReadmeLang: null,
+    detectedLanguage: null,
+    verificationScore: null,
+    verificationTier: null,
+    verificationSignals: null,
+    verificationCheckedAt: null,
+    isForked: null,
+    updateAvailable: null,
+    updateCheckedAt: null,
+    upstreamVersion: null,
+    storedVersion: null,
+    archivedAt: null,
+    forkedAt: null,
+    fetchedAt: null,
+    starredCheckedAt: null,
+    storybookUrl: null,
   }
 }
 
@@ -112,7 +100,7 @@ export default function ProfileOverlay() {
   const { profileState, popProfile, closeProfile, setStackAt, pushProfile } = useProfileOverlay()
   const { stack, currentUsername } = profileState
 
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<ProfileUser | null>(null)
   const [loadingUser, setLoadingUser] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('Repos')
   const [isVerified, setIsVerified] = useState(false)
@@ -125,7 +113,7 @@ export default function ProfileOverlay() {
     setActiveTab('Repos')
     setIsVerified(false)
     window.api.profile.getUser(currentUsername)
-      .then(data => { if (isMounted) setUser(data) })
+      .then(data => { if (isMounted) setUser(data as ProfileUser) })
       .catch(() => { if (isMounted) setUser(null) })
       .finally(() => { if (isMounted) setLoadingUser(false) })
     // Non-blocking: fetch verified status after profile renders
@@ -136,7 +124,7 @@ export default function ProfileOverlay() {
   }, [currentUsername])
 
   const counts: Partial<Record<Tab, number>> = {
-    Repos:     user?.public_repos,
+    Repos:     user?.publicRepos,
     Followers: user?.followers,
     Following: user?.following,
   }
@@ -205,7 +193,7 @@ export default function ProfileOverlay() {
 }
 
 // ── ProfileHeader ─────────────────────────────────────────────────
-function ProfileHeader({ user, currentUsername, isVerified }: { user: any; currentUsername: string; isVerified: boolean }) {
+function ProfileHeader({ user, currentUsername, isVerified }: { user: ProfileUser; currentUsername: string; isVerified: boolean }) {
   const auth = useGitHubAuth()
   const loggedInUsername = auth.user?.login ?? ''
   const [following, setFollowing] = useState(false)
@@ -236,7 +224,7 @@ function ProfileHeader({ user, currentUsername, isVerified }: { user: any; curre
 
   return (
     <div className="profile-identity-row">
-      <img src={user.avatar_url} alt={user.login} className="profile-avatar" />
+      <img src={user.avatarUrl} alt={user.login} className="profile-avatar" />
       <div className="profile-meta">
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div className="profile-display-name">{user.name ?? user.login}</div>
@@ -264,7 +252,7 @@ function ProfileHeader({ user, currentUsername, isVerified }: { user: any; curre
 }
 
 function ReposTab({ username }: { username: string }) {
-  const [repos, setRepos] = useState<GithubApiRepo[]>([])
+  const [repos, setRepos] = useState<Repo[]>([])
   const [loading, setLoading] = useState(true)
   const [sort, setSort] = useState<RepoSort>('Stars')
   const navigate = useNavigate()
@@ -273,7 +261,7 @@ function ReposTab({ username }: { username: string }) {
     let isMounted = true
     setLoading(true)
     window.api.profile.getUserRepos(username, SORT_MAP[sort])
-      .then(data => { if (isMounted) setRepos(data) })
+      .then((data: Repo[]) => { if (isMounted) setRepos(data) })
       .catch(() => { if (isMounted) setRepos([]) })
       .finally(() => { if (isMounted) setLoading(false) })
     return () => { isMounted = false }
@@ -300,11 +288,11 @@ function ReposTab({ username }: { username: string }) {
         ) : (
           <div className="repo-grid">
             {repos.map(r => {
-              const row = apiRepoToRow(r)
+              const saved = repoToSavedRepo(r)
               return (
                 <RepoCard
-                  key={row.id}
-                  repo={row}
+                  key={saved.fullName}
+                  repo={saved}
                   onNavigate={navigate}
                 />
               )
@@ -317,7 +305,7 @@ function ReposTab({ username }: { username: string }) {
 }
 
 function StarredTab({ username }: { username: string }) {
-  const [repos, setRepos] = useState<GithubApiRepo[]>([])
+  const [repos, setRepos] = useState<Repo[]>([])
   const [loading, setLoading] = useState(true)
   const [sort, setSort] = useState<'Stars' | 'Recent'>('Stars')
   const navigate = useNavigate()
@@ -326,7 +314,7 @@ function StarredTab({ username }: { username: string }) {
     let isMounted = true
     setLoading(true)
     window.api.profile.getStarred(username)
-      .then(data => { if (isMounted) setRepos(data) })
+      .then((data: Repo[]) => { if (isMounted) setRepos(data) })
       .catch(() => { if (isMounted) setRepos([]) })
       .finally(() => { if (isMounted) setLoading(false) })
     return () => { isMounted = false }
@@ -334,8 +322,8 @@ function StarredTab({ username }: { username: string }) {
 
   const sorted = [...repos].sort((a, b) =>
     sort === 'Stars'
-      ? (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0)
-      : new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime()
+      ? (b.stars ?? 0) - (a.stars ?? 0)
+      : new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime()
   )
 
   return (
@@ -351,9 +339,9 @@ function StarredTab({ username }: { username: string }) {
         ) : (
           <div className="repo-grid">
             {sorted.map(r => {
-              const row = apiRepoToRow(r)
+              const saved = repoToSavedRepo(r)
               return (
-                <RepoCard key={row.id} repo={row} onNavigate={navigate} />
+                <RepoCard key={saved.fullName} repo={saved} onNavigate={navigate} />
               )
             })}
           </div>
@@ -382,7 +370,7 @@ function PeopleTab({ username, kind, onOpenProfile }: {
 }) {
   const auth = useGitHubAuth()
   const loggedInUser = auth.user?.login ?? ''
-  const [people, setPeople]             = useState<any[]>([])
+  const [people, setPeople]             = useState<User[]>([])
   const [loading, setLoading]           = useState(true)
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set())
 
@@ -393,15 +381,15 @@ function PeopleTab({ username, kind, onOpenProfile }: {
       ? window.api.profile.getFollowing(username)
       : window.api.profile.getFollowers(username)
     fetch
-      .then(async (list) => {
+      .then(async (list: User[]) => {
         if (!isMounted) return
         setPeople(list)
         try {
           // Seed followingSet: check which ones the logged-in user follows
-          const checks = await Promise.all(list.map((p: any) => window.api.profile.isFollowing(p.login)))
+          const checks = await Promise.all(list.map(p => window.api.profile.isFollowing(p.login)))
           if (!isMounted) return
           const set = new Set<string>()
-          list.forEach((p: any, i: number) => { if (checks[i]) set.add(p.login) })
+          list.forEach((p, i) => { if (checks[i]) set.add(p.login) })
           setFollowingSet(set)
         } catch {
           // isFollowing checks failed — people list still shown, followingSet stays empty

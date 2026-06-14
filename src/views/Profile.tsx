@@ -4,52 +4,63 @@ import { useProfileOverlay } from '../contexts/ProfileOverlay'
 import { useGitHubAuth } from '../contexts/GitHubAuth'
 import RepoCard, { formatCount } from '../components/RepoCard'
 import PersonRow from '../components/PersonRow'
+import type { Repo, SavedRepo, User } from '../types/repo'
 import React from 'react'
 
 // ── Types ────────────────────────────────────────────────────────
 
-interface GithubApiRepo {
-  id: number
-  name: string
-  description: string | null
-  language: string | null
-  topics?: string[]
-  stargazers_count: number | null
-  forks_count: number | null
-  watchers_count: number | null
-  size: number | null
-  open_issues_count: number | null
-  homepage: string | null
-  updated_at: string | null
-  pushed_at: string | null
-  default_branch: string | null
-  owner?: { login: string; avatar_url?: string }
-  license?: { spdx_id: string } | null
+/** Full GitHub-profile shape returned by `profile:getUser` (richer than `User`).
+ *  All fields camelCase per the Phase-2 normalization contract. */
+interface ProfileUser extends User {
+  name: string | null
+  bio: string | null
+  location: string | null
+  company: string | null
+  blog: string | null
+  createdAt: string | null
+  htmlUrl: string
+  followers: number
+  following: number
 }
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-function apiRepoToRow(r: GithubApiRepo) {
+/** Promote a `Repo` to a `SavedRepo` by filling in the library-extras nulls.
+ *  Profile's Repos/Starred tabs receive `Repo[]` from IPC (no library state)
+ *  but RepoCard's prop type is `SavedRepo`, so we pad with nulls here. */
+function repoToSavedRepo(r: Repo): SavedRepo {
   return {
-    id: String(r.id), owner: r.owner?.login ?? '', name: r.name,
-    description: r.description ?? null, language: r.language ?? null,
-    topics: JSON.stringify(r.topics ?? []),
-    stars: r.stargazers_count ?? null, forks: r.forks_count ?? null,
-    license: r.license?.spdx_id ?? null, homepage: r.homepage ?? null,
-    updated_at: r.updated_at ?? null, pushed_at: r.pushed_at ?? null,
-    saved_at: null, type: null, banner_svg: null, discovered_at: null,
-    discover_query: null, watchers: r.watchers_count ?? null,
-    size: r.size ?? null, open_issues: r.open_issues_count ?? null,
-    starred_at: null, unstarred_at: null, default_branch: r.default_branch ?? 'main',
-    avatar_url: r.owner?.avatar_url ?? null, banner_color: null,
-    translated_description: null, translated_description_lang: null,
-    translated_readme: null, translated_readme_lang: null,
-    detected_language: null, verification_score: null,
-    verification_tier: null, verification_signals: null,
-    verification_checked_at: null, type_bucket: null, type_sub: null,
-    og_image_url: null,
-    is_forked: null, update_available: null, update_checked_at: null,
-    upstream_version: null, stored_version: null,
+    ...r,
+    savedAt: null,
+    starredAt: null,
+    unstarredAt: null,
+    discoveredAt: null,
+    discoverQuery: null,
+    bannerSvg: null,
+    bannerColor: null,
+    ogImageUrl: null,
+    type: null,
+    typeBucket: null,
+    typeSub: null,
+    translatedDescription: null,
+    translatedDescriptionLang: null,
+    translatedReadme: null,
+    translatedReadmeLang: null,
+    detectedLanguage: null,
+    verificationScore: null,
+    verificationTier: null,
+    verificationSignals: null,
+    verificationCheckedAt: null,
+    isForked: null,
+    updateAvailable: null,
+    updateCheckedAt: null,
+    upstreamVersion: null,
+    storedVersion: null,
+    archivedAt: null,
+    forkedAt: null,
+    fetchedAt: null,
+    starredCheckedAt: null,
+    storybookUrl: null,
   }
 }
 
@@ -83,7 +94,7 @@ type Tab = typeof TABS[number]
 export default function Profile() {
   const auth = useGitHubAuth()
   const login = auth.user?.login ?? ''
-  const [user, setUser]               = useState<GitHubUser | null>(null)
+  const [user, setUser]               = useState<ProfileUser | null>(null)
   const [loadingUser, setLoadingUser] = useState(true)
   const [userError, setUserError]     = useState(false)
   const [activeTab, setActiveTab]     = useState<Tab>('Repos')
@@ -93,14 +104,14 @@ export default function Profile() {
     if (!login) return
     let isMounted = true
     window.api.profile.getUser(login)
-      .then((data: GitHubUser) => { if (isMounted) setUser(data) })
+      .then((data) => { if (isMounted) setUser(data as ProfileUser) })
       .catch(() => { if (isMounted) setUserError(true) })
       .finally(() => { if (isMounted) setLoadingUser(false) })
     return () => { isMounted = false }
   }, [login])
 
   const counts: Partial<Record<Tab, number>> = {
-    Repos:     user?.public_repos,
+    Repos:     user?.publicRepos,
     Following: user?.following,
     Followers: user?.followers,
   }
@@ -115,7 +126,7 @@ export default function Profile() {
           <p className="profile-view-error" style={{ color: 'var(--t3)', fontSize: 12 }}>Could not load profile.</p>
         ) : (
           <>
-            <img src={user.avatar_url} alt={user.login} className="profile-view-avatar" />
+            <img src={user.avatarUrl} alt={user.login} className="profile-view-avatar" />
             <div>
               <div className="profile-view-name">{user.name ?? user.login}</div>
               <div className="profile-view-username">@{user.login}</div>
@@ -140,9 +151,9 @@ export default function Profile() {
                   </a>
                 </div>
               )}
-              {user.created_at && (
+              {user.createdAt && (
                 <div className="profile-view-meta-row">
-                  <span>📅</span><span>{formatJoined(user.created_at)}</span>
+                  <span>📅</span><span>{formatJoined(user.createdAt)}</span>
                 </div>
               )}
             </div>
@@ -158,7 +169,7 @@ export default function Profile() {
             </div>
             <button
               className="profile-view-edit-btn"
-              onClick={() => window.api.openExternal(user.html_url)}
+              onClick={() => window.api.openExternal(user.htmlUrl)}
             >
               Edit on GitHub ↗
             </button>
@@ -206,7 +217,7 @@ export default function Profile() {
 const REPO_SORTS = ['Stars', 'Updated', 'Name'] as const
 type RepoSort = typeof REPO_SORTS[number]
 const SORT_MAP: Record<RepoSort, string> = {
-  Stars: 'stars', Updated: 'updated', Name: 'full_name',
+  Stars: 'stars', Updated: 'updated', Name: 'full_name',  // 'full_name' is GitHub's sort param, not a field access
 }
 
 function SkeletonGrid() {
@@ -226,7 +237,7 @@ function SkeletonGrid() {
 }
 
 function ReposTab({ login }: { login: string }) {
-  const [repos, setRepos]      = useState<GithubApiRepo[]>([])
+  const [repos, setRepos]      = useState<Repo[]>([])
   const [loading, setLoading]  = useState(true)
   const [error, setError]      = useState(false)
   const [sort, setSort]        = useState<RepoSort>('Stars')
@@ -238,7 +249,7 @@ function ReposTab({ login }: { login: string }) {
     setLoading(true)
     setError(false)
     window.api.profile.getUserRepos(login, SORT_MAP[sort])
-      .then((data: GithubApiRepo[]) => { if (isMounted) setRepos(data) })
+      .then((data: Repo[]) => { if (isMounted) setRepos(data) })
       .catch(() => { if (isMounted) setError(true) })
       .finally(() => { if (isMounted) setLoading(false) })
     return () => { isMounted = false }
@@ -272,8 +283,8 @@ function ReposTab({ login }: { login: string }) {
         ) : (
           <div className="repo-grid">
             {repos.map(r => {
-              const row = apiRepoToRow(r)
-              return <RepoCard key={row.id} repo={row} onNavigate={navigate} />
+              const saved = repoToSavedRepo(r)
+              return <RepoCard key={saved.fullName} repo={saved} onNavigate={navigate} />
             })}
           </div>
         )}
@@ -283,7 +294,7 @@ function ReposTab({ login }: { login: string }) {
 }
 
 function StarredTab({ login }: { login: string }) {
-  const [repos, setRepos]      = useState<GithubApiRepo[]>([])
+  const [repos, setRepos]      = useState<Repo[]>([])
   const [loading, setLoading]  = useState(true)
   const [error, setError]      = useState(false)
   const [sort, setSort]        = useState<'Stars' | 'Recent'>('Stars')
@@ -295,7 +306,7 @@ function StarredTab({ login }: { login: string }) {
     setLoading(true)
     setError(false)
     window.api.profile.getStarred(login)
-      .then((data: GithubApiRepo[]) => { if (isMounted) setRepos(data) })
+      .then((data: Repo[]) => { if (isMounted) setRepos(data) })
       .catch(() => { if (isMounted) setError(true) })
       .finally(() => { if (isMounted) setLoading(false) })
     return () => { isMounted = false }
@@ -303,8 +314,8 @@ function StarredTab({ login }: { login: string }) {
 
   const sorted = [...repos].sort((a, b) =>
     sort === 'Stars'
-      ? (b.stargazers_count ?? 0) - (a.stargazers_count ?? 0)
-      : new Date(b.updated_at ?? 0).getTime() - new Date(a.updated_at ?? 0).getTime()
+      ? (b.stars ?? 0) - (a.stars ?? 0)
+      : new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime()
   )
 
   if (error) return (
@@ -327,8 +338,8 @@ function StarredTab({ login }: { login: string }) {
         ) : (
           <div className="repo-grid">
             {sorted.map(r => {
-              const row = apiRepoToRow(r)
-              return <RepoCard key={row.id} repo={row} onNavigate={navigate} />
+              const saved = repoToSavedRepo(r)
+              return <RepoCard key={saved.fullName} repo={saved} onNavigate={navigate} />
             })}
           </div>
         )}
@@ -352,7 +363,7 @@ function PersonRowVerified(props: React.ComponentPropsWithoutRef<typeof PersonRo
 
 function PeopleTab({ login, kind }: { login: string; kind: 'following' | 'followers' }) {
   const { openProfile }                 = useProfileOverlay()
-  const [people, setPeople]             = useState<any[]>([])
+  const [people, setPeople]             = useState<User[]>([])
   const [loading, setLoading]           = useState(true)
   const [error, setError]               = useState(false)
   const [followingSet, setFollowingSet] = useState<Set<string>>(new Set())
@@ -366,14 +377,14 @@ function PeopleTab({ login, kind }: { login: string; kind: 'following' | 'follow
       ? window.api.profile.getFollowing(login)
       : window.api.profile.getFollowers(login)
     fetch
-      .then(async (list: any[]) => {
+      .then(async (list: User[]) => {
         if (!isMounted) return
         setPeople(list)
         try {
-          const checks = await Promise.all(list.map((p: any) => window.api.profile.isFollowing(p.login)))
+          const checks = await Promise.all(list.map(p => window.api.profile.isFollowing(p.login)))
           if (!isMounted) return
           const set = new Set<string>()
-          list.forEach((p: any, i: number) => { if (checks[i]) set.add(p.login) })
+          list.forEach((p, i) => { if (checks[i]) set.add(p.login) })
           setFollowingSet(set)
         } catch { /* people list still shown */ }
       })

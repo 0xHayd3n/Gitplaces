@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
 import { GitHubAuthProvider } from '../contexts/GitHubAuth'
 import { MockLearningProgressProvider } from '../contexts/LearningProgressContext'
+import { fixtureRepo } from '../test-utils/repoFixtures'
 import Profile from './Profile'
 
 // jsdom does not provide ResizeObserver — needed by DitherBackground inside RepoCard
@@ -48,16 +49,16 @@ function makeApi(overrides: Record<string, unknown> = {}) {
       getUser: vi.fn().mockResolvedValue({
         login: 'alice',
         name: 'Alice Smith',
-        avatar_url: 'https://example.com/avatar.png',
+        avatarUrl: 'https://example.com/avatar.png',
         bio: 'Test bio',
         location: 'NYC',
         company: 'Acme',
         blog: 'https://alice.dev',
-        created_at: '2020-01-15T00:00:00Z',
-        public_repos: 12,
+        createdAt: '2020-01-15T00:00:00Z',
+        publicRepos: 12,
         followers: 100,
         following: 50,
-        html_url: 'https://github.com/alice',
+        htmlUrl: 'https://github.com/alice',
       }),
       getUserRepos: vi.fn().mockResolvedValue([]),
       getStarred:   vi.fn().mockResolvedValue([]),
@@ -180,13 +181,20 @@ describe('ReposTab', () => {
         profile: {
           ...makeApi().profile,
           getUserRepos: vi.fn().mockResolvedValue([
-            {
-              id: 1, name: 'my-repo', description: 'A repo', language: 'TypeScript',
-              stargazers_count: 42, forks_count: 3, watchers_count: 42,
-              size: 100, open_issues_count: 0, homepage: null,
-              updated_at: '2024-01-01T00:00:00Z', pushed_at: null,
-              default_branch: 'main', owner: { login: 'alice' }, license: null,
-            },
+            fixtureRepo({
+              hostNativeId: 1,
+              fullName: 'alice/my-repo',
+              owner: 'alice',
+              name: 'my-repo',
+              description: 'A repo',
+              language: 'TypeScript',
+              stars: 42,
+              forks: 3,
+              watchers: 42,
+              size: 100,
+              openIssues: 0,
+              updatedAt: '2024-01-01T00:00:00Z',
+            }),
           ]),
         },
       }),
@@ -218,13 +226,20 @@ describe('StarredTab', () => {
         profile: {
           ...makeApi().profile,
           getStarred: vi.fn().mockResolvedValue([
-            {
-              id: 2, name: 'cool-lib', description: null, language: 'Go',
-              stargazers_count: 999, forks_count: 10, watchers_count: 999,
-              size: 200, open_issues_count: 5, homepage: null,
-              updated_at: '2024-03-01T00:00:00Z', pushed_at: null,
-              default_branch: 'main', owner: { login: 'other' }, license: null,
-            },
+            fixtureRepo({
+              hostNativeId: 2,
+              fullName: 'other/cool-lib',
+              owner: 'other',
+              name: 'cool-lib',
+              description: null,
+              language: 'Go',
+              stars: 999,
+              forks: 10,
+              watchers: 999,
+              size: 200,
+              openIssues: 5,
+              updatedAt: '2024-03-01T00:00:00Z',
+            }),
           ]),
         },
       }),
@@ -255,10 +270,10 @@ describe('PeopleTab', () => {
   const personApi = {
     ...makeApi().profile,
     getFollowing: vi.fn().mockResolvedValue([
-      { login: 'bob', name: null, avatar_url: 'https://example.com/bob.png', bio: null },
+      { login: 'bob', avatarUrl: 'https://example.com/bob.png', publicRepos: 0, name: null, bio: null },
     ]),
     getFollowers: vi.fn().mockResolvedValue([
-      { login: 'carol', name: null, avatar_url: 'https://example.com/carol.png', bio: null },
+      { login: 'carol', avatarUrl: 'https://example.com/carol.png', publicRepos: 0, name: null, bio: null },
     ]),
   }
 
