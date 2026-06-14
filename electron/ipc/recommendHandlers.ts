@@ -291,4 +291,9 @@ export function registerRecommendHandlers(): void {
   ipcMain.handle('github:getRecommended', async (_event, page?: number, excludeIds?: string[]) => {
     return getRecommendedHandler(page ?? 1, excludeIds ?? [])
   })
+
+  // Parallel repo:* channel — no hostId arg (multi-host fan-out lands in Phase 6).
+  ipcMain.handle('repo:getRecommended', async (_event, page?: number, excludeIds?: string[]) => {
+    return getRecommendedHandler(page ?? 1, excludeIds ?? [])
+  })
 }

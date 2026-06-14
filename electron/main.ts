@@ -101,6 +101,7 @@ import { registerAiChatHandlers } from './ipc/aiChatHandlers'
 import { registerTtsHandlers } from './ipc/ttsHandlers'
 import { registerAgentHandlers } from './ipc/agentHandlers'
 import { registerRecommendHandlers } from './ipc/recommendHandlers'
+import { registerRepoHandlers } from './ipc/repoHandlers'
 import { registerEngagementHandlers } from './ipc/engagementHandlers'
 import { registerUpdateHandlers } from './ipc/updateHandlers'
 import { registerLLMHandlers } from './ipc/llmHandlers'
@@ -2489,6 +2490,7 @@ registerAiChatHandlers()
 registerTtsHandlers()
 registerAgentHandlers()
 registerRecommendHandlers()
+registerRepoHandlers()
 registerEngagementHandlers()
 registerUpdateHandlers()
 registerCreateHandlers()
