@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 const SETTINGS_KEY = 'archived_repos'
 
@@ -29,7 +30,10 @@ export function useArchivedRepos() {
     if (archived) next.add(key); else next.delete(key)
     setArchivedSet(next)
     window.api.settings.set(SETTINGS_KEY, JSON.stringify([...next])).catch(() => {})
-    window.api.github.setArchivedAt(owner, name, archived).catch(() => {})
+    // Phase 3: the hook currently only services GitHub repos; once multi-host
+    // lands the caller will need to thread hostId through. Defaulting here
+    // matches the pre-migration behaviour byte-for-byte.
+    window.api.repo.setArchivedAt(HOST_ID_GITHUB, owner, name, archived).catch(() => {})
   }, [])
 
   return { archivedSet, loading, toggle }

@@ -3,6 +3,7 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import type { CollectionRow, CollectionRepoRow, LibrarySavedRepo } from '../types/repo'
 import { useToast } from '../contexts/Toast'
 import CollDetail from '../components/CollDetail'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 export default function CollectionDetail() {
   const { id } = useParams<{ id: string }>()
@@ -49,7 +50,7 @@ export default function CollectionDetail() {
     const key = `${owner}/${name}`
     setInstalling(prev => new Set(prev).add(key))
     try {
-      await window.api.github.saveRepo(owner, name)
+      await window.api.repo.save(HOST_ID_GITHUB, owner, name)
       await window.api.skill.generate(owner, name, { flavour: 'library' })
       const rows = await window.api.collection.getDetail(id)
       setDetail(rows)
@@ -69,7 +70,7 @@ export default function CollectionDetail() {
         const key = `${r.owner}/${r.name}`
         setInstalling(prev => new Set(prev).add(key))
         try {
-          await window.api.github.saveRepo(r.owner, r.name)
+          await window.api.repo.save(HOST_ID_GITHUB, r.owner, r.name)
           await window.api.skill.generate(r.owner, r.name, { flavour: 'library' })
         } catch {
           // individual failure — continue

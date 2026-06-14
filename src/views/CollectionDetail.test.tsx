@@ -40,7 +40,7 @@ beforeEach(() => {
       delete: vi.fn().mockResolvedValue(undefined),
     },
     library: { getAll: vi.fn().mockResolvedValue([]) },
-    github: { saveRepo: vi.fn().mockResolvedValue(undefined) },
+    repo: { save: vi.fn().mockResolvedValue(undefined) },
     skill: { generate: vi.fn().mockResolvedValue({ content: '', version: 'v1', generated_at: '' }) },
   })
 })

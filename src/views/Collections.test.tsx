@@ -34,7 +34,7 @@ beforeEach(() => {
     library: { getAll: vi.fn().mockResolvedValue([]) },
     settings: { getApiKey: vi.fn().mockResolvedValue('key') },
     skill: { generate: vi.fn().mockResolvedValue({ content: '', version: 'v1', generated_at: '' }), detectClaudeCode: vi.fn().mockResolvedValue(false) },
-    github: { saveRepo: vi.fn().mockResolvedValue(undefined) },
+    repo: { save: vi.fn().mockResolvedValue(undefined) },
   })
 })
 

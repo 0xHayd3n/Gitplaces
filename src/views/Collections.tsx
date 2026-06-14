@@ -7,6 +7,7 @@ import { useKeyboardNav } from '../hooks/useKeyboardNav'
 import CollRow from '../components/CollRow'
 import CollDetail from '../components/CollDetail'
 import NewCollectionModal from '../components/NewCollectionModal'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 export default function Collections() {
   const [searchParams] = useSearchParams()
@@ -58,7 +59,7 @@ export default function Collections() {
     const key = `${owner}/${name}`
     setInstalling(prev => new Set(prev).add(key))
     try {
-      await window.api.github.saveRepo(owner, name)
+      await window.api.repo.save(HOST_ID_GITHUB, owner, name)
       await window.api.skill.generate(owner, name, { flavour: 'library' })
       if (selectedId) {
         const rows = await window.api.collection.getDetail(selectedId)
@@ -80,7 +81,7 @@ export default function Collections() {
         const key = `${r.owner}/${r.name}`
         setInstalling(prev => new Set(prev).add(key))
         try {
-          await window.api.github.saveRepo(r.owner, r.name)
+          await window.api.repo.save(HOST_ID_GITHUB, r.owner, r.name)
           await window.api.skill.generate(r.owner, r.name, { flavour: 'library' })
         } catch {
           // individual install failure — continue with others

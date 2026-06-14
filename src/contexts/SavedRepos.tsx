@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 interface SavedReposContextValue {
   isSaved: (owner: string, name: string) => boolean
@@ -19,7 +20,7 @@ export function SavedReposProvider({ children }: { children: React.ReactNode }) 
   setRef.current = saved
 
   useEffect(() => {
-    window.api.github.getSavedRepos()
+    window.api.repo.getSaved()
       .then((rows) => {
         setSaved(new Set(rows.map((r) => `${r.owner}/${r.name}`)))
       })
@@ -32,7 +33,7 @@ export function SavedReposProvider({ children }: { children: React.ReactNode }) 
   const saveRepo = async (owner: string, name: string) => {
     const key = `${owner}/${name}`
     setSaved((prev) => new Set([...prev, key]))  // optimistic
-    await window.api.github.saveRepo(owner, name)
+    await window.api.repo.save(HOST_ID_GITHUB, owner, name)
   }
 
   return (

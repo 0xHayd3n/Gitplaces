@@ -9,6 +9,7 @@ import { useGitHubAuth } from '../contexts/GitHubAuth'
 import VerifiedBadge from '../components/VerifiedBadge'
 import LanguageIcon from '../components/LanguageIcon'
 import { useKeyboardNav } from '../hooks/useKeyboardNav'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 type SortKey = 'recent' | 'stars' | 'az'
 type FilterKey = 'all' | 'not-installed' | 'installed'
@@ -79,7 +80,7 @@ export default function Starred() {
   const handleSync = async () => {
     setSyncing(true)
     try {
-      await window.api.github.getStarred(true)
+      await window.api.repo.getMyStarred(HOST_ID_GITHUB, true)
       await loadRows()
       await loadSyncedAgo()
     } finally {
