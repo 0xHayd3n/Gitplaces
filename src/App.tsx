@@ -23,6 +23,9 @@ const Library = lazy(() => import('./views/Library'))
 const Starred = lazy(() => import('./views/Starred'))
 const Profile = lazy(() => import('./views/Profile'))
 const RepoDetail = lazy(() => import('./views/RepoDetail'))
+const RepoRouteCompatRedirect = lazy(() =>
+  import('./views/RepoRouteCompatRedirect').then(m => ({ default: m.RepoRouteCompatRedirect })),
+)
 const Onboarding = lazy(() => import('./views/Onboarding'))
 const Settings = lazy(() => import('./views/Settings'))
 const Create = lazy(() => import('./views/Create'))
@@ -99,7 +102,8 @@ function AppContent() {
                 <Route path="/create/:sessionId" element={<Create />} />
                 <Route path="/starred" element={<RequireGitHub><Starred /></RequireGitHub>} />
                 <Route path="/profile" element={<RequireGitHub><Profile /></RequireGitHub>} />
-                <Route path="/repo/:owner/:name" element={<RequireGitHub><RepoDetail /></RequireGitHub>} />
+                <Route path="/repo/:hostId/:owner/:name" element={<RequireGitHub><RepoDetail /></RequireGitHub>} />
+                <Route path="/repo/:owner/:name" element={<RequireGitHub><RepoRouteCompatRedirect /></RequireGitHub>} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
