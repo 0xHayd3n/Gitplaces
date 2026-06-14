@@ -3,7 +3,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DiscoverRow from './DiscoverRow'
 import DiscoverRowRepoCard from './DiscoverRowRepoCard'
-import type { RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
+import { fixtureSavedRepo } from '../test-utils/repoFixtures'
 
 vi.mock('./DitherBackground', () => ({
   default: () => <div data-testid="dither-bg" />,
@@ -32,24 +33,18 @@ beforeAll(() => {
   }
 })
 
-function makeRepo(owner: string, name: string, overrides: Partial<RepoRow> = {}): RepoRow {
-  return {
-    id: `${owner}/${name}`, owner, name,
+function makeRepo(owner: string, name: string, overrides: Partial<SavedRepo> = {}): SavedRepo {
+  return fixtureSavedRepo({
+    hostNativeId: `${owner}/${name}`,
+    fullName: `${owner}/${name}`,
+    owner,
+    name,
     description: 'Sample description text.',
-    language: 'TypeScript', stars: 1000, forks: 100,
-    topics: '[]', avatar_url: null, starred_at: null, unstarred_at: null, pushed_at: null,
-    license: null, homepage: null, updated_at: null, saved_at: null,
-    type: null, banner_svg: null, discovered_at: null, discover_query: null,
-    watchers: null, size: null, open_issues: null, default_branch: null,
-    og_image_url: null, banner_color: null,
-    translated_description: null, translated_description_lang: null,
-    translated_readme: null, translated_readme_lang: null, detected_language: null,
-    verification_score: null, verification_tier: null, verification_signals: null,
-    verification_checked_at: null, type_bucket: null, type_sub: null,
-    is_forked: null, update_available: null, update_checked_at: null,
-    upstream_version: null, stored_version: null,
+    language: 'TypeScript',
+    stars: 1000,
+    forks: 100,
     ...overrides,
-  }
+  })
 }
 
 const repos = [
@@ -58,16 +53,16 @@ const repos = [
   makeRepo('golang', 'go'),
 ]
 
-function renderRepoRow(props: Partial<Parameters<typeof DiscoverRow<RepoRow>>[0]> & {
+function renderRepoRow(props: Partial<Parameters<typeof DiscoverRow<SavedRepo>>[0]> & {
   onNavigate?: (path: string) => void
 } = {}) {
   const onNavigate = props.onNavigate ?? vi.fn()
   return render(
-    <DiscoverRow<RepoRow>
+    <DiscoverRow<SavedRepo>
       items={props.items ?? repos}
       activeIndex={props.activeIndex ?? 0}
       columns={props.columns ?? 3}
-      getItemKey={r => r.id}
+      getItemKey={r => String(r.hostNativeId)}
       onAdvance={props.onAdvance ?? vi.fn()}
       onMore={props.onMore ?? vi.fn()}
       renderCard={({ item, posIndex, columns, visible }) => (
@@ -115,17 +110,16 @@ describe('DiscoverRow', () => {
     expect(onNavigate).toHaveBeenCalledWith('/repo/facebook/react')
   })
 
-  it('renders the new card structure (title, author, description, language overlay)', () => {
+  it('renders the new card structure (title, description, language overlay)', () => {
     const { container } = renderRepoRow()
     expect(container.querySelector('.repo-card-title')).toBeTruthy()
-    expect(container.querySelector('.repo-card-author')).toBeTruthy()
     expect(container.querySelector('.repo-card-description')).toBeTruthy()
     expect(container.querySelector('.repo-card-lang-overlay')).toBeTruthy()
   })
 
   it('does NOT render star button, license chip, recency stat, or tag chips', () => {
     const { container } = renderRepoRow({
-      items: [makeRepo('facebook', 'react', { topics: '["ui","library"]', license: 'MIT', pushed_at: new Date().toISOString() })],
+      items: [makeRepo('facebook', 'react', { topics: ['ui', 'library'], license: 'MIT', pushedAt: new Date().toISOString() })],
     })
     expect(container.querySelector('.repo-card-badge-br')).toBeNull()
     expect(container.querySelector('.discover-row-card-license')).toBeNull()

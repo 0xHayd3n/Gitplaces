@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { parseTopics, type RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
 import { getSubTypeConfig } from '../config/repoTypeConfig'
 import type { ListDensity, ListFields } from './LayoutDropdown'
 import { formatCount } from './RepoCard'
@@ -8,7 +8,7 @@ import VerificationBadge from './VerificationBadge'
 import { useLearningProgress } from '../hooks/useLearningProgress'
 
 interface RepoListRowProps {
-  repo: RepoRow
+  repo: SavedRepo
   onNavigate: (path: string) => void
   onTagClick: (tag: string) => void
   onOwnerClick?: (owner: string) => void
@@ -23,7 +23,7 @@ interface RepoListRowProps {
   onToggleTags?: () => void
 }
 
-function formatRecency(updatedAt: string | null): string {
+function formatRecency(updatedAt: string): string {
   if (!updatedAt) return ''
   const days = Math.floor((Date.now() - new Date(updatedAt).getTime()) / 86_400_000)
   if (days < 1)   return 'today'
@@ -39,7 +39,7 @@ export default function RepoListRow({
   density, fields, focused, tagsExpanded = false, onToggleTags,
 }: RepoListRowProps) {
   const rowRef = useRef<HTMLDivElement>(null)
-  const allTopics = parseTopics(repo.topics)
+  const allTopics = repo.topics
   const visibleTopics = tagsExpanded ? allTopics : allTopics.slice(0, 3)
   const moreCount = allTopics.length - 3
   const typeConfig = getSubTypeConfig(typeSub)
@@ -143,7 +143,7 @@ export default function RepoListRow({
           <div className="repo-list-row-stats">
             <span><Star size={11} /> {formatCount(repo.stars)}</span>
             <span><GitFork size={11} /> {formatCount(repo.forks)}</span>
-            <span><Clock size={11} /> {formatRecency(repo.updated_at)}</span>
+            <span><Clock size={11} /> {formatRecency(repo.updatedAt)}</span>
           </div>
         )}
       </div>

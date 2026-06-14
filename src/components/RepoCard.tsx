@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, memo } from 'react'
-import { type RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
 import DitherBackground from './DitherBackground'
-import { getSubTypeConfig, getBucketGradient, getBucketColor } from '../config/repoTypeConfig'
+import { getSubTypeConfig, getBucketColor } from '../config/repoTypeConfig'
 import LanguageIcon from './LanguageIcon'
 
 // ── Module-level IPC cache for the user's preferred translation language ─
@@ -64,9 +64,8 @@ function parseEmoji(text: string): string {
 
 // ── Repo Card ─────────────────────────────────────────────────────
 interface RepoCardProps {
-  repo: RepoRow
+  repo: SavedRepo
   onNavigate: (path: string) => void
-  onOwnerClick?: (owner: string) => void
   onLanguageClick?: (lang: string) => void
   onSubtypeClick?: (subtypeId: string) => void
   typeSub?: string | null
@@ -76,11 +75,11 @@ interface RepoCardProps {
 }
 
 const RepoCard = memo(function RepoCard({
-  repo, onNavigate, onOwnerClick, onLanguageClick, onSubtypeClick,
+  repo, onNavigate, onLanguageClick, onSubtypeClick,
   typeSub, typeBucket, focused, learnState,
 }: RepoCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
-  const starred = !!repo.starred_at
+  const starred = !!repo.starredAt
 
   useEffect(() => {
     if (focused && cardRef.current) {
@@ -94,8 +93,8 @@ const RepoCard = memo(function RepoCard({
     async function checkAndTranslate() {
       if (!repo.description || repo.description.length < 6) return
       const preferredLang = await getPreferredLang()
-      if (repo.translated_description && repo.translated_description_lang === preferredLang) {
-        setDisplayDescription(repo.translated_description)
+      if (repo.translatedDescription && repo.translatedDescriptionLang === preferredLang) {
+        setDisplayDescription(repo.translatedDescription)
         return
       }
       const scriptLang = await window.api.translate.check(repo.description, preferredLang, 6).catch(() => null)
@@ -103,18 +102,18 @@ const RepoCard = memo(function RepoCard({
       const result = await window.api.translate.translate(repo.description, preferredLang).catch(() => null)
       if (!result) return
       setDisplayDescription(result.translatedText)
-      if (repo.id) {
+      const repoDbId = String(repo.hostNativeId)
+      if (repoDbId) {
         window.api.db.cacheTranslatedDescription(
-          repo.id, result.translatedText, preferredLang, scriptLang,
+          repoDbId, result.translatedText, preferredLang, scriptLang,
         ).catch(() => {})
       }
     }
     checkAndTranslate()
-  }, [repo.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [repo.hostNativeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const typeConfig = getSubTypeConfig(typeSub)
   const pillAccent = typeConfig?.accentColor ?? (typeBucket ? getBucketColor(typeBucket) : null)
-  const gradient = getBucketGradient(typeConfig?.accentColor ?? getBucketColor(typeBucket))
   const parsedDescription = useMemo(() => parseEmoji(displayDescription), [displayDescription])
 
   return (
@@ -125,7 +124,7 @@ const RepoCard = memo(function RepoCard({
     >
       <div className="repo-card-image">
         <div className="repo-card-image-canvas">
-          <DitherBackground avatarUrl={repo.avatar_url} fallbackGradient={gradient} />
+          <DitherBackground avatarUrl={repo.ownerAvatarUrl} />
         </div>
         {repo.language && (
           <span
@@ -139,13 +138,9 @@ const RepoCard = memo(function RepoCard({
       </div>
       <div className="repo-card-body">
         <div className="repo-card-title">{repo.name}</div>
-        <button
-          type="button"
-          className="repo-card-author"
-          onClick={e => { e.stopPropagation(); onOwnerClick?.(repo.owner) }}
-        >
-          by {repo.owner}
-        </button>
+        {parsedDescription && (
+          <p className="repo-card-description">{parsedDescription}</p>
+        )}
         <div className="repo-card-pill-row">
           {typeConfig && pillAccent && typeSub && (
             <button
@@ -163,9 +158,6 @@ const RepoCard = memo(function RepoCard({
             </button>
           )}
         </div>
-        {parsedDescription && (
-          <p className="repo-card-description">{parsedDescription}</p>
-        )}
       </div>
     </div>
   )

@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { render } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import RepoCard from './RepoCard'
-import type { RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
+import { fixtureSavedRepo } from '../test-utils/repoFixtures'
 
 vi.mock('./DitherBackground', () => ({
   default: () => <div data-testid="dither-bg" />,
@@ -32,28 +33,18 @@ beforeAll(() => {
   }
 })
 
-function makeRepo(overrides: Partial<RepoRow> = {}): RepoRow {
-  return {
-    id: 'kirillzyusko/react-native-keyboard-controller',
+function makeRepo(overrides: Partial<SavedRepo> = {}): SavedRepo {
+  return fixtureSavedRepo({
+    hostNativeId: 'kirillzyusko/react-native-keyboard-controller',
+    fullName: 'kirillzyusko/react-native-keyboard-controller',
     owner: 'kirillzyusko',
     name: 'react-native-keyboard-controller',
     description: 'Keyboard manager which works in identical way on both iOS and Android.',
     language: 'TypeScript',
-    stars: 1000, forks: 100,
-    topics: '[]',
-    avatar_url: null, starred_at: null, unstarred_at: null, pushed_at: null,
-    license: null, homepage: null, updated_at: null, saved_at: null,
-    type: null, banner_svg: null, discovered_at: null, discover_query: null,
-    watchers: null, size: null, open_issues: null, default_branch: null,
-    og_image_url: null, banner_color: null,
-    translated_description: null, translated_description_lang: null,
-    translated_readme: null, translated_readme_lang: null, detected_language: null,
-    verification_score: null, verification_tier: null, verification_signals: null,
-    verification_checked_at: null, type_bucket: null, type_sub: null,
-    is_forked: null, update_available: null, update_checked_at: null,
-    upstream_version: null, stored_version: null,
+    stars: 1000,
+    forks: 100,
     ...overrides,
-  }
+  })
 }
 
 function renderCard(props: Partial<React.ComponentProps<typeof RepoCard>> = {}) {
@@ -61,10 +52,9 @@ function renderCard(props: Partial<React.ComponentProps<typeof RepoCard>> = {}) 
 }
 
 describe('RepoCard (Nexus-style)', () => {
-  it('renders title, author subtitle, and description', () => {
+  it('renders title and description', () => {
     const { container } = renderCard()
     expect(container.querySelector('.repo-card-title')?.textContent).toBe('react-native-keyboard-controller')
-    expect(container.querySelector('.repo-card-author')?.textContent).toBe('by kirillzyusko')
     expect(container.querySelector('.repo-card-description')?.textContent)
       .toBe('Keyboard manager which works in identical way on both iOS and Android.')
   })
@@ -97,7 +87,7 @@ describe('RepoCard (Nexus-style)', () => {
 
   it('does NOT render star button, learn button, tag chips, or anchor strip', () => {
     const { container } = renderCard({
-      repo: makeRepo({ topics: '["mobile","keyboard","react-native"]', starred_at: '2026-01-01' }),
+      repo: makeRepo({ topics: ['mobile', 'keyboard', 'react-native'], starredAt: '2026-01-01' }),
     })
     expect(container.querySelector('.repo-card-badge-br')).toBeNull()
     expect(container.querySelector('.repo-card-badge-learn')).toBeNull()
@@ -110,15 +100,6 @@ describe('RepoCard (Nexus-style)', () => {
     const { container } = renderCard({ onNavigate })
     await userEvent.click(container.querySelector('.repo-card')!)
     expect(onNavigate).toHaveBeenCalledWith('/repo/kirillzyusko/react-native-keyboard-controller')
-  })
-
-  it('clicking the author subtitle calls onOwnerClick (and not onNavigate)', async () => {
-    const onOwnerClick = vi.fn()
-    const onNavigate = vi.fn()
-    const { container } = renderCard({ onOwnerClick, onNavigate })
-    await userEvent.click(container.querySelector('.repo-card-author')!)
-    expect(onOwnerClick).toHaveBeenCalledWith('kirillzyusko')
-    expect(onNavigate).not.toHaveBeenCalled()
   })
 
   it('clicking the language overlay calls onLanguageClick (and not onNavigate)', async () => {
@@ -139,8 +120,8 @@ describe('RepoCard (Nexus-style)', () => {
     expect(onNavigate).not.toHaveBeenCalled()
   })
 
-  it('applies starred glow class when repo.starred_at is set', () => {
-    const { container } = renderCard({ repo: makeRepo({ starred_at: '2026-01-01' }) })
+  it('applies starred glow class when repo.starredAt is set', () => {
+    const { container } = renderCard({ repo: makeRepo({ starredAt: '2026-01-01' }) })
     expect(container.querySelector('.repo-card')?.classList.contains('repo-card-starred')).toBe(true)
   })
 

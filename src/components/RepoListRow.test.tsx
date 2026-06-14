@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import RepoListRow from './RepoListRow'
-import type { RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
+import { fixtureSavedRepo } from '../test-utils/repoFixtures'
 import { DEFAULT_LAYOUT_PREFS } from './LayoutDropdown'
 import type { ListDensity, ListFields } from './LayoutDropdown'
 import { SavedReposProvider } from '../contexts/SavedRepos'
@@ -59,50 +60,25 @@ function makeApi() {
   })
 }
 
-const baseRepo: RepoRow = {
-  id: 'abc123',
+const baseRepo: SavedRepo = fixtureSavedRepo({
+  hostNativeId: 'abc123',
+  fullName: 'vercel/next.js',
   owner: 'vercel',
   name: 'next.js',
   description: 'The React framework for production',
   language: 'TypeScript',
   stars: 120000,
   forks: 25000,
-  open_issues: 500,
+  openIssues: 500,
   watchers: 120000,
   size: 50000,
   license: 'MIT',
-  topics: '[]',
-  updated_at: '2024-01-01',
-  saved_at: null,
-  starred_at: null,
-  unstarred_at: null,
-  banner_color: null,
-  discovered_at: null,
-  verification_score: null,
-  verification_tier: null,
-  verification_signals: null,
-  verification_checked_at: null,
-  homepage: null,
-  pushed_at: null,
-  type: null,
-  banner_svg: null,
-  discover_query: null,
-  default_branch: null,
-  avatar_url: null,
-  translated_description: null,
-  translated_description_lang: null,
-  translated_readme: null,
-  translated_readme_lang: null,
-  detected_language: null,
-  type_bucket: null,
-  type_sub: null,
-  og_image_url: null,
-  is_forked: null, update_available: null, update_checked_at: null,
-  upstream_version: null, stored_version: null,
-}
+  topics: [],
+  updatedAt: '2024-01-01',
+})
 
 async function renderRow(
-  overrides: Partial<RepoRow> = {},
+  overrides: Partial<SavedRepo> = {},
   density: ListDensity = 'comfortable',
   fields: ListFields = DEFAULT_LAYOUT_PREFS.fields,
   verificationTier: 'verified' | 'likely' | null = null,
