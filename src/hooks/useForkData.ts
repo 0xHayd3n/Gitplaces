@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
 
 export interface ForkRepoData {
   owner: string
@@ -13,7 +13,7 @@ export interface ForkRepoData {
 
 const cache = new Map<string, ForkRepoData | null>()
 
-function rowToForkData(row: RepoRow): ForkRepoData {
+function rowToForkData(row: SavedRepo): ForkRepoData {
   return {
     owner: row.owner,
     name: row.name,
@@ -21,7 +21,7 @@ function rowToForkData(row: RepoRow): ForkRepoData {
     language: row.language,
     stars: row.stars,
     forks: row.forks,
-    avatarUrl: row.avatar_url ?? `https://github.com/${row.owner}.png?size=200`,
+    avatarUrl: row.ownerAvatarUrl || `https://github.com/${row.owner}.png?size=200`,
   }
 }
 

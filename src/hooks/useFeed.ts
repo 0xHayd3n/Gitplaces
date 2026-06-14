@@ -123,14 +123,14 @@ export function useFeed(): FeedState & { refresh: () => void } {
         ({ owner, name }) =>
           window.api.github.getReleases(owner, name).then(releases =>
             (releases ?? [])
-              .filter(r => r.tag_name && new Date(r.published_at).getTime() > cutoff)
+              .filter(r => r.tagName && new Date(r.publishedAt).getTime() > cutoff)
               .map((r): GitHubFeedEvent => ({
-                id: `release-${owner}-${name}-${r.tag_name}`,
+                id: `release-${owner}-${name}-${r.tagName}`,
                 type: 'ReleaseEvent',
                 actor: { login: owner, avatar_url: `https://github.com/${owner}.png?size=200` },
                 repo: { full_name: `${owner}/${name}` },
-                payload: { release: { tag_name: r.tag_name, name: r.name, body: r.body, prerelease: r.prerelease } },
-                created_at: r.published_at,
+                payload: { release: { tag_name: r.tagName, name: r.name, body: r.body, prerelease: r.prerelease } },
+                created_at: r.publishedAt,
               }))
           ),
       )
