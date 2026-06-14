@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useAppearance, type BackgroundMode } from '../contexts/Appearance'
 import AIPanel from './settings/AIPanel'
 import ConnectorsPanel from './settings/ConnectorsPanel'
+import ConnectionsPanel from './settings/ConnectionsPanel'
 import AIIcon from './settings/shared/AIIcon'
 
-type CategoryId = 'ai' | 'appearance' | 'language' | 'downloads' | 'projects' | 'connectors' | 'updates'
+type CategoryId = 'ai' | 'appearance' | 'language' | 'downloads' | 'projects' | 'connectors' | 'connections' | 'updates'
 
 const BACKGROUND_OPTIONS: { value: BackgroundMode; label: string }[] = [
   { value: 'none', label: 'Default' },
@@ -69,14 +70,23 @@ const UpdatesIcon = () => (
   </svg>
 )
 
+const ConnectionsIcon = () => (
+  <svg {...iconProps}>
+    <rect x="2.5" y="2.5" width="5" height="5" rx="1" />
+    <rect x="8.5" y="8.5" width="5" height="5" rx="1" />
+    <path d="M5 7.5v1 M11 7.5h-1 M5 8.5h6" />
+  </svg>
+)
+
 const CATEGORIES: { id: CategoryId; label: string; icon: ReactNode }[] = [
-  { id: 'ai',         label: 'AI',               icon: <AIIcon /> },
-  { id: 'appearance', label: 'Appearance',        icon: <PaletteIcon /> },
-  { id: 'language',   label: 'Language & Speech', icon: <GlobeIcon /> },
-  { id: 'downloads',  label: 'Downloads',         icon: <DownloadIcon /> },
-  { id: 'projects',   label: 'Projects',          icon: <ProjectsIcon /> },
-  { id: 'connectors', label: 'Connectors',        icon: <ConnectorsIcon /> },
-  { id: 'updates',    label: 'Updates',           icon: <UpdatesIcon /> },
+  { id: 'ai',          label: 'AI',                icon: <AIIcon /> },
+  { id: 'appearance',  label: 'Appearance',        icon: <PaletteIcon /> },
+  { id: 'language',    label: 'Language & Speech', icon: <GlobeIcon /> },
+  { id: 'downloads',   label: 'Downloads',         icon: <DownloadIcon /> },
+  { id: 'projects',    label: 'Projects',          icon: <ProjectsIcon /> },
+  { id: 'connectors',  label: 'Connectors',        icon: <ConnectorsIcon /> },
+  { id: 'connections', label: 'Connections',       icon: <ConnectionsIcon /> },
+  { id: 'updates',     label: 'Updates',           icon: <UpdatesIcon /> },
 ]
 
 export default function Settings() {
@@ -522,7 +532,8 @@ export default function Settings() {
           {activeCategory === 'language'   && renderLanguage()}
           {activeCategory === 'downloads'  && renderDownloads()}
           {activeCategory === 'projects'   && renderProjects()}
-          {activeCategory === 'connectors' && <ConnectorsPanel />}
+          {activeCategory === 'connectors'  && <ConnectorsPanel />}
+          {activeCategory === 'connections' && <ConnectionsPanel />}
           {activeCategory === 'updates'    && renderUpdates()}
         </div>
       </main>
