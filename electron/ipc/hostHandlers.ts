@@ -10,7 +10,7 @@
 // singleton lives in electron/githubLoginPopup.ts. After Task 13 deletes the
 // legacy handlers, only this file owns those interactions.
 
-import { ipcMain, type BrowserWindow } from 'electron'
+import { ipcMain, app, type BrowserWindow } from 'electron'
 import {
   listHosts,
   getHost,
@@ -27,6 +27,9 @@ import { githubUserToUser } from '../providers/github/normalize'
 import { HOST_ID_GITHUB, type HostInstance, type HostType } from '../providers/types'
 import { openLoginPopup, closeLoginPopup } from '../githubLoginPopup'
 import { getDeviceFlowAbort, setDeviceFlowAbort } from '../services/deviceFlowState'
+import { setGitHubUser, clearGitHubUser } from '../store'
+import { getDb } from '../db'
+import { initTopicCache } from '../services/topicCacheService'
 
 interface AddHostInput {
   type: HostType
@@ -81,11 +84,25 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
     if (!provider) throw new Error(`Unknown host: ${hostId}`)
     const rawUser = await provider.getUser(token)
     setToken(hostId, token)
+    // GitHub remains the canonical identity for legacy consumers (createHandlers,
+    // updateService user-filter, skillSync:setup, recommendation owner-filter).
+    // Until Phase 4+ teaches those paths about other hosts, mirror the user
+    // identity into the GitHub-specific slots only for HOST_ID_GITHUB.
+    if (hostId === HOST_ID_GITHUB) {
+      setGitHubUser(rawUser.login, rawUser.avatar_url)
+      const db = getDb(app.getPath('userData'))
+      db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('github_username', rawUser.login)
+    }
     return { user: githubUserToUser(rawUser) }
   })
 
   ipcMain.handle('hosts:clearToken', (_event, hostId: string) => {
     clearToken(hostId)
+    if (hostId === HOST_ID_GITHUB) {
+      clearGitHubUser()
+      const db = getDb(app.getPath('userData'))
+      db.prepare('DELETE FROM settings WHERE key = ?').run('github_username')
+    }
   })
 
   ipcMain.handle('hosts:getConnectedUser', async (_event, hostId: string) => {
@@ -121,6 +138,14 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
       const token = await provider.pollDeviceToken(deviceCode, interval, controller.signal)
       setToken(hostId, token)
       const rawUser = await provider.getUser(token)
+      // GitHub-specific: mirror identity into legacy slots (see hosts:setToken
+      // for the full rationale) and warm the topic cache for Discover.
+      if (hostId === HOST_ID_GITHUB) {
+        setGitHubUser(rawUser.login, rawUser.avatar_url)
+        const db = getDb(app.getPath('userData'))
+        db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('github_username', rawUser.login)
+        initTopicCache(token).catch(() => {}) // Non-blocking
+      }
       return { user: githubUserToUser(rawUser) }
     } finally {
       closeLoginPopup()

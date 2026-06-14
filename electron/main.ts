@@ -115,6 +115,7 @@ import { startSkillSyncService, push as skillSyncPush, pushAll as skillSyncPushA
 import { startNotesSyncService, pushNote as notesSyncPush, pushAllPendingNotes, pullNote } from './services/notesSyncService'
 import { startAgentsBackupSyncService, pushAllPendingAgents } from './services/agentsBackupSyncService'
 import { parseOgImage, isGenericGitHubOg } from './services/ogImageService'
+import { initTopicCache } from './services/topicCacheService'
 import { sanitiseRef } from './sanitiseRef'
 import type { CollectionRow, CollectionRepoRow, SavedRepo } from '../src/types/repo'
 import {
@@ -222,30 +223,9 @@ export function getCollectionDetail(db: Database.Database, id: string): Collecti
   `).all(id) as CollectionRepoRow[]
 }
 
-async function initTopicCache(token: string): Promise<void> {
-  const db = getDb(app.getPath('userData'))
-  const count = db.prepare('SELECT COUNT(*) as n FROM topic_cache').get() as { n: number }
-  const lastFetch = db.prepare(
-    'SELECT fetched_at FROM topic_cache ORDER BY fetched_at DESC LIMIT 1'
-  ).get() as { fetched_at: string } | undefined
-
-  const isStale = !lastFetch ||
-    (Date.now() - new Date(lastFetch.fetched_at).getTime()) > 7 * 24 * 60 * 60 * 1000
-
-  if (count.n === 0 || isStale) {
-    try {
-      const topics = await gh.fetchGitHubTopics(token)
-      const now = new Date().toISOString()
-      const insert = db.prepare('INSERT OR REPLACE INTO topic_cache (topic, fetched_at) VALUES (?, ?)')
-      const insertMany = db.transaction((ts: string[]) => {
-        for (const topic of ts) insert.run(topic, now)
-      })
-      insertMany(topics)
-    } catch {
-      // Non-critical — silently ignore
-    }
-  }
-}
+// initTopicCache was extracted to electron/services/topicCacheService.ts so the
+// hosts:pollDeviceToken handler (electron/ipc/hostHandlers.ts) can warm the
+// cache after login without a circular import on this file.
 
 function getCollectionColors(language: string | null): { color_start: string; color_end: string } {
   switch (language?.toLowerCase()) {
