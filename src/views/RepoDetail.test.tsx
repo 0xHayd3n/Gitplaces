@@ -95,16 +95,6 @@ function setupDetail(
         recordFork: vi.fn().mockResolvedValue(undefined),
         setArchivedAt: vi.fn().mockResolvedValue(undefined),
       },
-      // Other providers that mount during this test still call legacy
-      // window.api.github.* methods that haven't migrated yet:
-      //   - GitHubAuthProvider → getUser (Task 11)
-      //   - SavedReposProvider → getSavedRepos (Task 8)
-      // Keep the mocks here so those contexts can initialise; later tasks
-      // will migrate them and drop the legacy entries.
-      github: {
-        getUser: vi.fn().mockResolvedValue({ login: 'tester' }),
-        getSavedRepos: vi.fn().mockResolvedValue([]),
-      },
       org: {
         getVerified: vi.fn().mockResolvedValue(false),
       },

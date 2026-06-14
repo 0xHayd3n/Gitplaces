@@ -17,8 +17,8 @@ beforeEach(() => {
           faviconUrl: '', domain: 'example.com',
         }),
       },
-      github: {
-        getRepo: vi.fn().mockResolvedValue(null),
+      repo: {
+        get: vi.fn().mockResolvedValue(null),
       },
     },
   })
@@ -719,7 +719,7 @@ describe('GitHub repo link behaviour', () => {
     afterEach(() => { vi.useRealTimers() })
 
     it('shows popover after 300ms hover with repo name', async () => {
-      ;(window.api.github.getRepo as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ;(window.api.repo.get as ReturnType<typeof vi.fn>).mockResolvedValue({
         id: '1', owner: 'facebook', name: 'react',
         description: 'A JS library', stars: 200000, avatar_url: '',
         language: null, topics: '[]', forks: null, license: null,
@@ -739,7 +739,7 @@ describe('GitHub repo link behaviour', () => {
     })
 
     it('hides popover 80ms after mouse leaves', async () => {
-      ;(window.api.github.getRepo as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ;(window.api.repo.get as ReturnType<typeof vi.fn>).mockResolvedValue({
         id: '1', owner: 'facebook', name: 'react',
         description: '', stars: 0, avatar_url: '',
         language: null, topics: '[]', forks: null, license: null,

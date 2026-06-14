@@ -6,9 +6,10 @@ import type { LocalProject } from '../../types/library'
 import RepoCard from '../RepoCard'
 import { useArchivedRepos } from '../../hooks/useArchivedRepos'
 import { recordRecentVisit } from '../../lib/recentVisits'
+import { HOST_ID_GITHUB } from '../../lib/hostIds'
 
 
-// ── Lift a normalized Repo (from window.api.github.getMyRepos) into a
+// ── Lift a normalized Repo (from window.api.repo.getMyRepos) into a
 //    full SavedRepo so it can be passed to <RepoCard /> (which expects
 //    the library-extras shape). SavedRepo's extras are all nullable. ──
 
@@ -160,7 +161,7 @@ export default function TemplateGallery() {
 
   useEffect(() => {
     window.api.create.getTemplates().then(setTemplates).catch(() => {})
-    window.api.github.getMyRepos()
+    window.api.repo.getMyRepos(HOST_ID_GITHUB)
       .then((raw: Repo[]) => setGithubRepos(raw.map(repoToSavedRepo)))
       .catch(() => {})
       .finally(() => setLoading(false))

@@ -3,6 +3,8 @@
 // ReadmeRenderer instances in the same renderer process.
 // Mirrors the structure of linkPreviewFetcher.ts.
 
+import { HOST_ID_GITHUB } from '../lib/hostIds'
+
 export interface GitHubRepoPreview {
   owner:       string
   name:        string
@@ -44,7 +46,7 @@ export async function fetchRepoPreview(owner: string, name: string): Promise<Git
 
   const promise = (async () => {
     try {
-      const row = await window.api.github.getRepo(owner, name)
+      const row = await window.api.repo.get(HOST_ID_GITHUB, owner, name)
       const result: GitHubRepoPreview = row
         ? {
             owner:       owner.toLowerCase(),

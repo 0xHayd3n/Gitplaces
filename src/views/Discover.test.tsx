@@ -33,8 +33,6 @@ function SearchInputShim() {
 //           star, unstar, isStarred, getSaved, getFeed, extractColor, getOgImage }
 //   settings: { getApiKey }
 //   skill: { generate, get, delete }
-// NOTE: window.api.github.{ getSavedRepos, saveRepo } stay mocked for
-// SavedReposProvider, which migrates to window.api.repo in Task 8.
 
 function makeDiscoverApi(overrides?: {
   skillGet?: ReturnType<typeof vi.fn>
@@ -47,10 +45,6 @@ function makeDiscoverApi(overrides?: {
 
   Object.defineProperty(window, 'api', {
     value: {
-      github: {
-        getSavedRepos: vi.fn().mockResolvedValue([]),
-        saveRepo: vi.fn().mockResolvedValue(undefined),
-      },
       db: {
         setStarredAt: vi.fn().mockResolvedValue(undefined),
         cacheTranslatedDescription: vi.fn().mockResolvedValue(undefined),
