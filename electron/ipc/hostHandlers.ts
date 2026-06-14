@@ -29,6 +29,7 @@ import { getDeviceFlowAbort, setDeviceFlowAbort } from '../services/deviceFlowSt
 import { setGitHubUser, clearGitHubUser } from '../store'
 import { getDb } from '../db'
 import { initTopicCache } from '../services/topicCacheService'
+import { getServerVersion as getGitLabServerVersion } from '../providers/gitlab/rest'
 
 interface AddHostInput {
   type: HostType
@@ -71,10 +72,20 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
   })
 
   ipcMain.handle('hosts:probe', async (_event, input: ProbeInput): Promise<ProbeResult> => {
-    if (input.type === 'github' && input.baseUrl === 'https://api.github.com') {
-      return { ok: true }
+    if (input.type === 'github') {
+      if (input.baseUrl === 'https://api.github.com') return { ok: true }
+      return { ok: false, error: 'GitHub Enterprise probes are not supported yet' }
     }
-    // GitLab + Gitea probe paths land with their providers in Phases 4-5.
+
+    if (input.type === 'gitlab') {
+      const v = await getGitLabServerVersion(input.baseUrl)
+      if (v && typeof v.version === 'string' && v.version.length > 0) {
+        return { ok: true }
+      }
+      return { ok: false, error: `${input.baseUrl} did not respond as a GitLab instance (no /api/v4/version)` }
+    }
+
+    // Gitea lands in Phase 5.
     return { ok: false, error: `Probe not implemented for host type "${input.type}" yet` }
   })
 
