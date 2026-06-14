@@ -5,20 +5,24 @@ import App from './App'
 function makeApi(overrides: Partial<typeof window.api> = {}) {
   return {
     windowControls: { minimize: vi.fn(), maximize: vi.fn(), close: vi.fn() },
-    github: {
+    hosts: {
       startDeviceFlow: vi.fn(), pollDeviceToken: vi.fn(), cancelDeviceFlow: vi.fn(),
       openLoginPopup: vi.fn().mockResolvedValue(undefined),
-      getUser: vi.fn(), getStarred: vi.fn().mockResolvedValue(undefined),
-      disconnect: vi.fn(),
-      getSavedRepos: vi.fn().mockResolvedValue([]),
-      getFeedRepos: vi.fn().mockResolvedValue([]),
-      saveRepo: vi.fn().mockResolvedValue(undefined),
-      searchRepos: vi.fn().mockResolvedValue([]),
-      getRepo: vi.fn().mockResolvedValue(null),
+      getConnectedUser: vi.fn().mockResolvedValue(null),
+      clearToken: vi.fn().mockResolvedValue(undefined),
+    },
+    repo: {
+      getMyStarred: vi.fn().mockResolvedValue([]),
+      getSaved: vi.fn().mockResolvedValue([]),
+      getFeed: vi.fn().mockResolvedValue([]),
+      save: vi.fn().mockResolvedValue(undefined),
+      search: vi.fn().mockResolvedValue([]),
+      get: vi.fn().mockResolvedValue(null),
       getReadme: vi.fn().mockResolvedValue(null),
       getReleases: vi.fn().mockResolvedValue([]),
       getCompare: vi.fn().mockResolvedValue(null),
-      getRelatedRepos: vi.fn().mockResolvedValue([]),
+      getRelated: vi.fn().mockResolvedValue([]),
+      getRecommended: vi.fn().mockResolvedValue({ items: [], hasMore: false }),
     },
     settings: {
       get: vi.fn().mockResolvedValue(null),
@@ -95,7 +99,7 @@ describe('App onboarding gate', () => {
     window.api.settings.get = vi.fn().mockResolvedValue('1')
     render(<App />)
     await waitFor(() => {
-      expect(window.api.github.getStarred).toHaveBeenCalled()
+      expect(window.api.repo.getMyStarred).toHaveBeenCalledWith('gh:api.github.com')
     })
   })
 
@@ -103,6 +107,6 @@ describe('App onboarding gate', () => {
     window.api.settings.get = vi.fn().mockResolvedValue(null)
     render(<App />)
     await waitFor(() => screen.getByTestId('onboarding-screen-0'))
-    expect(window.api.github.getStarred).not.toHaveBeenCalled()
+    expect(window.api.repo.getMyStarred).not.toHaveBeenCalled()
   })
 })

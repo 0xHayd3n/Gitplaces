@@ -16,10 +16,11 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 function makeApi(overrides = {}) {
   let connected = false
+  const user = { login: 'alice', avatarUrl: '', publicRepos: 5 }
   return {
     openExternal: vi.fn().mockResolvedValue(undefined),
     windowControls: { minimize: vi.fn(), maximize: vi.fn(), close: vi.fn() },
-    github: {
+    hosts: {
       startDeviceFlow: vi.fn().mockResolvedValue({
         deviceCode: 'dev-code',
         userCode: 'ABCD-1234',
@@ -28,15 +29,14 @@ function makeApi(overrides = {}) {
         expiresIn: 900,
         interval: 5,
       }),
-      pollDeviceToken: vi.fn(async () => { connected = true }),
+      pollDeviceToken: vi.fn(async () => { connected = true; return { user } }),
       cancelDeviceFlow: vi.fn().mockResolvedValue(undefined),
       openLoginPopup: vi.fn().mockResolvedValue(undefined),
-      getUser: vi.fn(async () => {
-        if (!connected) throw new Error('not connected')
-        return { login: 'alice', avatarUrl: '', publicRepos: 5 }
-      }),
-      getStarred: vi.fn().mockResolvedValue(undefined),
-      disconnect: vi.fn(),
+      getConnectedUser: vi.fn(async () => connected ? user : null),
+      clearToken: vi.fn().mockResolvedValue(undefined),
+    },
+    repo: {
+      getMyStarred: vi.fn().mockResolvedValue([]),
     },
     settings: {
       get: vi.fn().mockResolvedValue('5'),
@@ -128,7 +128,7 @@ describe('Screen 1 — Connect GitHub', () => {
   it('Connect starts the device flow and shows the user code', async () => {
     fireEvent.click(screen.getByText('Connect'))
     await waitFor(() => {
-      expect(window.api.github.startDeviceFlow).toHaveBeenCalled()
+      expect(window.api.hosts.startDeviceFlow).toHaveBeenCalledWith('gh:api.github.com')
       expect(screen.getByText('ABCD-1234')).toBeInTheDocument()
     })
   })
@@ -136,8 +136,8 @@ describe('Screen 1 — Connect GitHub', () => {
   it('after approval, Continue becomes enabled and shows connected state', async () => {
     fireEvent.click(screen.getByText('Connect'))
     await waitFor(() => {
-      expect(window.api.github.pollDeviceToken).toHaveBeenCalledWith('dev-code', 5)
-      expect(window.api.github.getUser).toHaveBeenCalled()
+      expect(window.api.hosts.pollDeviceToken).toHaveBeenCalledWith('gh:api.github.com', 'dev-code', 5)
+      expect(window.api.hosts.getConnectedUser).toHaveBeenCalled()
     })
     await waitFor(() => {
       expect(screen.getByText('Continue →')).not.toBeDisabled()
@@ -155,13 +155,13 @@ describe('Screen 1 — Connect GitHub', () => {
 
 describe('Device flow cleanup', () => {
   it('cancels in-flight device flow on unmount', async () => {
-    window.api.github.pollDeviceToken = vi.fn(() => new Promise(() => {})) // never resolves
+    window.api.hosts.pollDeviceToken = vi.fn(() => new Promise(() => {})) // never resolves
     const { unmount } = renderOnboarding()
     fireEvent.click(screen.getByText('Connect GitHub →'))
     fireEvent.click(screen.getByRole('button', { name: 'Connect' }))
-    await waitFor(() => expect(window.api.github.startDeviceFlow).toHaveBeenCalled())
+    await waitFor(() => expect(window.api.hosts.startDeviceFlow).toHaveBeenCalled())
     unmount()
-    expect(window.api.github.cancelDeviceFlow).toHaveBeenCalled()
+    expect(window.api.hosts.cancelDeviceFlow).toHaveBeenCalled()
   })
 })
 
@@ -171,7 +171,7 @@ describe('Screen 2 — Done', () => {
     renderOnboarding()
     fireEvent.click(screen.getByText('Connect GitHub →'))
     fireEvent.click(screen.getByText('Connect'))
-    await waitFor(() => expect(window.api.github.pollDeviceToken).toHaveBeenCalled())
+    await waitFor(() => expect(window.api.hosts.pollDeviceToken).toHaveBeenCalled())
     await waitFor(() => {
       const btn = screen.getByText('Continue →')
       if ((btn as HTMLButtonElement).disabled) throw new Error('still disabled')
@@ -202,7 +202,7 @@ describe('Screen 2 — Done', () => {
     await goToScreen2()
     fireEvent.click(screen.getByText('Open Git Suite →'))
     await waitFor(() => {
-      expect(window.api.github.getStarred).toHaveBeenCalled()
+      expect(window.api.repo.getMyStarred).toHaveBeenCalledWith('gh:api.github.com')
     })
   })
 })

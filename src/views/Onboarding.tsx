@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGitHubAuth } from '../contexts/GitHubAuth'
 import { useGitHubLogin } from '../hooks/useGitHubLogin'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 // ── Background SVG for Screen 0 ─────────────────────────────────
 function BackgroundSVG() {
@@ -133,7 +134,7 @@ function ConnectScreen({
 
   function handleOpenVerification() {
     const url = verificationUriComplete ?? verificationUri
-    if (url) window.api.github.openLoginPopup(url).catch(() => {})
+    if (url) window.api.hosts.openLoginPopup(HOST_ID_GITHUB, url).catch(() => {})
   }
 
   const btnLabel =
@@ -236,7 +237,7 @@ function DoneScreen() {
 
   useEffect(() => {
     async function syncAndLoad() {
-      await window.api.github.getStarred().catch(() => {})
+      await window.api.repo.getMyStarred(HOST_ID_GITHUB).catch(() => {})
       const val = await window.api.settings.get('starred_repo_count').catch(() => null)
       setRepoCount(val ?? '0')
     }
@@ -245,7 +246,7 @@ function DoneScreen() {
 
   async function handleOpen() {
     await window.api.settings.set('onboarding_complete', '1')
-    window.api.github.getStarred().catch(() => {})
+    window.api.repo.getMyStarred(HOST_ID_GITHUB).catch(() => {})
     navigate('/discover')
   }
 

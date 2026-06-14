@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useGitHubAuth } from '../contexts/GitHubAuth'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 export type LoginStatus = 'idle' | 'pending' | 'polling' | 'success' | 'error'
 
@@ -26,7 +27,7 @@ export function useGitHubLogin(): UseGitHubLoginResult {
   useEffect(() => {
     return () => {
       if (activeRef.current) {
-        window.api.github.cancelDeviceFlow()?.catch?.(() => {})
+        window.api.hosts.cancelDeviceFlow(HOST_ID_GITHUB)?.catch?.(() => {})
       }
     }
   }, [])
@@ -39,12 +40,12 @@ export function useGitHubLogin(): UseGitHubLoginResult {
     setStatus('pending')
     activeRef.current = true
     try {
-      const flow = await window.api.github.startDeviceFlow()
+      const flow = await window.api.hosts.startDeviceFlow(HOST_ID_GITHUB)
       setUserCode(flow.userCode)
       setVerificationUri(flow.verificationUri)
       setVerificationUriComplete(flow.verificationUriComplete)
       setStatus('polling')
-      await window.api.github.pollDeviceToken(flow.deviceCode, flow.interval)
+      await window.api.hosts.pollDeviceToken(HOST_ID_GITHUB, flow.deviceCode, flow.interval)
       await refresh()
       window.api.settings.set('onboarding_complete', '1').catch(() => {})
       setStatus('success')
@@ -70,7 +71,7 @@ export function useGitHubLogin(): UseGitHubLoginResult {
 
   const cancel = useCallback(async () => {
     if (!activeRef.current) return
-    await window.api.github.cancelDeviceFlow()?.catch?.(() => {})
+    await window.api.hosts.cancelDeviceFlow(HOST_ID_GITHUB)?.catch?.(() => {})
     activeRef.current = false
     setStatus('idle')
     setUserCode(null)

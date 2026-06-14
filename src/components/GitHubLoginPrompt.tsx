@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useGitHubLogin } from '../hooks/useGitHubLogin'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 import './GitHubLoginPrompt.css'
 
 export default function GitHubLoginPrompt() {
@@ -21,7 +22,7 @@ export default function GitHubLoginPrompt() {
 
   function handleOpen() {
     const url = verificationUriComplete ?? verificationUri
-    if (url) window.api.github.openLoginPopup(url).catch(() => {})
+    if (url) window.api.hosts.openLoginPopup(HOST_ID_GITHUB, url).catch(() => {})
   }
 
   return (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useGitHubAuth } from '../../contexts/GitHubAuth'
 import { useGitHubLogin } from '../../hooks/useGitHubLogin'
+import { HOST_ID_GITHUB } from '../../lib/hostIds'
 
 export default function ConnectorsPanel() {
   const auth = useGitHubAuth()
@@ -63,7 +64,7 @@ export default function ConnectorsPanel() {
     githubLogin.reset()
     setGithubDisconnecting(true)
     try {
-      await window.api.github.disconnect()
+      await window.api.hosts.clearToken(HOST_ID_GITHUB)
       await auth.refresh()
     } finally {
       setGithubDisconnecting(false)
@@ -118,7 +119,7 @@ export default function ConnectorsPanel() {
                     <span className="connector-code">{githubUserCode}</span>
                     <button className="settings-btn" onClick={() => {
                       const url = githubVerificationUriComplete ?? githubVerificationUri
-                      if (url) window.api.github.openLoginPopup(url).catch(() => {})
+                      if (url) window.api.hosts.openLoginPopup(HOST_ID_GITHUB, url).catch(() => {})
                     }}>
                       Open login window
                     </button>

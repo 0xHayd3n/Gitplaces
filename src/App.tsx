@@ -10,6 +10,7 @@ import { RepoNavProvider } from './contexts/RepoNav'
 import { AppearanceProvider, useAppearance } from './contexts/Appearance'
 import { GitHubAuthProvider } from './contexts/GitHubAuth'
 import { LearningProgressProvider } from './contexts/LearningProgressContext'
+import { HOST_ID_GITHUB } from './lib/hostIds'
 import ProfileOverlay from './components/ProfileOverlay'
 import Titlebar from './components/Titlebar'
 import Dock from './components/Dock'
@@ -60,7 +61,7 @@ function AppContent() {
       if (val !== '1') {
         navigate('/onboarding')
       } else {
-        window.api.github.getStarred().catch(() => {})
+        window.api.repo.getMyStarred(HOST_ID_GITHUB).catch(() => {})
       }
     }).catch(() => {
       navigate('/onboarding')
