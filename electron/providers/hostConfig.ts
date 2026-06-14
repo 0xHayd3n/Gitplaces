@@ -76,15 +76,18 @@ export function removeHost(id: string): void {
   writeAll(readAll().filter(h => h.id !== id))
 }
 
+const DEFAULT_HOSTS: ReadonlyArray<Omit<HostInstance, 'addedAt'>> = [
+  { id: HOST_ID_GITHUB, type: 'github', baseUrl: 'https://api.github.com', label: 'GitHub' },
+  { id: 'gl:gitlab.com', type: 'gitlab', baseUrl: 'https://gitlab.com', label: 'GitLab.com' },
+]
+
 export function seedDefaultHosts(): void {
   const list = readAll()
-  if (list.some(h => h.id === HOST_ID_GITHUB)) return
-  const seeded: HostInstance = {
-    id: HOST_ID_GITHUB,
-    type: 'github',
-    baseUrl: 'https://api.github.com',
-    label: 'GitHub',
-    addedAt: new Date().toISOString(),
+  const additions: HostInstance[] = []
+  const now = new Date().toISOString()
+  for (const def of DEFAULT_HOSTS) {
+    if (list.some(h => h.id === def.id)) continue
+    additions.push({ ...def, addedAt: now })
   }
-  writeAll([...list, seeded])
+  if (additions.length > 0) writeAll([...list, ...additions])
 }
