@@ -1,13 +1,14 @@
 // src/hooks/useRepoStats.test.ts
 import { renderHook, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 import type { RepoStats } from '../types/repoStats'
 
 const mockGetRepoStats = vi.fn()
 
 beforeAll(() => {
   Object.defineProperty(window, 'api', {
-    value: { github: { getRepoStats: mockGetRepoStats } },
+    value: { repo: { getRepoStats: mockGetRepoStats } },
     configurable: true,
   })
 })
@@ -42,28 +43,28 @@ const mockStats: RepoStats = {
 
 describe('useRepoStats', () => {
   it('returns loading immediately without calling IPC when owner is undefined', () => {
-    const { result } = renderHook(() => useRepoStats(undefined, 'repo'))
+    const { result } = renderHook(() => useRepoStats(HOST_ID_GITHUB, undefined, 'repo'))
     expect(result.current).toBe('loading')
     expect(mockGetRepoStats).not.toHaveBeenCalled()
   })
 
   it('transitions from loading to stats on success', async () => {
     mockGetRepoStats.mockResolvedValueOnce(mockStats)
-    const { result } = renderHook(() => useRepoStats('owner', 'repo'))
+    const { result } = renderHook(() => useRepoStats(HOST_ID_GITHUB, 'owner', 'repo'))
     expect(result.current).toBe('loading')
     await waitFor(() => expect(result.current).toEqual(mockStats))
   })
 
   it('transitions to error when IPC rejects', async () => {
     mockGetRepoStats.mockRejectedValueOnce(new Error('network'))
-    const { result } = renderHook(() => useRepoStats('owner', 'repo'))
+    const { result } = renderHook(() => useRepoStats(HOST_ID_GITHUB, 'owner', 'repo'))
     await waitFor(() => expect(result.current).toBe('error'))
   })
 
   it('shows loading skeleton when navigating to a different repo', async () => {
     mockGetRepoStats.mockResolvedValueOnce(mockStats)
     const { result, rerender } = renderHook(
-      ({ owner, name }: { owner: string; name: string }) => useRepoStats(owner, name),
+      ({ owner, name }: { owner: string; name: string }) => useRepoStats(HOST_ID_GITHUB, owner, name),
       { initialProps: { owner: 'a', name: 'r1' } },
     )
     await waitFor(() => expect(result.current).toEqual(mockStats))
@@ -83,7 +84,7 @@ describe('useRepoStats', () => {
   it('fetches stats exactly once per repo (no second fetch tied to releases)', async () => {
     mockGetRepoStats.mockResolvedValue(mockStats)
     const { rerender } = renderHook(
-      ({ owner, name }: { owner: string; name: string }) => useRepoStats(owner, name),
+      ({ owner, name }: { owner: string; name: string }) => useRepoStats(HOST_ID_GITHUB, owner, name),
       { initialProps: { owner: 'owner', name: 'repo' } },
     )
     // Re-render the same repo a few times — should not trigger more IPC calls.

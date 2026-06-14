@@ -10,6 +10,7 @@ GlobalWorkerOptions.workerSrc = new URL(
 ).toString()
 
 interface Props {
+  hostId: string
   owner: string
   name: string
   branch: string
@@ -22,7 +23,7 @@ const PAGE_BUFFER = 2 // render this many pages above/below viewport
 const DEFAULT_W = 612
 const DEFAULT_H = 792
 
-export default function PdfViewer({ owner, name, branch, path }: Props) {
+export default function PdfViewer({ hostId, owner, name, branch, path }: Props) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -67,7 +68,7 @@ export default function PdfViewer({ owner, name, branch, path }: Props) {
     ;(async () => {
       try {
         // Fetch raw binary through main process IPC (15 s timeout built in)
-        const buf: ArrayBuffer = await window.api.github.getRawFile(owner, name, branch, path)
+        const buf: ArrayBuffer = await window.api.repo.getRawFile(hostId, owner, name, branch, path)
         if (cancelled) return
 
         const data = new Uint8Array(buf)
@@ -112,7 +113,7 @@ export default function PdfViewer({ owner, name, branch, path }: Props) {
       pdfRef.current?.destroy()
       pdfRef.current = null
     }
-  }, [owner, name, branch, path])
+  }, [hostId, owner, name, branch, path])
 
   // Get dimensions for a page — returns known dims or the default
   const getDim = useCallback((pageNum: number) => {

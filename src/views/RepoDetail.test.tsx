@@ -78,23 +78,32 @@ function setupDetail(
     : vi.fn().mockResolvedValue(userEvents)
   Object.defineProperty(window, 'api', {
     value: {
-      github: {
-        fetchRepoBundle: vi.fn().mockResolvedValue(null),
-        getRepo: vi.fn().mockResolvedValue(repoRow),
+      repo: {
+        fetchBundle: vi.fn().mockResolvedValue(null),
+        get: vi.fn().mockResolvedValue(repoRow),
         getReleases: releasesFn,
-        getRelatedRepos: vi.fn().mockResolvedValue(relatedRepos),
+        getRelated: vi.fn().mockResolvedValue(relatedRepos),
         getReadme: vi.fn().mockResolvedValue(null),
-        saveRepo: vi.fn().mockResolvedValue(undefined),
-        searchRepos: vi.fn().mockResolvedValue([]),
-        getSavedRepos: vi.fn().mockResolvedValue([]),
-        starRepo: vi.fn().mockResolvedValue(undefined),
-        unstarRepo: vi.fn().mockResolvedValue(undefined),
+        save: vi.fn().mockResolvedValue(undefined),
+        search: vi.fn().mockResolvedValue([]),
+        getSaved: vi.fn().mockResolvedValue([]),
+        star: vi.fn().mockResolvedValue(undefined),
+        unstar: vi.fn().mockResolvedValue(undefined),
         isStarred: vi.fn().mockResolvedValue(false),
-        getUser: vi.fn().mockResolvedValue({ login: 'tester' }),
         getRepoUserEvents: userEventsFn,
         getRepoStats: vi.fn().mockResolvedValue('loading'),
         recordFork: vi.fn().mockResolvedValue(undefined),
         setArchivedAt: vi.fn().mockResolvedValue(undefined),
+      },
+      // Other providers that mount during this test still call legacy
+      // window.api.github.* methods that haven't migrated yet:
+      //   - GitHubAuthProvider → getUser (Task 11)
+      //   - SavedReposProvider → getSavedRepos (Task 8)
+      // Keep the mocks here so those contexts can initialise; later tasks
+      // will migrate them and drop the legacy entries.
+      github: {
+        getUser: vi.fn().mockResolvedValue({ login: 'tester' }),
+        getSavedRepos: vi.fn().mockResolvedValue([]),
       },
       org: {
         getVerified: vi.fn().mockResolvedValue(false),

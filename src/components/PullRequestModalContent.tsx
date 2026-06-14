@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import type { GitHubFeedEvent } from '../hooks/useFeed'
 import { stripMentionsAndRefs } from '../utils/stripMentionsAndRefs'
 import { CompareSummary } from './CompareSummary'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 const ReadmeRenderer = lazy(() => import('./ReadmeRenderer'))
 
@@ -35,6 +36,7 @@ export function PullRequestModalContent({ event }: Props) {
         </Suspense>
       )}
       <CompareSummary
+        hostId={HOST_ID_GITHUB}
         owner={owner ?? ''}
         repo={repo ?? ''}
         base={pr.base.sha}

@@ -8,6 +8,9 @@ import './RepoStatsSidebar.css'
 
 interface Props {
   stats: RepoStats | 'loading' | 'error'
+  /** Host id passed through so the Momentum section can route its IPC call
+   *  to the correct provider — added in Phase 3 multi-host migration. */
+  hostId: string
   /** Owner/name passed through so the Momentum section can lazily fetch its
    *  own data on first expand — see Phase 1C in the GitHub-call reduction work. */
   owner?: string
@@ -80,7 +83,7 @@ function computeVerdict(stats: RepoStats): Verdict {
   return { label: 'Stable', color: 'var(--t2)', sub: 'No critical signals' }
 }
 
-export function RepoStatsSidebar({ stats, owner, name }: Props) {
+export function RepoStatsSidebar({ stats, hostId, owner, name }: Props) {
   if (stats === 'loading') return <StatsSidebarSkeleton />
   if (stats === 'error')   return <div className="stats-sidebar-error">Failed to load stats.</div>
 
@@ -166,7 +169,7 @@ export function RepoStatsSidebar({ stats, owner, name }: Props) {
       <div className="stats-divider" />
 
       {/* ── Momentum (lazy — fetched on first expand) ── */}
-      <MomentumSection owner={owner} name={name} />
+      <MomentumSection hostId={hostId} owner={owner} name={name} />
 
       <div className="stats-divider" />
 
@@ -322,9 +325,9 @@ function CollapsibleSection({
 // once the user expands this section. Defaults closed so a user who never
 // opens it pays zero GitHub calls for momentum (and the endpoint is the
 // heaviest in the bundle, often returning 202 = "still computing").
-function MomentumSection({ owner, name }: { owner?: string; name?: string }) {
+function MomentumSection({ hostId, owner, name }: { hostId: string; owner?: string; name?: string }) {
   const [hasOpened, setHasOpened] = useState(false)
-  const momentum = useRepoMomentum(owner, name, hasOpened)
+  const momentum = useRepoMomentum(hostId, owner, name, hasOpened)
 
   return (
     <CollapsibleSection

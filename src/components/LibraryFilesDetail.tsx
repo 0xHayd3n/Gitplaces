@@ -78,6 +78,7 @@ export default function LibraryFilesDetail({ row, onToggleActive, onInstalled }:
       <div className="lib-files-body">
         <RepoNavProvider>
           <FilesTab
+            hostId={row.hostId}
             owner={row.owner}
             name={row.name}
             branch={row.defaultBranch || 'main'}

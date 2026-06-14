@@ -2,6 +2,7 @@ import { useCompare } from '../hooks/useCompare'
 import './CompareSummary.css'
 
 interface Props {
+  hostId: string
   owner: string
   repo: string
   // Either a real base ref (compare) or null when this is a first-release
@@ -20,7 +21,7 @@ function fileStatusLabel(status: string): string {
   }
 }
 
-export function CompareSummary({ owner, repo, base, head }: Props) {
+export function CompareSummary({ hostId, owner, repo, base, head }: Props) {
   // First release: no compare to fetch, just show a "first release" pill
   // linking to the commits page.
   if (base === null) {
@@ -35,11 +36,11 @@ export function CompareSummary({ owner, repo, base, head }: Props) {
     )
   }
 
-  return <CompareSummaryFetched owner={owner} repo={repo} base={base} head={head} />
+  return <CompareSummaryFetched hostId={hostId} owner={owner} repo={repo} base={base} head={head} />
 }
 
-function CompareSummaryFetched({ owner, repo, base, head }: { owner: string; repo: string; base: string; head: string }) {
-  const { data, loading, error } = useCompare(owner, repo, base, head)
+function CompareSummaryFetched({ hostId, owner, repo, base, head }: { hostId: string; owner: string; repo: string; base: string; head: string }) {
+  const { data, loading, error } = useCompare(hostId, owner, repo, base, head)
   const fallbackUrl = `https://github.com/${owner}/${repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`
 
   if (loading) {

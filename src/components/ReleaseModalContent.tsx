@@ -5,6 +5,7 @@ import { stripMentionsAndRefs } from '../utils/stripMentionsAndRefs'
 import { formatBytes } from '../utils/formatBytes'
 import { sanitiseRef } from '../../electron/sanitiseRef'
 import { CompareSummary } from './CompareSummary'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 const ReadmeRenderer = lazy(() => import('./ReadmeRenderer'))
 
@@ -101,6 +102,7 @@ export function ReleaseModalContent({ event, onLearnVersion, learnState, already
       )}
       {compare && compare.kind === 'compare' && (
         <CompareSummary
+          hostId={HOST_ID_GITHUB}
           owner={compare.owner}
           repo={compare.repo}
           base={compare.base}

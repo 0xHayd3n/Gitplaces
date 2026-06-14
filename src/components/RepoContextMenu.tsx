@@ -10,13 +10,14 @@ export interface RepoContextMenuTarget {
 }
 
 interface Props {
+  hostId: string
   x: number
   y: number
   target: RepoContextMenuTarget
   onClose: () => void
 }
 
-export default function RepoContextMenu({ x, y, target, onClose }: Props) {
+export default function RepoContextMenu({ hostId, x, y, target, onClose }: Props) {
   const menuRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -43,9 +44,9 @@ export default function RepoContextMenu({ x, y, target, onClose }: Props) {
   const handleToggleStar = async () => {
     try {
       if (target.isStarred) {
-        await window.api.github.unstarRepo(target.owner, target.name)
+        await window.api.repo.unstar(hostId, target.owner, target.name)
       } else {
-        await window.api.github.starRepo(target.owner, target.name)
+        await window.api.repo.star(hostId, target.owner, target.name)
       }
       window.dispatchEvent(new CustomEvent('library:changed'))
       onClose()

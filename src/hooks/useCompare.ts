@@ -20,14 +20,14 @@ const cache = new Map<string, CompareSummaryData | null>()
 // React strict-mode's double-mount) into a single IPC round-trip.
 const inflight = new Map<string, Promise<CompareSummaryData | null>>()
 
-function cacheKey(owner: string, repo: string, base: string, head: string): string {
-  return `${owner}/${repo}/${base}...${head}`
+function cacheKey(hostId: string, owner: string, repo: string, base: string, head: string): string {
+  return `${hostId}|${owner}/${repo}/${base}...${head}`
 }
 
-function fetchOnce(key: string, owner: string, repo: string, base: string, head: string): Promise<CompareSummaryData | null> {
+function fetchOnce(key: string, hostId: string, owner: string, repo: string, base: string, head: string): Promise<CompareSummaryData | null> {
   const existing = inflight.get(key)
   if (existing) return existing
-  const promise = window.api.github.getCompare(owner, repo, base, head)
+  const promise = window.api.repo.getCompare(hostId, owner, repo, base, head)
     .then(result => {
       cache.set(key, result)
       return result as CompareSummaryData | null
@@ -44,12 +44,13 @@ function fetchOnce(key: string, owner: string, repo: string, base: string, head:
 }
 
 export function useCompare(
+  hostId: string,
   owner: string,
   repo: string,
   base: string,
   head: string,
 ): { data: CompareSummaryData | null; loading: boolean; error: boolean } {
-  const key = cacheKey(owner, repo, base, head)
+  const key = cacheKey(hostId, owner, repo, base, head)
   const [data, setData] = useState<CompareSummaryData | null>(cache.get(key) ?? null)
   const [loading, setLoading] = useState(!cache.has(key))
   const [error, setError] = useState(false)
@@ -64,14 +65,14 @@ export function useCompare(
     let cancelled = false
     setLoading(true)
     setError(false)
-    fetchOnce(key, owner, repo, base, head).then(result => {
+    fetchOnce(key, hostId, owner, repo, base, head).then(result => {
       if (cancelled) return
       setData(result)
       setError(result === null)
       setLoading(false)
     })
     return () => { cancelled = true }
-  }, [key, owner, repo, base, head])
+  }, [key, hostId, owner, repo, base, head])
 
   return { data, loading, error }
 }

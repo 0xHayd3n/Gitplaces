@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { LastCommitInfo } from '../lib/fileTree/types'
 
 interface UseLastCommitsInput {
+  hostId: string
   repoId: string | null
   owner: string
   name: string
@@ -28,7 +29,7 @@ export function useLastCommits(input: UseLastCommitsInput): UseLastCommitsResult
   useEffect(() => {
     setCache(new Map())
     inFlight.current.clear()
-  }, [input.repoId, input.owner, input.name, input.ref])
+  }, [input.hostId, input.repoId, input.owner, input.name, input.ref])
 
   const request = useCallback((rows: PathSha[]) => {
     if (!input.repoId) return
@@ -42,8 +43,8 @@ export function useLastCommits(input: UseLastCommitsInput): UseLastCommitsResult
     }
     if (missing.length === 0) return
 
-    void window.api.github
-      .getLastCommitsForPaths(input.repoId, input.owner, input.name, input.ref, missing)
+    void window.api.repo
+      .getLastCommitsForPaths(input.hostId, input.repoId, input.owner, input.name, input.ref, missing)
       .then(result => {
         setCache(prev => {
           const next = new Map(prev)
@@ -59,7 +60,7 @@ export function useLastCommits(input: UseLastCommitsInput): UseLastCommitsResult
       .finally(() => {
         for (const r of missing) inFlight.current.delete(r.path)
       })
-  }, [cache, input.repoId, input.owner, input.name, input.ref])
+  }, [cache, input.hostId, input.repoId, input.owner, input.name, input.ref])
 
   const get = useCallback((path: string) => cache.get(path), [cache])
 

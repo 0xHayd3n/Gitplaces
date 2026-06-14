@@ -82,7 +82,7 @@ export default function LibrarySidebar({
   selectedId, selectedLocalPath, collSelectedId = null,
   onSelect, onSelectLocal, onSelectColl, onModeChange,
 }: Props) {
-  const [menu, setMenu] = useState<{ x: number; y: number; target: RepoContextMenuTarget } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; hostId: string; target: RepoContextMenuTarget } | null>(null)
   const collMatch = useMatch('/library/collection/:id')
   const repoMatch = useMatch('/library/repo/:owner/:name')
   const agentMatch = useMatch('/library/agent/:id')
@@ -161,9 +161,9 @@ export default function LibrarySidebar({
   }, [unstarredRows, searchTerm])
 
   const handleRepoContextMenu = useCallback(
-    (e: React.MouseEvent, target: RepoContextMenuTarget) => {
+    (e: React.MouseEvent, hostId: string, target: RepoContextMenuTarget) => {
       e.preventDefault()
-      setMenu({ x: e.clientX, y: e.clientY, target })
+      setMenu({ x: e.clientX, y: e.clientY, hostId, target })
     },
     [],
   )
@@ -337,6 +337,7 @@ export default function LibrarySidebar({
 
       {menu && (
         <RepoContextMenu
+          hostId={menu.hostId}
           x={menu.x}
           y={menu.y}
           target={menu.target}
@@ -353,7 +354,7 @@ interface SidebarRepoRowProps {
   isStarred: boolean
   selected: boolean
   onSelect: (row: SavedRepo, isInstalled: boolean) => void
-  onContextMenu: (e: React.MouseEvent, target: RepoContextMenuTarget) => void
+  onContextMenu: (e: React.MouseEvent, hostId: string, target: RepoContextMenuTarget) => void
 }
 
 const SidebarRepoRow = memo(function SidebarRepoRow({
@@ -366,8 +367,8 @@ const SidebarRepoRow = memo(function SidebarRepoRow({
   const handleClick = useCallback(() => onSelect(row, isInstalled), [onSelect, row.owner, row.name, isInstalled])
   const handleContextMenu = useCallback(
     (e: React.MouseEvent) =>
-      onContextMenu(e, { owner: row.owner, name: row.name, isStarred }),
-    [onContextMenu, row.owner, row.name, isStarred],
+      onContextMenu(e, row.hostId, { owner: row.owner, name: row.name, isStarred }),
+    [onContextMenu, row.hostId, row.owner, row.name, isStarred],
   )
 
   return (

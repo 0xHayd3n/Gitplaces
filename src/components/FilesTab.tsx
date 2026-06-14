@@ -25,6 +25,7 @@ import type { Release } from '../types/repo'
 type ContentPanelEntry = { path: string; mode: string; type: 'blob' | 'tree'; sha: string; size?: number }
 
 interface Props {
+  hostId: string
   owner: string
   name: string
   branch: string
@@ -37,7 +38,7 @@ interface Props {
   } | null
 }
 
-export default function FilesTab({ owner, name, branch, initialPath, repoId, releases, prefetchedTree }: Props) {
+export default function FilesTab({ hostId, owner, name, branch, initialPath, repoId, releases, prefetchedTree }: Props) {
   const [rootTreeSha, setRootTreeSha] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -75,9 +76,9 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
     maxWidth: 600,
   })
 
-  const lastCommits = useLastCommits({ repoId: repoId ?? null, owner, name, ref: branch })
+  const lastCommits = useLastCommits({ hostId, repoId: repoId ?? null, owner, name, ref: branch })
   const gitStatus = useGitStatus({
-    repoId: repoId ?? null, owner, name,
+    hostId, repoId: repoId ?? null, owner, name,
     baseRef: diffBase?.ref ?? null,
     headRef: branch,
   })
@@ -120,19 +121,19 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
     setError(null)
     ;(async () => {
       try {
-        const { rootTreeSha: sha } = await window.api.github.getBranch(owner, name, branch)
+        const { rootTreeSha: sha } = await window.api.repo.getBranch(hostId, owner, name, branch)
         if (cancelled) return
         setRootTreeSha(sha)
-        const entries = await window.api.github.getTree(owner, name, sha)
+        const entries = await window.api.repo.getTree(hostId, owner, name, sha)
         if (cancelled) return
         setTreeData(prev => new Map(prev).set(sha, entries))
       } catch {
         if (branch === 'main') {
           try {
-            const { rootTreeSha: sha } = await window.api.github.getBranch(owner, name, 'master')
+            const { rootTreeSha: sha } = await window.api.repo.getBranch(hostId, owner, name, 'master')
             if (cancelled) return
             setRootTreeSha(sha)
-            const entries = await window.api.github.getTree(owner, name, sha)
+            const entries = await window.api.repo.getTree(hostId, owner, name, sha)
             if (cancelled) return
             setTreeData(prev => new Map(prev).set(sha, entries))
             setLoading(false)
@@ -145,7 +146,7 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
       }
     })()
     return () => { cancelled = true }
-  }, [owner, name, branch, retryKey, prefetchedTree])
+  }, [hostId, owner, name, branch, retryKey, prefetchedTree])
 
   const visibleRows = useMemo(() => {
     if (!rootTreeSha) return []
@@ -181,7 +182,7 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
     if (existing) return existing
     setTreeLoading(prev => new Set(prev).add(sha))
     try {
-      const entries = await window.api.github.getTree(owner, name, sha)
+      const entries = await window.api.repo.getTree(hostId, owner, name, sha)
       setTreeData(prev => new Map(prev).set(sha, entries))
       return entries as TreeEntry[]
     } finally {
@@ -191,7 +192,7 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
         return next
       })
     }
-  }, [owner, name, treeData])
+  }, [hostId, owner, name, treeData])
 
   const handleToggleExpand = useCallback(async (path: string) => {
     const row = visibleRows.find(r => r.path === path)
@@ -225,14 +226,14 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
     if (!isVideoFile(path) && !isPdfFile(path) && (!row.size || row.size <= 1_000_000)) {
       setBlobLoading(true)
       try {
-        const result = await window.api.github.getBlob(owner, name, row.sha)
+        const result = await window.api.repo.getBlob(hostId, owner, name, row.sha)
         setBlobContent(result.content)
         setBlobRawBase64(result.rawBase64)
       } catch { setBlobContent(null) }
       finally { setBlobLoading(false) }
     }
     pushHistory(path)
-  }, [visibleRows, expanded, handleToggleExpand, owner, name])
+  }, [visibleRows, expanded, handleToggleExpand, hostId, owner, name])
 
   const handleRowClick = useCallback((row: VisibleRow, e: React.MouseEvent) => {
     setFocused(row.path)
@@ -473,6 +474,7 @@ export default function FilesTab({ owner, name, branch, initialPath, repoId, rel
           blobContent={blobContent}
           blobRawBase64={blobRawBase64}
           blobLoading={blobLoading}
+          hostId={hostId}
           owner={owner}
           name={name}
           branch={branch}

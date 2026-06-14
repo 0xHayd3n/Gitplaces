@@ -69,6 +69,7 @@ import { RepoStatsSidebar } from '../components/RepoStatsSidebar'
 import type { RepoActivityItem } from '../types/repoActivity'
 import FilesTab from '../components/FilesTab'
 import { useRepoNav } from '../contexts/RepoNav'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 const StorybookExplorer = lazy(() => import('../components/StorybookExplorer'))
 const ComponentExplorer = lazy(() => import('../components/ComponentExplorer'))
 import { isComponentLibraryRepo } from '../utils/componentLibraryDetector'
@@ -539,7 +540,8 @@ function writeSessionCache<T>(map: Map<string, { value: T; ts: number }>, key: s
 }
 
 export default function RepoDetail() {
-  const { owner, name } = useParams<{ owner: string; name: string }>()
+  const { hostId: hostIdParam, owner, name } = useParams<{ hostId?: string; owner: string; name: string }>()
+  const hostId = hostIdParam ? decodeURIComponent(hostIdParam) : HOST_ID_GITHUB
   const navigate = useNavigate()
   const location = useLocation()
   const inLibrary = location.pathname.startsWith('/library/')
@@ -594,7 +596,7 @@ export default function RepoDetail() {
   )
   // User-action events (star / archive / fork / learn) recorded locally by
   // write IPCs; merged with releases below to form the unified Activities feed.
-  const userEvents = useRepoUserEvents(owner, name)
+  const userEvents = useRepoUserEvents(hostId, owner, name)
   const lastReleaseDate = Array.isArray(releases) && releases.length > 0
     ? (releases as Release[])[0].publishedAt
     : null
@@ -605,7 +607,7 @@ export default function RepoDetail() {
   // IPC until the user is actually there. Activities is the default tab so
   // most users still trigger this on first load; users who deep-link to
   // another tab don't pay for stats they never see.
-  const rawRepoStats = useRepoStats(owner, name, activeTab === 'activities')
+  const rawRepoStats = useRepoStats(hostId, owner, name, activeTab === 'activities')
   const repoStats = useMemo(() => {
     if (rawRepoStats === 'loading' || rawRepoStats === 'error') return rawRepoStats
     if (lastReleaseDate === null || rawRepoStats.health.daysSinceCommit === undefined) {
@@ -842,13 +844,13 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     // getRepo + getReleases + isStarred REST calls. On failure we degrade
     // gracefully to the per-endpoint IPCs (which themselves still benefit from
     // ETag and DB caches from Phases 2-3).
-    window.api.github.fetchRepoBundle(owner, name)
+    window.api.repo.fetchBundle(hostId, owner, name)
       .then((bundle) => {
         if (cancelled) return
         if (!bundle) {
           // GraphQL failed (no token, network error, etc.) — fall back to
-          // per-endpoint REST. github:getRepo handles its own DB upsert.
-          window.api.github.getRepo(owner, name)
+          // per-endpoint REST. repo:get handles its own DB upsert.
+          window.api.repo.get(hostId, owner, name)
             .then(row => {
               if (cancelled) return
               if (!row) { setRepoError(true); return }
@@ -858,14 +860,14 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
               window.api.verification.getScore(String(row.hostNativeId))
                 .then(s => { if (!cancelled && s) { setSeedTier(s.tier); setSeedSignals(s.signals) } })
                 .catch(() => {})
-              window.api.github.getRelatedRepos(owner, name, JSON.stringify(row.topics))
+              window.api.repo.getRelated(hostId, owner, name, JSON.stringify(row.topics))
                 .then(items => { if (!cancelled) setRelated(items) })
                 .catch(() => {})
             })
             .catch(() => { if (!cancelled) setRepoError(true) })
           // Fallback live star check — only if session cache doesn't have it.
           if (readSessionCache(_starredCache, cacheKey) === undefined) {
-            window.api.github.isStarred(owner, name)
+            window.api.repo.isStarred(hostId, owner, name)
               .then(s => {
                 if (cancelled) return
                 setStarred(s)
@@ -883,7 +885,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
           if (cachedReleases !== undefined) {
             setReleases(cachedReleases)
           } else {
-            window.api.github.getReleases(owner, name)
+            window.api.repo.getReleases(hostId, owner, name)
               .then(r => {
                 if (cancelled) return
                 if (r === null) {
@@ -920,7 +922,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
         window.api.verification.getScore(String(row.hostNativeId))
           .then(s => { if (!cancelled && s) { setSeedTier(s.tier); setSeedSignals(s.signals) } })
           .catch(() => {})
-        window.api.github.getRelatedRepos(owner, name, JSON.stringify(row.topics))
+        window.api.repo.getRelated(hostId, owner, name, JSON.stringify(row.topics))
           .then(items => { if (!cancelled) setRelated(items) })
           .catch(() => {})
       })
@@ -1072,7 +1074,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     }
 
     let cancelled = false
-    window.api.github.getReleases(owner, name)
+    window.api.repo.getReleases(hostId, owner, name)
       .then((r) => {
         if (cancelled) return
         // The IPC handler returns `null` instead of throwing on network error /
@@ -1168,7 +1170,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
       const ck = `${owner!}/${name!}`
       let raw: string | null
       try {
-        raw = await window.api.github.getReadme(owner!, name!)
+        raw = await window.api.repo.getReadme(hostId, owner!, name!)
       } catch {
         setReadme('error')
         return
@@ -1193,7 +1195,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
         ?? (preferredLang.includes('-') ? langSwitcher[preferredLang.split('-')[0]] : null)
 
       if (switcherPath) {
-        const altContent = await window.api.github.getFileContent(owner!, name!, switcherPath).catch(() => null)
+        const altContent = await window.api.repo.getFileContent(hostId, owner!, name!, switcherPath).catch(() => null)
         if (altContent) {
           const { badges: altBadges, cleaned: altCleaned } = extractBadges(altContent)
           setReadmeBadges(altBadges)
@@ -1266,7 +1268,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   const handleFork = () => {
     if (!owner || !name) return
     void window.api.openExternal(`https://github.com/${owner}/${name}/fork`)
-    void window.api.github.recordFork(owner, name)
+    void window.api.repo.recordFork(hostId, owner, name)
   }
 
   const handleArchive = () => {
@@ -1280,11 +1282,11 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     const cacheKey = `${owner}/${name}`
     try {
       if (starred) {
-        await window.api.github.unstarRepo(owner, name)
+        await window.api.repo.unstar(hostId, owner, name)
         setStarred(false)
         writeSessionCache(_starredCache, cacheKey, false)
       } else {
-        await window.api.github.starRepo(owner, name)
+        await window.api.repo.star(hostId, owner, name)
         setStarred(true)
         writeSessionCache(_starredCache, cacheKey, true)
         window.api.svgCache.prefetch(owner, name, repo?.defaultBranch ?? 'main').catch(() => {})
@@ -1369,7 +1371,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   async function handleVersionLearn(tag: string) {
     setVersionLearnStates(prev => new Map(prev).set(tag, 'LEARNING'))
     try {
-      await window.api.github.saveRepo(owner ?? '', name ?? '')
+      await window.api.repo.save(hostId, owner ?? '', name ?? '')
       await window.api.skill.generate(owner ?? '', name ?? '', { flavour: 'library', ref: tag })
       setVersionedLearns(prev => new Set([...prev, tag]))
       setVersionLearnStates(prev => { const m = new Map(prev); m.delete(tag); return m })
@@ -1534,7 +1536,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   const statsSlotNode = !repoError ? (
     isStatsLoading ? (
       <div className="stats-sidebar">
-        <RepoStatsSidebar stats={repoStats} />
+        <RepoStatsSidebar stats={repoStats} hostId={hostId} />
       </div>
     ) : (
     <div className="stats-sidebar">
@@ -1544,7 +1546,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
       )}
 
       {/* ── Enriched stats sidebar ── */}
-      <RepoStatsSidebar stats={repoStats} owner={owner} name={name} />
+      <RepoStatsSidebar stats={repoStats} hostId={hostId} owner={owner} name={name} />
 
       {/* ── Skills Folder tile (only when learned) ── */}
       {learnState === 'LEARNED' && skillRow && (
@@ -1793,6 +1795,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
 
                 {activeTab === 'files' && repo && (
                   <FilesTab
+                    hostId={hostId}
                     owner={owner ?? ''}
                     name={name ?? ''}
                     branch={repo.defaultBranch ?? 'main'}

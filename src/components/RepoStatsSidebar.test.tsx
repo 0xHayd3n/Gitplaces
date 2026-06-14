@@ -2,14 +2,15 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { RepoStatsSidebar } from './RepoStatsSidebar'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 import type { RepoStats } from '../types/repoStats'
 
-// Momentum is fetched lazily via window.api.github.getRepoMomentum (Phase 1C).
+// Momentum is fetched lazily via window.api.repo.getRepoMomentum (Phase 1C).
 // Stub the IPC so the lazy MomentumSection inside the sidebar can resolve.
 const mockGetRepoMomentum = vi.fn()
 beforeAll(() => {
   Object.defineProperty(window, 'api', {
-    value: { github: { getRepoMomentum: mockGetRepoMomentum } },
+    value: { repo: { getRepoMomentum: mockGetRepoMomentum } },
     configurable: true,
   })
 })
@@ -100,29 +101,29 @@ const middlingStats: RepoStats = {
 
 describe('RepoStatsSidebar', () => {
   it('renders loading skeleton when stats is loading', () => {
-    const { container } = render(<RepoStatsSidebar stats="loading" />)
+    const { container } = render(<RepoStatsSidebar stats="loading" hostId={HOST_ID_GITHUB} />)
     expect(container.querySelector('.stats-sidebar-skeleton')).not.toBeNull()
   })
 
   it('renders error message when stats is error', () => {
-    render(<RepoStatsSidebar stats="error" />)
+    render(<RepoStatsSidebar stats="error" hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText(/failed to load/i)).toBeInTheDocument()
   })
 
   it('renders vitals section labels', () => {
-    render(<RepoStatsSidebar stats={mockStats} />)
+    render(<RepoStatsSidebar stats={mockStats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText(/stars/i)).toBeInTheDocument()
     expect(screen.getByText(/forks/i)).toBeInTheDocument()
     expect(screen.getByText(/contributors/i)).toBeInTheDocument()
   })
 
   it('renders health score', () => {
-    render(<RepoStatsSidebar stats={mockStats} />)
+    render(<RepoStatsSidebar stats={mockStats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText('80')).toBeInTheDocument()
   })
 
   it('renders total vulnerability count when security is available', () => {
-    render(<RepoStatsSidebar stats={mockStats} />)
+    render(<RepoStatsSidebar stats={mockStats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText(/3 vulnerabilit/i)).toBeInTheDocument()
   })
 
@@ -135,47 +136,47 @@ describe('RepoStatsSidebar', () => {
         codeScanning: null, secretScanning: null, alerts: null,
       },
     }
-    render(<RepoStatsSidebar stats={stats} />)
+    render(<RepoStatsSidebar stats={stats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText(/not available/i)).toBeInTheDocument()
   })
 
   it('renders computing label when momentum lazily fetches null (e.g., GitHub returns 202)', async () => {
     mockGetRepoMomentum.mockResolvedValueOnce(null)
-    render(<RepoStatsSidebar stats={mockStats} owner="o" name="r" />)
+    render(<RepoStatsSidebar stats={mockStats} hostId={HOST_ID_GITHUB} owner="o" name="r" />)
     // Momentum section is closed by default — open it to trigger the fetch
     fireEvent.click(screen.getByRole('button', { name: /Momentum/i }))
     await waitFor(() => expect(screen.getByText(/computing/i)).toBeInTheDocument())
   })
 
   it('renders engagement section with skills learned count', () => {
-    render(<RepoStatsSidebar stats={healthyStats} />)
+    render(<RepoStatsSidebar stats={healthyStats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText('2')).toBeInTheDocument()
   })
 
   // Verdict tests
   it('renders "Healthy" verdict for a well-maintained repo with no vulns', () => {
-    render(<RepoStatsSidebar stats={healthyStats} />)
+    render(<RepoStatsSidebar stats={healthyStats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText('Healthy')).toBeInTheDocument()
   })
 
   it('renders "Critical issues" verdict when high vulnerabilities exist', () => {
-    render(<RepoStatsSidebar stats={criticalStats} />)
+    render(<RepoStatsSidebar stats={criticalStats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText('Critical issues')).toBeInTheDocument()
   })
 
   it('renders "Needs attention" verdict for stale repo', () => {
-    render(<RepoStatsSidebar stats={staleStats} />)
+    render(<RepoStatsSidebar stats={staleStats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText('Needs attention')).toBeInTheDocument()
   })
 
   it('renders "Stable" verdict for middling repo with no critical signals', () => {
-    render(<RepoStatsSidebar stats={middlingStats} />)
+    render(<RepoStatsSidebar stats={middlingStats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText('Stable')).toBeInTheDocument()
   })
 
   // Collapse tests
   it('Momentum section is collapsed by default and lazily fetches on first expand', async () => {
-    render(<RepoStatsSidebar stats={healthyStats} owner="o" name="r" />)
+    render(<RepoStatsSidebar stats={healthyStats} hostId={HOST_ID_GITHUB} owner="o" name="r" />)
     // Default closed — content not rendered, no fetch yet
     expect(screen.queryByText(/Commits\/month/i)).not.toBeInTheDocument()
     expect(mockGetRepoMomentum).not.toHaveBeenCalled()
@@ -186,14 +187,14 @@ describe('RepoStatsSidebar', () => {
   })
 
   it('collapses Security section when header is clicked', () => {
-    render(<RepoStatsSidebar stats={healthyStats} />)
+    render(<RepoStatsSidebar stats={healthyStats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText(/Security policy/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Security/i }))
     expect(screen.queryByText(/Security policy/i)).not.toBeInTheDocument()
   })
 
   it('Momentum re-expands when toggled, and the IPC is NOT called a second time', async () => {
-    render(<RepoStatsSidebar stats={healthyStats} owner="o" name="r" />)
+    render(<RepoStatsSidebar stats={healthyStats} hostId={HOST_ID_GITHUB} owner="o" name="r" />)
     const btn = screen.getByRole('button', { name: /Momentum/i })
     fireEvent.click(btn) // open
     await waitFor(() => expect(screen.getByText(/Commits\/month/i)).toBeInTheDocument())
@@ -216,7 +217,7 @@ describe('RepoStatsSidebar', () => {
         codeScanning: null, secretScanning: null, alerts: null,
       },
     }
-    render(<RepoStatsSidebar stats={stats} />)
+    render(<RepoStatsSidebar stats={stats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText(/token lacks permission/i)).toBeInTheDocument()
   })
 
@@ -228,7 +229,7 @@ describe('RepoStatsSidebar', () => {
         dismissedVulnerabilities: { critical: 1, high: 2, moderate: 0, low: 0 },
       },
     }
-    render(<RepoStatsSidebar stats={stats} />)
+    render(<RepoStatsSidebar stats={stats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText(/3 dismissed/i)).toBeInTheDocument()
   })
 
@@ -240,7 +241,7 @@ describe('RepoStatsSidebar', () => {
         codeScanning: { critical: 0, high: 1, medium: 2, low: 0, note: 0, warning: 0 },
       },
     }
-    render(<RepoStatsSidebar stats={stats} />)
+    render(<RepoStatsSidebar stats={stats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText(/3 alerts/i)).toBeInTheDocument()
   })
 
@@ -249,7 +250,7 @@ describe('RepoStatsSidebar', () => {
       ...mockStats,
       security: { ...mockStats.security, hasSecurityPolicy: null, codeScanning: false },
     }
-    render(<RepoStatsSidebar stats={stats} />)
+    render(<RepoStatsSidebar stats={stats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText(/Code scanning/i)).toBeInTheDocument()
     expect(screen.getByText(/● Absent/)).toBeInTheDocument()
   })
@@ -262,7 +263,7 @@ describe('RepoStatsSidebar', () => {
         secretScanning: { active: 2, inactive: 0, unknown: 1 },
       },
     }
-    render(<RepoStatsSidebar stats={stats} />)
+    render(<RepoStatsSidebar stats={stats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText(/2 active/i)).toBeInTheDocument()
   })
 
@@ -274,7 +275,7 @@ describe('RepoStatsSidebar', () => {
         secretScanning: { active: 1, inactive: 0, unknown: 0 },
       },
     }
-    render(<RepoStatsSidebar stats={stats} />)
+    render(<RepoStatsSidebar stats={stats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText('Critical issues')).toBeInTheDocument()
   })
 
@@ -286,7 +287,7 @@ describe('RepoStatsSidebar', () => {
         codeScanning: { critical: 1, high: 0, medium: 0, low: 0, note: 0, warning: 0 },
       },
     }
-    render(<RepoStatsSidebar stats={stats} />)
+    render(<RepoStatsSidebar stats={stats} hostId={HOST_ID_GITHUB} />)
     expect(screen.getByText('Critical issues')).toBeInTheDocument()
   })
 })

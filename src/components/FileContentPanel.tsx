@@ -38,6 +38,7 @@ interface Props {
   blobContent: string | null
   blobRawBase64: string | null
   blobLoading: boolean
+  hostId: string
   owner: string
   name: string
   branch: string
@@ -58,7 +59,7 @@ interface Props {
 
 export default function FileContentPanel({
   selectedPath, selectedEntry, blobContent, blobRawBase64, blobLoading,
-  owner, name, branch,
+  hostId, owner, name, branch,
   onNavigateToFile,
   wordWrap, onToggleWordWrap, lineCount, onLineCountReady,
 }: Props) {
@@ -105,7 +106,7 @@ export default function FileContentPanel({
         <VideoPlayer rawUrl={rawUrl} filename={filename} />
       ) : isPdfFile(filename) && selectedPath ? (
         <Suspense fallback={<div style={{ minHeight: 300 }}>Loading PDF viewer…</div>}>
-          <PdfViewer owner={owner} name={name} branch={branch} path={selectedPath} />
+          <PdfViewer hostId={hostId} owner={owner} name={name} branch={branch} path={selectedPath} />
         </Suspense>
       ) : blobLoading ? (
         <div className="file-content-panel__loading">

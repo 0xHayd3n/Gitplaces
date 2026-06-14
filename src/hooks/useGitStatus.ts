@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { GitFileStatus } from '../lib/fileTree/types'
 
 interface UseGitStatusInput {
+  hostId: string
   repoId: string | null
   owner: string
   name: string
@@ -25,8 +26,8 @@ export function useGitStatus(input: UseGitStatusInput): UseGitStatusResult {
     setError(null)
     if (!input.repoId || !input.baseRef) return
     let cancelled = false
-    window.api.github
-      .compareRefs(input.repoId, input.owner, input.name, input.baseRef, input.headRef)
+    window.api.repo
+      .compareRefs(input.hostId, input.repoId, input.owner, input.name, input.baseRef, input.headRef)
       .then(files => {
         if (cancelled) return
         if (files === null) {
@@ -41,7 +42,7 @@ export function useGitStatus(input: UseGitStatusInput): UseGitStatusResult {
         if (!cancelled) setError('Compare failed')
       })
     return () => { cancelled = true }
-  }, [input.repoId, input.owner, input.name, input.baseRef, input.headRef, retryKey])
+  }, [input.hostId, input.repoId, input.owner, input.name, input.baseRef, input.headRef, retryKey])
 
   return { statusMap, error, retry: () => setRetryKey(k => k + 1) }
 }
