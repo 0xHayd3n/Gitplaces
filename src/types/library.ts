@@ -1,4 +1,4 @@
-import type { SavedRepo, LibrarySavedRepo } from './repo'
+import type { SavedRepo } from './repo'
 
 // Re-export so existing consumers can import LibrarySavedRepo from '../types/library'.
 export type { LibrarySavedRepo } from './repo'

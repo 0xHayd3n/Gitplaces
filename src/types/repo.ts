@@ -1,4 +1,4 @@
-import type { ProviderCapabilities, HostType } from '../../electron/providers/types'
+import type { HostType } from '../../electron/providers/types'
 
 /** Canonical normalized repository shape consumed across the renderer.
  *  Provider-agnostic — Phases 4–5 add GitLab + Gitea providers that produce the same shape. */
@@ -112,77 +112,6 @@ export function formatStars(n: number | null | undefined): string {
   return String(n)
 }
 
-/** @deprecated Use `SavedRepo` from this file. Removed in the Phase 2 finalisation pass. */
-export interface RepoRow {
-  id: string
-  owner: string
-  name: string
-  description: string | null
-  language: string | null
-  topics: string           // JSON string, e.g. '["cli","rust"]'
-  stars: number | null
-  forks: number | null
-  license: string | null
-  homepage: string | null
-  updated_at: string | null
-  pushed_at: string | null
-  saved_at: string | null
-  type: string | null
-  banner_svg: string | null
-  discovered_at: string | null
-  discover_query: string | null
-  watchers: number | null
-  size: number | null
-  open_issues: number | null
-  starred_at: string | null
-  unstarred_at: string | null  // Set when user unstars; cleared on re-star. Powers the Unstarred filter (last 30 days).
-  default_branch: string | null
-  avatar_url: string | null    // owner avatar URL from GitHub API
-  og_image_url: string | null
-  banner_color: string | null  // JSON: {"h":220,"s":0.6,"l":0.18} — derived from avatar
-  // Phase 12 — translation cache
-  translated_description: string | null
-  translated_description_lang: string | null
-  translated_readme: string | null
-  translated_readme_lang: string | null
-  detected_language: string | null
-  // Phase 15 — verification
-  verification_score:      number  | null
-  verification_tier:       string  | null  // 'verified' | 'likely' | null
-  verification_signals:    string  | null  // JSON array of signal names
-  verification_checked_at: number  | null  // Unix timestamp
-  // Phase 16 — nested repo type system
-  type_bucket: string | null  // e.g. "dev-tools"
-  type_sub:    string | null  // e.g. "algorithm"
-  // Phase 23 — update notifications
-  is_forked:         number | null   // 1 if user has a GitHub fork of this repo
-  update_available:  number | null   // 1 if an update has been detected
-  update_checked_at: number | null   // Unix timestamp of last check
-  upstream_version:  string | null   // latest release tag or pushed_at
-  stored_version:    string | null   // version at last save or update
-}
-
-/** @deprecated Use `Release` from this file. Removed in the Phase 2 finalisation pass. */
-export interface ReleaseRow {
-  tag_name: string
-  name: string | null
-  published_at: string
-  body: string | null
-  assets: Array<{
-    name: string
-    size: number
-    browser_download_url: string
-    download_count: number
-  }>
-  prerelease: boolean
-}
-
-/** @deprecated Use `Repo.topics` (already a string[]) from this file. Removed in the Phase 2 finalisation pass. */
-export function parseTopics(topics: string | null): string[] {
-  if (!topics) return []
-  try { return JSON.parse(topics) as string[] } catch { return [] }
-}
-
 export interface SkillRow {
   repo_id: string
   filename: string
@@ -212,20 +141,6 @@ export interface SubSkillRow {
   active: number
 }
 
-/** @deprecated Use `LibrarySavedRepo` from this file. Removed in the Phase 2 finalisation pass.
- *  Returned by library:getAll — repos INNER JOIN skills.
- *  version and generated_at are nullable per DB schema.
- *  content/filename are fetched on-demand via skill:getContent. */
-export interface LibraryRow extends RepoRow {
-  installed: number  // 0 | 1 — whether a skill is installed (always 1 in library:getAll, 0 for uninstalled discover rows)
-  active: number
-  version: string | null
-  generated_at: string | null
-  enabled_components: string | null  // JSON string[] | null; null means all enabled
-  enabled_tools: string | null       // JSON string[] | null; null means all enabled
-  tier?: number  // 1 | 2 — skill generation quality tier
-}
-
 export interface CollectionRow {
   id: string
   name: string
@@ -246,12 +161,6 @@ export interface CollectionRepoRow {
   version: string | null         // from skills.version — null if not installed
   content_size: number | null    // length(skills.content) in bytes — null if not installed
   saved: number                  // 1 if skill installed, 0 if missing
-}
-
-/** @deprecated Use `LibrarySavedRepo` from this file. Removed in the Phase 2 finalisation pass.
- *  Returned by starred:getAll — repos WHERE starred_at IS NOT NULL, LEFT JOIN skills. */
-export interface StarredRepoRow extends RepoRow {
-  installed: number  // 0 or 1 — 1 if a skill exists for this repo
 }
 
 // ── Anatomy engine (renderer-facing; parsed in main via skill:getAnatomy) ──
