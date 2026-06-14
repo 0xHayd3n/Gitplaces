@@ -2504,7 +2504,30 @@ ipcMain.handle('profile:getUser', async (_, username: string) => {
   if (cached && Date.now() - new Date(cached.fetched_at).getTime() < TTL) {
     return JSON.parse(cached.data)
   }
-  const user = await gh.getProfileUser(token, username)
+  const raw = await gh.getProfileUser(token, username) as import('./providers/github').GitHubUser & {
+    name: string | null
+    bio: string | null
+    location: string | null
+    company: string | null
+    blog: string | null
+    created_at: string | null
+    html_url: string
+    followers: number
+    following: number
+  }
+  // Normalize before caching so cache-hit and cache-miss return the same camelCase shape.
+  const user = {
+    ...githubUserToUser(raw),
+    name: raw.name,
+    bio: raw.bio,
+    location: raw.location,
+    company: raw.company,
+    blog: raw.blog,
+    createdAt: raw.created_at,
+    htmlUrl: raw.html_url,
+    followers: raw.followers,
+    following: raw.following,
+  }
   db.prepare('INSERT OR REPLACE INTO profile_cache (username, data, fetched_at) VALUES (?, ?, ?)').run(username, JSON.stringify(user), new Date().toISOString())
   return user
 })
@@ -2512,7 +2535,8 @@ ipcMain.handle('profile:getUser', async (_, username: string) => {
 ipcMain.handle('profile:getUserRepos', async (_, username: string, sort?: string) => {
   const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return gh.getUserRepos(token, username, sort)
+  const repos = await gh.getUserRepos(token, username, sort) as import('./providers/github').GitHubRepo[]
+  return repos.map(githubRepoToRepo)
 })
 
 ipcMain.handle('github:getMyRepos', async () => {
