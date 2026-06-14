@@ -17,71 +17,9 @@ contextBridge.exposeInMainWorld('api', {
     close:    () => ipcRenderer.send('window:close'),
   },
 
-  github: {
-    startDeviceFlow: () => ipcRenderer.invoke('github:startDeviceFlow') as Promise<{
-      deviceCode: string
-      userCode: string
-      verificationUri: string
-      verificationUriComplete: string
-      expiresIn: number
-      interval: number
-    }>,
-    pollDeviceToken: (deviceCode: string, interval: number) =>
-      ipcRenderer.invoke('github:pollDeviceToken', deviceCode, interval),
-    cancelDeviceFlow: () => ipcRenderer.invoke('github:cancelDeviceFlow'),
-    openLoginPopup: (url: string) => ipcRenderer.invoke('github:openLoginPopup', url),
-    getUser:       () => ipcRenderer.invoke('github:getUser'),
-    getStarred:    (force?: boolean) => ipcRenderer.invoke('github:getStarred', force),
-    disconnect:    () => ipcRenderer.invoke('github:disconnect'),
-    searchRepos:   (query: string, sort?: string, order?: string, page?: number) => ipcRenderer.invoke('github:searchRepos', query, sort, order, page),
-    getRepo:       (owner: string, name: string) => ipcRenderer.invoke('github:getRepo', owner, name),
-    getReadme:        (owner: string, name: string) => ipcRenderer.invoke('github:getReadme', owner, name),
-    getFileContent:   (owner: string, name: string, path: string) => ipcRenderer.invoke('github:getFileContent', owner, name, path),
-    getReleases:   (owner: string, name: string) => ipcRenderer.invoke('github:getReleases', owner, name),
-    getRepoUserEvents: (owner: string, name: string) =>
-      ipcRenderer.invoke('github:getRepoUserEvents', owner, name),
-    getRepoStats: (owner: string, name: string) =>
-      ipcRenderer.invoke('github:getRepoStats', owner, name),
-    getRepoMomentum: (owner: string, name: string) =>
-      ipcRenderer.invoke('github:getRepoMomentum', owner, name),
-    fetchRepoBundle: (owner: string, name: string) =>
-      ipcRenderer.invoke('github:fetchRepoBundle', owner, name),
-    recordFork: (owner: string, name: string) =>
-      ipcRenderer.invoke('github:recordFork', owner, name),
-    setArchivedAt: (owner: string, name: string, archived: boolean) =>
-      ipcRenderer.invoke('github:setArchivedAt', owner, name, archived),
-    saveRepo:        (owner: string, name: string) => ipcRenderer.invoke('github:saveRepo', owner, name),
-    getSavedRepos:   () => ipcRenderer.invoke('github:getSavedRepos'),
-    getFeedRepos:    () => ipcRenderer.invoke('github:getFeedRepos'),
-    getMyRepos:      () => ipcRenderer.invoke('github:getMyRepos'),
-    getRelatedRepos: (owner: string, name: string, topicsJson: string) =>
-      ipcRenderer.invoke('github:getRelatedRepos', owner, name, topicsJson),
-    starRepo:   (owner: string, name: string) => ipcRenderer.invoke('github:starRepo', owner, name),
-    unstarRepo: (owner: string, name: string) => ipcRenderer.invoke('github:unstarRepo', owner, name),
-    isStarred:  (owner: string, name: string) => ipcRenderer.invoke('github:isStarred', owner, name),
-    getRecommended: (page?: number, excludeIds?: string[]) =>
-      ipcRenderer.invoke('github:getRecommended', page, excludeIds),
-    getBranch:  (owner: string, name: string, branch: string) => ipcRenderer.invoke('github:getBranch', owner, name, branch),
-    getTree:    (owner: string, name: string, treeSha: string) => ipcRenderer.invoke('github:getTree', owner, name, treeSha),
-    getBlob:    (owner: string, name: string, blobSha: string) => ipcRenderer.invoke('github:getBlob', owner, name, blobSha),
-    getRawFile: (owner: string, name: string, branch: string, path: string) => ipcRenderer.invoke('github:getRawFile', owner, name, branch, path),
-
-    getLastCommitsForPaths: (
-      repoId: string, owner: string, name: string, ref: string,
-      pathShas: { path: string; sha: string }[],
-    ) => ipcRenderer.invoke('github:getLastCommitsForPaths', repoId, owner, name, ref, pathShas),
-    compareRefs: (repoId: string, owner: string, name: string, base: string, head: string) =>
-      ipcRenderer.invoke('github:compareRefs', repoId, owner, name, base, head),
-    getReceivedEvents: (username: string) =>
-      ipcRenderer.invoke('github:getReceivedEvents', username) as Promise<import('./providers/github').GitHubEvent[]>,
-    getCompare: (owner: string, name: string, base: string, head: string) =>
-      ipcRenderer.invoke('github:getCompare', owner, name, base, head) as Promise<import('./providers/github').CompareSummary>,
-  },
-
-  // Host-id-aware mirror of `github:*` channels. Task 13 deletes the legacy
-  // `github` namespace once all renderer files have migrated to this one.
-  // Also includes the pre-Phase-3 `extractColor` + `getOgImage` methods that
-  // previously lived in their own `repo: {...}` namespace below.
+  // Host-id-aware repo namespace (multi-host Phase 3+). Includes the
+  // pre-Phase-3 `extractColor` + `getOgImage` methods that previously lived
+  // in their own `repo: {...}` namespace.
   repo: {
     extractColor: (avatarUrl: string, repoId: string) =>
       ipcRenderer.invoke('repo:extractColor', avatarUrl, repoId),
