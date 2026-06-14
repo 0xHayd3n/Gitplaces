@@ -117,7 +117,18 @@ import { getRepoUserEvents } from './services/repoUserEvents'
 import { getRepoStats, getRepoMomentum } from './services/repoStats'
 import { fetchRepoBundle, fetchLastCommitsForPaths, type RepoBundle } from './providers/github/graphql'
 import { sanitiseRef } from './sanitiseRef'
-import type { CollectionRow, CollectionRepoRow } from '../src/types/repo'
+import type { CollectionRow, CollectionRepoRow, SavedRepo } from '../src/types/repo'
+import {
+  githubRepoToRepo,
+  githubReleaseToRelease,
+  githubUserToUser,
+  githubStarredToStarredEntry,
+} from './providers/github/normalize'
+import {
+  repoRowToSavedRepo,
+  libraryRowToLibrarySavedRepo,
+} from './repoNormalize'
+import type { RepoRow, LibraryRow, StarredRepoRow } from './db-row-types'
 import { classifyRepoBucket } from '../src/lib/classifyRepoType'
 import { cascadeRepoId, readLastCommitCache, writeLastCommitCache, readCompareCache, writeCompareCache } from './db-helpers'
 import { LRUCache } from './lruCache'
@@ -451,7 +462,7 @@ ipcMain.handle('github:getUser', async () => {
   setGitHubUser(user.login, user.avatar_url)
   const db = getDb(app.getPath('userData'))
   db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('github_username', user.login)
-  return { login: user.login, avatarUrl: user.avatar_url, publicRepos: user.public_repos }
+  return githubUserToUser(user)
 })
 
 ipcMain.handle('github:getStarred', async (_, force?: boolean) => {
@@ -568,7 +579,7 @@ ipcMain.handle('connectors:test', async (_event, url: string) => {
 
 // In-memory cache for browse-tab search results (Popular / Forked / Rising).
 // Keyed by query+sort+order+page.  Survives tab switches within a session.
-const searchReposCache = new LRUCache<string, { rows: unknown[]; ts: number }>(20)
+const searchReposCache = new LRUCache<string, { rows: SavedRepo[]; ts: number }>(20)
 const SEARCH_REPOS_TTL = 10 * 60 * 1000 // 10 minutes
 
 ipcMain.handle('github:searchRepos', async (_event, query: string, sort?: string, order?: string, page?: number) => {
@@ -599,17 +610,17 @@ ipcMain.handle('github:searchRepos', async (_event, query: string, sort?: string
       const db = getDb(app.getPath('userData'))
       const langMatch = query.match(/\blanguage:([^\s]+)/i)
       const lang = langMatch ? langMatch[1] : null
-      let rows: unknown[] = []
+      let rows: RepoRow[] = []
       if (lang) {
-        rows = db.prepare('SELECT * FROM repos WHERE LOWER(language) = LOWER(?) ORDER BY stars DESC LIMIT 100').all(lang)
+        rows = db.prepare('SELECT * FROM repos WHERE LOWER(language) = LOWER(?) ORDER BY stars DESC LIMIT 100').all(lang) as RepoRow[]
       }
       if (rows.length === 0) {
-        rows = db.prepare('SELECT * FROM repos WHERE stars IS NOT NULL ORDER BY stars DESC LIMIT 100').all()
+        rows = db.prepare('SELECT * FROM repos WHERE stars IS NOT NULL ORDER BY stars DESC LIMIT 100').all() as RepoRow[]
       }
       if (rows.length === 0) {
-        rows = db.prepare('SELECT * FROM repos ORDER BY discovered_at DESC LIMIT 100').all()
+        rows = db.prepare('SELECT * FROM repos ORDER BY discovered_at DESC LIMIT 100').all() as RepoRow[]
       }
-      return rows
+      return rows.map(repoRowToSavedRepo)
     }
     throw err
   }
@@ -680,8 +691,9 @@ ipcMain.handle('github:searchRepos', async (_event, query: string, sort?: string
 
   // Look up each result by owner/name — avoids stale discover_query overwrite bug
   const rows = items
-    .map(r => db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(r.owner.login, r.name))
-    .filter(Boolean)
+    .map(r => db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(r.owner.login, r.name) as RepoRow | undefined)
+    .filter((row): row is RepoRow => Boolean(row))
+    .map(repoRowToSavedRepo)
 
   // Populate in-memory cache for this query so tab revisits cost 0 API calls
   searchReposCache.set(cacheKey, { rows, ts: Date.now() })
@@ -701,15 +713,16 @@ ipcMain.handle('github:getRepo', async (_event, owner: string, name: string) => 
   // Skip the GitHub call entirely if our local row was refreshed within TTL.
   const fresh = db.prepare(
     'SELECT * FROM repos WHERE owner = ? AND name = ? AND fetched_at IS NOT NULL AND fetched_at > ?'
-  ).get(owner, name, Date.now() - REPO_FETCH_TTL_MS)
-  if (fresh) return fresh
+  ).get(owner, name, Date.now() - REPO_FETCH_TTL_MS) as RepoRow | undefined
+  if (fresh) return repoRowToSavedRepo(fresh)
 
   let repo: Awaited<ReturnType<typeof gh.getRepo>>
   try {
     repo = await gh.getRepo(token, owner, name, db)
   } catch {
     // On network error, fall back to the (possibly stale) DB row if we have one
-    return db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(owner, name) ?? null
+    const row = db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(owner, name) as RepoRow | undefined
+    return row ? repoRowToSavedRepo(row) : null
   }
 
   const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: JSON.stringify(repo.topics ?? []) })
@@ -773,7 +786,8 @@ ipcMain.handle('github:getRepo', async (_event, owner: string, name: string) => 
     }
   }
 
-  return db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(owner, name)
+  const row = db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(owner, name) as RepoRow | undefined
+  return row ? repoRowToSavedRepo(row) : null
 })
 
 ipcMain.handle('github:getReadme', async (_event, owner: string, name: string) => {
@@ -798,7 +812,10 @@ ipcMain.handle('github:getReleases', async (_event, owner: string, name: string)
     'SELECT fetched_at, data FROM repo_releases_cache WHERE owner=? AND name=?'
   ).get(owner, name) as { fetched_at: number; data: string } | undefined
   if (cached && Date.now() - cached.fetched_at < RELEASES_CACHE_TTL_MS) {
-    try { return JSON.parse(cached.data) } catch { /* fall through to refetch */ }
+    try {
+      const parsed = JSON.parse(cached.data) as import('./providers/github').GitHubRelease[]
+      return parsed.map(githubReleaseToRelease)
+    } catch { /* fall through to refetch */ }
   }
 
   try {
@@ -806,13 +823,16 @@ ipcMain.handle('github:getReleases', async (_event, owner: string, name: string)
     db.prepare(
       'INSERT OR REPLACE INTO repo_releases_cache (owner, name, fetched_at, data) VALUES (?,?,?,?)'
     ).run(owner, name, Date.now(), JSON.stringify(fresh))
-    return fresh
+    return fresh.map(githubReleaseToRelease)
   } catch {
     // On network error: serve a stale cache row if we have one (better than
     // showing 'error'), else return null so the renderer can show the
     // "Couldn't load releases" notice.
     if (cached) {
-      try { return JSON.parse(cached.data) } catch { /* fall through */ }
+      try {
+        const parsed = JSON.parse(cached.data) as import('./providers/github').GitHubRelease[]
+        return parsed.map(githubReleaseToRelease)
+      } catch { /* fall through */ }
     }
     return null
   }
@@ -936,10 +956,10 @@ ipcMain.handle('github:fetchRepoBundle', async (_event, owner: string, name: str
 
   // Return the canonical DB row alongside the bundle so the renderer can
   // setRepo(row) directly (matches the github:getRepo contract).
-  const repoRow = db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(owner, name)
+  const repoRow = db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(owner, name) as RepoRow | undefined
   return {
-    repoRow,
-    releases: bundle.releases,
+    repoRow: repoRow ? repoRowToSavedRepo(repoRow) : null,
+    releases: bundle.releases.map(githubReleaseToRelease),
     isStarred: bundle.isStarred,
     vulnerabilities: bundle.vulnerabilities,
     securityPolicyUrl: bundle.securityPolicyUrl,
@@ -1086,7 +1106,7 @@ ipcMain.handle('github:getRelatedRepos', async (_event, owner: string, name: str
      AND NOT (owner = ? AND name = ?)
      ORDER BY stars DESC
      LIMIT 50`
-  ).all(...escaped, owner, name) as Record<string, unknown>[]
+  ).all(...escaped, owner, name) as RepoRow[]
 
   const seen = new Set<string>()
   return rows
@@ -1097,6 +1117,7 @@ ipcMain.handle('github:getRelatedRepos', async (_event, owner: string, name: str
       return true
     })
     .slice(0, 3)
+    .map(repoRowToSavedRepo)
 })
 
 // In-memory caches for Trees/Blobs API (SHA-keyed = immutable, never stale)
@@ -1330,7 +1351,7 @@ ipcMain.handle('settings:setApiKey', async (_, key: string) => setApiKey(key))
 // ── Starred IPC ─────────────────────────────────────────────────
 ipcMain.handle('starred:getAll', async () => {
   const db = getDb(app.getPath('userData'))
-  return db.prepare(`
+  const rows = db.prepare(`
     SELECT
       repos.*,
       CASE WHEN skills.repo_id IS NOT NULL THEN 1 ELSE 0 END AS installed
@@ -1338,13 +1359,24 @@ ipcMain.handle('starred:getAll', async () => {
     LEFT JOIN skills ON repos.id = skills.repo_id
     WHERE repos.starred_at IS NOT NULL
     ORDER BY repos.starred_at DESC
-  `).all()
+  `).all() as StarredRepoRow[]
+  // StarredRepoRow is RepoRow + installed; LibraryRow needs the extra skill
+  // columns (active/version/etc) but starred:getAll doesn't expose those,
+  // so we widen to LibraryRow with nulls for the skill-only fields.
+  return rows.map(r => libraryRowToLibrarySavedRepo({
+    ...r,
+    active: 0,
+    version: null,
+    generated_at: null,
+    enabled_components: null,
+    enabled_tools: null,
+  }))
 })
 
 ipcMain.handle('starred:getRecentlyUnstarred', async () => {
   const db = getDb(app.getPath('userData'))
   const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-  return db.prepare(`
+  const rows = db.prepare(`
     SELECT
       repos.*,
       CASE WHEN skills.repo_id IS NOT NULL THEN 1 ELSE 0 END AS installed
@@ -1352,7 +1384,15 @@ ipcMain.handle('starred:getRecentlyUnstarred', async () => {
     LEFT JOIN skills ON repos.id = skills.repo_id
     WHERE repos.unstarred_at IS NOT NULL AND repos.unstarred_at >= ?
     ORDER BY repos.unstarred_at DESC
-  `).all(cutoff)
+  `).all(cutoff) as StarredRepoRow[]
+  return rows.map(r => libraryRowToLibrarySavedRepo({
+    ...r,
+    active: 0,
+    version: null,
+    generated_at: null,
+    enabled_components: null,
+    enabled_tools: null,
+  }))
 })
 
 // ── Skill IPC ───────────────────────────────────────────────────
@@ -2013,13 +2053,15 @@ ipcMain.handle('notes:pullFromGitHub', async (_event, repoId: string, owner: str
 // ── Library IPC ─────────────────────────────────────────────────
 ipcMain.handle('library:getAll', async () => {
   const db = getDb(app.getPath('userData'))
-  return db.prepare(`
+  const rows = db.prepare(`
     SELECT r.*, s.active, s.version, s.generated_at, s.tier,
            s.enabled_components, s.enabled_tools
     FROM repos r
     INNER JOIN skills s ON r.id = s.repo_id
     ORDER BY s.generated_at DESC
-  `).all()
+  `).all() as LibraryRow[]
+  // library:getAll always returns installed skills, so set installed = 1.
+  return rows.map(r => libraryRowToLibrarySavedRepo({ ...r, installed: 1 }))
 })
 
 ipcMain.handle('skill:getContent', async (_, owner: string, name: string) => {
@@ -2241,7 +2283,7 @@ ipcMain.handle('search:extractTags', async (_, query: string) => {
 })
 
 // Shared helper: upsert raw GitHub results to DB and return RepoRows in original order
-function upsertAndReturnRepoRows(db: Database.Database, results: any[], query: string): any[] {
+function upsertAndReturnRepoRows(db: Database.Database, results: any[], query: string): RepoRow[] {
   if (results.length === 0) return []
   const now = new Date().toISOString()
   const upsert = db.prepare(`
@@ -2288,7 +2330,9 @@ function upsertAndReturnRepoRows(db: Database.Database, results: any[], query: s
       )
     }
   })()
-  return results.map(r => select.get(r.owner.login, r.name)).filter(Boolean)
+  return results
+    .map(r => select.get(r.owner.login, r.name) as RepoRow | undefined)
+    .filter((row): row is RepoRow => Boolean(row))
 }
 
 ipcMain.handle('search:raw', async (_, query: string, language?: string, filters?: SearchFilters, page?: number) => {
@@ -2304,11 +2348,14 @@ ipcMain.handle('search:raw', async (_, query: string, language?: string, filters
   ).get(cacheKey) as { results: string; fetched_at: string } | undefined
 
   if (cached && Date.now() - new Date(cached.fetched_at).getTime() < TTL) {
+    // Cache stores SavedRepo[] post-Task-5 (was RepoRow[] before); JSON shape
+    // remains stable enough that pre-Task-5 cache rows resurface only stale
+    // snake_case data, which is overwritten on next refetch within TTL.
     return JSON.parse(cached.results)
   }
 
   const apiResults = await rawSearch(token, query, language, filters, p)
-  const rows = upsertAndReturnRepoRows(db, apiResults, query)
+  const rows = upsertAndReturnRepoRows(db, apiResults, query).map(repoRowToSavedRepo)
 
   db.prepare(
     'INSERT OR REPLACE INTO search_cache (cache_key, results, fetched_at) VALUES (?, ?, ?)'
@@ -2334,7 +2381,7 @@ ipcMain.handle('search:tagged', async (_, tags: string[], originalQuery: string,
   }
 
   const apiResults = await tagSearch(token, tags, originalQuery, language, filters, p)
-  const rows = upsertAndReturnRepoRows(db, apiResults, originalQuery)
+  const rows = upsertAndReturnRepoRows(db, apiResults, originalQuery).map(repoRowToSavedRepo)
 
   db.prepare(
     'INSERT OR REPLACE INTO search_cache (cache_key, results, fetched_at) VALUES (?, ?, ?)'
@@ -2471,7 +2518,8 @@ ipcMain.handle('profile:getUserRepos', async (_, username: string, sort?: string
 ipcMain.handle('github:getMyRepos', async () => {
   const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return gh.getMyRepos(token)
+  const repos = await gh.getMyRepos(token) as import('./providers/github').GitHubRepo[]
+  return repos.map(githubRepoToRepo)
 })
 
 ipcMain.handle('projects:scanFolder', async (_event, folderPath: string) => {
@@ -2564,19 +2612,22 @@ ipcMain.handle('projects:writeFile', async (_event, folderPath: string, filename
 ipcMain.handle('profile:getStarred', async (_, username: string) => {
   const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return gh.getUserStarred(token, username)
+  const repos = await gh.getUserStarred(token, username) as import('./providers/github').GitHubRepo[]
+  return repos.map(githubRepoToRepo)
 })
 
 ipcMain.handle('profile:getFollowing', async (_, username: string) => {
   const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return gh.getUserFollowing(token, username)
+  const users = await gh.getUserFollowing(token, username) as import('./providers/github').GitHubUser[]
+  return users.map(githubUserToUser)
 })
 
 ipcMain.handle('profile:getFollowers', async (_, username: string) => {
   const token = getToken(HOST_ID_GITHUB)
   if (!token) throw new Error('Not authenticated')
-  return gh.getUserFollowers(token, username)
+  const users = await gh.getUserFollowers(token, username) as import('./providers/github').GitHubUser[]
+  return users.map(githubUserToUser)
 })
 
 ipcMain.handle('profile:isFollowing', async (_, username: string) => {

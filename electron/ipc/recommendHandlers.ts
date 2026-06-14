@@ -13,7 +13,8 @@ import { planQueries, fetchCandidates } from '../services/recommendationFetcher'
 import { getRecentClicks, pruneOldEvents } from '../services/engagementTracker'
 import { cascadeRepoId } from '../db-helpers'
 import type { RecommendationResponse, RecommendationItem } from '../../src/types/recommendation'
-import type { RepoRow } from '../../src/types/repo'
+import type { RepoRow } from '../db-row-types'
+import { repoRowToSavedRepo } from '../repoNormalize'
 
 const ENGAGEMENT_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000
 const PRUNE_INTERVAL_MS      = 7  * 24 * 60 * 60 * 1000
@@ -201,8 +202,11 @@ export async function getRecommendedHandler(
       .map((repo): RecommendationItem | null => {
         const row = coldByIdMap.get(String(repo.id))
         if (!row) return null
+        // Normalize at the IPC boundary. RecommendationItem.repo's static type
+        // is still `RepoRow` (renamed in Task 12) but the runtime payload is
+        // the canonical SavedRepo shape.
         return {
-          repo: row, score: 0,
+          repo: repoRowToSavedRepo(row) as unknown as RepoRow, score: 0,
           scoreBreakdown: { topic: 0, description: 0, bucket: 0, subType: 0, language: 0, scale: 0, freshness: 0, engagement: 0 },
           anchors: [], primaryAnchor: null,
         }
@@ -246,7 +250,8 @@ export async function getRecommendedHandler(
     .map((item): RecommendationItem | null => {
       const row = byIdMap.get(String(item.repo.id))
       if (!row) return null
-      return { ...item, repo: row }
+      // Normalize at the IPC boundary; see comment in cold-start branch above.
+      return { ...item, repo: repoRowToSavedRepo(row) as unknown as RepoRow }
     })
     .filter((i): i is RecommendationItem => i !== null)
 
@@ -265,8 +270,9 @@ export async function getRecommendedHandler(
         .map((repo): RecommendationItem | null => {
           const row = coldByIdMap.get(String(repo.id))
           if (!row) return null
+          // Normalize at the IPC boundary; see cold-start branch comment.
           return {
-            repo: row, score: 0,
+            repo: repoRowToSavedRepo(row) as unknown as RepoRow, score: 0,
             scoreBreakdown: { topic: 0, description: 0, bucket: 0, subType: 0, language: 0, scale: 0, freshness: 0, engagement: 0 },
             anchors: [], primaryAnchor: null,
           }
