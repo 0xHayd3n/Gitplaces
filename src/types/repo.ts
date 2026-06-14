@@ -1,4 +1,118 @@
-/** Mirrors the `repos` SQLite table schema. All IPC handlers that return repo data use this shape. */
+import type { ProviderCapabilities, HostType } from '../../electron/providers/types'
+
+/** Canonical normalized repository shape consumed across the renderer.
+ *  Provider-agnostic — Phases 4–5 add GitLab + Gitea providers that produce the same shape. */
+export interface Repo {
+  hostId: string
+  hostType: HostType
+  hostNativeId: string | number
+  fullName: string                 // "owner/repo"
+  owner: string
+  name: string
+  htmlUrl: string
+  homepageUrl: string | null
+  description: string | null
+  language: string | null
+  topics: string[]
+  license: string | null           // SPDX id where available
+  defaultBranch: string
+  archived: boolean
+  size: number                     // KB
+  stars: number
+  forks: number
+  watchers: number
+  openIssues: number
+  createdAt: string                // ISO 8601
+  updatedAt: string                // ISO 8601
+  pushedAt: string                 // ISO 8601
+  ownerAvatarUrl: string
+}
+
+/** `Repo` plus library/discovery/verification state — what `library:*`/`starred:*`
+ *  IPC channels return after Task 5. Mirror of the SavedRepo extras enumerated in the
+ *  field rename map. Every field is nullable because pre-existing rows are populated
+ *  lazily by separate flows (engagement, verification, classification, etc.). */
+export interface SavedRepo extends Repo {
+  savedAt: string | null
+  starredAt: string | null
+  unstarredAt: string | null
+  discoveredAt: string | null
+  discoverQuery: string | null
+  bannerSvg: string | null
+  bannerColor: string | null
+  ogImageUrl: string | null
+  type: string | null
+  typeBucket: string | null
+  typeSub: string | null
+  translatedDescription: string | null
+  translatedDescriptionLang: string | null
+  translatedReadme: string | null
+  translatedReadmeLang: string | null
+  detectedLanguage: string | null
+  verificationScore: number | null
+  verificationTier: string | null
+  verificationSignals: string | null
+  verificationCheckedAt: number | null
+  isForked: number | null
+  updateAvailable: number | null
+  updateCheckedAt: number | null
+  upstreamVersion: string | null
+  storedVersion: string | null
+  archivedAt: string | null
+  forkedAt: string | null
+  fetchedAt: number | null
+  starredCheckedAt: number | null
+  storybookUrl: string | null
+}
+
+/** `SavedRepo` plus the columns added by `library:getAll` joining `skills`. */
+export interface LibrarySavedRepo extends SavedRepo {
+  installed: number                // 0 | 1
+  active: number                   // 0 | 1
+  version: string | null
+  generatedAt: string | null
+  enabledComponents: string | null
+  enabledTools: string | null
+  tier?: number
+}
+
+/** Single release entry (camelCase). Replaces both `GitHubRelease` (live API) and `ReleaseRow` (legacy renderer). */
+export interface ReleaseAsset {
+  name: string
+  size: number
+  browserDownloadUrl: string
+  downloadCount: number
+}
+export interface Release {
+  tagName: string
+  name: string | null
+  publishedAt: string
+  body: string | null
+  assets: ReleaseAsset[]
+  prerelease: boolean
+}
+
+/** Authenticated user info. Replaces `GitHubUser`. */
+export interface User {
+  login: string
+  avatarUrl: string
+  publicRepos: number
+}
+
+/** Output of `github:getStarred`. Replaces `GitHubStarredRepo`. */
+export interface StarredEntry {
+  starredAt: string
+  repo: Repo
+}
+
+/** Format a star count: 76200 → "76.2k", 500 → "500" */
+export function formatStars(n: number | null | undefined): string {
+  if (n == null) return '—'
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+  return String(n)
+}
+
+/** @deprecated Use `SavedRepo` from this file. Removed in the Phase 2 finalisation pass. */
 export interface RepoRow {
   id: string
   owner: string
@@ -48,33 +162,25 @@ export interface RepoRow {
   stored_version:    string | null   // version at last save or update
 }
 
-export interface ReleaseAsset {
-  name: string
-  size: number
-  browser_download_url: string
-  download_count: number
-}
-
+/** @deprecated Use `Release` from this file. Removed in the Phase 2 finalisation pass. */
 export interface ReleaseRow {
   tag_name: string
   name: string | null
   published_at: string
   body: string | null
-  assets: ReleaseAsset[]
+  assets: Array<{
+    name: string
+    size: number
+    browser_download_url: string
+    download_count: number
+  }>
   prerelease: boolean
 }
 
-/** Parse the JSON topics string from a RepoRow into a string array. */
+/** @deprecated Use `Repo.topics` (already a string[]) from this file. Removed in the Phase 2 finalisation pass. */
 export function parseTopics(topics: string | null): string[] {
   if (!topics) return []
   try { return JSON.parse(topics) as string[] } catch { return [] }
-}
-
-/** Format a star count: 76200 → "76.2k", 500 → "500" */
-export function formatStars(n: number | null): string {
-  if (n == null) return '—'
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
-  return String(n)
 }
 
 export interface SkillRow {
@@ -106,7 +212,8 @@ export interface SubSkillRow {
   active: number
 }
 
-/** Returned by library:getAll — repos INNER JOIN skills.
+/** @deprecated Use `LibrarySavedRepo` from this file. Removed in the Phase 2 finalisation pass.
+ *  Returned by library:getAll — repos INNER JOIN skills.
  *  version and generated_at are nullable per DB schema.
  *  content/filename are fetched on-demand via skill:getContent. */
 export interface LibraryRow extends RepoRow {
@@ -141,7 +248,8 @@ export interface CollectionRepoRow {
   saved: number                  // 1 if skill installed, 0 if missing
 }
 
-/** Returned by starred:getAll — repos WHERE starred_at IS NOT NULL, LEFT JOIN skills. */
+/** @deprecated Use `LibrarySavedRepo` from this file. Removed in the Phase 2 finalisation pass.
+ *  Returned by starred:getAll — repos WHERE starred_at IS NOT NULL, LEFT JOIN skills. */
 export interface StarredRepoRow extends RepoRow {
   installed: number  // 0 or 1 — 1 if a skill exists for this repo
 }
