@@ -110,6 +110,7 @@ function makeRepoRow(id: string, starred = false, saved = false) {
     pushed_at: null,
     saved_at: saved ? '2024-01-01T00:00:00Z' : null,
     starred_at: starred ? '2024-01-01T00:00:00Z' : null,
+    unstarred_at: null,
     type: null,
     banner_svg: null,
     discovered_at: null,
@@ -132,6 +133,17 @@ function makeRepoRow(id: string, starred = false, saved = false) {
     verification_checked_at: null,
     type_bucket: null,
     type_sub: null,
+    is_forked: null,
+    update_available: null,
+    update_checked_at: null,
+    upstream_version: null,
+    stored_version: null,
+    archived_at: null,
+    forked_at: null,
+    fetched_at: null,
+    starred_checked_at: null,
+    storybook_url: null,
+    host_id: 'gh:api.github.com',
   }
 }
 
