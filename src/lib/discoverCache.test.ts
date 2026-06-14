@@ -8,8 +8,9 @@ import {
   loadCachedAgents, saveCachedAgents,
   POPULAR_CACHE_TTL_MS,
 } from './discoverCache'
-import type { RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
 import type { RecommendationItem } from '../types/recommendation'
+import { fixtureSavedRepo } from '../test-utils/repoFixtures'
 
 const KEY_POPULAR = 'discover-cache.popular.v1'
 const KEY_RECOMMENDED = 'discover-cache.recommended.v1'
@@ -18,26 +19,20 @@ const KEY_TRENDING_WEEK = 'discover-cache.trending-week.v1'
 const KEY_HIDDEN_GEMS = 'discover-cache.hidden-gems.v1'
 const KEY_AGENTS = 'discover-cache.agents.v1'
 
-function makeRepo(name: string): RepoRow {
-  return {
-    id: name, owner: 'alice', name, description: null, language: null,
-    topics: '[]', stars: 0, forks: 0, license: null, homepage: null,
-    updated_at: null, pushed_at: null, saved_at: null, type: null,
-    banner_svg: null, discovered_at: null, discover_query: null,
-    watchers: 0, size: 0, open_issues: 0, starred_at: null, unstarred_at: null,
-    default_branch: null, avatar_url: null, og_image_url: null, banner_color: null,
-    translated_description: null, translated_description_lang: null,
-    translated_readme: null, translated_readme_lang: null, detected_language: null,
-    verification_score: null, verification_tier: null, verification_signals: null,
-    verification_checked_at: null, type_bucket: null, type_sub: null,
-    is_forked: null, update_available: null, update_checked_at: null,
-    upstream_version: null, stored_version: null,
-  }
+function makeRepo(name: string): SavedRepo {
+  return fixtureSavedRepo({
+    hostNativeId: name,
+    fullName: `alice/${name}`,
+    owner: 'alice',
+    name,
+  })
 }
 
+// RecommendationItem.repo is still statically `RepoRow` (renamed in Task 12);
+// the runtime payload is the canonical SavedRepo shape, so cast at the boundary.
 function makeRecItem(name: string): RecommendationItem {
   return {
-    repo: makeRepo(name),
+    repo: makeRepo(name) as unknown as RecommendationItem['repo'],
     score: 0,
     scoreBreakdown: { topic: 0, description: 0, bucket: 0, subType: 0, language: 0, scale: 0, freshness: 0, engagement: 0 },
     anchors: [],

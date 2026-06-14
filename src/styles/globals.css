@@ -1820,18 +1820,16 @@ a {
 .discover-content {
   flex: 1;
   overflow-y: overlay;
-  /* Mandatory vertical snap. Hero aligns to start (top); rows align to
-     start with scroll-padding-top that pushes the snap line down — the
-     focused row's TOP lands at that line and stays put when the carousel
-     grows downward, so the snap engine never has to re-correct mid-
-     transition. The result: rows "click" in cleanly without nudging.
-     padding-bottom gives the last rows enough room to scroll up into the
-     focus zone — without it, the bottom row can never reach the snap line
-     because there's nothing below it to scroll into. */
-  scroll-snap-type: y mandatory;
+  /* Proximity vertical snap. `proximity` lets the user free-scroll between
+     rows and only snaps when they release near a snap point — much smoother
+     than `mandatory`, which fights every wheel tick. The focused-row
+     IntersectionObserver runs independently of snap, so row-focus still
+     transitions cleanly without forcing a hard stop on every scroll.
+     padding-bottom gives the last rows room to reach the focus band. */
+  scroll-snap-type: y proximity;
   scroll-behavior: smooth;
   scroll-padding-top: max(0px, calc((100% - 540px) / 2));
-  padding-bottom: 50vh;
+  padding-bottom: 25vh;
 }
 
 .discover-content-inner {
@@ -2379,28 +2377,15 @@ a {
   overflow: hidden;
 }
 
-.repo-card-author {
-  font-size: 12.5px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.5);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  text-align: left;
-  transition: color 0.15s;
-}
-.repo-card-author:hover { color: rgba(255, 255, 255, 0.85); }
-
 /* Reserved slot for the pill — keeps description on a consistent baseline
-   whether or not the repo has a classified bucket / subtype. */
+   whether or not the repo has a classified bucket / subtype.
+   `margin-top: auto` anchors the pill to the bottom of the flex column
+   body so descriptions can grow without pushing the pill out of view. */
 .repo-card-pill-row {
   min-height: 24px;
   display: flex;
   align-items: center;
+  margin-top: auto;
 }
 
 .repo-card-pill {

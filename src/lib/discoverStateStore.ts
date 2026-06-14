@@ -4,7 +4,7 @@
 // Module-level variable intentionally — it lives for the app session and is
 // independent of React's render lifecycle.
 
-import type { RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
 import type { ViewModeKey } from './discoverQueries'
 
 interface SearchFilters {
@@ -15,7 +15,7 @@ interface SearchFilters {
 
 export interface DiscoverSnapshot {
   query: string
-  repos: RepoRow[]
+  repos: SavedRepo[]
   viewMode: ViewModeKey
   selectedLanguages: string[]
   appliedFilters: SearchFilters

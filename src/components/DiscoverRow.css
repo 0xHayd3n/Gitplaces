@@ -62,7 +62,10 @@
 .discover-row-carousel {
   position: relative;
   height: 230px;
-  overflow: hidden;
+  /* Clip horizontally so off-screen peek cards stay hidden, but allow
+     vertical bleed so hover scale + drop-shadow can pop above/below. */
+  overflow-x: clip;
+  overflow-y: visible;
   transition: height 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -84,7 +87,7 @@
 }
 
 .discover-row[data-focused="true"] .repo-card-description {
-  -webkit-line-clamp: 5;
+  -webkit-line-clamp: 8;
 }
 
 .discover-row .repo-card-title {
@@ -111,7 +114,10 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    scale 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
 }
 
@@ -122,9 +128,18 @@
   pointer-events: none;
 }
 
-.discover-row-card:hover {
+/* Netflix-style hover: subtle scale + white outline + soft drop-shadow.
+   `scale:` is its own property so the inline `transform: translateX(...)`
+   that positions the card in the carousel keeps working.
+   Scale kept modest (1.03) so the rightmost card doesn't clip past the
+   carousel's overflow-x: clip edge when it pops. */
+.discover-row-card:hover:not(.discover-row-card--peek) {
   opacity: 1 !important;
   z-index: 5;
+  scale: 1.03;
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 18px 40px rgba(0, 0, 0, 0.65);
 }
 
 .discover-row-card--starred .repo-card-image {

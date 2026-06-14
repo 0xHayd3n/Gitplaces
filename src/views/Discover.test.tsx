@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { useRef, useEffect } from 'react'
 import Discover from './Discover'
+import { fixtureSavedRepo } from '../test-utils/repoFixtures'
 import { SavedReposProvider } from '../contexts/SavedRepos'
 import { MockLearningProgressProvider } from '../contexts/LearningProgressContext'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
@@ -44,12 +45,21 @@ function makeDiscoverApi(overrides?: {
   Object.defineProperty(window, 'api', {
     value: {
       github: {
-        searchRepos: vi.fn().mockResolvedValue([{
-          owner: 'vercel', name: 'next.js', description: 'The React framework',
-          language: 'TypeScript', stars: 100000, forks: 20000, open_issues: 500,
-          watchers: 100000, size: 50000, license: 'MIT', topics: '[]',
-          updated_at: '2024-01-01', saved_at: null,
-        }]),
+        searchRepos: vi.fn().mockResolvedValue([fixtureSavedRepo({
+          hostNativeId: '12345',
+          fullName: 'vercel/next.js',
+          owner: 'vercel',
+          name: 'next.js',
+          description: 'The React framework',
+          language: 'TypeScript',
+          stars: 100000,
+          forks: 20000,
+          openIssues: 500,
+          watchers: 100000,
+          size: 50000,
+          license: 'MIT',
+          updatedAt: '2024-01-01',
+        })]),
         saveRepo: vi.fn().mockResolvedValue(undefined),
         getRepo: vi.fn().mockResolvedValue({}),
         getRelatedRepos: vi.fn().mockResolvedValue([]),
@@ -60,13 +70,21 @@ function makeDiscoverApi(overrides?: {
         unstarRepo: vi.fn().mockResolvedValue(undefined),
         getRecommended: vi.fn().mockResolvedValue({
           items: [{
-            repo: {
-              id: '12345',
-              owner: 'vercel', name: 'next.js', description: 'The React framework',
-              language: 'TypeScript', stars: 100000, forks: 20000, open_issues: 500,
-              watchers: 100000, size: 50000, license: 'MIT', topics: '[]',
-              updated_at: '2024-01-01', saved_at: null,
-            },
+            repo: fixtureSavedRepo({
+              hostNativeId: '12345',
+              fullName: 'vercel/next.js',
+              owner: 'vercel',
+              name: 'next.js',
+              description: 'The React framework',
+              language: 'TypeScript',
+              stars: 100000,
+              forks: 20000,
+              openIssues: 500,
+              watchers: 100000,
+              size: 50000,
+              license: 'MIT',
+              updatedAt: '2024-01-01',
+            }),
             score: 0,
             scoreBreakdown: { topic: 0, bucket: 0, subType: 0, language: 0, scale: 0 },
             anchors: [],
@@ -78,6 +96,11 @@ function makeDiscoverApi(overrides?: {
       },
       db: {
         setStarredAt: vi.fn().mockResolvedValue(undefined),
+        cacheTranslatedDescription: vi.fn().mockResolvedValue(undefined),
+      },
+      repo: {
+        extractColor: vi.fn().mockResolvedValue({ h: 0, s: 0, l: 0 }),
+        getOgImage: vi.fn().mockResolvedValue(null),
       },
       settings: {
         get: vi.fn(),

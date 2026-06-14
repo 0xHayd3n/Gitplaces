@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DiscoverHero from './DiscoverHero'
-import type { RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
+import { fixtureSavedRepo } from '../test-utils/repoFixtures'
 
 vi.mock('./DitherBackground', () => ({
   default: () => <div data-testid="dither-bg" />,
@@ -18,23 +19,18 @@ beforeAll(() => {
   } as unknown as typeof ResizeObserver
 })
 
-const repo: RepoRow = {
-  id: '1', owner: 'vercel', name: 'next.js',
-  description: 'The React Framework', language: 'JavaScript',
-  stars: 128000, forks: 27000, topics: '[]',
-  avatar_url: 'https://example.com/avatar.png',
-  starred_at: null, unstarred_at: null, pushed_at: '2024-01-01T00:00:00Z',
-  license: null, homepage: null, updated_at: null, saved_at: null,
-  type: null, banner_svg: null, discovered_at: null, discover_query: null,
-  watchers: null, size: null, open_issues: null, default_branch: null,
-  og_image_url: null, banner_color: null,
-  translated_description: null, translated_description_lang: null,
-  translated_readme: null, translated_readme_lang: null, detected_language: null,
-  verification_score: null, verification_tier: null, verification_signals: null,
-  verification_checked_at: null, type_bucket: null, type_sub: null,
-  is_forked: null, update_available: null, update_checked_at: null,
-  upstream_version: null, stored_version: null,
-}
+const repo: SavedRepo = fixtureSavedRepo({
+  hostNativeId: '1',
+  fullName: 'vercel/next.js',
+  owner: 'vercel',
+  name: 'next.js',
+  description: 'The React Framework',
+  language: 'JavaScript',
+  stars: 128000,
+  forks: 27000,
+  ownerAvatarUrl: 'https://example.com/avatar.png',
+  pushedAt: '2024-01-01T00:00:00Z',
+})
 
 describe('DiscoverHero', () => {
   it('renders null when repo is null', () => {
@@ -44,10 +40,9 @@ describe('DiscoverHero', () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it('renders name and owner', () => {
+  it('renders name', () => {
     render(<DiscoverHero repo={repo} onNavigate={vi.fn()} />)
     expect(screen.getByText('next.js')).toBeTruthy()
-    expect(screen.getByText('vercel')).toBeTruthy()
   })
 
   it('renders description', () => {

@@ -6,7 +6,7 @@
 // fetch and `save*()` the fresh result. Within TTL, cached cards render
 // immediately; beyond TTL, the cache is treated as missing.
 
-import type { RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
 import type { RecommendationItem } from '../types/recommendation'
 
 const KEY_POPULAR = 'discover-cache.popular.v1'
@@ -28,7 +28,7 @@ export const POPULAR_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const MAX_CACHED_ENTRIES = 100
 
 interface CachedPopular {
-  repos: RepoRow[]
+  repos: SavedRepo[]
   fetchedAt: number
 }
 
@@ -54,7 +54,7 @@ export function loadCachedPopular(): CachedPopular | null {
   return loadCache<CachedPopular>(KEY_POPULAR)
 }
 
-export function saveCachedPopular(repos: RepoRow[]): void {
+export function saveCachedPopular(repos: SavedRepo[]): void {
   try {
     const payload: CachedPopular = {
       repos: repos.slice(0, MAX_CACHED_ENTRIES),
@@ -86,7 +86,7 @@ export function loadCachedHotToday(): CachedPopular | null {
   return loadCache<CachedPopular>(KEY_HOT_TODAY)
 }
 
-export function saveCachedHotToday(repos: RepoRow[]): void {
+export function saveCachedHotToday(repos: SavedRepo[]): void {
   try {
     const payload: CachedPopular = {
       repos: repos.slice(0, MAX_CACHED_ENTRIES),
@@ -102,7 +102,7 @@ export function loadCachedTrendingWeek(): CachedPopular | null {
   return loadCache<CachedPopular>(KEY_TRENDING_WEEK)
 }
 
-export function saveCachedTrendingWeek(repos: RepoRow[]): void {
+export function saveCachedTrendingWeek(repos: SavedRepo[]): void {
   try {
     const payload: CachedPopular = {
       repos: repos.slice(0, MAX_CACHED_ENTRIES),
@@ -118,7 +118,7 @@ export function loadCachedHiddenGems(): CachedPopular | null {
   return loadCache<CachedPopular>(KEY_HIDDEN_GEMS)
 }
 
-export function saveCachedHiddenGems(repos: RepoRow[]): void {
+export function saveCachedHiddenGems(repos: SavedRepo[]): void {
   try {
     const payload: CachedPopular = {
       repos: repos.slice(0, MAX_CACHED_ENTRIES),
@@ -134,7 +134,7 @@ export function loadCachedAgents(): CachedPopular | null {
   return loadCache<CachedPopular>(KEY_AGENTS)
 }
 
-export function saveCachedAgents(repos: RepoRow[]): void {
+export function saveCachedAgents(repos: SavedRepo[]): void {
   try {
     const payload: CachedPopular = {
       repos: repos.slice(0, MAX_CACHED_ENTRIES),

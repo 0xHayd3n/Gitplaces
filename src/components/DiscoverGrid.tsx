@@ -1,5 +1,5 @@
 import { useState, type RefObject } from 'react'
-import type { RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
 import type { Anchor } from '../types/recommendation'
 import type { LayoutPrefs } from './LayoutDropdown'
 import type { useVerification } from '../hooks/useVerification'
@@ -12,7 +12,7 @@ export interface DiscoverGridProps {
   loading: boolean
   loadingMore: boolean
   error: string | null
-  visibleRepos: RepoRow[]
+  visibleRepos: SavedRepo[]
   discoverQuery: string
   layoutPrefs: LayoutPrefs
   sentinelRef: RefObject<HTMLDivElement>
@@ -131,10 +131,10 @@ export default function DiscoverGrid({
               onNavigate={onNavigate}
               onTagClick={onTagClick}
               onOwnerClick={onOwnerClick}
-              typeSub={repo.type_sub}
-              verificationTier={verification.getTier(repo.id)}
-              verificationSignals={verification.getSignals(repo.id)}
-              verificationResolving={verification.isResolving(repo.id)}
+              typeSub={repo.typeSub}
+              verificationTier={verification.getTier(String(repo.hostNativeId))}
+              verificationSignals={verification.getSignals(String(repo.hostNativeId))}
+              verificationResolving={verification.isResolving(String(repo.hostNativeId))}
               density={layoutPrefs.density}
               fields={layoutPrefs.fields}
               focused={i === focusIndex}
@@ -170,15 +170,14 @@ export default function DiscoverGrid({
       >
         {visibleRepos.map((repo, i) => (
           <ViewportWindow
-            key={repo.id ?? `${repo.owner}/${repo.name}`}
+            key={String(repo.hostNativeId) || `${repo.owner}/${repo.name}`}
             placeholderHeight={280}
           >
             <RepoCard
               repo={repo}
               onNavigate={onNavigate}
-              onOwnerClick={onOwnerClick}
-              typeSub={repo.type_sub}
-              typeBucket={repo.type_bucket}
+              typeSub={repo.typeSub}
+              typeBucket={repo.typeBucket}
               focused={i === focusIndex}
               onLanguageClick={onLanguageClick}
               onSubtypeClick={onSubtypeClick}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate, useNavigationType, useSearchParams, useLocation } from 'react-router-dom'
 import { useSearch } from '../contexts/Search'
-import { type RepoRow } from '../types/repo'
+import { type SavedRepo } from '../types/repo'
 import type { RecommendationItem } from '../types/recommendation'
 import { saveDiscoverSnapshot, peekDiscoverSnapshot, popDiscoverSnapshot } from '../lib/discoverStateStore'
 import { detectSearchMode } from '../services/search-mode'
@@ -83,27 +83,27 @@ let _recommendedModuleCache: { items: RecommendationItem[]; fetchedAt: number } 
   return persisted ? { items: persisted.items, fetchedAt: persisted.fetchedAt } : null
 })()
 
-let _popularModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
+let _popularModuleCache: { repos: SavedRepo[]; fetchedAt: number } | null = (() => {
   const persisted = loadCachedPopular()
   return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
 })()
 
-let _hotTodayModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
+let _hotTodayModuleCache: { repos: SavedRepo[]; fetchedAt: number } | null = (() => {
   const persisted = loadCachedHotToday()
   return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
 })()
 
-let _trendingWeekModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
+let _trendingWeekModuleCache: { repos: SavedRepo[]; fetchedAt: number } | null = (() => {
   const persisted = loadCachedTrendingWeek()
   return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
 })()
 
-let _hiddenGemsModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
+let _hiddenGemsModuleCache: { repos: SavedRepo[]; fetchedAt: number } | null = (() => {
   const persisted = loadCachedHiddenGems()
   return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
 })()
 
-let _agentsModuleCache: { repos: RepoRow[]; fetchedAt: number } | null = (() => {
+let _agentsModuleCache: { repos: SavedRepo[]; fetchedAt: number } | null = (() => {
   const persisted = loadCachedAgents()
   return persisted ? { repos: persisted.repos, fetchedAt: persisted.fetchedAt } : null
 })()
@@ -135,7 +135,7 @@ export default function Discover() {
   const restoredSnapshot = useRef(navigationType === 'POP' ? peekDiscoverSnapshot() : null)
   const restoredFromSnapshot = useRef(restoredSnapshot.current !== null)
 
-  const [repos, setRepos] = useState<RepoRow[]>(() => {
+  const [repos, setRepos] = useState<SavedRepo[]>(() => {
     if (restoredSnapshot.current?.repos?.length) return restoredSnapshot.current.repos
     // Seed from persistent cache only when the URL describes a default-popular
     // landing — any filter param means the cache is for the wrong query.
@@ -148,21 +148,21 @@ export default function Discover() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const recommendedCache = useRef<RepoRow[] | null>(null)
+  const recommendedCache = useRef<SavedRepo[] | null>(null)
   const recommendedItemsCache = useRef<RecommendationItem[] | null>(null)
-  const [rowRepos, setRowRepos] = useState<RepoRow[]>([])
-  const [hotTodayRowRepos, setHotTodayRowRepos] = useState<RepoRow[]>(
+  const [rowRepos, setRowRepos] = useState<SavedRepo[]>([])
+  const [hotTodayRowRepos, setHotTodayRowRepos] = useState<SavedRepo[]>(
     () => _hotTodayModuleCache?.repos ?? []
   )
-  const [trendingWeekRowRepos, setTrendingWeekRowRepos] = useState<RepoRow[]>(
+  const [trendingWeekRowRepos, setTrendingWeekRowRepos] = useState<SavedRepo[]>(
     () => _trendingWeekModuleCache?.repos ?? []
   )
-  const [hiddenGemsRowRepos, setHiddenGemsRowRepos] = useState<RepoRow[]>(
+  const [hiddenGemsRowRepos, setHiddenGemsRowRepos] = useState<SavedRepo[]>(
     () => _hiddenGemsModuleCache?.repos ?? []
   )
   const [heroIndex, setHeroIndex] = useState(0)
   const [heroPaused, setHeroPaused] = useState(false)
-  const [agentsRowRepos, setAgentsRowRepos] = useState<RepoRow[]>(
+  const [agentsRowRepos, setAgentsRowRepos] = useState<SavedRepo[]>(
     () => _agentsModuleCache?.repos ?? []
   )
   const [agentsIndex, setAgentsIndex] = useState(0)
@@ -209,13 +209,20 @@ export default function Discover() {
 
   const discoverInputRef = topNavInputRef
 
-  const ensureClassified = useCallback((repos: RepoRow[]) => {
+  const ensureClassified = useCallback((repos: SavedRepo[]) => {
     for (const r of repos) {
-      if (!r.type_bucket) {
-        const result = classifyRepoBucket(r)
+      if (!r.typeBucket) {
+        // classifyRepoBucket still consumes the legacy `topics: string` (JSON)
+        // shape; the new normalized Repo carries `topics: string[]`.
+        // Adapt here until classifyRepoType.ts is migrated in a later task.
+        const result = classifyRepoBucket({
+          name: r.name,
+          description: r.description,
+          topics: JSON.stringify(r.topics),
+        })
         if (result) {
-          r.type_bucket = result.bucket
-          r.type_sub = result.subType
+          r.typeBucket = result.bucket
+          r.typeSub = result.subType
         }
       }
     }
@@ -283,7 +290,7 @@ export default function Discover() {
 
   useEffect(() => {
     if (repos.length) {
-      verification.seedFromDb(repos.map(r => r.id).filter(Boolean))
+      verification.seedFromDb(repos.map(r => String(r.hostNativeId)).filter(Boolean))
     }
   }, [repos])
 
@@ -316,8 +323,10 @@ export default function Discover() {
       const cached = recommendedItemsCache.current ?? _recommendedModuleCache?.items ?? null
       if (cached) {
         recommendedItemsCache.current = cached
-        recommendedCache.current = cached.map(i => i.repo)
-        setRowRepos(cached.slice(0, 16).map(i => i.repo))
+        // RecommendationItem.repo's static type is still RepoRow (renamed in
+        // Task 12) but the IPC handler emits the normalized SavedRepo shape.
+        recommendedCache.current = cached.map(i => i.repo as unknown as SavedRepo)
+        setRowRepos(cached.slice(0, 16).map(i => i.repo as unknown as SavedRepo))
       }
 
       const isFreshInSession = _recommendedModuleCache
@@ -330,8 +339,8 @@ export default function Discover() {
         _recommendedModuleCache = { items, fetchedAt: Date.now() }
         saveCachedRecommended(items)
         recommendedItemsCache.current = items
-        recommendedCache.current = items.map(i => i.repo)
-        setRowRepos(items.slice(0, 16).map(i => i.repo))
+        recommendedCache.current = items.map(i => i.repo as unknown as SavedRepo)
+        setRowRepos(items.slice(0, 16).map(i => i.repo as unknown as SavedRepo))
       } catch {
         // non-critical — hero/row simply won't render
       }
@@ -347,7 +356,9 @@ export default function Discover() {
       try {
         const q = buildViewModeQuery('hot-today', '', '')
         const { sort, order } = getViewModeSort('hot-today')
-        const data = await window.api.github.searchRepos(q, sort, order)
+        // searchRepos statically returns Repo[] but the handler emits SavedRepo[]
+        // (rows go through repoRowToSavedRepo). Safe to widen here.
+        const data = await window.api.github.searchRepos(q, sort, order) as SavedRepo[]
         _hotTodayModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedHotToday(data)
         setHotTodayRowRepos(data)
@@ -366,7 +377,7 @@ export default function Discover() {
       try {
         const q = buildViewModeQuery('trending-week', '', '')
         const { sort, order } = getViewModeSort('trending-week')
-        const data = await window.api.github.searchRepos(q, sort, order)
+        const data = await window.api.github.searchRepos(q, sort, order) as SavedRepo[]
         _trendingWeekModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedTrendingWeek(data)
         setTrendingWeekRowRepos(data)
@@ -385,7 +396,7 @@ export default function Discover() {
       try {
         const q = buildViewModeQuery('hidden-gems', '', '')
         const { sort, order } = getViewModeSort('hidden-gems')
-        const data = await window.api.github.searchRepos(q, sort, order)
+        const data = await window.api.github.searchRepos(q, sort, order) as SavedRepo[]
         _hiddenGemsModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedHiddenGems(data)
         setHiddenGemsRowRepos(data)
@@ -412,7 +423,7 @@ export default function Discover() {
       try {
         const q = buildViewModeQuery('agents', '', '')
         const { sort, order } = getViewModeSort('agents')
-        const data = await window.api.github.searchRepos(q, sort, order)
+        const data = await window.api.github.searchRepos(q, sort, order) as SavedRepo[]
         _agentsModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedAgents(data)
         setAgentsRowRepos(data)
@@ -547,13 +558,14 @@ export default function Discover() {
     }
   }, [searchParams, setSearchParams])
 
-  const extractMissingColors = useCallback((rows: RepoRow[]) => {
+  const extractMissingColors = useCallback((rows: SavedRepo[]) => {
     for (const repo of rows) {
-      if (repo.banner_color || !repo.avatar_url || !repo.id) continue
-      window.api.repo.extractColor(repo.avatar_url, repo.id)
+      const repoId = String(repo.hostNativeId)
+      if (repo.bannerColor || !repo.ownerAvatarUrl || !repoId) continue
+      window.api.repo.extractColor(repo.ownerAvatarUrl, repoId)
         .then((color: { h: number; s: number; l: number }) => {
           setRepos(prev => prev.map(r =>
-            r.id === repo.id ? { ...r, banner_color: JSON.stringify(color) } : r,
+            String(r.hostNativeId) === repoId ? { ...r, bannerColor: JSON.stringify(color) } : r,
           ))
         })
         .catch(() => {/* non-critical */})
@@ -585,7 +597,7 @@ export default function Discover() {
       setRepos(cachedRepos)
       ensureClassified(cachedRepos)
       extractMissingColors(cachedRepos)
-      const cachedIds = cachedRepos.map(r => r.id).filter(Boolean)
+      const cachedIds = cachedRepos.map(r => String(r.hostNativeId)).filter(Boolean)
       if (cachedIds.length) window.api.verification.prioritise(cachedIds).catch(() => {})
     } else {
       setLoading(true)
@@ -599,17 +611,17 @@ export default function Discover() {
     setLoadingMore(false)
     const gen = ++fetchGeneration.current
     try {
-      let data: RepoRow[]
+      let data: SavedRepo[]
       if (viewMode === 'recommended' && selectedSubtypes.length === 0) {
         if (recommendedCache.current) {
           data = recommendedCache.current
         } else if (_recommendedModuleCache && Date.now() - _recommendedModuleCache.fetchedAt < RECOMMENDED_TTL_MS) {
-          data = _recommendedModuleCache.items.map(i => i.repo)
+          data = _recommendedModuleCache.items.map(i => i.repo as unknown as SavedRepo)
           recommendedCache.current = data
           recommendedItemsCache.current = _recommendedModuleCache.items
         } else {
           const response = await window.api.github.getRecommended()
-          data = response.items.map(item => item.repo)
+          data = response.items.map(item => item.repo as unknown as SavedRepo)
           recommendedCache.current = data
           recommendedItemsCache.current = response.items
           _recommendedModuleCache = { items: response.items, fetchedAt: Date.now() }
@@ -623,12 +635,12 @@ export default function Discover() {
         const langKey = selectedLanguages.length === 1 ? selectedLanguages[0] : ''
         const q = buildTrendingQuery(vm, langKey, filters ?? {}, subKw)
         const { sort: s, order: o } = getViewModeSort(vm)
-        data = await window.api.github.searchRepos(q, s, o)
+        data = await window.api.github.searchRepos(q, s, o) as SavedRepo[]
       }
       if (gen !== fetchGeneration.current) return
       setRepos(data)
       ensureClassified(data)
-      const ids = data.map(r => r.id).filter(Boolean)
+      const ids = data.map(r => String(r.hostNativeId)).filter(Boolean)
       if (ids.length) window.api.verification.prioritise(ids).catch(() => {})
       extractMissingColors(data)
 
@@ -712,7 +724,7 @@ export default function Discover() {
       setDitherScrollHint(true)
       clearTimeout(timer)
       timer = setTimeout(() => {
-        const ids = repos.map(r => r.id).filter(Boolean)
+        const ids = repos.map(r => String(r.hostNativeId)).filter(Boolean)
         if (ids.length) window.api.verification.prioritise(ids).catch(() => {})
       }, 200)
     }
@@ -781,11 +793,11 @@ export default function Discover() {
     fetchGeneration.current += 1
     const langFilter = selectedLanguages.length === 1 ? selectedLanguages[0] : undefined
     try {
-      const res = await window.api.search.tagged(tags, discoverQuery, langFilter, filters ?? appliedFilters)
+      const res = await window.api.search.tagged(tags, discoverQuery, langFilter, filters ?? appliedFilters) as SavedRepo[]
       setRepos(res)
       ensureClassified(res)
       extractMissingColors(res)
-      const ids = res.map(r => r.id).filter(Boolean)
+      const ids = res.map(r => String(r.hostNativeId)).filter(Boolean)
       if (ids.length) window.api.verification.prioritise(ids).catch(() => {})
       const related = await window.api.search.getRelatedTags(res, tags)
       setRelatedTags(related)
@@ -815,10 +827,10 @@ export default function Discover() {
     if (searchMode === 'raw') {
       setSearchPath('raw')
       try {
-        const res = await window.api.search.raw(q, langFilter, filters)
+        const res = await window.api.search.raw(q, langFilter, filters) as SavedRepo[]
         setRepos(res)
         ensureClassified(res)
-        const ids = res.map(r => r.id).filter(Boolean)
+        const ids = res.map(r => String(r.hostNativeId)).filter(Boolean)
         if (ids.length) window.api.verification.prioritise(ids).catch(() => {})
         extractMissingColors(res)
         setDetectedTags([])
@@ -843,10 +855,10 @@ export default function Discover() {
         setAnalysing(false)
         setSearchPath('raw')
         try {
-          const res = await window.api.search.raw(q, langFilter, filters)
+          const res = await window.api.search.raw(q, langFilter, filters) as SavedRepo[]
           setRepos(res)
           ensureClassified(res)
-          const ids = res.map(r => r.id).filter(Boolean)
+          const ids = res.map(r => String(r.hostNativeId)).filter(Boolean)
           if (ids.length) window.api.verification.prioritise(ids).catch(() => {})
         } catch {
           setError('Search failed')
@@ -873,8 +885,8 @@ export default function Discover() {
 
   const allVisible = useMemo(() => {
     return repos.filter(r =>
-      (selectedSubtypes.length === 0 || (r.type_sub != null && selectedSubtypes.includes(r.type_sub))) &&
-      (activeVerification.size === 0 || activeVerification.has(verification.getTier(r.id) as 'verified' | 'likely')) &&
+      (selectedSubtypes.length === 0 || (r.typeSub != null && selectedSubtypes.includes(r.typeSub))) &&
+      (activeVerification.size === 0 || activeVerification.has(verification.getTier(String(r.hostNativeId)) as 'verified' | 'likely')) &&
       (selectedLanguages.length === 0 || (r.language != null && selectedLanguages.some(l => l.toLowerCase() === r.language!.toLowerCase())))
     )
   }, [repos, selectedSubtypes, activeVerification, verification, selectedLanguages])
@@ -888,7 +900,7 @@ export default function Discover() {
     if (viewMode !== 'recommended') return undefined
     const items = recommendedItemsCache.current
     if (!items) return undefined
-    return new Map(items.map(item => [item.repo.id, item.anchors]))
+    return new Map(items.map(item => [String((item.repo as unknown as SavedRepo).hostNativeId), item.anchors]))
     // repos change is the proxy signal that recommendedItemsCache.current was just written
   }, [viewMode, repos])
 
@@ -928,14 +940,14 @@ export default function Discover() {
     const nextPage = page + 1
 
     try {
-      let newResults: RepoRow[]
+      let newResults: SavedRepo[]
       if (searchPath === 'trending') {
         if (viewMode === 'recommended' && selectedSubtypes.length === 0) {
           // Paginate the recommendation engine: fetch the next GitHub search page
           // for each query plan, exclude already-shown ids server-side, re-rank.
-          const excludeIds = repos.map(r => String(r.id))
+          const excludeIds = repos.map(r => String(r.hostNativeId))
           const response = await window.api.github.getRecommended(nextPage, excludeIds)
-          newResults = response.items.map(item => item.repo)
+          newResults = response.items.map(item => item.repo as unknown as SavedRepo)
           if (recommendedItemsCache.current) {
             recommendedItemsCache.current = [...recommendedItemsCache.current, ...response.items]
           }
@@ -947,27 +959,27 @@ export default function Discover() {
           const langKey = selectedLanguages.length === 1 ? selectedLanguages[0] : ''
           const q = buildTrendingQuery(vm, langKey, appliedFilters, subKw)
           const { sort: s, order: o } = getViewModeSort(vm)
-          newResults = await window.api.github.searchRepos(q, s, o, nextPage)
+          newResults = await window.api.github.searchRepos(q, s, o, nextPage) as SavedRepo[]
         }
       } else if (searchPath === 'raw') {
         const langFilter = selectedLanguages.length === 1 ? selectedLanguages[0] : undefined
-        newResults = await window.api.search.raw(discoverQuery, langFilter, appliedFilters, nextPage)
+        newResults = await window.api.search.raw(discoverQuery, langFilter, appliedFilters, nextPage) as SavedRepo[]
       } else {
         const langFilter = selectedLanguages.length === 1 ? selectedLanguages[0] : undefined
-        newResults = await window.api.search.tagged(activeTags, discoverQuery, langFilter, appliedFilters, nextPage)
+        newResults = await window.api.search.tagged(activeTags, discoverQuery, langFilter, appliedFilters, nextPage) as SavedRepo[]
       }
 
       if (gen !== fetchGeneration.current) return
 
-      const existingIds = new Set(repos.map(r => r.id))
-      const unique = newResults.filter(r => !existingIds.has(r.id))
+      const existingIds = new Set(repos.map(r => String(r.hostNativeId)))
+      const unique = newResults.filter(r => !existingIds.has(String(r.hostNativeId)))
 
       if (unique.length > 0) {
         setRepos(prev => [...prev, ...unique])
         setRenderLimit(prev => prev + RENDER_CHUNK)
         ensureClassified(unique)
         extractMissingColors(unique)
-        const newIds = unique.map(r => r.id).filter(Boolean)
+        const newIds = unique.map(r => String(r.hostNativeId)).filter(Boolean)
         if (newIds.length) window.api.verification.prioritise(newIds).catch(() => {})
       }
 
@@ -1001,11 +1013,12 @@ export default function Discover() {
     if (snap) saveDiscoverSnapshot({ ...snap, scrollTop: scrollRef.current?.scrollTop ?? 0 })
     const match = path.match(/^\/repo\/([^/]+)\/([^/]+)/)
     const repo = snap?.repos && match ? snap.repos.find(r => r.owner === match[1] && r.name === match[2]) : null
-    if (repo?.id) {
-      window.api.engagement.logClick(repo.id, snap?.viewMode === 'recommended' ? 'recommended' : 'discover')
+    const repoId = repo ? String(repo.hostNativeId) : null
+    if (repoId) {
+      window.api.engagement.logClick(repoId, snap?.viewMode === 'recommended' ? 'recommended' : 'discover')
         .catch(() => { /* non-critical */ })
     }
-    navigate(path, { state: { fromDiscoverView: snap?.viewMode, fromDiscoverPath: location.pathname + location.search, repoAvatarUrl: repo?.avatar_url ?? null, background: location } })
+    navigate(path, { state: { fromDiscoverView: snap?.viewMode, fromDiscoverPath: location.pathname + location.search, repoAvatarUrl: repo?.ownerAvatarUrl ?? null, background: location } })
   }, [navigate, location.pathname, location.search])
 
   const handleAiNavigate = useCallback((owner: string, name: string) => {
@@ -1100,7 +1113,7 @@ export default function Discover() {
 
   const handleStar = useCallback((repoId: string, starred: boolean) => {
     if (starred && viewMode === 'recommended') {
-      setRepos(prev => prev.filter(r => r.id !== repoId))
+      setRepos(prev => prev.filter(r => String(r.hostNativeId) !== repoId))
     }
   }, [viewMode])
 
@@ -1213,12 +1226,12 @@ export default function Discover() {
                       : <div className="discover-hero discover-hero--skeleton" />}
 
                     {rowRepos.length > 0 && (
-                      <DiscoverRow<RepoRow>
+                      <DiscoverRow<SavedRepo>
                         title="Recommended"
                         items={rowRepos}
                         activeIndex={heroIndex}
                         columns={effectiveCols}
-                        getItemKey={r => r.id}
+                        getItemKey={r => String(r.hostNativeId)}
                         renderCard={({ item, posIndex, columns, visible }) => (
                           <DiscoverRowRepoCard
                             repo={item}
@@ -1240,12 +1253,12 @@ export default function Discover() {
                     )}
 
                     {agentsRowRepos.length > 0 && (
-                      <DiscoverRow<RepoRow>
+                      <DiscoverRow<SavedRepo>
                         title="Agents"
                         items={agentsRowRepos}
                         activeIndex={agentsIndex}
                         columns={effectiveCols}
-                        getItemKey={r => r.id}
+                        getItemKey={r => String(r.hostNativeId)}
                         renderCard={({ item, posIndex, columns, visible }) => (
                           <DiscoverRowRepoCard
                             repo={item}
@@ -1266,12 +1279,12 @@ export default function Discover() {
                     )}
 
                     {hotTodayRowRepos.length > 0 && (
-                      <DiscoverRow<RepoRow>
+                      <DiscoverRow<SavedRepo>
                         title="Hot today"
                         items={hotTodayRowRepos}
                         activeIndex={hotTodayIndex}
                         columns={effectiveCols}
-                        getItemKey={r => r.id}
+                        getItemKey={r => String(r.hostNativeId)}
                         renderCard={({ item, posIndex, columns, visible }) => (
                           <DiscoverRowRepoCard
                             repo={item}
@@ -1292,12 +1305,12 @@ export default function Discover() {
                     )}
 
                     {trendingWeekRowRepos.length > 0 && (
-                      <DiscoverRow<RepoRow>
+                      <DiscoverRow<SavedRepo>
                         title="Trending this week"
                         items={trendingWeekRowRepos}
                         activeIndex={trendingWeekIndex}
                         columns={effectiveCols}
-                        getItemKey={r => r.id}
+                        getItemKey={r => String(r.hostNativeId)}
                         renderCard={({ item, posIndex, columns, visible }) => (
                           <DiscoverRowRepoCard
                             repo={item}
@@ -1318,12 +1331,12 @@ export default function Discover() {
                     )}
 
                     {repos.length > 0 && (
-                      <DiscoverRow<RepoRow>
+                      <DiscoverRow<SavedRepo>
                         title="Most Popular"
                         items={repos.slice(0, 30)}
                         activeIndex={mostPopularIndex}
                         columns={effectiveCols}
-                        getItemKey={r => r.id}
+                        getItemKey={r => String(r.hostNativeId)}
                         renderCard={({ item, posIndex, columns, visible }) => (
                           <DiscoverRowRepoCard
                             repo={item}
@@ -1345,12 +1358,12 @@ export default function Discover() {
                     )}
 
                     {hiddenGemsRowRepos.length > 0 && (
-                      <DiscoverRow<RepoRow>
+                      <DiscoverRow<SavedRepo>
                         title="Hidden gems"
                         items={hiddenGemsRowRepos}
                         activeIndex={hiddenGemsIndex}
                         columns={effectiveCols}
-                        getItemKey={r => r.id}
+                        getItemKey={r => String(r.hostNativeId)}
                         renderCard={({ item, posIndex, columns, visible }) => (
                           <DiscoverRowRepoCard
                             repo={item}

@@ -79,24 +79,6 @@
   flex-shrink: 0;
 }
 
-.discover-hero-owner-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-bottom: 10px;
-}
-
-.discover-hero-owner-icon {
-  color: rgba(255, 255, 255, 0.4);
-  flex-shrink: 0;
-}
-
-.discover-hero-owner {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
-}
-
 .discover-hero-content {
   position: absolute;
   bottom: 0;

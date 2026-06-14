@@ -4,34 +4,34 @@ import DitherBackground from './DitherBackground'
 import LanguageIcon from './LanguageIcon'
 import { getLangColor } from '../lib/languages'
 import { getSubTypeConfig } from '../config/repoTypeConfig'
-import type { RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
 
 interface DiscoverHeroProps {
-  repo: RepoRow | null
+  repo: SavedRepo | null
   onNavigate?: (path: string) => void
 }
 
 interface LayerProps {
-  repo: RepoRow
+  repo: SavedRepo
   animClass: string
 }
 
 function HeroLayer({ repo, animClass }: LayerProps) {
   const langColor = getLangColor(repo.language)
-  const typeConfig = getSubTypeConfig(repo.type_sub)
+  const typeConfig = getSubTypeConfig(repo.typeSub)
 
   // Use cached translation if the description is non-English, or resolve async
   const [desc, setDesc] = useState<string | null>(() => {
-    if (repo.detected_language && repo.detected_language !== 'en' && repo.translated_description) {
-      return repo.translated_description
+    if (repo.detectedLanguage && repo.detectedLanguage !== 'en' && repo.translatedDescription) {
+      return repo.translatedDescription
     }
     return repo.description
   })
 
   useEffect(() => {
     setDesc(() => {
-      if (repo.detected_language && repo.detected_language !== 'en' && repo.translated_description) {
-        return repo.translated_description
+      if (repo.detectedLanguage && repo.detectedLanguage !== 'en' && repo.translatedDescription) {
+        return repo.translatedDescription
       }
       return repo.description
     })
@@ -41,8 +41,8 @@ function HeroLayer({ repo, animClass }: LayerProps) {
     async function maybeTranslate() {
       try {
         const preferredLang = await window.api.settings.getPreferredLanguage().catch(() => 'en')
-        if (repo.translated_description && repo.translated_description_lang === preferredLang) {
-          setDesc(repo.translated_description)
+        if (repo.translatedDescription && repo.translatedDescriptionLang === preferredLang) {
+          setDesc(repo.translatedDescription)
           return
         }
         const scriptLang = await window.api.translate.check(repo.description!, preferredLang, 6).catch(() => null)
@@ -50,25 +50,26 @@ function HeroLayer({ repo, animClass }: LayerProps) {
         const result = await window.api.translate.translate(repo.description!, preferredLang).catch(() => null)
         if (!result) return
         setDesc(result.translatedText)
-        if (repo.id) {
-          window.api.db.cacheTranslatedDescription(repo.id, result.translatedText, preferredLang, scriptLang).catch(() => {})
+        const repoDbId = String(repo.hostNativeId)
+        if (repoDbId) {
+          window.api.db.cacheTranslatedDescription(repoDbId, result.translatedText, preferredLang, scriptLang).catch(() => {})
         }
       } catch { /* non-critical */ }
     }
 
     maybeTranslate()
-  }, [repo.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [repo.hostNativeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className={`discover-hero-layer ${animClass}`}>
-      <DitherBackground avatarUrl={repo.avatar_url} />
+      <DitherBackground avatarUrl={repo.ownerAvatarUrl} />
       <div className="discover-hero-fade-top" />
       <div className="discover-hero-fade" />
       <div className="discover-hero-content">
         <div className="discover-hero-text">
           <div className="discover-hero-title-row">
-            {repo.avatar_url && (
-              <img className="discover-hero-avatar-img" src={repo.avatar_url} alt={repo.owner} />
+            {repo.ownerAvatarUrl && (
+              <img className="discover-hero-avatar-img" src={repo.ownerAvatarUrl} alt={repo.owner} />
             )}
             <div className="discover-hero-title">{repo.name}</div>
           </div>
@@ -95,14 +96,6 @@ function HeroLayer({ repo, animClass }: LayerProps) {
               )}
             </div>
           )}
-          {repo.owner && (
-            <div className="discover-hero-owner-row">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="discover-hero-owner-icon">
-                <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
-              </svg>
-              <span className="discover-hero-owner">{repo.owner}</span>
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -110,12 +103,12 @@ function HeroLayer({ repo, animClass }: LayerProps) {
 }
 
 export default function DiscoverHero({ repo, onNavigate }: DiscoverHeroProps) {
-  const [shownRepo, setShownRepo] = useState<RepoRow | null>(repo)
-  const [outgoingRepo, setOutgoingRepo] = useState<RepoRow | null>(null)
+  const [shownRepo, setShownRepo] = useState<SavedRepo | null>(repo)
+  const [outgoingRepo, setOutgoingRepo] = useState<SavedRepo | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (!repo || repo.id === shownRepo?.id) return
+    if (!repo || repo.hostNativeId === shownRepo?.hostNativeId) return
 
     if (timerRef.current) clearTimeout(timerRef.current)
 
@@ -125,7 +118,7 @@ export default function DiscoverHero({ repo, onNavigate }: DiscoverHeroProps) {
     timerRef.current = setTimeout(() => {
       setOutgoingRepo(null)
     }, 520)
-  }, [repo?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [repo?.hostNativeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
@@ -137,10 +130,10 @@ export default function DiscoverHero({ repo, onNavigate }: DiscoverHeroProps) {
       onClick={() => { if (shownRepo) onNavigate?.(`/repo/${shownRepo.owner}/${shownRepo.name}`) }}
     >
       {outgoingRepo && (
-        <HeroLayer key={outgoingRepo.id + '-out'} repo={outgoingRepo} animClass="discover-hero-layer--out" />
+        <HeroLayer key={String(outgoingRepo.hostNativeId) + '-out'} repo={outgoingRepo} animClass="discover-hero-layer--out" />
       )}
       {shownRepo && (
-        <HeroLayer key={shownRepo.id + '-in'} repo={shownRepo} animClass={outgoingRepo ? 'discover-hero-layer--in' : 'discover-hero-layer--stable'} />
+        <HeroLayer key={String(shownRepo.hostNativeId) + '-in'} repo={shownRepo} animClass={outgoingRepo ? 'discover-hero-layer--in' : 'discover-hero-layer--stable'} />
       )}
     </div>
   )
