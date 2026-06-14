@@ -18,6 +18,7 @@ import { buildVisibleRows } from '../lib/fileTree/model'
 import { buildDiffBaseOptions } from '../lib/fileTree/diffBaseOptions'
 import type { TreeEntry, VisibleRow, Density, SearchMode, DiffBaseRef } from '../lib/fileTree/types'
 import { isVideoFile, isPdfFile } from './files/fileTypes'
+import type { Release } from '../types/repo'
 
 // FileContentPanel's local TreeEntry doesn't include 'commit'; this alias
 // matches its expected shape so casts at the boundary are explicit.
@@ -29,7 +30,7 @@ interface Props {
   branch: string
   initialPath?: string | null
   repoId?: string | null
-  releases?: { tag_name: string }[]
+  releases?: Release[]
   prefetchedTree?: {
     sha: string
     entries: Array<{ path: string; mode: string; type: 'blob' | 'tree' | 'commit'; sha: string; size?: number }>

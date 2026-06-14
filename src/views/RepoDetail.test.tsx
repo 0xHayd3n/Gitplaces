@@ -9,6 +9,7 @@ import { GitHubAuthProvider } from '../contexts/GitHubAuth'
 import { MockLearningProgressProvider } from '../contexts/LearningProgressContext'
 import { parseSkillDepths } from '../utils/skillParse'
 import type { SkillRow } from '../types/repo'
+import { fixtureSavedRepo, fixtureRelease } from '../test-utils/repoFixtures'
 
 // BannerCard renders DitherBackground directly; mock it so jsdom doesn't choke
 // on canvas operations while the Activities tab renders cards in tests.
@@ -40,21 +41,24 @@ describe('parseSkillDepths', () => {
 
 // ── RepoDetail install button tests ─────────────────────────────────
 
-const repoRow = {
-  owner: 'vercel', name: 'next.js', description: 'The React framework',
-  language: 'TypeScript', stars: 100000, forks: 20000, open_issues: 500,
-  watchers: 100000, size: 50000, license: 'MIT', topics: '[]',
-  updated_at: '2024-01-01', saved_at: null,
-}
+const repoRow = fixtureSavedRepo({
+  hostNativeId: 'vercel/next.js',
+  fullName: 'vercel/next.js',
+  owner: 'vercel',
+  name: 'next.js',
+  description: 'The React framework',
+  language: 'TypeScript',
+  stars: 100000,
+  forks: 20000,
+  openIssues: 500,
+  watchers: 100000,
+  size: 50000,
+  license: 'MIT',
+  topics: [],
+  updatedAt: '2024-01-01',
+})
 
-const sampleRelease = {
-  tag_name: 'v1.0.0',
-  name: 'v1.0.0',
-  published_at: '2026-04-01T00:00:00Z',
-  body: 'release notes',
-  assets: [],
-  prerelease: false,
-}
+const sampleRelease = fixtureRelease()
 
 function setupDetail(
   skillRow: SkillRow | null,
@@ -269,12 +273,22 @@ describe('RepoDetail related tab', () => {
 
   it('shows Related tab and cards when related repos are provided', async () => {
     setupDetail(null, null, vi.fn(), [
-      {
-        owner: 'facebook', name: 'react', description: 'A JS library',
-        language: 'JavaScript', stars: 200000, forks: 40000,
-        open_issues: 1000, watchers: 200000, size: 30000,
-        license: 'MIT', topics: '[]', updated_at: '2024-01-01', saved_at: null,
-      },
+      fixtureSavedRepo({
+        hostNativeId: 'facebook/react',
+        fullName: 'facebook/react',
+        owner: 'facebook',
+        name: 'react',
+        description: 'A JS library',
+        language: 'JavaScript',
+        stars: 200000,
+        forks: 40000,
+        openIssues: 1000,
+        watchers: 200000,
+        size: 30000,
+        license: 'MIT',
+        topics: [],
+        updatedAt: '2024-01-01',
+      }),
     ])
     const relatedTab = await waitFor(() => screen.getByRole('button', { name: 'Related' }))
     fireEvent.click(relatedTab)
@@ -402,16 +416,16 @@ describe('RepoDetail activities tab — merged feed', () => {
 })
 
 describe('releaseRowToFeedEvent', () => {
-  it('maps a ReleaseRow to a synthetic ReleaseEvent with the expected shape', async () => {
+  it('maps a Release to a synthetic ReleaseEvent with the expected shape', async () => {
     const { releaseRowToFeedEvent } = await import('./RepoDetail')
-    const row = {
-      tag_name: 'v2.0.0',
+    const row = fixtureRelease({
+      tagName: 'v2.0.0',
       name: 'Two Point Oh',
-      published_at: '2026-03-15T12:00:00Z',
+      publishedAt: '2026-03-15T12:00:00Z',
       body: 'big release',
-      assets: [{ name: 'a.zip', size: 100, browser_download_url: 'u', download_count: 0 }],
+      assets: [{ name: 'a.zip', size: 100, browserDownloadUrl: 'u', downloadCount: 0 }],
       prerelease: false,
-    }
+    })
     const event = releaseRowToFeedEvent(row, 'acme/widget')
     expect(event.id).toBe('release-v2.0.0')
     expect(event.type).toBe('ReleaseEvent')
@@ -424,6 +438,8 @@ describe('releaseRowToFeedEvent', () => {
     expect(release.body).toBe('big release')
     expect(release.prerelease).toBe(false)
     expect(release.assets).toHaveLength(1)
+    expect(release.assets[0].browser_download_url).toBe('u')
+    expect(release.assets[0].download_count).toBe(0)
   })
 })
 

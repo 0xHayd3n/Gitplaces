@@ -20,7 +20,7 @@ import LanguageIcon from '../components/LanguageIcon'
 import logoTransparent from '../assets/logo-transparent.png'
 import { useSavedRepos } from '../contexts/SavedRepos'
 import { useArchivedRepos } from '../hooks/useArchivedRepos'
-import { parseTopics, formatStars, type RepoRow, type ReleaseRow, type SkillRow, type SubSkillRow, type AnatomyPayload } from '../types/repo'
+import { formatStars, type Repo, type SavedRepo, type Release, type SkillRow, type SubSkillRow, type AnatomyPayload } from '../types/repo'
 import AnatomyIndicators from '../components/AnatomyIndicators'
 import AnatomyView from '../components/AnatomyView'
 import AnatomyMemoryPanel from '../components/AnatomyMemoryPanel'
@@ -443,34 +443,44 @@ const ALL_TABS: { id: Tab; label: string }[] = [
 ]
 
 // ── Synthetic ReleaseEvent adapter ─────────────────────────────────
-// Maps a ReleaseRow (from getReleases) into the GitHubFeedEvent shape that
+// Maps a Release (from getReleases) into the GitHubFeedEvent shape that
 // BannerCard / ActivityModal expect, so the Activities tab can reuse the same
 // presentation pieces as the Library feed without a parallel rendering path.
 // actor.login/avatar_url are empty: BannerCard derives the card avatar from
 // repo.full_name, and ActivityModalEntry computes bylineActor but never
-// displays it. ReleaseRow has no author field, so we can't populate them.
-export function releaseRowToFeedEvent(r: ReleaseRow, repoFullName: string): GitHubFeedEvent {
+// displays it. Release has no author field, so we can't populate them.
+//
+// Output uses snake_case because GitHubFeedEvent mirrors the GitHub events
+// API shape — the activity layer (BannerCard, ActivityModal) reads snake_case
+// fields out of event.payload.release. The conversion is "translate Release
+// (camelCase) → event payload (snake_case)" at this single boundary.
+export function releaseRowToFeedEvent(r: Release, repoFullName: string): GitHubFeedEvent {
   return {
-    id: `release-${r.tag_name}`,
+    id: `release-${r.tagName}`,
     type: 'ReleaseEvent',
     actor: { login: '', avatar_url: '' },
     repo: { full_name: repoFullName },
     payload: {
       release: {
-        tag_name: r.tag_name,
+        tag_name: r.tagName,
         name: r.name,
         body: r.body,
         prerelease: r.prerelease,
-        assets: r.assets,
+        assets: r.assets.map(a => ({
+          name: a.name,
+          size: a.size,
+          browser_download_url: a.browserDownloadUrl,
+          download_count: a.downloadCount,
+        })),
       },
     },
-    created_at: r.published_at,
+    created_at: r.publishedAt,
   }
 }
 
 // ── Per-repo data cache (survives navigations in the same session) ──
 interface CachedRepoEntry {
-  repo: RepoRow
+  repo: SavedRepo
   readme: string | null
   cleanedReadme: string
   displayReadme: string
@@ -488,7 +498,7 @@ function patchRepoCache(key: string, patch: Partial<CachedRepoEntry>) {
 // waiting for fetchRepoBundle to resolve. The live fetch still runs and
 // overwrites, so any drift between the cached row and the live response is
 // resolved within one round-trip.
-export function primeRepoCacheFromRows(rows: ReadonlyArray<RepoRow>) {
+export function primeRepoCacheFromRows(rows: ReadonlyArray<SavedRepo>) {
   for (const row of rows) {
     patchRepoCache(`${row.owner}/${row.name}`, { repo: row })
   }
@@ -501,7 +511,7 @@ export function primeRepoCacheFromRows(rows: ReadonlyArray<RepoRow>) {
 // without serving stale data for very long.
 const SESSION_CACHE_TTL_MS = 5 * 60 * 1000
 
-const _releasesCache     = new Map<string, { value: ReleaseRow[]; ts: number }>()
+const _releasesCache     = new Map<string, { value: Release[]; ts: number }>()
 const _starredCache      = new Map<string, { value: boolean;       ts: number }>()
 // Caches only the boolean answer "does this repo have importable agent
 // content?" (skills / sub-agents / slash commands). We don't cache the full
@@ -542,7 +552,7 @@ export default function RepoDetail() {
   const [seedTier, setSeedTier]       = useState<'verified' | 'likely' | null>(null)
   const [seedSignals, setSeedSignals] = useState<string[]>([])
 
-  const [repo, setRepo] = useState<RepoRow | null>(null)
+  const [repo, setRepo] = useState<SavedRepo | null>(null)
   const [prefetchedTree, setPrefetchedTree] = useState<{
     sha: string
     entries: Array<{ path: string; mode: string; type: 'blob' | 'tree' | 'commit'; sha: string; size?: number }>
@@ -569,16 +579,16 @@ export default function RepoDetail() {
   const [readmeBadges, setReadmeBadges] = useState<ParsedBadge[]>([])
   const [cleanedReadme, setCleanedReadme] = useState<string>('')
   const [cleanedDisplayReadme, setCleanedDisplayReadme] = useState<string>('')
-  const [releases, setReleases] = useState<ReleaseRow[] | 'loading' | 'error'>('loading')
+  const [releases, setReleases] = useState<Release[] | 'loading' | 'error'>('loading')
   const [versionedLearns, setVersionedLearns] = useState<Set<string>>(new Set())
   const [versionLearnStates, setVersionLearnStates] = useState<Map<string, 'UNLEARNED' | 'LEARNING' | 'LEARNED' | 'ERROR'>>(new Map())
-  const [related, setRelated] = useState<RepoRow[]>([])
+  const [related, setRelated] = useState<Repo[]>([])
   // Memoised synthetic events for the Activities tab; rebuilt only when the
   // releases data or the repo identity changes. Still used as the `events`
   // prop on <ActivityModal> for stacked navigation through release modals.
   const activityEvents = useMemo(
     () => Array.isArray(releases)
-      ? (releases as ReleaseRow[]).map(r => releaseRowToFeedEvent(r, `${owner}/${name}`))
+      ? (releases as Release[]).map(r => releaseRowToFeedEvent(r, `${owner}/${name}`))
       : [],
     [releases, owner, name],
   )
@@ -586,7 +596,7 @@ export default function RepoDetail() {
   // write IPCs; merged with releases below to form the unified Activities feed.
   const userEvents = useRepoUserEvents(owner, name)
   const lastReleaseDate = Array.isArray(releases) && releases.length > 0
-    ? (releases as ReleaseRow[])[0].published_at
+    ? (releases as Release[])[0].publishedAt
     : null
   // Stats fetches once per repo (no `lastReleaseDate` dep). When releases
   // later resolve, we recompute the release-affected score components in
@@ -624,7 +634,7 @@ export default function RepoDetail() {
   const repoActivityItems = useMemo<RepoActivityItem[]>(() => {
     const items: RepoActivityItem[] = []
     if (Array.isArray(releases)) {
-      for (const r of releases as ReleaseRow[]) {
+      for (const r of releases as Release[]) {
         const ev = releaseRowToFeedEvent(r, `${owner}/${name}`)
         items.push({ kind: 'release', ts: ev.created_at, event: ev })
       }
@@ -729,7 +739,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   const [storybookState, setStorybookState] = useState<'detecting' | string | null>('detecting')
   const [storybookReadmeScanned, setStorybookReadmeScanned] = useState(false)
   const isComponentLibrary = useMemo(
-    () => isComponentLibraryRepo(parseTopics(repo?.topics ?? null), repo?.description ?? null),
+    () => isComponentLibraryRepo(repo?.topics ?? [], repo?.description ?? null),
     [repo?.topics, repo?.description]
   )
 
@@ -782,7 +792,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
 
     // Seed from cache immediately so the UI shows content on revisit without a flash
     setRepo(cached?.repo ?? null)
-    setStarred(cached?.repo ? !!cached.repo.starred_at : false)
+    setStarred(cached?.repo ? !!cached.repo.starredAt : false)
     setReadme(cached && 'readme' in cached ? (cached.readme as string | null) : 'loading')
     setDisplayReadme(cached?.displayReadme ?? '')
     setCleanedReadme(cached?.cleanedReadme ?? '')
@@ -844,11 +854,11 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
               if (!row) { setRepoError(true); return }
               setRepo(row)
               patchRepoCache(cacheKey, { repo: row })
-              setStarred(!!row.starred_at)
-              window.api.verification.getScore(row.id)
+              setStarred(!!row.starredAt)
+              window.api.verification.getScore(String(row.hostNativeId))
                 .then(s => { if (!cancelled && s) { setSeedTier(s.tier); setSeedSignals(s.signals) } })
                 .catch(() => {})
-              window.api.github.getRelatedRepos(owner, name, row.topics ?? '[]')
+              window.api.github.getRelatedRepos(owner, name, JSON.stringify(row.topics))
                 .then(items => { if (!cancelled) setRelated(items) })
                 .catch(() => {})
             })
@@ -907,10 +917,10 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
         writeSessionCache(_releasesCache, cacheKey, bundle.releases)
         releasesFetchedRef.current = cacheKey
         setPrefetchedTree(bundle.rootTree)
-        window.api.verification.getScore(row.id)
+        window.api.verification.getScore(String(row.hostNativeId))
           .then(s => { if (!cancelled && s) { setSeedTier(s.tier); setSeedSignals(s.signals) } })
           .catch(() => {})
-        window.api.github.getRelatedRepos(owner, name, row.topics ?? '[]')
+        window.api.github.getRelatedRepos(owner, name, JSON.stringify(row.topics))
           .then(items => { if (!cancelled) setRelated(items) })
           .catch(() => {})
       })
@@ -963,12 +973,12 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   useEffect(() => {
     if (!owner || !name) return
     if (!isComponentLibrary) return
-    // Defer until repo.default_branch resolves — otherwise we'd prefetch with
+    // Defer until repo.defaultBranch resolves — otherwise we'd prefetch with
     // the 'main' fallback first, then re-fire with the real branch when repo
     // loads, paying for two scans on repos whose default branch isn't 'main'.
     // In practice isComponentLibrary already gates on repo loading (it reads
     // repo.topics/description), so this guard is defensive belt-and-suspenders.
-    const branch = repo?.default_branch
+    const branch = repo?.defaultBranch
     if (!branch) return
     if (getCachedScan(owner, name, branch)) return
 
@@ -987,7 +997,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     }, { timeout: 3000 })
 
     return () => cancelIdle(handle)
-  }, [owner, name, isComponentLibrary, repo?.default_branch])
+  }, [owner, name, isComponentLibrary, repo?.defaultBranch])
 
   // Detect whether this repo contains importable agent content
   // (skills/, agents/, commands/) so the dropdown's "Import to agent library…"
@@ -1087,15 +1097,16 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   }, [owner, name, activeTab])
 
   // Load collections
+  const repoId = repo ? String(repo.hostNativeId) : null
   useEffect(() => {
-    if (!repo?.id) return
-    window.api.library.getCollections(repo.id).then(cols => setRepoCols(cols))
-  }, [repo?.id])
+    if (!repoId) return
+    window.api.library.getCollections(repoId).then(cols => setRepoCols(cols))
+  }, [repoId])
 
   useEffect(() => {
-    if (!repo?.id) return
-    window.api.engagement.logClick(repo.id, 'detail').catch(() => {})
-  }, [repo?.id])
+    if (!repoId) return
+    window.api.engagement.logClick(repoId, 'detail').catch(() => {})
+  }, [repoId])
 
   // Extract YouTube video links, social posts, and commands when README loads
   useEffect(() => {
@@ -1198,13 +1209,13 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
       }
 
       // ── Step 2: Check translation cache ──
-      if (repo?.translated_readme && repo.translated_readme_lang === preferredLang) {
-        const { cleaned: cleanedCached } = extractBadges(repo.translated_readme)
+      if (repo?.translatedReadme && repo.translatedReadmeLang === preferredLang) {
+        const { cleaned: cleanedCached } = extractBadges(repo.translatedReadme)
         setCleanedDisplayReadme(cleanedCached)
-        setDisplayReadme(repo.translated_readme)
+        setDisplayReadme(repo.translatedReadme)
         setReadmeTranslated(true)
-        setReadmeDetectedLang(repo.detected_language ?? null)
-        patchRepoCache(ck, { readme: raw, cleanedReadme: cleanedRaw, displayReadme: repo.translated_readme, cleanedDisplayReadme: cleanedCached, readmeBadges: badges })
+        setReadmeDetectedLang(repo.detectedLanguage ?? null)
+        patchRepoCache(ck, { readme: raw, cleanedReadme: cleanedRaw, displayReadme: repo.translatedReadme, cleanedDisplayReadme: cleanedCached, readmeBadges: badges })
         return
       }
 
@@ -1238,9 +1249,9 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
       patchRepoCache(ck, { readme: raw, cleanedReadme: cleanedRaw, displayReadme: result.translatedText, cleanedDisplayReadme: cleanedTranslated, readmeBadges: badges })
 
       // Cache result
-      if (repo?.id) {
+      if (repoId) {
         window.api.db.cacheTranslatedReadme(
-          repo.id,
+          repoId,
           result.translatedText,
           preferredLang,
           scriptLang,
@@ -1276,7 +1287,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
         await window.api.github.starRepo(owner, name)
         setStarred(true)
         writeSessionCache(_starredCache, cacheKey, true)
-        window.api.svgCache.prefetch(owner, name, repo?.default_branch ?? 'main').catch(() => {})
+        window.api.svgCache.prefetch(owner, name, repo?.defaultBranch ?? 'main').catch(() => {})
       }
       window.dispatchEvent(new CustomEvent('library:changed'))
     } catch { /* silently ignore */ }
@@ -1302,7 +1313,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
       setComponentsSkillRow(freshComp)
       setLearnState('LEARNED')
       window.dispatchEvent(new CustomEvent('library:changed'))
-      window.api.svgCache.prefetch(owner ?? '', name ?? '', repo?.default_branch ?? 'main').catch(() => {})
+      window.api.svgCache.prefetch(owner ?? '', name ?? '', repo?.defaultBranch ?? 'main').catch(() => {})
     } catch (err) {
       setLearnState('UNLEARNED')
       const msg = err instanceof Error ? err.message : ''
@@ -1368,10 +1379,15 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   }
 
   // ── Derived values ────────────────────────────────────────────────
-  const topics = parseTopics(repo?.topics ?? null)
+  const topics = repo?.topics ?? []
   const cfg = getLangConfig(repo?.language ?? '')
-  const typeBucket = repo?.type_bucket ?? (repo ? classifyRepoBucket(repo)?.bucket : null) ?? null
-  const typeConfig = getSubTypeConfig(repo?.type_sub ?? null)
+  // classifyRepoBucket still consumes the legacy `topics: string` JSON-encoded
+  // shape; bridge by stringifying. Task 12 migrates classifyRepoBucket to take
+  // `string[]` directly.
+  const typeBucket = repo?.typeBucket ?? (repo
+    ? classifyRepoBucket({ name: repo.name, description: repo.description, topics: JSON.stringify(repo.topics) })?.bucket
+    : null) ?? null
+  const typeConfig = getSubTypeConfig(repo?.typeSub ?? null)
   const ditherGradient = getBucketGradient(typeConfig?.accentColor ?? getBucketColor(typeBucket))
 
   // Badge category buckets
@@ -1405,9 +1421,9 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
 
   const skillDepths = skillRow ? parseSkillDepths(skillRow.content) : null
 
-  const liveTier    = (repo ? verification.getTier(repo.id) : null) ?? seedTier
-  const liveSignals = (repo && verification.getSignals(repo.id).length > 0)
-    ? verification.getSignals(repo.id)
+  const liveTier    = (repoId ? verification.getTier(repoId) : null) ?? seedTier
+  const liveSignals = (repoId && verification.getSignals(repoId).length > 0)
+    ? verification.getSignals(repoId)
     : seedSignals
 
   // Defer heavy README rendering so the page header/tabs render first
@@ -1422,9 +1438,9 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   // ── Article slot content ─────────────────────────────────────────
   const bylineNode = (
     <>
-      {repo?.avatar_url ? (
+      {repo?.ownerAvatarUrl ? (
         <img
-          src={repo.avatar_url}
+          src={repo.ownerAvatarUrl}
           alt={owner ?? 'owner'}
           className="article-layout-byline-avatar"
         />
@@ -1445,7 +1461,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
       {repo && (
         <span className="article-layout-byline-meta">
           <span className="article-layout-byline-meta-sep">·</span>
-          Updated {formatDate(repo.pushed_at ?? repo.updated_at)}
+          Updated {formatDate(repo.pushedAt ?? repo.updatedAt)}
         </span>
       )}
     </>
@@ -1527,7 +1543,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     <div className="stats-sidebar">
 
       {repo && (
-        <RepoNotes repoId={repo.id} owner={owner!} repoName={name!} />
+        <RepoNotes repoId={repoId!} owner={owner!} repoName={name!} />
       )}
 
       {/* ── Enriched stats sidebar ── */}
@@ -1616,7 +1632,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
               { key: 'License',        val: formatLicense(repo.license) ?? '—' },
               { key: 'Size',           val: formatSize(repo.size) },
               { key: 'Watchers',       val: formatCount(repo.watchers) },
-              { key: 'Default branch', val: repo.default_branch ?? 'main', isMono: true },
+              { key: 'Default branch', val: repo.defaultBranch ?? 'main', isMono: true },
             ] as { key: string; val: string; isMono?: boolean }[]).map(({ key, val, isMono }) => (
               <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
                 <span style={{ fontFamily: 'Inter, sans-serif', color: 'var(--t3)' }}>{key}</span>
@@ -1724,7 +1740,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
           <ArticleLayout
             navBar={inLibrary ? null : <NavBar />}
             byline={bylineNode}
-            dither={<DitherBackground avatarUrl={repo?.avatar_url} fallbackGradient={ditherGradient} staticFrame staticCameraIdx={cameraIdxForRepo(owner ?? '', name ?? '')} />}
+            dither={<DitherBackground avatarUrl={repo?.ownerAvatarUrl} fallbackGradient={ditherGradient} staticFrame staticCameraIdx={cameraIdxForRepo(owner ?? '', name ?? '')} />}
             title={titleNode}
             titleExtras={titleExtrasNode}
             description={
@@ -1768,7 +1784,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                         content={deferredReadmeContent || (readme as string)}
                         repoOwner={owner ?? ''}
                         repoName={name ?? ''}
-                        branch={repo?.default_branch ?? 'main'}
+                        branch={repo?.defaultBranch ?? 'main'}
                         onNavigateToFile={handleNavigateToFile}
                         onTocReady={handleTocReady}
                         readmeBodyRef={readmeBodyRef}
@@ -1782,9 +1798,9 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                   <FilesTab
                     owner={owner ?? ''}
                     name={name ?? ''}
-                    branch={repo.default_branch ?? 'main'}
+                    branch={repo.defaultBranch ?? 'main'}
                     initialPath={filesTargetPath}
-                    repoId={repo?.id ?? null}
+                    repoId={repoId}
                     releases={Array.isArray(releases) ? releases : []}
                     prefetchedTree={prefetchedTree}
                   />
@@ -1794,7 +1810,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                   skillRow ? (
                     skillRow.anatomy_source && anatomyPayload ? (
                       <div className="anatomy-skill-tab">
-                        <AnatomyIndicators payload={anatomyPayload} updateAvailable={(repo?.update_available ?? 0) as number} />
+                        <AnatomyIndicators payload={anatomyPayload} updateAvailable={(repo?.updateAvailable ?? 0) as number} />
                         <AnatomyView payload={anatomyPayload} />
                         <AnatomyMemoryPanel entries={anatomyPayload.memory} />
                       </div>
@@ -2120,7 +2136,7 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                         key={`${owner ?? ''}/${name ?? ''}`}
                         owner={owner ?? ''}
                         name={name ?? ''}
-                        branch={repo?.default_branch ?? 'main'}
+                        branch={repo?.defaultBranch ?? 'main'}
                       />
                     </Suspense>
                   )
@@ -2161,8 +2177,8 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
                   owner={owner ?? ''}
                   name={name ?? ''}
                   typeBucket={typeBucket ?? ''}
-                  typeSub={repo?.type_sub ?? null}
-                  defaultBranch={repo?.default_branch ?? 'main'}
+                  typeSub={repo?.typeSub ?? null}
+                  defaultBranch={repo?.defaultBranch ?? 'main'}
                 />
               )
             }

@@ -2,7 +2,7 @@
 // Use these from component tests so each spec doesn't redefine the full
 // 50-field shape inline.
 
-import type { Repo, SavedRepo, LibrarySavedRepo } from '../types/repo'
+import type { Repo, SavedRepo, LibrarySavedRepo, Release } from '../types/repo'
 
 export function fixtureRepo(overrides: Partial<Repo> = {}): Repo {
   return {
@@ -82,6 +82,18 @@ export function fixtureLibrarySavedRepo(
     enabledComponents: null,
     enabledTools: null,
     tier: 1,
+    ...overrides,
+  }
+}
+
+export function fixtureRelease(overrides: Partial<Release> = {}): Release {
+  return {
+    tagName: 'v1.0.0',
+    name: 'v1.0.0',
+    publishedAt: '2026-04-01T00:00:00Z',
+    body: 'release notes',
+    assets: [],
+    prerelease: false,
     ...overrides,
   }
 }

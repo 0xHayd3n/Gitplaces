@@ -100,11 +100,8 @@ export default function Library() {
   // Prime RepoDetail's per-repo cache from rows we already have in memory,
   // so first-time navigation to a sidebar repo shows its header/description/
   // stats immediately instead of waiting for fetchRepoBundle.
-  // RepoDetail still types this as RepoRow until Task 10 migrates it.
   useEffect(() => {
-    primeRepoCacheFromRows(
-      [...rows, ...starredRows, ...unstarredRows] as unknown as Parameters<typeof primeRepoCacheFromRows>[0],
-    )
+    primeRepoCacheFromRows([...rows, ...starredRows, ...unstarredRows])
   }, [rows, starredRows, unstarredRows])
 
   const repoSelectedId = useMemo(() => {

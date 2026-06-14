@@ -6,12 +6,12 @@ export interface DiffBaseOption {
 }
 
 export function buildDiffBaseOptions(
-  releases: { tag_name: string }[],
+  releases: { tagName: string }[],
   currentBranch: string,
 ): DiffBaseOption[] {
   const opts: DiffBaseOption[] = []
   for (const r of releases.slice(0, 10)) {
-    opts.push({ label: `vs ${r.tag_name}`, ref: { type: 'tag', ref: r.tag_name } })
+    opts.push({ label: `vs ${r.tagName}`, ref: { type: 'tag', ref: r.tagName } })
   }
   if (currentBranch !== 'main') opts.push({ label: 'vs main', ref: { type: 'branch', ref: 'main' } })
   if (currentBranch !== 'master') opts.push({ label: 'vs master', ref: { type: 'branch', ref: 'master' } })
