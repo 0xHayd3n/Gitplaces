@@ -29,9 +29,12 @@ function SearchInputShim() {
 // Read src/App.test.tsx to see the makeApi() pattern, then replicate a minimal
 // version here with the mocks needed for Discover tests.
 // The window.api mock needs at minimum:
-//   github: { searchRepos, saveRepo, getRepo, getRelatedRepos, getReadme, getReleases }
+//   repo: { search, save, get, getRelated, getReadme, getReleases, getRecommended,
+//           star, unstar, isStarred, getSaved, getFeed, extractColor, getOgImage }
 //   settings: { getApiKey }
 //   skill: { generate, get, delete }
+// NOTE: window.api.github.{ getSavedRepos, saveRepo } stay mocked for
+// SavedReposProvider, which migrates to window.api.repo in Task 8.
 
 function makeDiscoverApi(overrides?: {
   skillGet?: ReturnType<typeof vi.fn>
@@ -45,7 +48,17 @@ function makeDiscoverApi(overrides?: {
   Object.defineProperty(window, 'api', {
     value: {
       github: {
-        searchRepos: vi.fn().mockResolvedValue([fixtureSavedRepo({
+        getSavedRepos: vi.fn().mockResolvedValue([]),
+        saveRepo: vi.fn().mockResolvedValue(undefined),
+      },
+      db: {
+        setStarredAt: vi.fn().mockResolvedValue(undefined),
+        cacheTranslatedDescription: vi.fn().mockResolvedValue(undefined),
+      },
+      repo: {
+        extractColor: vi.fn().mockResolvedValue({ h: 0, s: 0, l: 0 }),
+        getOgImage: vi.fn().mockResolvedValue(null),
+        search: vi.fn().mockResolvedValue([fixtureSavedRepo({
           hostNativeId: '12345',
           fullName: 'vercel/next.js',
           owner: 'vercel',
@@ -60,14 +73,16 @@ function makeDiscoverApi(overrides?: {
           license: 'MIT',
           updatedAt: '2024-01-01',
         })]),
-        saveRepo: vi.fn().mockResolvedValue(undefined),
-        getRepo: vi.fn().mockResolvedValue({}),
-        getRelatedRepos: vi.fn().mockResolvedValue([]),
+        save: vi.fn().mockResolvedValue(undefined),
+        get: vi.fn().mockResolvedValue({}),
+        getRelated: vi.fn().mockResolvedValue([]),
         getReadme: vi.fn().mockResolvedValue(null),
         getReleases: vi.fn().mockResolvedValue([]),
-        getSavedRepos: vi.fn().mockResolvedValue([]),
-        starRepo: vi.fn().mockResolvedValue(undefined),
-        unstarRepo: vi.fn().mockResolvedValue(undefined),
+        getSaved: vi.fn().mockResolvedValue([]),
+        getFeed: vi.fn().mockResolvedValue([]),
+        star: vi.fn().mockResolvedValue(undefined),
+        unstar: vi.fn().mockResolvedValue(undefined),
+        isStarred: vi.fn().mockResolvedValue(false),
         getRecommended: vi.fn().mockResolvedValue({
           items: [{
             repo: fixtureSavedRepo({
@@ -93,14 +108,6 @@ function makeDiscoverApi(overrides?: {
           stale: false,
           coldStart: false,
         }),
-      },
-      db: {
-        setStarredAt: vi.fn().mockResolvedValue(undefined),
-        cacheTranslatedDescription: vi.fn().mockResolvedValue(undefined),
-      },
-      repo: {
-        extractColor: vi.fn().mockResolvedValue({ h: 0, s: 0, l: 0 }),
-        getOgImage: vi.fn().mockResolvedValue(null),
       },
       settings: {
         get: vi.fn(),
@@ -314,8 +321,8 @@ describe('Search history', () => {
   it('clicking "x" removes entry without triggering search', async () => {
     localStorage.setItem('discover-search-history', JSON.stringify(['react', 'vue']))
     renderDiscover()
-    await waitFor(() => expect(window.api.github.getRecommended).toHaveBeenCalled())
-    ;(window.api.github.searchRepos as ReturnType<typeof vi.fn>).mockClear()
+    await waitFor(() => expect(window.api.repo.getRecommended).toHaveBeenCalled())
+    ;(window.api.repo.search as ReturnType<typeof vi.fn>).mockClear()
     const input = screen.getByPlaceholderText(/Search repos/)
     fireEvent.focus(input)
     const reactEntry = screen.getByText('react').closest('.discover-history-item')!
@@ -324,7 +331,7 @@ describe('Search history', () => {
     fireEvent.mouseDown(removeBtn)
     expect(screen.queryByText('react')).not.toBeInTheDocument()
     expect(screen.getByText('vue')).toBeInTheDocument()
-    expect(window.api.github.searchRepos).not.toHaveBeenCalled()
+    expect(window.api.repo.search).not.toHaveBeenCalled()
   })
 
   it('clicking "Clear all" removes all entries', async () => {
@@ -358,7 +365,7 @@ describe('Recommended tab', () => {
   it('calls getRecommended on initial load', async () => {
     renderDiscover()
     await waitFor(() => {
-      expect(window.api.github.getRecommended).toHaveBeenCalled()
+      expect(window.api.repo.getRecommended).toHaveBeenCalled()
     })
   })
 })
@@ -480,7 +487,7 @@ describe('Discover search suggestions', () => {
   it('clicking a subtype suggestion triggers a search API call via the type filter', async () => {
     makeApiWithTopics([])
     renderDiscover()
-    const searchSpy = (window as any).api.github.searchRepos as ReturnType<typeof vi.fn>
+    const searchSpy = (window as any).api.repo.search as ReturnType<typeof vi.fn>
     searchSpy.mockClear()
     const input = screen.getByPlaceholderText(/search repos/i)
     fireEvent.change(input, { target: { value: 'ui' } })
@@ -506,14 +513,14 @@ describe('Discover search suggestions', () => {
   it('pressing Enter on a highlighted subtype suggestion triggers a search API call', async () => {
     makeApiWithTopics([])
     renderDiscover()
-    const searchSpy = (window as any).api.github.searchRepos as ReturnType<typeof vi.fn>
+    const searchSpy = (window as any).api.repo.search as ReturnType<typeof vi.fn>
     searchSpy.mockClear()
     const input = screen.getByPlaceholderText(/search repos/i)
     fireEvent.change(input, { target: { value: 'ui' } })
     await waitFor(() => screen.getByText('UI Library'))
     fireEvent.keyDown(input, { key: 'ArrowDown' })
     fireEvent.keyDown(input, { key: 'Enter' })
-    // The selectedSubtypes useEffect fires a search (via loadTrending → searchRepos)
+    // The selectedSubtypes useEffect fires a search (via loadTrending → repo.search)
     await waitFor(() => expect(searchSpy).toHaveBeenCalled())
   })
 

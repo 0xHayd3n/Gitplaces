@@ -40,6 +40,7 @@ import {
   loadCachedHiddenGems, saveCachedHiddenGems,
   loadCachedAgents, saveCachedAgents,
 } from '../lib/discoverCache'
+import { HOST_ID_GITHUB } from '../lib/hostIds'
 
 // ── Layout prefs loader ───────────────────────────────────────────
 
@@ -329,7 +330,7 @@ export default function Discover() {
       if (cached && isFreshInSession) return
 
       try {
-        const response = await window.api.github.getRecommended()
+        const response = await window.api.repo.getRecommended()
         const items = response.items
         _recommendedModuleCache = { items, fetchedAt: Date.now() }
         saveCachedRecommended(items)
@@ -351,9 +352,9 @@ export default function Discover() {
       try {
         const q = buildViewModeQuery('hot-today', '', '')
         const { sort, order } = getViewModeSort('hot-today')
-        // searchRepos statically returns Repo[] but the handler emits SavedRepo[]
+        // search statically returns Repo[] but the handler emits SavedRepo[]
         // (rows go through repoRowToSavedRepo). Safe to widen here.
-        const data = await window.api.github.searchRepos(q, sort, order) as SavedRepo[]
+        const data = await window.api.repo.search(HOST_ID_GITHUB, q, sort, order) as SavedRepo[]
         _hotTodayModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedHotToday(data)
         setHotTodayRowRepos(data)
@@ -372,7 +373,7 @@ export default function Discover() {
       try {
         const q = buildViewModeQuery('trending-week', '', '')
         const { sort, order } = getViewModeSort('trending-week')
-        const data = await window.api.github.searchRepos(q, sort, order) as SavedRepo[]
+        const data = await window.api.repo.search(HOST_ID_GITHUB, q, sort, order) as SavedRepo[]
         _trendingWeekModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedTrendingWeek(data)
         setTrendingWeekRowRepos(data)
@@ -391,7 +392,7 @@ export default function Discover() {
       try {
         const q = buildViewModeQuery('hidden-gems', '', '')
         const { sort, order } = getViewModeSort('hidden-gems')
-        const data = await window.api.github.searchRepos(q, sort, order) as SavedRepo[]
+        const data = await window.api.repo.search(HOST_ID_GITHUB, q, sort, order) as SavedRepo[]
         _hiddenGemsModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedHiddenGems(data)
         setHiddenGemsRowRepos(data)
@@ -418,7 +419,7 @@ export default function Discover() {
       try {
         const q = buildViewModeQuery('agents', '', '')
         const { sort, order } = getViewModeSort('agents')
-        const data = await window.api.github.searchRepos(q, sort, order) as SavedRepo[]
+        const data = await window.api.repo.search(HOST_ID_GITHUB, q, sort, order) as SavedRepo[]
         _agentsModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedAgents(data)
         setAgentsRowRepos(data)
@@ -615,7 +616,7 @@ export default function Discover() {
           recommendedCache.current = data
           recommendedItemsCache.current = _recommendedModuleCache.items
         } else {
-          const response = await window.api.github.getRecommended()
+          const response = await window.api.repo.getRecommended()
           data = response.items.map(item => item.repo)
           recommendedCache.current = data
           recommendedItemsCache.current = response.items
@@ -630,7 +631,7 @@ export default function Discover() {
         const langKey = selectedLanguages.length === 1 ? selectedLanguages[0] : ''
         const q = buildTrendingQuery(vm, langKey, filters ?? {}, subKw)
         const { sort: s, order: o } = getViewModeSort(vm)
-        data = await window.api.github.searchRepos(q, s, o) as SavedRepo[]
+        data = await window.api.repo.search(HOST_ID_GITHUB, q, s, o) as SavedRepo[]
       }
       if (gen !== fetchGeneration.current) return
       setRepos(data)
@@ -941,7 +942,7 @@ export default function Discover() {
           // Paginate the recommendation engine: fetch the next GitHub search page
           // for each query plan, exclude already-shown ids server-side, re-rank.
           const excludeIds = repos.map(r => String(r.hostNativeId))
-          const response = await window.api.github.getRecommended(nextPage, excludeIds)
+          const response = await window.api.repo.getRecommended(nextPage, excludeIds)
           newResults = response.items.map(item => item.repo)
           if (recommendedItemsCache.current) {
             recommendedItemsCache.current = [...recommendedItemsCache.current, ...response.items]
@@ -954,7 +955,7 @@ export default function Discover() {
           const langKey = selectedLanguages.length === 1 ? selectedLanguages[0] : ''
           const q = buildTrendingQuery(vm, langKey, appliedFilters, subKw)
           const { sort: s, order: o } = getViewModeSort(vm)
-          newResults = await window.api.github.searchRepos(q, s, o, nextPage) as SavedRepo[]
+          newResults = await window.api.repo.search(HOST_ID_GITHUB, q, s, o, nextPage) as SavedRepo[]
         }
       } else if (searchPath === 'raw') {
         const langFilter = selectedLanguages.length === 1 ? selectedLanguages[0] : undefined
