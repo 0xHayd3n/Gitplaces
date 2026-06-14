@@ -1,4 +1,4 @@
-import type { RepoRow, ReleaseRow, SkillRow, SubSkillRow, LibraryRow, CollectionRow, CollectionRepoRow, StarredRepoRow, AnatomyPayload } from './types/repo'
+import type { Repo, SavedRepo, Release, User, LibrarySavedRepo, SkillRow, SubSkillRow, CollectionRow, CollectionRepoRow, AnatomyPayload } from './types/repo'
 import type { ComponentScanResult } from './types/components'
 import type { AiChatMessage } from './components/AiChatOverlay.types'
 import type { RecommendationResponse } from './types/recommendation'
@@ -33,21 +33,6 @@ declare global {
     readonly message: string
   }
 
-  interface GitHubUser {
-    login: string
-    name: string | null
-    avatar_url: string
-    bio: string | null
-    location: string | null
-    company: string | null
-    public_repos: number
-    followers: number
-    following: number
-    html_url: string
-    blog?: string | null
-    created_at?: string | null
-  }
-
   interface Window {
     api: {
       openExternal: (url: string) => Promise<void>
@@ -75,17 +60,17 @@ declare global {
         getUser:       () => Promise<{ login: string; avatarUrl: string; publicRepos: number }>
         getStarred:    (force?: boolean) => Promise<void>
         disconnect:    () => Promise<void>
-        searchRepos:   (query: string, sort?: string, order?: string, page?: number) => Promise<RepoRow[]>
-        getRepo:       (owner: string, name: string) => Promise<RepoRow | null>
+        searchRepos:   (query: string, sort?: string, order?: string, page?: number) => Promise<Repo[]>
+        getRepo:       (owner: string, name: string) => Promise<Repo | null>
         getReadme:        (owner: string, name: string) => Promise<string | null>
         getFileContent:   (owner: string, name: string, path: string) => Promise<string | null>
-        getReleases:   (owner: string, name: string) => Promise<ReleaseRow[] | null>
+        getReleases:   (owner: string, name: string) => Promise<Release[] | null>
         getRepoUserEvents: (owner: string, name: string) => Promise<RepoUserEvent[]>
         getRepoStats: (owner: string, name: string) => Promise<import('./types/repoStats').RepoStats>
         getRepoMomentum: (owner: string, name: string) => Promise<import('./types/repoStats').RepoStats['momentum']>
         fetchRepoBundle: (owner: string, name: string) => Promise<{
-          repoRow: RepoRow
-          releases: ReleaseRow[]
+          repoRow: SavedRepo
+          releases: Release[]
           isStarred: boolean
           vulnerabilities: import('../../electron/githubGraphql').RepoBundle['vulnerabilities']
           securityPolicyUrl: string | null
@@ -97,7 +82,7 @@ declare global {
         getSavedRepos:    () => Promise<{ owner: string; name: string }[]>
         getFeedRepos:     () => Promise<{ owner: string; name: string }[]>
         getMyRepos:       () => Promise<any[]>
-        getRelatedRepos:  (owner: string, name: string, topicsJson: string) => Promise<RepoRow[]>
+        getRelatedRepos:  (owner: string, name: string, topicsJson: string) => Promise<Repo[]>
         starRepo:         (owner: string, name: string) => Promise<void>
         unstarRepo:       (owner: string, name: string) => Promise<void>
         isStarred:        (owner: string, name: string) => Promise<boolean>
@@ -232,7 +217,7 @@ declare global {
         offLoginProgress(cb: (event: { message: string; isError?: boolean; done?: boolean }) => void): void
       }
       library: {
-        getAll(): Promise<LibraryRow[]>
+        getAll(): Promise<LibrarySavedRepo[]>
         getCollections(repoId: string): Promise<{ id: string; name: string }[]>
       }
       collection: {
@@ -352,8 +337,8 @@ declare global {
         offChanged(cb: () => void): void
       }
       starred: {
-        getAll(): Promise<StarredRepoRow[]>
-        getRecentlyUnstarred(): Promise<StarredRepoRow[]>
+        getAll(): Promise<LibrarySavedRepo[]>
+        getRecentlyUnstarred(): Promise<LibrarySavedRepo[]>
       }
       svgCache: {
         prefetch(owner: string, name: string, branch: string): Promise<void>
@@ -370,10 +355,10 @@ declare global {
         test(url: string): Promise<{ ok: boolean; statusCode?: number; latencyMs: number; error?: string }>
       }
       search: {
-        raw(query: string, language?: string, filters?: SearchFilters, page?: number): Promise<RepoRow[]>
-        tagged(tags: string[], originalQuery: string, language?: string, filters?: SearchFilters, page?: number): Promise<RepoRow[]>
+        raw(query: string, language?: string, filters?: SearchFilters, page?: number): Promise<Repo[]>
+        tagged(tags: string[], originalQuery: string, language?: string, filters?: SearchFilters, page?: number): Promise<Repo[]>
         extractTags(query: string): Promise<string[]>
-        getRelatedTags(results: RepoRow[], currentTags: string[]): Promise<string[]>
+        getRelatedTags(results: Repo[], currentTags: string[]): Promise<string[]>
         getTopics(): Promise<string[]>
       }
       org: {
@@ -384,11 +369,11 @@ declare global {
         getOgImage: (owner: string, name: string) => Promise<string | null>
       }
       profile: {
-        getUser:      (username: string) => Promise<GitHubUser>
+        getUser:      (username: string) => Promise<User>
         getUserRepos: (username: string, sort?: string) => Promise<any[]>
         getStarred:   (username: string) => Promise<any[]>
-        getFollowing: (username: string) => Promise<GitHubUser[]>
-        getFollowers: (username: string) => Promise<GitHubUser[]>
+        getFollowing: (username: string) => Promise<User[]>
+        getFollowers: (username: string) => Promise<User[]>
         isFollowing:  (username: string) => Promise<boolean>
         follow:       (username: string) => Promise<void>
         unfollow:     (username: string) => Promise<void>
@@ -488,7 +473,7 @@ declare global {
       }
       engagement: {
         logClick: (repoId: string, source: string) => Promise<void>
-        getRecentlyVisited: (limit?: number) => Promise<RepoRow[]>
+        getRecentlyVisited: (limit?: number) => Promise<SavedRepo[]>
       }
       updates: {
         checkNow: () => Promise<void>
