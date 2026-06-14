@@ -31,6 +31,7 @@ import { getProvider } from './providers/registry'
 // passing hostId on the wire and this hoist disappears.
 const gh = getProvider(HOST_ID_GITHUB)!
 import { openLoginPopup, closeLoginPopup } from './githubLoginPopup'
+import { getDeviceFlowAbort, setDeviceFlowAbort } from './services/deviceFlowState'
 import { scanFromSources } from './mcp-scanner'
 import type { McpScanResult } from '../src/types/mcp'
 import { extractTags } from './tag-extractor'
@@ -102,6 +103,7 @@ import { registerTtsHandlers } from './ipc/ttsHandlers'
 import { registerAgentHandlers } from './ipc/agentHandlers'
 import { registerRecommendHandlers } from './ipc/recommendHandlers'
 import { registerRepoHandlers } from './ipc/repoHandlers'
+import { registerHostHandlers } from './ipc/hostHandlers'
 import { registerEngagementHandlers } from './ipc/engagementHandlers'
 import { registerUpdateHandlers } from './ipc/updateHandlers'
 import { registerLLMHandlers } from './ipc/llmHandlers'
@@ -272,7 +274,8 @@ interface WindowStoreSchema {
 const windowStore = new Store<WindowStoreSchema>()
 let mainWindow: BrowserWindow | null = null
 let mcpProcess: ReturnType<typeof spawn> | null = null
-let deviceFlowAbort: AbortController | null = null
+// Device-flow abort state lives in electron/services/deviceFlowState.ts so the
+// legacy github:* and new hosts:* handlers can share it during Phase 3.
 
 // ── MCP helpers ──────────────────────────────────────────────────────────────
 
@@ -426,8 +429,8 @@ ipcMain.handle('shell:showItemInFolder', (_event, fullPath: string) => shell.sho
 // blocks until approval (or timeout / rejection).
 
 ipcMain.handle('github:startDeviceFlow', async () => {
-  deviceFlowAbort?.abort()
-  deviceFlowAbort = new AbortController()
+  getDeviceFlowAbort()?.abort()
+  setDeviceFlowAbort(new AbortController())
   const start = await gh.startDeviceFlow()
   // Auto-open a small in-app popup at the pre-filled verification page.
   openLoginPopup(start.verificationUriComplete, mainWindow)
@@ -435,7 +438,7 @@ ipcMain.handle('github:startDeviceFlow', async () => {
 })
 
 ipcMain.handle('github:pollDeviceToken', async (_event, deviceCode: string, interval: number) => {
-  const controller = deviceFlowAbort ?? new AbortController()
+  const controller = getDeviceFlowAbort() ?? new AbortController()
   try {
     const token = await gh.pollDeviceToken(deviceCode, interval, controller.signal)
     setToken(HOST_ID_GITHUB, token)
@@ -446,8 +449,8 @@ ipcMain.handle('github:pollDeviceToken', async (_event, deviceCode: string, inte
 })
 
 ipcMain.handle('github:cancelDeviceFlow', () => {
-  deviceFlowAbort?.abort()
-  deviceFlowAbort = null
+  getDeviceFlowAbort()?.abort()
+  setDeviceFlowAbort(null)
   closeLoginPopup()
 })
 
@@ -2491,6 +2494,7 @@ registerTtsHandlers()
 registerAgentHandlers()
 registerRecommendHandlers()
 registerRepoHandlers()
+registerHostHandlers(() => mainWindow)
 registerEngagementHandlers()
 registerUpdateHandlers()
 registerCreateHandlers()
