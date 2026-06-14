@@ -21,10 +21,10 @@ async function freshImport() {
 }
 
 describe('fetchRepoPreview', () => {
-  it('maps IPC RepoRow fields to GitHubRepoPreview shape', async () => {
+  it('maps IPC SavedRepo fields to GitHubRepoPreview shape', async () => {
     mockApi(() => Promise.resolve({
-      id: '1', owner: 'facebook', name: 'react',
-      description: 'A JS library', stars: 200000, avatar_url: 'https://example.com/avatar.png',
+      hostNativeId: '1', owner: 'facebook', name: 'react',
+      description: 'A JS library', stars: 200000, ownerAvatarUrl: 'https://example.com/avatar.png',
     }))
     const { fetchRepoPreview: fetch } = await freshImport()
     const result = await fetch('facebook', 'react')
@@ -39,8 +39,8 @@ describe('fetchRepoPreview', () => {
 
   it('returns cached result on second call without extra IPC calls', async () => {
     const getRepo = vi.fn().mockResolvedValue({
-      id: '1', owner: 'facebook', name: 'react',
-      description: 'A JS library', stars: 100, avatar_url: '',
+      hostNativeId: '1', owner: 'facebook', name: 'react',
+      description: 'A JS library', stars: 100, ownerAvatarUrl: '',
     })
     Object.defineProperty(window, 'api', { writable: true, value: { github: { getRepo } } })
     const { fetchRepoPreview: fetch } = await freshImport()
@@ -51,8 +51,8 @@ describe('fetchRepoPreview', () => {
 
   it('deduplicates concurrent requests — only one IPC call', async () => {
     const getRepo = vi.fn().mockResolvedValue({
-      id: '1', owner: 'vuejs', name: 'vue',
-      description: '', stars: 0, avatar_url: '',
+      hostNativeId: '1', owner: 'vuejs', name: 'vue',
+      description: '', stars: 0, ownerAvatarUrl: '',
     })
     Object.defineProperty(window, 'api', { writable: true, value: { github: { getRepo } } })
     const { fetchRepoPreview: fetch } = await freshImport()
@@ -82,8 +82,8 @@ describe('fetchRepoPreview', () => {
 
   it('treats mixed-case owner/name as the same cache key', async () => {
     const getRepo = vi.fn().mockResolvedValue({
-      id: '1', owner: 'facebook', name: 'react',
-      description: '', stars: 0, avatar_url: '',
+      hostNativeId: '1', owner: 'facebook', name: 'react',
+      description: '', stars: 0, ownerAvatarUrl: '',
     })
     Object.defineProperty(window, 'api', { writable: true, value: { github: { getRepo } } })
     const { fetchRepoPreview: fetch } = await freshImport()
@@ -102,7 +102,7 @@ describe('getCachedRepoPreview', () => {
 
   it('returns the cached value after fetch', async () => {
     mockApi(() => Promise.resolve({
-      id: '1', owner: 'test', name: 'pkg', description: 'hi', stars: 5, avatar_url: '',
+      hostNativeId: '1', owner: 'test', name: 'pkg', description: 'hi', stars: 5, ownerAvatarUrl: '',
     }))
     const { fetchRepoPreview: fetch, getCachedRepoPreview: getCache } = await freshImport()
     await fetch('test', 'pkg')

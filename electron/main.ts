@@ -511,7 +511,7 @@ ipcMain.handle('github:getStarred', async (_, force?: boolean) => {
       const repo = item.repo
       const rid = String(repo.id)
       cascadeRepoId(db, repo.owner.login, repo.name, rid)
-      const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: JSON.stringify(repo.topics ?? []) })
+      const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: repo.topics ?? [] })
       upsert.run(
         rid,
         repo.owner.login,
@@ -663,7 +663,7 @@ ipcMain.handle('github:searchRepos', async (_event, query: string, sort?: string
     for (const repo of items) {
       const rid = String(repo.id)
       cascadeRepoId(db, repo.owner.login, repo.name, rid)
-      const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: JSON.stringify(repo.topics ?? []) })
+      const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: repo.topics ?? [] })
       upsert.run(
         rid, repo.owner.login, repo.name, repo.description, repo.language,
         JSON.stringify(repo.topics ?? []), repo.stargazers_count, repo.forks_count,
@@ -725,7 +725,7 @@ ipcMain.handle('github:getRepo', async (_event, owner: string, name: string) => 
     return row ? repoRowToSavedRepo(row) : null
   }
 
-  const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: JSON.stringify(repo.topics ?? []) })
+  const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: repo.topics ?? [] })
   const rid = String(repo.id)
   // Fix ID mismatches: star handler may have created rows with synthetic "owner/name" IDs
   cascadeRepoId(db, owner, name, rid)
@@ -901,7 +901,7 @@ ipcMain.handle('github:fetchRepoBundle', async (_event, owner: string, name: str
   if (!bundle) return null
 
   const r = bundle.repo
-  const classified = classifyRepoBucket({ name: r.name, description: r.description, topics: JSON.stringify(r.topics ?? []) })
+  const classified = classifyRepoBucket({ name: r.name, description: r.description, topics: r.topics ?? [] })
   cascadeRepoId(db, owner, name, String(r.id))
   db.prepare(`
     INSERT INTO repos (id, owner, name, description, language, topics, stars, forks, license,
@@ -2318,7 +2318,7 @@ function upsertAndReturnRepoRows(db: Database.Database, results: any[], query: s
     for (const repo of results) {
       const rid = String(repo.id)
       cascadeRepoId(db, repo.owner.login, repo.name, rid)
-      const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: JSON.stringify(repo.topics ?? []) })
+      const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: repo.topics ?? [] })
       upsert.run(
         rid, repo.owner.login, repo.name, repo.description, repo.language,
         JSON.stringify(repo.topics ?? []), repo.stargazers_count, repo.forks_count,
@@ -2984,7 +2984,9 @@ app.whenReady().then(() => {
       )
       const backfill = db.transaction(() => {
         for (const row of unclassified) {
-          const classified = classifyRepoBucket({ name: row.name, description: row.description, topics: row.topics ?? '[]' })
+          let topics: string[] = []
+          try { const parsed = JSON.parse(row.topics ?? '[]'); if (Array.isArray(parsed)) topics = parsed } catch { /* ignore */ }
+          const classified = classifyRepoBucket({ name: row.name, description: row.description, topics })
           updateType.run(classified?.bucket ?? null, classified?.subType ?? null, row.id)
         }
       })

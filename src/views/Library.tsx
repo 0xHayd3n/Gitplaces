@@ -122,7 +122,7 @@ export default function Library() {
 
   const handleRepoSelect = useCallback((row: SavedRepo, _isInstalled: boolean) => {
     prewarmStaticDither(row.ownerAvatarUrl, cameraIdxForRepo(row.owner, row.name))
-    recordRecentVisit({ owner: row.owner, name: row.name, avatar_url: row.ownerAvatarUrl, navigatePath: `/library/repo/${row.owner}/${row.name}` })
+    recordRecentVisit({ owner: row.owner, name: row.name, ownerAvatarUrl: row.ownerAvatarUrl, navigatePath: `/library/repo/${row.owner}/${row.name}` })
     refreshRecentVisits()
     navigate(`/library/repo/${row.owner}/${row.name}`)
   }, [navigate, refreshRecentVisits])
@@ -131,7 +131,7 @@ export default function Library() {
     const navPath = project.owner && project.repoName
       ? `/library/repo/${project.owner}/${project.repoName}`
       : `/local-project?path=${encodeURIComponent(project.path)}&name=${encodeURIComponent(project.name)}&git=${project.isGit ? '1' : '0'}`
-    recordRecentVisit({ owner: project.owner ?? '', name: project.repoName ?? project.name, avatar_url: null, navigatePath: navPath })
+    recordRecentVisit({ owner: project.owner ?? '', name: project.repoName ?? project.name, ownerAvatarUrl: null, navigatePath: navPath })
     refreshRecentVisits()
     navigate(navPath)
   }, [navigate, refreshRecentVisits])

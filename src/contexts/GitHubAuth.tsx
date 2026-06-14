@@ -2,13 +2,13 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo, t
 
 type AuthStatus = 'loading' | 'connected' | 'disconnected'
 
-interface GitHubUser {
+interface AuthUser {
   login: string
 }
 
 interface GitHubAuthContextValue {
   status: AuthStatus
-  user: GitHubUser | null
+  user: AuthUser | null
   refresh: () => Promise<void>
 }
 
@@ -16,7 +16,7 @@ const GitHubAuthContext = createContext<GitHubAuthContextValue | null>(null)
 
 export function GitHubAuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading')
-  const [user, setUser] = useState<GitHubUser | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
 
   const refresh = useCallback(async () => {
     try {

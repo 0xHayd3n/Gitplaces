@@ -1,5 +1,8 @@
 // src/types/recommendation.ts
-import type { RepoRow } from './repo'
+import type { SavedRepo } from './repo'
+// Main-process-only DB row shape — UserProfile is engine-internal and never
+// crosses the IPC boundary, so reaching into electron/ for this type is OK.
+import type { RepoRow } from '../../electron/db-row-types'
 
 /** Document-frequency + IDF stats for both topics and description tokens, computed in one DB sweep. */
 export interface CorpusStats {
@@ -35,7 +38,8 @@ export interface UserProfile {
   languageWeights: Map<string, number>
   /** Star-count percentiles across the user's starred/saved repos. */
   starScale: { median: number; p25: number; p75: number }
-  /** Top ~20 starred/saved repos for anchor finding. */
+  /** Top ~20 starred/saved repos for anchor finding. Uses the raw DB row
+   *  shape — UserProfile is engine-internal (main process only). */
   anchorPool: RepoRow[]
   /** Total number of starred + saved repos used to build this profile. */
   repoCount: number
@@ -71,7 +75,7 @@ export interface Anchor {
 }
 
 export interface RecommendationItem {
-  repo: RepoRow
+  repo: SavedRepo
   /** Composite weighted score in [0, 1]. */
   score: number
   scoreBreakdown: ScoreBreakdown

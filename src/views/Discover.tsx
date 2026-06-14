@@ -212,13 +212,10 @@ export default function Discover() {
   const ensureClassified = useCallback((repos: SavedRepo[]) => {
     for (const r of repos) {
       if (!r.typeBucket) {
-        // classifyRepoBucket still consumes the legacy `topics: string` (JSON)
-        // shape; the new normalized Repo carries `topics: string[]`.
-        // Adapt here until classifyRepoType.ts is migrated in a later task.
         const result = classifyRepoBucket({
           name: r.name,
           description: r.description,
-          topics: JSON.stringify(r.topics),
+          topics: r.topics,
         })
         if (result) {
           r.typeBucket = result.bucket
@@ -323,10 +320,8 @@ export default function Discover() {
       const cached = recommendedItemsCache.current ?? _recommendedModuleCache?.items ?? null
       if (cached) {
         recommendedItemsCache.current = cached
-        // RecommendationItem.repo's static type is still RepoRow (renamed in
-        // Task 12) but the IPC handler emits the normalized SavedRepo shape.
-        recommendedCache.current = cached.map(i => i.repo as unknown as SavedRepo)
-        setRowRepos(cached.slice(0, 16).map(i => i.repo as unknown as SavedRepo))
+        recommendedCache.current = cached.map(i => i.repo)
+        setRowRepos(cached.slice(0, 16).map(i => i.repo))
       }
 
       const isFreshInSession = _recommendedModuleCache
@@ -621,7 +616,7 @@ export default function Discover() {
           recommendedItemsCache.current = _recommendedModuleCache.items
         } else {
           const response = await window.api.github.getRecommended()
-          data = response.items.map(item => item.repo as unknown as SavedRepo)
+          data = response.items.map(item => item.repo)
           recommendedCache.current = data
           recommendedItemsCache.current = response.items
           _recommendedModuleCache = { items: response.items, fetchedAt: Date.now() }
@@ -900,7 +895,7 @@ export default function Discover() {
     if (viewMode !== 'recommended') return undefined
     const items = recommendedItemsCache.current
     if (!items) return undefined
-    return new Map(items.map(item => [String((item.repo as unknown as SavedRepo).hostNativeId), item.anchors]))
+    return new Map(items.map(item => [String(item.repo.hostNativeId), item.anchors]))
     // repos change is the proxy signal that recommendedItemsCache.current was just written
   }, [viewMode, repos])
 
@@ -947,7 +942,7 @@ export default function Discover() {
           // for each query plan, exclude already-shown ids server-side, re-rank.
           const excludeIds = repos.map(r => String(r.hostNativeId))
           const response = await window.api.github.getRecommended(nextPage, excludeIds)
-          newResults = response.items.map(item => item.repo as unknown as SavedRepo)
+          newResults = response.items.map(item => item.repo)
           if (recommendedItemsCache.current) {
             recommendedItemsCache.current = [...recommendedItemsCache.current, ...response.items]
           }

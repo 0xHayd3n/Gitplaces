@@ -1,6 +1,6 @@
 // electron/services/userProfile.ts
 import type { CorpusStats, UserProfile } from '../../src/types/recommendation'
-import type { RepoRow } from '../../src/types/repo'
+import type { RepoRow } from '../db-row-types'
 import type { EngagementRow } from './engagementTracker'
 import { buildTopicAffinity } from './signals/topicSignal'
 import { buildDescriptionAffinity } from './signals/descriptionSignal'

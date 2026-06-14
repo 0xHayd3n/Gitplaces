@@ -28,11 +28,9 @@ function makeRepo(name: string): SavedRepo {
   })
 }
 
-// RecommendationItem.repo is still statically `RepoRow` (renamed in Task 12);
-// the runtime payload is the canonical SavedRepo shape, so cast at the boundary.
 function makeRecItem(name: string): RecommendationItem {
   return {
-    repo: makeRepo(name) as unknown as RecommendationItem['repo'],
+    repo: makeRepo(name),
     score: 0,
     scoreBreakdown: { topic: 0, description: 0, bucket: 0, subType: 0, language: 0, scale: 0, freshness: 0, engagement: 0 },
     anchors: [],

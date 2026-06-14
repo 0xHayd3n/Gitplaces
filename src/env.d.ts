@@ -81,7 +81,7 @@ declare global {
         saveRepo:         (owner: string, name: string) => Promise<void>
         getSavedRepos:    () => Promise<{ owner: string; name: string }[]>
         getFeedRepos:     () => Promise<{ owner: string; name: string }[]>
-        getMyRepos:       () => Promise<any[]>
+        getMyRepos:       () => Promise<Repo[]>
         getRelatedRepos:  (owner: string, name: string, topicsJson: string) => Promise<Repo[]>
         starRepo:         (owner: string, name: string) => Promise<void>
         unstarRepo:       (owner: string, name: string) => Promise<void>

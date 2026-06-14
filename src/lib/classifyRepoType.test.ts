@@ -1,52 +1,38 @@
 import { describe, it, expect } from 'vitest'
 import { classifyRepoType, classifyRepoBucket } from './classifyRepoType'
-import type { RepoRow } from '../types/repo'
 
-function makeRepo(overrides: Partial<RepoRow>): RepoRow {
+interface ClassifyInput {
+  name: string
+  description: string | null
+  topics: string[]
+}
+
+/**
+ * Build a minimal input for classifyRepoBucket/classifyRepoType. Accepts the
+ * pre-Phase-2 `topics: string` (JSON) form so the historical test cases below
+ * can stay readable as-is; this helper parses to string[] before passing on.
+ */
+function makeRepo(overrides: Partial<{
+  name: string
+  description: string | null
+  topics: string | string[]
+}>): ClassifyInput {
+  const t = overrides.topics
+  let topics: string[] = []
+  if (Array.isArray(t)) {
+    topics = t
+  } else if (typeof t === 'string') {
+    try {
+      const parsed = JSON.parse(t)
+      if (Array.isArray(parsed)) topics = parsed
+    } catch {
+      topics = []
+    }
+  }
   return {
-    id: 'test/repo',
-    owner: 'test',
-    name: 'repo',
-    description: null,
-    language: null,
-    topics: '[]',
-    stars: null,
-    forks: null,
-    license: null,
-    homepage: null,
-    updated_at: null,
-    pushed_at: null,
-    saved_at: null,
-    type: null,
-    banner_svg: null,
-    discovered_at: null,
-    discover_query: null,
-    watchers: null,
-    size: null,
-    open_issues: null,
-    default_branch: null,
-    avatar_url: null,
-    banner_color: null,
-    starred_at: null,
-    unstarred_at: null,
-    translated_description: null,
-    translated_description_lang: null,
-    translated_readme: null,
-    translated_readme_lang: null,
-    detected_language: null,
-    verification_score: null,
-    verification_tier: null,
-    verification_signals: null,
-    verification_checked_at: null,
-    type_bucket: null,
-    type_sub: null,
-    og_image_url: null,
-    is_forked: null,
-    update_available: null,
-    update_checked_at: null,
-    upstream_version: null,
-    stored_version: null,
-    ...overrides,
+    name: overrides.name ?? 'repo',
+    description: overrides.description ?? null,
+    topics,
   }
 }
 

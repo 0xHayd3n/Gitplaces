@@ -1,12 +1,11 @@
-import type { RepoRow } from '../types/repo'
+import type { Repo } from '../types/repo'
 
 // ── New core classifier ───────────────────────────────────────────
 
 export function classifyRepoBucket(
-  repo: { name: string; description: string | null; topics: string }
+  repo: { name: string; description: string | null; topics: string[] }
 ): { bucket: string; subType: string } | null {
-  let topics: string[] = []
-  try { topics = JSON.parse(repo.topics) as string[] } catch {}
+  const topics: string[] = Array.isArray(repo.topics) ? repo.topics : []
 
   const name = repo.name.toLowerCase()
   const desc = (repo.description ?? '').toLowerCase()
@@ -622,7 +621,9 @@ export const BUCKET_TO_LEGACY: Record<string, RepoType> = {
   'utilities':      'tool',
 }
 
-export function classifyRepoType(repo: RepoRow): RepoType {
+export function classifyRepoType(
+  repo: Pick<Repo, 'name' | 'description' | 'topics'>
+): RepoType {
   const result = classifyRepoBucket(repo)
   return result ? (BUCKET_TO_LEGACY[result.bucket] ?? 'other') : 'other'
 }

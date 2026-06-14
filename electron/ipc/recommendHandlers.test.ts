@@ -226,8 +226,8 @@ describe('getRecommendedHandler', () => {
     expect(result.items[0].anchors).toEqual([])
     expect(result.items[0].score).toBe(0)
     expect(result.items[0].primaryAnchor).toBeNull()
-    // item.repo is now a RepoRow re-read from DB, not the raw GitHubRepo
-    expect(result.items[0].repo.id).toBe('99999')
+    // item.repo is the normalized SavedRepo (re-read from DB via repoRowToSavedRepo).
+    expect(result.items[0].repo.hostNativeId).toBe('99999')
     expect(result.items[0].repo.name).toBe('repo-99999')
 
     // fetchCandidates should have been called with a coldStart query

@@ -7,11 +7,11 @@ import SkillDepthBars from './SkillDepthBars'
 import { getLangConfig } from './BannerSVG'
 import { formatDate, daysSince } from '../utils/dateHelpers'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
-import type { LibraryRow, SubSkillRow } from '../types/repo'
+import type { LibrarySavedRepo, SubSkillRow } from '../types/repo'
 import type { McpScanResult } from '../types/mcp'
 
 export interface MCPToolsDetailProps {
-  row: LibraryRow
+  row: LibrarySavedRepo
   collections: { id: string; name: string }[]
   activeTab: 'tools' | 'skill' | 'details'
   onTabChange: (t: 'tools' | 'skill' | 'details') => void
@@ -49,8 +49,8 @@ export default function MCPToolsDetail({
   const { openProfile } = useProfileOverlay()
   const navigate = useNavigate()
 
-  const enabledNames: string[] | null = row.enabled_tools
-    ? (() => { try { return JSON.parse(row.enabled_tools!) as string[] } catch { return null } })()
+  const enabledNames: string[] | null = row.enabledTools
+    ? (() => { try { return JSON.parse(row.enabledTools!) as string[] } catch { return null } })()
     : null
   const enabledSet = enabledNames ? new Set(enabledNames) : null
   const tools = scanResult?.tools ?? []
@@ -201,7 +201,7 @@ export default function MCPToolsDetail({
             <div className="lib-skill-panel-body">
               <SkillDepthBars content={skillContent ?? ''} />
               <p className="lib-skill-note">
-                Generated from v{row.version ?? '\u2014'} {'\u00B7'} {row.generated_at ? daysSince(row.generated_at) : '\u2014'}
+                Generated from v{row.version ?? '\u2014'} {'\u00B7'} {row.generatedAt ? daysSince(row.generatedAt) : '\u2014'}
               </p>
             </div>
           </div>
@@ -212,7 +212,7 @@ export default function MCPToolsDetail({
         <div className="lib-detail-body">
           <div className="lib-details-section">
             <span className="lib-details-label">Details</span>
-            <DetailRow k="Saved"          v={formatDate(row.saved_at)} />
+            <DetailRow k="Saved"          v={formatDate(row.savedAt)} />
             <DetailRow k="Repo version"   v={row.version ?? '\u2014'} />
             <DetailRow k="Skill size"     v={`${skillSizeKb} KB`} />
             <DetailRow k="Language"       v={row.language ?? '\u2014'} />

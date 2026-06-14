@@ -67,7 +67,7 @@ function toScoringCandidate(repo: GitHubRepo): ScoringCandidate {
   const classification = classifyRepoBucket({
     name: repo.name,
     description: repo.description ?? null,
-    topics: JSON.stringify(topics),
+    topics,
   })
   return {
     topics,

@@ -1381,11 +1381,8 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
   // ── Derived values ────────────────────────────────────────────────
   const topics = repo?.topics ?? []
   const cfg = getLangConfig(repo?.language ?? '')
-  // classifyRepoBucket still consumes the legacy `topics: string` JSON-encoded
-  // shape; bridge by stringifying. Task 12 migrates classifyRepoBucket to take
-  // `string[]` directly.
   const typeBucket = repo?.typeBucket ?? (repo
-    ? classifyRepoBucket({ name: repo.name, description: repo.description, topics: JSON.stringify(repo.topics) })?.bucket
+    ? classifyRepoBucket({ name: repo.name, description: repo.description, topics: repo.topics })?.bucket
     : null) ?? null
   const typeConfig = getSubTypeConfig(repo?.typeSub ?? null)
   const ditherGradient = getBucketGradient(typeConfig?.accentColor ?? getBucketColor(typeBucket))

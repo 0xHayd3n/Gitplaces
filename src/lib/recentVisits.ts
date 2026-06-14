@@ -4,7 +4,7 @@ const MAX_ENTRIES = 30
 export interface RecentEntry {
   owner: string
   name: string
-  avatar_url: string | null
+  ownerAvatarUrl: string | null
   navigatePath: string
   visitedAt: number
 }
@@ -12,7 +12,16 @@ export interface RecentEntry {
 export function getRecentVisits(): RecentEntry[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as RecentEntry[]) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as Array<Partial<RecentEntry> & { avatar_url?: string | null }>
+    // Tolerate older snake_case `avatar_url` entries written before Phase 2.
+    return parsed.map(e => ({
+      owner: e.owner ?? '',
+      name: e.name ?? '',
+      ownerAvatarUrl: e.ownerAvatarUrl ?? e.avatar_url ?? null,
+      navigatePath: e.navigatePath ?? '',
+      visitedAt: e.visitedAt ?? 0,
+    }))
   } catch {
     return []
   }

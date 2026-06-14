@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { LibraryRow } from '../../types/repo'
+import type { LibrarySavedRepo } from '../../types/repo'
 
 interface Props {
   repoIds: string[]
@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function RepoBrowser({ repoIds, onAdd, onRemove }: Props) {
-  const [libraryRepos, setLibraryRepos] = useState<LibraryRow[]>([])
+  const [libraryRepos, setLibraryRepos] = useState<LibrarySavedRepo[]>([])
   const [search, setSearch] = useState('')
 
   useEffect(() => {

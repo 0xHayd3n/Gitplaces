@@ -51,7 +51,7 @@ export async function fetchRepoPreview(owner: string, name: string): Promise<Git
             name:        name.toLowerCase(),
             description: row.description ?? '',
             stars:       row.stars        ?? 0,
-            avatarUrl:   row.avatar_url   ?? '',
+            avatarUrl:   row.ownerAvatarUrl ?? '',
           }
         : placeholder(owner, name)
       cache.set(key, result)

@@ -104,7 +104,7 @@ function upsertCandidates(
       const classified = classifyRepoBucket({
         name: repo.name,
         description: repo.description,
-        topics: JSON.stringify(repo.topics ?? []),
+        topics: repo.topics ?? [],
       })
       upsert.run(
         rid, repo.owner.login, repo.name, repo.description, repo.language,
@@ -202,18 +202,15 @@ export async function getRecommendedHandler(
       .map((repo): RecommendationItem | null => {
         const row = coldByIdMap.get(String(repo.id))
         if (!row) return null
-        // Normalize at the IPC boundary. RecommendationItem.repo's static type
-        // is still `RepoRow` (renamed in Task 12) but the runtime payload is
-        // the canonical SavedRepo shape.
         return {
-          repo: repoRowToSavedRepo(row) as unknown as RepoRow, score: 0,
+          repo: repoRowToSavedRepo(row), score: 0,
           scoreBreakdown: { topic: 0, description: 0, bucket: 0, subType: 0, language: 0, scale: 0, freshness: 0, engagement: 0 },
           anchors: [], primaryAnchor: null,
         }
       })
       .filter((i): i is RecommendationItem => i !== null)
     const filteredItems = excludeSet.size > 0
-      ? items.filter(i => !excludeSet.has(String(i.repo.id)))
+      ? items.filter(i => !excludeSet.has(String(i.repo.hostNativeId)))
       : items
     const response: RecommendationResponse = { items: filteredItems, stale: false, coldStart: true }
     if (page === 1) {
@@ -250,8 +247,7 @@ export async function getRecommendedHandler(
     .map((item): RecommendationItem | null => {
       const row = byIdMap.get(String(item.repo.id))
       if (!row) return null
-      // Normalize at the IPC boundary; see comment in cold-start branch above.
-      return { ...item, repo: repoRowToSavedRepo(row) as unknown as RepoRow }
+      return { ...item, repo: repoRowToSavedRepo(row) }
     })
     .filter((i): i is RecommendationItem => i !== null)
 
@@ -270,14 +266,13 @@ export async function getRecommendedHandler(
         .map((repo): RecommendationItem | null => {
           const row = coldByIdMap.get(String(repo.id))
           if (!row) return null
-          // Normalize at the IPC boundary; see cold-start branch comment.
           return {
-            repo: repoRowToSavedRepo(row) as unknown as RepoRow, score: 0,
+            repo: repoRowToSavedRepo(row), score: 0,
             scoreBreakdown: { topic: 0, description: 0, bucket: 0, subType: 0, language: 0, scale: 0, freshness: 0, engagement: 0 },
             anchors: [], primaryAnchor: null,
           }
         })
-        .filter((i): i is RecommendationItem => i !== null && !excludeSet.has(String(i.repo.id)))
+        .filter((i): i is RecommendationItem => i !== null && !excludeSet.has(String(i.repo.hostNativeId)))
       const response: RecommendationResponse = { items: fallbackItems, stale: false, coldStart: true }
       if (page === 1) l1Cache.set(profileHash, { timestamp: Date.now(), response })
       return response

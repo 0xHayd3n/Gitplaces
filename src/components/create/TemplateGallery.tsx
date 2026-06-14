@@ -1,78 +1,84 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { CreateTemplate } from '../../types/create'
-import type { RepoRow } from '../../types/repo'
+import type { Repo, SavedRepo } from '../../types/repo'
 import type { LocalProject } from '../../types/library'
 import RepoCard from '../RepoCard'
 import { useArchivedRepos } from '../../hooks/useArchivedRepos'
 import { recordRecentVisit } from '../../lib/recentVisits'
 
 
-// ── GitHub API repo → RepoRow ─────────────────────────────────────
+// ── Lift a normalized Repo (from window.api.github.getMyRepos) into a
+//    full SavedRepo so it can be passed to <RepoCard /> (which expects
+//    the library-extras shape). SavedRepo's extras are all nullable. ──
 
-interface GithubApiRepo {
-  id: number
-  name: string
-  description: string | null
-  language: string | null
-  topics?: string[]
-  stargazers_count: number | null
-  forks_count: number | null
-  watchers_count: number | null
-  size: number | null
-  open_issues_count: number | null
-  homepage: string | null
-  updated_at: string | null
-  pushed_at: string | null
-  default_branch: string | null
-  owner?: { login: string; avatar_url?: string }
-  license?: { spdx_id: string } | null
-}
-
-function apiRepoToRow(r: GithubApiRepo): RepoRow {
+function repoToSavedRepo(r: Repo): SavedRepo {
   return {
-    id: String(r.id), owner: r.owner?.login ?? '', name: r.name,
-    description: r.description ?? null, language: r.language ?? null,
-    topics: JSON.stringify(r.topics ?? []),
-    stars: r.stargazers_count ?? null, forks: r.forks_count ?? null,
-    license: r.license?.spdx_id ?? null, homepage: r.homepage ?? null,
-    updated_at: r.updated_at ?? null, pushed_at: r.pushed_at ?? null,
-    saved_at: null, type: null, banner_svg: null, discovered_at: null,
-    discover_query: null, watchers: r.watchers_count ?? null,
-    size: r.size ?? null, open_issues: r.open_issues_count ?? null,
-    starred_at: null, unstarred_at: null, default_branch: r.default_branch ?? 'main',
-    avatar_url: r.owner?.avatar_url ?? null, banner_color: null,
-    translated_description: null, translated_description_lang: null,
-    translated_readme: null, translated_readme_lang: null,
-    detected_language: null, verification_score: null,
-    verification_tier: null, verification_signals: null,
-    verification_checked_at: null, type_bucket: null, type_sub: null,
-    og_image_url: null,
-    is_forked: null, update_available: null, update_checked_at: null,
-    upstream_version: null, stored_version: null,
+    ...r,
+    savedAt: null,
+    starredAt: null,
+    unstarredAt: null,
+    discoveredAt: null,
+    discoverQuery: null,
+    bannerSvg: null,
+    bannerColor: null,
+    ogImageUrl: null,
+    type: null,
+    typeBucket: null,
+    typeSub: null,
+    translatedDescription: null,
+    translatedDescriptionLang: null,
+    translatedReadme: null,
+    translatedReadmeLang: null,
+    detectedLanguage: null,
+    verificationScore: null,
+    verificationTier: null,
+    verificationSignals: null,
+    verificationCheckedAt: null,
+    isForked: null,
+    updateAvailable: null,
+    updateCheckedAt: null,
+    upstreamVersion: null,
+    storedVersion: null,
+    archivedAt: null,
+    forkedAt: null,
+    fetchedAt: null,
+    starredCheckedAt: null,
+    storybookUrl: null,
   }
 }
 
 // ── Local project ─────────────────────────────────────────────────
 
-function makeStubRow(p: LocalProject): RepoRow {
-  return {
-    id: `local:${p.path}`, owner: p.owner ?? '', name: p.name,
-    description: null, language: null, topics: '[]',
-    stars: null, forks: null, license: null, homepage: null,
-    updated_at: null, pushed_at: null, saved_at: null, type: null,
-    banner_svg: null, discovered_at: null, discover_query: null,
-    watchers: null, size: null, open_issues: null, starred_at: null, unstarred_at: null,
-    default_branch: 'main', avatar_url: null, banner_color: null,
-    translated_description: null, translated_description_lang: null,
-    translated_readme: null, translated_readme_lang: null,
-    detected_language: null, verification_score: null,
-    verification_tier: null, verification_signals: null,
-    verification_checked_at: null, type_bucket: null, type_sub: null,
-    og_image_url: null,
-    is_forked: null, update_available: null, update_checked_at: null,
-    upstream_version: null, stored_version: null,
-  }
+function makeStubRow(p: LocalProject): SavedRepo {
+  const owner = p.owner ?? ''
+  const name = p.name
+  const fullName = owner ? `${owner}/${name}` : name
+  return repoToSavedRepo({
+    hostId: 'gh:api.github.com',
+    hostType: 'github',
+    hostNativeId: `local:${p.path}`,
+    fullName,
+    owner,
+    name,
+    htmlUrl: owner ? `https://github.com/${owner}/${name}` : '',
+    homepageUrl: null,
+    description: null,
+    language: null,
+    topics: [],
+    license: null,
+    defaultBranch: 'main',
+    archived: false,
+    size: 0,
+    stars: 0,
+    forks: 0,
+    watchers: 0,
+    openIssues: 0,
+    createdAt: '',
+    updatedAt: '',
+    pushedAt: '',
+    ownerAvatarUrl: '',
+  })
 }
 
 // ── Type shortcut icons ───────────────────────────────────────────
@@ -132,7 +138,7 @@ const TYPE_LABELS: Record<string, string> = {
 // ── Component ─────────────────────────────────────────────────────
 
 export interface ProjectEntry {
-  row: RepoRow
+  row: SavedRepo
   isLocal: boolean
   isGitRepo: boolean
   localPath: string | null
@@ -144,7 +150,7 @@ const DEFAULT_COLS = 6
 export default function TemplateGallery() {
   const navigate = useNavigate()
   const [templates, setTemplates] = useState<CreateTemplate[]>([])
-  const [githubRepos, setGithubRepos] = useState<RepoRow[]>([])
+  const [githubRepos, setGithubRepos] = useState<SavedRepo[]>([])
   const [localProjects, setLocalProjects] = useState<LocalProject[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -155,7 +161,7 @@ export default function TemplateGallery() {
   useEffect(() => {
     window.api.create.getTemplates().then(setTemplates).catch(() => {})
     window.api.github.getMyRepos()
-      .then((raw: GithubApiRepo[]) => setGithubRepos(raw.map(apiRepoToRow)))
+      .then((raw: Repo[]) => setGithubRepos(raw.map(repoToSavedRepo)))
       .catch(() => {})
       .finally(() => setLoading(false))
     window.api.settings.get('projectsFolder').then(folder => {
@@ -299,7 +305,7 @@ export default function TemplateGallery() {
         ) : (
           <div className="discover-grid" data-cols={cols} style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
             {filtered.map(({ row, isLocal, isGitRepo, localPath, hasGithub }) => (
-              <div key={row.id} className={`projects-card-wrap${isLocal ? ' is-local' : ''}`}>
+              <div key={`${row.owner}/${row.name}`} className={`projects-card-wrap${isLocal ? ' is-local' : ''}`}>
                 {isLocal && <span className="projects-local-pill">Local</span>}
                 <RepoCard
                   repo={row}
@@ -307,7 +313,7 @@ export default function TemplateGallery() {
                     const actualPath = !hasGithub && localPath
                       ? `/local-project?path=${encodeURIComponent(localPath)}&name=${encodeURIComponent(row.name)}&git=${isGitRepo ? '1' : '0'}`
                       : path
-                    recordRecentVisit({ owner: row.owner, name: row.name, avatar_url: row.avatar_url, navigatePath: actualPath })
+                    recordRecentVisit({ owner: row.owner, name: row.name, ownerAvatarUrl: row.ownerAvatarUrl, navigatePath: actualPath })
                     navigate(actualPath)
                   }}
                 />

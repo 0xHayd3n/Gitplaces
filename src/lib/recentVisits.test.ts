@@ -6,7 +6,7 @@ const STORAGE_KEY = 'projects-recent-repos'
 const entry = (name: string, owner = 'alice') => ({
   owner,
   name,
-  avatar_url: null,
+  ownerAvatarUrl: null,
   navigatePath: `/repo/${owner}/${name}`,
 })
 
@@ -18,9 +18,17 @@ describe('getRecentVisits', () => {
   })
 
   it('returns stored entries', () => {
-    const stored = [{ owner: 'a', name: 'b', avatar_url: null, navigatePath: '/repo/a/b', visitedAt: 1 }]
+    const stored = [{ owner: 'a', name: 'b', ownerAvatarUrl: null, navigatePath: '/repo/a/b', visitedAt: 1 }]
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
     expect(getRecentVisits()).toEqual(stored)
+  })
+
+  it('migrates legacy snake_case avatar_url entries on read', () => {
+    const stored = [{ owner: 'a', name: 'b', avatar_url: 'https://x/y', navigatePath: '/repo/a/b', visitedAt: 1 }]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
+    expect(getRecentVisits()).toEqual([
+      { owner: 'a', name: 'b', ownerAvatarUrl: 'https://x/y', navigatePath: '/repo/a/b', visitedAt: 1 },
+    ])
   })
 
   it('returns empty array on corrupt JSON', () => {

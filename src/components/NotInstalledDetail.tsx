@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Star, Download } from 'lucide-react'
-import type { RepoRow } from '../types/repo'
+import type { SavedRepo } from '../types/repo'
 
 interface Props {
-  row: RepoRow
+  row: SavedRepo
   onInstalled: () => void
 }
 
@@ -27,8 +27,8 @@ export default function NotInstalledDetail({ row, onInstalled }: Props) {
   return (
     <div className="not-installed-detail">
       <div className="not-installed-hero">
-        {row.avatar_url && (
-          <img src={row.avatar_url} alt="" className="not-installed-avatar" />
+        {row.ownerAvatarUrl && (
+          <img src={row.ownerAvatarUrl} alt="" className="not-installed-avatar" />
         )}
         <div className="not-installed-titles">
           <h2 className="not-installed-name">{row.name}</h2>
