@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import type { CollectionRow, CollectionRepoRow, LibraryRow } from '../types/repo'
+import type { CollectionRow, CollectionRepoRow, LibrarySavedRepo } from '../types/repo'
 import { useSearch } from '../contexts/Search'
 import { useToast } from '../contexts/Toast'
 import { useKeyboardNav } from '../hooks/useKeyboardNav'
@@ -17,7 +17,7 @@ export default function Collections() {
   const { query: search } = useSearch()
   const { toast } = useToast()
   const [showModal, setShowModal] = useState(false)
-  const [libraryRows, setLibraryRows] = useState<LibraryRow[]>([])
+  const [libraryRows, setLibraryRows] = useState<LibrarySavedRepo[]>([])
   const [installing, setInstalling] = useState<Set<string>>(new Set())
   const [loaded, setLoaded] = useState(false)
 

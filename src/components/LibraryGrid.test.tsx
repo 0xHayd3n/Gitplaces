@@ -3,29 +3,38 @@ import { describe, it, expect } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
 import LibraryGrid from './LibraryGrid'
-import type { LibraryRow } from '../types/repo'
+import type { LibrarySavedRepo } from '../types/repo'
 import { DEFAULT_LAYOUT_PREFS } from './LayoutDropdown'
+import { fixtureLibrarySavedRepo } from '../test-utils/repoFixtures'
 
-const baseRow: LibraryRow = {
-  id: '', owner: '', name: '', language: 'TypeScript', description: null,
-  topics: '[]', stars: null, forks: null, license: null, homepage: null,
-  updated_at: null, pushed_at: null, saved_at: null, type: 'skill',
-  banner_svg: null, discovered_at: null, discover_query: null, watchers: null, size: null,
-  open_issues: null, starred_at: null, default_branch: null, avatar_url: null,
-  og_image_url: null, banner_color: null, translated_description: null,
-  translated_description_lang: null, translated_readme: null, translated_readme_lang: null,
-  detected_language: null, verification_score: null, verification_tier: null,
-  verification_signals: null, verification_checked_at: null,
-  type_bucket: null, type_sub: null,
-  active: 1, version: null, generated_at: null, enabled_components: null, enabled_tools: null, tier: 1, installed: 1,
-  unstarred_at: null, is_forked: null, update_available: null,
-  update_checked_at: null, upstream_version: null, stored_version: null,
-}
-
-const rows: LibraryRow[] = [
-  { ...baseRow, id: '1', owner: 'a', name: 'alpha', type_bucket: 'frameworks' },
-  { ...baseRow, id: '2', owner: 'b', name: 'beta',  type_bucket: 'frameworks' },
-  { ...baseRow, id: '3', owner: 'c', name: 'gamma', type_bucket: 'dev-tools' },
+const rows: LibrarySavedRepo[] = [
+  fixtureLibrarySavedRepo({
+    hostNativeId: '1',
+    fullName: 'a/alpha',
+    owner: 'a',
+    name: 'alpha',
+    language: 'TypeScript',
+    type: 'skill',
+    typeBucket: 'frameworks',
+  }),
+  fixtureLibrarySavedRepo({
+    hostNativeId: '2',
+    fullName: 'b/beta',
+    owner: 'b',
+    name: 'beta',
+    language: 'TypeScript',
+    type: 'skill',
+    typeBucket: 'frameworks',
+  }),
+  fixtureLibrarySavedRepo({
+    hostNativeId: '3',
+    fullName: 'c/gamma',
+    owner: 'c',
+    name: 'gamma',
+    language: 'TypeScript',
+    type: 'skill',
+    typeBucket: 'dev-tools',
+  }),
 ]
 
 function renderGrid(props: Partial<React.ComponentProps<typeof LibraryGrid>> = {}) {
@@ -66,7 +75,7 @@ describe('LibraryGrid', () => {
   })
 
   it('renders selected row with correct class', () => {
-    renderGrid({ selectedId: '1' })
+    renderGrid({ selectedId: 'a/alpha' })
     const alphaRow = screen.getByText('alpha')
     expect(alphaRow).toBeInTheDocument()
   })

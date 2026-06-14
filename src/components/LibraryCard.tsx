@@ -2,11 +2,11 @@ import './LibraryCard.css'
 import { useState } from 'react'
 import { Boxes, GitFork, ArrowUpCircle } from 'lucide-react'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
-import type { LibraryRow } from '../types/repo'
+import type { LibrarySavedRepo } from '../types/repo'
 import UpdateModal from './UpdateModal'
 
 export interface LibraryCardProps {
-  row: LibraryRow
+  row: LibrarySavedRepo
   selected: boolean
   hasSubSkill: boolean
   onSelect: () => void
@@ -15,8 +15,8 @@ export interface LibraryCardProps {
 export default function LibraryCard({ row, selected, hasSubSkill, onSelect }: LibraryCardProps) {
   const { openProfile } = useProfileOverlay()
   const [showUpdate, setShowUpdate] = useState(false)
-  const hasUpdate = row.update_available === 1
-  const isFork = row.is_forked === 1
+  const hasUpdate = row.updateAvailable === 1
+  const isFork = row.isForked === 1
 
   return (
     <>
@@ -60,7 +60,7 @@ export default function LibraryCard({ row, selected, hasSubSkill, onSelect }: Li
         )}
       </div>
       {showUpdate && (
-        <UpdateModal repoId={row.id} owner={row.owner} name={row.name} isFork={isFork} onClose={() => setShowUpdate(false)} />
+        <UpdateModal repoId={String(row.hostNativeId)} owner={row.owner} name={row.name} isFork={isFork} onClose={() => setShowUpdate(false)} />
       )}
     </>
   )

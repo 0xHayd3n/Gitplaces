@@ -5,10 +5,10 @@ import { RepoNavProvider } from '../contexts/RepoNav'
 import FilesTab from './FilesTab'
 import Toggle from './Toggle'
 import { getLangConfig } from './BannerSVG'
-import type { LibraryRow } from '../types/repo'
+import type { LibrarySavedRepo } from '../types/repo'
 
 interface Props {
-  row: LibraryRow
+  row: LibrarySavedRepo
   onToggleActive: (v: boolean) => void
   onInstalled: (result: { content: string; version: string | null; generated_at: string | null }) => void
 }
@@ -80,7 +80,7 @@ export default function LibraryFilesDetail({ row, onToggleActive, onInstalled }:
           <FilesTab
             owner={row.owner}
             name={row.name}
-            branch={row.default_branch ?? 'main'}
+            branch={row.defaultBranch || 'main'}
           />
         </RepoNavProvider>
       </div>

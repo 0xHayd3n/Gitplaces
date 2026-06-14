@@ -1,19 +1,19 @@
 import { useState } from 'react'
 import { GitFork, ArrowUpCircle } from 'lucide-react'
-import type { LibraryRow } from '../types/repo'
+import type { LibrarySavedRepo } from '../types/repo'
 import UpdateModal from './UpdateModal'
 import './LibraryListRow.css'
 
 export default function LibraryListRow({
   row, selected, onSelect,
 }: {
-  row: LibraryRow
+  row: LibrarySavedRepo
   selected: boolean
   onSelect: () => void
 }) {
   const [showUpdate, setShowUpdate] = useState(false)
-  const hasUpdate = row.update_available === 1
-  const isFork = row.is_forked === 1
+  const hasUpdate = row.updateAvailable === 1
+  const isFork = row.isForked === 1
 
   return (
     <>
@@ -42,7 +42,7 @@ export default function LibraryListRow({
         </div>
       </div>
       {showUpdate && (
-        <UpdateModal repoId={row.id} owner={row.owner} name={row.name} isFork={isFork} onClose={() => setShowUpdate(false)} />
+        <UpdateModal repoId={String(row.hostNativeId)} owner={row.owner} name={row.name} isFork={isFork} onClose={() => setShowUpdate(false)} />
       )}
     </>
   )

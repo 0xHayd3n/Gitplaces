@@ -4,25 +4,24 @@ import { describe, it, expect, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { ProfileOverlayProvider } from '../contexts/ProfileOverlay'
 import LibraryCard from './LibraryCard'
-import type { LibraryRow } from '../types/repo'
+import type { LibrarySavedRepo } from '../types/repo'
+import { fixtureLibrarySavedRepo } from '../test-utils/repoFixtures'
 
-const mockRow: LibraryRow = {
-  id: 'r1', owner: 'facebook', name: 'react', language: 'TypeScript',
+const mockRow: LibrarySavedRepo = fixtureLibrarySavedRepo({
+  hostNativeId: 'r1',
+  fullName: 'facebook/react',
+  owner: 'facebook',
+  name: 'react',
+  language: 'TypeScript',
   description: 'A JS library',
-  topics: '[]', stars: null, forks: null, license: 'MIT',
-  homepage: null, updated_at: null, pushed_at: null, saved_at: '2026-01-01',
-  type: 'skill', banner_svg: null, discovered_at: null, discover_query: null,
-  watchers: null, size: null, open_issues: null, starred_at: null,
-  default_branch: null, avatar_url: null, og_image_url: null, banner_color: null,
-  translated_description: null, translated_description_lang: null,
-  translated_readme: null, translated_readme_lang: null, detected_language: null,
-  verification_score: null, verification_tier: null, verification_signals: null, verification_checked_at: null,
-  type_bucket: 'frameworks', type_sub: 'web-framework',
-  active: 1, version: 'v18.0.0', generated_at: '2026-01-01T00:00:00.000Z',
-  enabled_components: null, enabled_tools: null, tier: 1, installed: 1,
-  unstarred_at: null, is_forked: null, update_available: null,
-  update_checked_at: null, upstream_version: null, stored_version: null,
-}
+  license: 'MIT',
+  savedAt: '2026-01-01',
+  type: 'skill',
+  typeBucket: 'frameworks',
+  typeSub: 'web-framework',
+  version: 'v18.0.0',
+  generatedAt: '2026-01-01T00:00:00.000Z',
+})
 
 function renderCard(props: Partial<React.ComponentProps<typeof LibraryCard>> = {}) {
   const defaults = {

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import type { LibraryRow } from '../types/repo'
+import type { LibrarySavedRepo } from '../types/repo'
 import LangBadge from './LangBadge'
 
 interface NewCollectionModalProps {
-  libraryRows: LibraryRow[]
+  libraryRows: LibrarySavedRepo[]
   onClose: () => void
   onCreate: (id: string) => void
 }
@@ -96,19 +96,22 @@ export default function NewCollectionModal({
               No installed repos found
             </div>
           )}
-          {filtered.map(r => (
-            <div
-              key={r.id}
-              className={`coll-modal-repo-row${selected.has(r.id) ? ' checked' : ''}`}
-              onClick={() => toggleRepo(r.id)}
-            >
-              <LangBadge lang={r.language} size={18} />
-              <span className="coll-modal-repo-name">{r.owner}/{r.name}</span>
-              <div className={`coll-modal-repo-check${selected.has(r.id) ? ' checked' : ''}`}>
-                {selected.has(r.id) && '✓'}
+          {filtered.map(r => {
+            const id = String(r.hostNativeId)
+            return (
+              <div
+                key={id}
+                className={`coll-modal-repo-row${selected.has(id) ? ' checked' : ''}`}
+                onClick={() => toggleRepo(id)}
+              >
+                <LangBadge lang={r.language} size={18} />
+                <span className="coll-modal-repo-name">{r.owner}/{r.name}</span>
+                <div className={`coll-modal-repo-check${selected.has(id) ? ' checked' : ''}`}>
+                  {selected.has(id) && '✓'}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="coll-modal-actions">

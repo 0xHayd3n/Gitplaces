@@ -3,35 +3,32 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import LibraryFilesDetail from './LibraryFilesDetail'
-import type { LibraryRow } from '../types/repo'
+import type { LibrarySavedRepo } from '../types/repo'
+import { fixtureLibrarySavedRepo } from '../test-utils/repoFixtures'
 
 // FilesTab makes GitHub API calls — mock the whole module
 vi.mock('./FilesTab', () => ({
   default: () => <div data-testid="files-tab" />,
 }))
 
-const baseRow: LibraryRow = {
-  id: 'r1', owner: 'acme', name: 'my-skill', language: 'TypeScript',
-  description: 'A skill', topics: '[]',
-  stars: 1200, forks: null, license: 'MIT', homepage: null,
-  updated_at: null, pushed_at: null, saved_at: '2026-01-01',
-  type: 'skill', banner_svg: null, discovered_at: null, discover_query: null,
-  watchers: null, size: null, open_issues: null, starred_at: null,
-  default_branch: 'main', avatar_url: null, og_image_url: null,
-  banner_color: null, translated_description: null,
-  translated_description_lang: null, translated_readme: null,
-  translated_readme_lang: null, detected_language: null,
-  verification_score: null, verification_tier: null,
-  verification_signals: null, verification_checked_at: null,
-  type_bucket: 'tools', type_sub: null,
-  active: 1, version: 'v2.0', generated_at: '2026-01-01T00:00:00.000Z',
-  enabled_components: null,
-  enabled_tools: null, tier: 1, installed: 1,
-  unstarred_at: null, is_forked: null, update_available: null,
-  update_checked_at: null, upstream_version: null, stored_version: null,
-}
+const baseRow: LibrarySavedRepo = fixtureLibrarySavedRepo({
+  hostNativeId: 'r1',
+  fullName: 'acme/my-skill',
+  owner: 'acme',
+  name: 'my-skill',
+  language: 'TypeScript',
+  description: 'A skill',
+  stars: 1200,
+  license: 'MIT',
+  defaultBranch: 'main',
+  savedAt: '2026-01-01',
+  type: 'skill',
+  typeBucket: 'tools',
+  version: 'v2.0',
+  generatedAt: '2026-01-01T00:00:00.000Z',
+})
 
-function renderDetail(overrides: Partial<LibraryRow> = {}, props = {}) {
+function renderDetail(overrides: Partial<LibrarySavedRepo> = {}, props = {}) {
   const row = { ...baseRow, ...overrides }
   return render(
     <MemoryRouter>

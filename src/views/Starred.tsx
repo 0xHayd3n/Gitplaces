@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { StarredRepoRow } from '../types/repo'
+import type { LibrarySavedRepo } from '../types/repo'
 import { formatStars } from '../types/repo'
 import { useSavedRepos } from '../contexts/SavedRepos'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
@@ -19,7 +19,7 @@ export default function Starred() {
   const { openProfile } = useProfileOverlay()
 
   // Data
-  const [rows, setRows] = useState<StarredRepoRow[]>([])
+  const [rows, setRows] = useState<LibrarySavedRepo[]>([])
   const [loading, setLoading] = useState(true)
 
   // Account bar
@@ -122,16 +122,16 @@ export default function Starred() {
 
   // Time buckets
   const now = useMemo(() => Date.now(), [visible])
-  const buckets: { label: string; rows: StarredRepoRow[] }[] = []
-  const week: StarredRepoRow[] = []
-  const month: StarredRepoRow[] = []
-  const older: StarredRepoRow[] = []
+  const buckets: { label: string; rows: LibrarySavedRepo[] }[] = []
+  const week: LibrarySavedRepo[] = []
+  const month: LibrarySavedRepo[] = []
+  const older: LibrarySavedRepo[] = []
   let hasDates = false
 
   for (const r of visible) {
-    if (!r.starred_at) { older.push(r); continue }
+    if (!r.starredAt) { older.push(r); continue }
     hasDates = true
-    const age = now - new Date(r.starred_at).getTime()
+    const age = now - new Date(r.starredAt).getTime()
     if (age < 7 * 86_400_000) week.push(r)
     else if (age < 30 * 86_400_000) month.push(r)
     else older.push(r)

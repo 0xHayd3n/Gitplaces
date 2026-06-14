@@ -1,4 +1,7 @@
-import type { RepoRow } from './repo'
+import type { SavedRepo, LibrarySavedRepo } from './repo'
+
+// Re-export so existing consumers can import LibrarySavedRepo from '../types/library'.
+export type { LibrarySavedRepo } from './repo'
 
 export interface LocalProject {
   name: string
@@ -9,5 +12,5 @@ export interface LocalProject {
 }
 
 export type LibraryEntry =
-  | { kind: 'repo'; row: RepoRow; isInstalled: boolean; isStarred: boolean }
+  | { kind: 'repo'; row: SavedRepo; isInstalled: boolean; isStarred: boolean }
   | { kind: 'local'; project: LocalProject }

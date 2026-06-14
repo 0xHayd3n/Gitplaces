@@ -1,15 +1,15 @@
 import LibraryCard from './LibraryCard'
 import LibraryListRow from './LibraryListRow'
 import ViewportWindow from './ViewportWindow'
-import type { LibraryRow } from '../types/repo'
+import type { LibrarySavedRepo } from '../types/repo'
 import type { LayoutPrefs } from './LayoutDropdown'
 
 export interface LibraryGridProps {
-  rows: LibraryRow[]
+  rows: LibrarySavedRepo[]
   selectedId: string | null
   layoutPrefs: LayoutPrefs
   subSkillIds: Set<string>
-  onSelect: (row: LibraryRow) => void
+  onSelect: (row: LibrarySavedRepo) => void
 }
 
 export default function LibraryGrid({
@@ -24,20 +24,20 @@ export default function LibraryGrid({
     >
       {rows.map(row => (
         <ViewportWindow
-          key={row.id}
+          key={row.fullName}
           placeholderHeight={isList ? 52 : 220}
         >
           {isList ? (
             <LibraryListRow
               row={row}
-              selected={selectedId === row.id}
+              selected={selectedId === row.fullName}
               onSelect={() => onSelect(row)}
             />
           ) : (
             <LibraryCard
               row={row}
-              selected={selectedId === row.id}
-              hasSubSkill={subSkillIds.has(row.id)}
+              selected={selectedId === row.fullName}
+              hasSubSkill={subSkillIds.has(row.fullName)}
               onSelect={() => onSelect(row)}
             />
           )}

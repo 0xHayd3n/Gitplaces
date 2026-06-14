@@ -4,26 +4,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import LibrarySidebar from './LibrarySidebar'
 import { MockLearningProgressProvider } from '../contexts/LearningProgressContext'
 import { ToastProvider } from '../contexts/Toast'
-import type { LibraryRow } from '../types/repo'
+import type { LibrarySavedRepo } from '../types/repo'
+import { fixtureLibrarySavedRepo } from '../test-utils/repoFixtures'
 
-function makeRow(owner: string, name: string): LibraryRow {
-  return {
-    id: `${owner}/${name}`, owner, name, active: 1,
-    description: null, language: null, topics: '[]',
-    stars: null, forks: null, license: null, homepage: null,
-    updated_at: null, pushed_at: null, saved_at: '2026-01-01', type: null,
-    banner_svg: null, discovered_at: null, discover_query: null,
-    watchers: null, size: null, open_issues: null, starred_at: null,
-    default_branch: null, avatar_url: null, og_image_url: null,
-    banner_color: null, translated_description: null,
-    translated_description_lang: null, translated_readme: null,
-    translated_readme_lang: null, detected_language: null,
-    verification_score: null, verification_tier: null,
-    verification_signals: null, verification_checked_at: null,
-    type_bucket: null, type_sub: null, version: null,
-    generated_at: '2026-01-01T00:00:00.000Z',
-    enabled_components: null, enabled_tools: null, tier: 1, installed: 1,
-  } as LibraryRow
+function makeRow(owner: string, name: string): LibrarySavedRepo {
+  return fixtureLibrarySavedRepo({
+    hostNativeId: `${owner}/${name}`,
+    fullName: `${owner}/${name}`,
+    owner,
+    name,
+    savedAt: '2026-01-01',
+    generatedAt: '2026-01-01T00:00:00.000Z',
+  })
 }
 
 function LocationDisplay() {
@@ -159,11 +151,11 @@ describe('LibrarySidebar — archived section', () => {
 })
 
 describe('LibrarySidebar — recently unstarred section', () => {
-  const unstarredRow = {
+  const unstarredRow: LibrarySavedRepo = {
     ...makeRow('zed', 'unstarred-repo'),
-    starred_at: null,
-    unstarred_at: '2026-05-22T00:00:00Z',
-  } as unknown as import('../types/repo').StarredRepoRow
+    starredAt: null,
+    unstarredAt: '2026-05-22T00:00:00Z',
+  }
 
   it('shows a collapsed Recently unstarred (N) section when there are items', () => {
     wrap(<LibrarySidebar {...defaultProps} unstarredRows={[unstarredRow]} />)

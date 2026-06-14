@@ -8,6 +8,7 @@ import { SearchProvider } from '../contexts/Search'
 import { ToastProvider } from '../contexts/Toast'
 import { GitHubAuthProvider } from '../contexts/GitHubAuth'
 import { MockLearningProgressProvider } from '../contexts/LearningProgressContext'
+import { fixtureLibrarySavedRepo } from '../test-utils/repoFixtures'
 
 vi.mock('../components/CollectionsSidebar', () => ({
   default: () => <div data-testid="collections-sidebar" />,
@@ -23,19 +24,21 @@ vi.mock('./CollectionDetail', () => ({
 }))
 
 const mockRows = [
-  { id: 'repo-1', owner: 'facebook', name: 'react', active: 1,
-    language: 'TypeScript', description: 'A JS library', topics: '[]',
-    stars: null, forks: null, license: 'MIT', homepage: null, updated_at: null,
-    pushed_at: null, saved_at: '2026-01-01', type: 'skill', banner_svg: null,
-    discovered_at: null, discover_query: null, watchers: null, size: null,
-    open_issues: null, starred_at: null, default_branch: null, avatar_url: null,
-    og_image_url: null, banner_color: null, translated_description: null,
-    translated_description_lang: null, translated_readme: null,
-    translated_readme_lang: null, detected_language: null,
-    verification_score: null, verification_tier: null, verification_signals: null,
-    verification_checked_at: null, type_bucket: 'frameworks', type_sub: 'web-framework',
-    version: 'v18.0.0', generated_at: '2026-01-01T00:00:00.000Z',
-    enabled_components: null, enabled_tools: null, tier: 1, installed: 1 },
+  fixtureLibrarySavedRepo({
+    hostNativeId: 'repo-1',
+    fullName: 'facebook/react',
+    owner: 'facebook',
+    name: 'react',
+    language: 'TypeScript',
+    description: 'A JS library',
+    license: 'MIT',
+    savedAt: '2026-01-01',
+    type: 'skill',
+    typeBucket: 'frameworks',
+    typeSub: 'web-framework',
+    version: 'v18.0.0',
+    generatedAt: '2026-01-01T00:00:00.000Z',
+  }),
 ]
 
 function renderLibrary(initialPath = '/library') {

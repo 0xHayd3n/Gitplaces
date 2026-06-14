@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
-import type { CollectionRow, CollectionRepoRow, LibraryRow } from '../types/repo'
+import type { CollectionRow, CollectionRepoRow, LibrarySavedRepo } from '../types/repo'
 import { useToast } from '../contexts/Toast'
 import CollDetail from '../components/CollDetail'
 
@@ -12,7 +12,7 @@ export default function CollectionDetail() {
 
   const [coll, setColl] = useState<CollectionRow | null>((location.state as any)?.coll ?? null)
   const [detail, setDetail] = useState<CollectionRepoRow[]>([])
-  const [libraryRows, setLibraryRows] = useState<LibraryRow[]>([])
+  const [libraryRows, setLibraryRows] = useState<LibrarySavedRepo[]>([])
   const [installing, setInstalling] = useState<Set<string>>(new Set())
 
   useEffect(() => {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useMatch, useLocation } from 'react-router-dom'
-import { type LibraryRow, type StarredRepoRow, type RepoRow } from '../types/repo'
+import { type LibrarySavedRepo, type SavedRepo } from '../types/repo'
 import type { CollectionRow } from '../types/repo'
 import type { LocalProject } from '../types/library'
 import { useToast } from '../contexts/Toast'
@@ -30,9 +30,9 @@ export default function Library() {
   const agentMatch = useMatch('/library/agent/:id')
   const hasDetail  = repoMatch !== null || collMatch !== null || agentMatch !== null
 
-  const [rows, setRows] = useState<LibraryRow[]>([])
-  const [starredRows, setStarredRows] = useState<StarredRepoRow[]>([])
-  const [unstarredRows, setUnstarredRows] = useState<StarredRepoRow[]>([])
+  const [rows, setRows] = useState<LibrarySavedRepo[]>([])
+  const [starredRows, setStarredRows] = useState<LibrarySavedRepo[]>([])
+  const [unstarredRows, setUnstarredRows] = useState<LibrarySavedRepo[]>([])
   const localProjects = useLocalProjects()
   const [recentVisits, setRecentVisits] = useState<RecentEntry[]>(() => getRecentVisits())
   const [mode, setMode] = useState<'repos' | 'collections' | 'agents'>('repos')
@@ -100,16 +100,19 @@ export default function Library() {
   // Prime RepoDetail's per-repo cache from rows we already have in memory,
   // so first-time navigation to a sidebar repo shows its header/description/
   // stats immediately instead of waiting for fetchRepoBundle.
+  // RepoDetail still types this as RepoRow until Task 10 migrates it.
   useEffect(() => {
-    primeRepoCacheFromRows([...rows, ...starredRows, ...unstarredRows])
+    primeRepoCacheFromRows(
+      [...rows, ...starredRows, ...unstarredRows] as unknown as Parameters<typeof primeRepoCacheFromRows>[0],
+    )
   }, [rows, starredRows, unstarredRows])
 
   const repoSelectedId = useMemo(() => {
     if (!repoMatch) return null
     const { owner, name } = repoMatch.params
     return (
-      rows.find(r => r.owner === owner && r.name === name)?.id ??
-      starredRows.find(r => r.owner === owner && r.name === name)?.id ??
+      rows.find(r => r.owner === owner && r.name === name)?.fullName ??
+      starredRows.find(r => r.owner === owner && r.name === name)?.fullName ??
       null
     )
   }, [repoMatch, rows, starredRows])
@@ -120,9 +123,9 @@ export default function Library() {
     ? new URLSearchParams(location.search).get('path')
     : null
 
-  const handleRepoSelect = useCallback((row: RepoRow, _isInstalled: boolean) => {
-    prewarmStaticDither(row.avatar_url, cameraIdxForRepo(row.owner, row.name))
-    recordRecentVisit({ owner: row.owner, name: row.name, avatar_url: row.avatar_url, navigatePath: `/library/repo/${row.owner}/${row.name}` })
+  const handleRepoSelect = useCallback((row: SavedRepo, _isInstalled: boolean) => {
+    prewarmStaticDither(row.ownerAvatarUrl, cameraIdxForRepo(row.owner, row.name))
+    recordRecentVisit({ owner: row.owner, name: row.name, avatar_url: row.ownerAvatarUrl, navigatePath: `/library/repo/${row.owner}/${row.name}` })
     refreshRecentVisits()
     navigate(`/library/repo/${row.owner}/${row.name}`)
   }, [navigate, refreshRecentVisits])

@@ -8,12 +8,12 @@ import AnatomyIndicators from './AnatomyIndicators'
 import { getLangConfig } from './BannerSVG'
 import { formatDate, daysSince } from '../utils/dateHelpers'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
-import type { LibraryRow, SubSkillRow, AnatomyPayload } from '../types/repo'
+import type { LibrarySavedRepo, SubSkillRow, AnatomyPayload } from '../types/repo'
 
 export default function GenericDetail({
   row, collections, onToggle, onRegenerate, onEnhance, onRemove, regenerating, componentsSubSkill, versionedInstalls,
 }: {
-  row: LibraryRow
+  row: LibrarySavedRepo
   collections: { id: string; name: string }[]
   onToggle: (active: boolean) => void
   onRegenerate: () => void
@@ -91,10 +91,10 @@ export default function GenericDetail({
           </div>
           <div className="lib-skill-panel-body">
             {anatomy
-              ? <AnatomyIndicators payload={anatomy} updateAvailable={(row.update_available ?? 0) as number} />
+              ? <AnatomyIndicators payload={anatomy} updateAvailable={(row.updateAvailable ?? 0) as number} />
               : <SkillDepthBars content={skillContent ?? ''} />}
             <p className="lib-skill-note">
-              Generated from v{row.version ?? '\u2014'} {'\u00B7'} {row.generated_at ? daysSince(row.generated_at) : '\u2014'}
+              Generated from v{row.version ?? '\u2014'} {'\u00B7'} {row.generatedAt ? daysSince(row.generatedAt) : '\u2014'}
             </p>
           </div>
         </div>
@@ -102,7 +102,7 @@ export default function GenericDetail({
         {/* Details */}
         <div className="lib-details-section">
           <span className="lib-details-label">Details</span>
-          <DetailRow k="Saved"          v={formatDate(row.saved_at)} />
+          <DetailRow k="Saved"          v={formatDate(row.savedAt)} />
           <DetailRow k="Repo version"   v={row.version ?? '\u2014'} />
           <DetailRow k="Skill size"     v={`${skillSizeKb} KB`} />
           <DetailRow k="Language"       v={row.language ?? '\u2014'} />

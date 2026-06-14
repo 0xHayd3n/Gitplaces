@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useCallback, memo } from 'react'
 import { useLocation, useNavigate, useMatch } from 'react-router-dom'
 import { Home, Search } from 'lucide-react'
 import './LibrarySidebar.css'
-import type { LibraryRow, StarredRepoRow, RepoRow, CollectionRow } from '../types/repo'
+import type { LibrarySavedRepo, SavedRepo, CollectionRow } from '../types/repo'
 import type { LibraryEntry, LocalProject } from '../types/library'
 import { useLearningProgress } from '../hooks/useLearningProgress'
 import RepoContextMenu, { type RepoContextMenuTarget } from './RepoContextMenu'
@@ -11,15 +11,15 @@ import CollectionsSidebar from './CollectionsSidebar'
 import AgentsSidebar from './AgentsSidebar'
 
 interface Props {
-  installedRows: LibraryRow[]
-  starredRows: StarredRepoRow[]
-  unstarredRows: StarredRepoRow[]
+  installedRows: LibrarySavedRepo[]
+  starredRows: LibrarySavedRepo[]
+  unstarredRows: LibrarySavedRepo[]
   localProjects: LocalProject[]
   archivedSet: Set<string>
   selectedId: string | null
   selectedLocalPath: string | null
   collSelectedId?: string | null
-  onSelect: (row: RepoRow, isInstalled: boolean) => void
+  onSelect: (row: SavedRepo, isInstalled: boolean) => void
   onSelectLocal: (project: LocalProject) => void
   onSelectColl?: (id: string, coll: CollectionRow) => void
   onModeChange?: (mode: 'repos' | 'collections' | 'agents') => void
@@ -113,11 +113,11 @@ export default function LibrarySidebar({
   const allEntries = useMemo<LibraryEntry[]>(() => {
     const map = new Map<string, LibraryEntry>()
     for (const row of installedRows) {
-      map.set(row.id, { kind: 'repo', row, isInstalled: true, isStarred: row.starred_at != null })
+      map.set(row.fullName, { kind: 'repo', row, isInstalled: true, isStarred: row.starredAt != null })
     }
     for (const row of starredRows) {
-      if (!map.has(row.id)) {
-        map.set(row.id, { kind: 'repo', row, isInstalled: false, isStarred: true })
+      if (!map.has(row.fullName)) {
+        map.set(row.fullName, { kind: 'repo', row, isInstalled: false, isStarred: true })
       }
     }
     for (const project of localProjects) {
@@ -234,11 +234,11 @@ export default function LibrarySidebar({
             const { row, isInstalled, isStarred } = entry
             return (
               <SidebarRepoRow
-                key={row.id}
+                key={row.fullName}
                 row={row}
                 isInstalled={isInstalled}
                 isStarred={isStarred}
-                selected={selectedId === row.id}
+                selected={selectedId === row.fullName}
                 onSelect={onSelect}
                 onContextMenu={handleRepoContextMenu}
               />
@@ -281,11 +281,11 @@ export default function LibrarySidebar({
               const { row } = entry
               return (
                 <SidebarRepoRow
-                  key={`archived-${row.id}`}
+                  key={`archived-${row.fullName}`}
                   row={row}
                   isInstalled={entry.isInstalled}
                   isStarred={entry.isStarred}
-                  selected={selectedId === row.id}
+                  selected={selectedId === row.fullName}
                   onSelect={onSelect}
                   onContextMenu={handleRepoContextMenu}
                 />
@@ -307,11 +307,11 @@ export default function LibrarySidebar({
             </button>
             {unstarredOpen && visibleUnstarred.map(row => (
               <SidebarRepoRow
-                key={`unstarred-${row.id}`}
+                key={`unstarred-${row.fullName}`}
                 row={row}
                 isInstalled={false}
                 isStarred={false}
-                selected={selectedId === row.id}
+                selected={selectedId === row.fullName}
                 onSelect={onSelect}
                 onContextMenu={handleRepoContextMenu}
               />
@@ -348,11 +348,11 @@ export default function LibrarySidebar({
 }
 
 interface SidebarRepoRowProps {
-  row: RepoRow | LibraryRow | StarredRepoRow
+  row: SavedRepo
   isInstalled: boolean
   isStarred: boolean
   selected: boolean
-  onSelect: (row: RepoRow, isInstalled: boolean) => void
+  onSelect: (row: SavedRepo, isInstalled: boolean) => void
   onContextMenu: (e: React.MouseEvent, target: RepoContextMenuTarget) => void
 }
 
@@ -378,8 +378,8 @@ const SidebarRepoRow = memo(function SidebarRepoRow({
       title={`${row.owner}/${row.name}`}
     >
       <span className="library-sidebar-avatar">
-        {row.avatar_url
-          ? <img src={row.avatar_url} alt="" loading="lazy" decoding="async" />
+        {row.ownerAvatarUrl
+          ? <img src={row.ownerAvatarUrl} alt="" loading="lazy" decoding="async" />
           : <span className="library-sidebar-avatar-fallback">{(row.name?.[0] ?? '?').toUpperCase()}</span>
         }
       </span>
