@@ -35,9 +35,9 @@ describe('useFeed synthesized releases', () => {
     mockGetFeedRepos.mockResolvedValue([{ owner: 'a', name: 'b' }])
     mockGetReleases.mockResolvedValue([
       {
-        tag_name: 'v1.0.0-rc.1',
+        tagName: 'v1.0.0-rc.1',
         name: 'RC',
-        published_at: new Date().toISOString(),
+        publishedAt: new Date().toISOString(),
         body: 'notes',
         assets: [],
         prerelease: true,
@@ -60,9 +60,9 @@ describe('useFeed session cache', () => {
     mockGetFeedRepos.mockResolvedValue([{ owner: 'a', name: 'b' }])
     mockGetReleases.mockResolvedValue([
       {
-        tag_name: 'v1.0.0',
+        tagName: 'v1.0.0',
         name: 'first',
-        published_at: new Date().toISOString(),
+        publishedAt: new Date().toISOString(),
         body: '',
         assets: [],
         prerelease: false,
@@ -87,9 +87,9 @@ describe('useFeed session cache', () => {
     mockGetFeedRepos.mockResolvedValue([{ owner: 'a', name: 'b' }])
     mockGetReleases.mockResolvedValue([
       {
-        tag_name: 'v3.0.0',
+        tagName: 'v3.0.0',
         name: 'persistent',
-        published_at: new Date().toISOString(),
+        publishedAt: new Date().toISOString(),
         body: '',
         assets: [],
         prerelease: false,
@@ -110,17 +110,17 @@ describe('useFeed session cache', () => {
 
   it('merges fresh fetch with cached events not in the new payload', async () => {
     const olderRelease = {
-      tag_name: 'v1.0.0',
+      tagName: 'v1.0.0',
       name: 'older',
-      published_at: new Date(Date.now() - 60_000).toISOString(),
+      publishedAt: new Date(Date.now() - 60_000).toISOString(),
       body: '',
       assets: [],
       prerelease: false,
     }
     const newerRelease = {
-      tag_name: 'v2.0.0',
+      tagName: 'v2.0.0',
       name: 'newer',
-      published_at: new Date().toISOString(),
+      publishedAt: new Date().toISOString(),
       body: '',
       assets: [],
       prerelease: false,
