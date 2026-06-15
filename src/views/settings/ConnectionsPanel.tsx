@@ -174,10 +174,14 @@ export default function ConnectionsPanel() {
         setAddError(probe.error ?? 'Probe failed.')
         return
       }
-      await window.api.hosts.add({ type: addType, baseUrl, label, webUrl: baseUrl })
-      const list = await loadHosts()
-      const newHost = list.find(h => h.baseUrl === baseUrl)
-      if (newHost) await refreshHost(newHost.id)
+      // `hosts:add` returns the canonical HostInstance with its deterministic
+      // id — use that rather than scanning the refreshed list by baseUrl
+      // (mixed-case input would silently skip refreshHost since the stored
+      // baseUrl preserves the user's original casing while computeHostId
+      // lowercases for the id).
+      const added = await window.api.hosts.add({ type: addType, baseUrl, label, webUrl: baseUrl })
+      await loadHosts()
+      await refreshHost(added.id)
       void runHealthCheck()
       // Reset form
       setAddBaseUrl('')
