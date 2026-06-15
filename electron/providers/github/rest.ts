@@ -1,6 +1,12 @@
 export const CLIENT_ID = 'Ov23liJxy53KWDh27mQx'
-const BASE = 'https://api.github.com'
+const DEFAULT_BASE = 'https://api.github.com'
 const SCOPE = 'read:user,repo'
+
+/** Public-instance default used by the singleton `githubProvider` and any
+ *  free-function callers that didn't pass a baseUrl explicitly. GHE
+ *  instances pass their own `https://github.acme.com/api/v3` via the
+ *  trailing `baseUrl` parameter on each function. */
+export function defaultGitHubBase(): string { return DEFAULT_BASE }
 
 // ── Server version probe (GHE detection) ────────────────────────────────────
 //
@@ -51,7 +57,7 @@ function classifyGhFetchError(err: unknown, baseUrl: string): GitHubServerVersio
  *  else, hits `/api/v3/meta` and looks for the `installed_version` field that
  *  GHE includes and api.github.com omits. */
 export async function getServerVersion(baseUrl: string): Promise<GitHubServerVersionResult> {
-  if (baseUrl === 'https://api.github.com' || baseUrl === BASE) {
+  if (baseUrl === 'https://api.github.com' || baseUrl === DEFAULT_BASE) {
     return { ok: true, version: 'github.com', flavor: 'github.com' }
   }
   const url = `${baseUrl.replace(/\/+$/, '')}/api/v3/meta`
@@ -238,10 +244,11 @@ export async function getReceivedEvents(
   token: string,
   username: string,
   cutoffMs: number = RECEIVED_EVENTS_DEFAULT_CUTOFF_MS,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<GitHubEvent[]> {
   const cutoff = Date.now() - cutoffMs
   const collected: GitHubEvent[] = []
-  let url: string | null = `${BASE}/users/${encodeURIComponent(username)}/received_events?per_page=30`
+  let url: string | null = `${baseUrl}/users/${encodeURIComponent(username)}/received_events?per_page=30`
   let pagesFetched = 0
 
   while (url && pagesFetched < RECEIVED_EVENTS_MAX_PAGES) {
@@ -278,15 +285,15 @@ export async function getReceivedEvents(
   return collected.filter(e => new Date(e.created_at).getTime() >= cutoff)
 }
 
-export async function getUser(token: string): Promise<GitHubUser> {
-  const res = await fetch(`${BASE}/user`, { headers: githubHeaders(token) })
+export async function getUser(token: string, baseUrl: string = DEFAULT_BASE): Promise<GitHubUser> {
+  const res = await fetch(`${baseUrl}/user`, { headers: githubHeaders(token) })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   return res.json() as Promise<GitHubUser>
 }
 
-export async function getStarred(token: string): Promise<GitHubStarredRepo[]> {
+export async function getStarred(token: string, baseUrl: string = DEFAULT_BASE): Promise<GitHubStarredRepo[]> {
   const results: GitHubStarredRepo[] = []
-  let url: string | null = `${BASE}/user/starred?per_page=100`
+  let url: string | null = `${baseUrl}/user/starred?per_page=100`
   let pagesFetched = 0
 
   // Build headers manually — githubHeaders() uses application/vnd.github+json
@@ -332,8 +339,9 @@ export async function getRepo(
   owner: string,
   name: string,
   db?: import('better-sqlite3').Database,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<GitHubRepo> {
-  const url = `${BASE}/repos/${owner}/${name}`
+  const url = `${baseUrl}/repos/${owner}/${name}`
   const init = { headers: githubHeaders(token), signal: AbortSignal.timeout(10_000) }
   if (db) {
     const { etagFetch } = await import('../../githubFetch')
@@ -354,13 +362,14 @@ export async function searchRepos(
   sort = 'stars',
   order = 'desc',
   page = 1,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<GitHubRepo[]> {
   // GitHub Search rejects empty queries with 422. Skip the round-trip and
   // return no results — semantically equivalent and avoids the noisy error.
   const trimmed = query.trim()
   if (!trimmed) return []
 
-  const url = `${BASE}/search/repositories?q=${encodeURIComponent(trimmed)}&sort=${sort}&order=${order}&per_page=${perPage}&page=${page}`
+  const url = `${baseUrl}/search/repositories?q=${encodeURIComponent(trimmed)}&sort=${sort}&order=${order}&per_page=${perPage}&page=${page}`
   const res = await fetch(url, { headers: githubHeaders(token) })
   // 422 = "Unprocessable Entity" — GitHub couldn't parse the query (too long,
   // bad qualifier syntax, reserved chars in unexpected places, etc.). Treat
@@ -375,10 +384,10 @@ export async function searchRepos(
   return data.items
 }
 
-export async function getReadme(token: string | null, owner: string, name: string, ref?: string): Promise<string | null> {
+export async function getReadme(token: string | null, owner: string, name: string, ref?: string, baseUrl: string = DEFAULT_BASE): Promise<string | null> {
   const url = ref
-    ? `${BASE}/repos/${owner}/${name}/readme?ref=${encodeURIComponent(ref)}`
-    : `${BASE}/repos/${owner}/${name}/readme`
+    ? `${baseUrl}/repos/${owner}/${name}/readme?ref=${encodeURIComponent(ref)}`
+    : `${baseUrl}/repos/${owner}/${name}/readme`
   const res = await fetch(url, { headers: githubHeaders(token) })
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
@@ -390,8 +399,9 @@ export async function getDefaultBranch(
   token: string | null,
   owner: string,
   name: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<string> {
-  const repo = await getRepo(token, owner, name)
+  const repo = await getRepo(token, owner, name, undefined, baseUrl)
   return repo.default_branch ?? 'main'
 }
 
@@ -400,6 +410,7 @@ export async function getReleases(
   owner: string,
   name: string,
   db?: import('better-sqlite3').Database,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<GitHubRelease[]> {
   // per_page=100 is GitHub's hard max for a single page. Covers ~all repos in
   // one call. Repos with >100 releases (rare — e.g. react ~360, next.js ~580)
@@ -407,7 +418,7 @@ export async function getReleases(
   // "load older" affordance.
   // 10s timeout matches getRepo — without it, a slow/dropped GitHub connection
   // leaves the Activities tab pinned at "Loading activity…" forever.
-  const url = `${BASE}/repos/${owner}/${name}/releases?per_page=100`
+  const url = `${baseUrl}/repos/${owner}/${name}/releases?per_page=100`
   const init = { headers: githubHeaders(token), signal: AbortSignal.timeout(10_000) }
   if (db) {
     const { etagFetch } = await import('../../githubFetch')
@@ -444,8 +455,9 @@ export async function getCompare(
   name: string,
   base: string,
   head: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<CompareSummary> {
-  const url = `${BASE}/repos/${owner}/${name}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`
+  const url = `${baseUrl}/repos/${owner}/${name}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`
   const res = await fetch(url, { headers: githubHeaders(token) })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   const data = await res.json() as {
@@ -491,16 +503,16 @@ export async function getCompare(
   }
 }
 
-export async function starRepo(token: string, owner: string, name: string): Promise<void> {
-  const res = await fetch(`${BASE}/user/starred/${owner}/${name}`, {
+export async function starRepo(token: string, owner: string, name: string, baseUrl: string = DEFAULT_BASE): Promise<void> {
+  const res = await fetch(`${baseUrl}/user/starred/${owner}/${name}`, {
     method: 'PUT',
     headers: { ...githubHeaders(token), 'Content-Length': '0' },
   })
   if (!res.ok && res.status !== 204) throw new Error(`GitHub API error: ${res.status}`)
 }
 
-export async function unstarRepo(token: string, owner: string, name: string): Promise<void> {
-  const res = await fetch(`${BASE}/user/starred/${owner}/${name}`, {
+export async function unstarRepo(token: string, owner: string, name: string, baseUrl: string = DEFAULT_BASE): Promise<void> {
+  const res = await fetch(`${baseUrl}/user/starred/${owner}/${name}`, {
     method: 'DELETE',
     headers: githubHeaders(token),
   })
@@ -516,13 +528,14 @@ export async function isRepoStarred(
   // symmetry with the other two but don't use it. Kept here so future callers
   // don't have to treat this differently.
   _db?: import('better-sqlite3').Database,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<boolean> {
   if (!token) return false
   // 10s timeout matches getRepo / getReleases — without it, a slow or dropped
   // GitHub connection leaks an unhandled rejection into the main-process log
   // ("TypeError: fetch failed → ConnectTimeoutError") even though the renderer
   // catches it.
-  const res = await fetch(`${BASE}/user/starred/${owner}/${name}`, {
+  const res = await fetch(`${baseUrl}/user/starred/${owner}/${name}`, {
     headers: githubHeaders(token),
     signal: AbortSignal.timeout(10_000),
   })
@@ -631,13 +644,13 @@ export async function pollDeviceToken(deviceCode: string, interval: number, sign
   }
 }
 
-export async function fetchGitHubTopics(token: string): Promise<string[]> {
+export async function fetchGitHubTopics(token: string, baseUrl: string = DEFAULT_BASE): Promise<string[]> {
   const topics: string[] = []
   let page = 1
 
   while (true) {
     const res = await fetch(
-      `${BASE}/search/topics?q=is:featured&per_page=100&page=${page}`,
+      `${baseUrl}/search/topics?q=is:featured&per_page=100&page=${page}`,
       {
         headers: {
           ...githubHeaders(token),
@@ -658,24 +671,24 @@ export async function fetchGitHubTopics(token: string): Promise<string[]> {
 
 // ── Profile API ───────────────────────────────────────────────────
 
-export async function getProfileUser(token: string, username: string): Promise<any> {
-  const res = await fetch(`${BASE}/users/${username}`, { headers: githubHeaders(token) })
+export async function getProfileUser(token: string, username: string, baseUrl: string = DEFAULT_BASE): Promise<any> {
+  const res = await fetch(`${baseUrl}/users/${username}`, { headers: githubHeaders(token) })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   return res.json() as Promise<any>
 }
 
-export async function getUserRepos(token: string, username: string, sort = 'stars'): Promise<any[]> {
-  const res = await fetch(`${BASE}/users/${username}/repos?sort=${sort}&per_page=30&type=public`, {
+export async function getUserRepos(token: string, username: string, sort = 'stars', baseUrl: string = DEFAULT_BASE): Promise<any[]> {
+  const res = await fetch(`${baseUrl}/users/${username}/repos?sort=${sort}&per_page=30&type=public`, {
     headers: githubHeaders(token),
   })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   return res.json() as Promise<any[]>
 }
 
-export async function getMyRepos(token: string): Promise<any[]> {
+export async function getMyRepos(token: string, baseUrl: string = DEFAULT_BASE): Promise<any[]> {
   const pages: any[] = []
   for (let page = 1; page <= 3; page++) {
-    const res = await fetch(`${BASE}/user/repos?type=all&sort=pushed&per_page=100&page=${page}`, {
+    const res = await fetch(`${baseUrl}/user/repos?type=all&sort=pushed&per_page=100&page=${page}`, {
       headers: githubHeaders(token),
     })
     if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
@@ -686,33 +699,33 @@ export async function getMyRepos(token: string): Promise<any[]> {
   return pages
 }
 
-export async function getUserStarred(token: string, username: string): Promise<any[]> {
-  const res = await fetch(`${BASE}/users/${username}/starred?per_page=30`, {
+export async function getUserStarred(token: string, username: string, baseUrl: string = DEFAULT_BASE): Promise<any[]> {
+  const res = await fetch(`${baseUrl}/users/${username}/starred?per_page=30`, {
     headers: githubHeaders(token),
   })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   return res.json() as Promise<any[]>
 }
 
-export async function getUserFollowing(token: string, username: string): Promise<any[]> {
-  const res = await fetch(`${BASE}/users/${username}/following?per_page=50`, {
+export async function getUserFollowing(token: string, username: string, baseUrl: string = DEFAULT_BASE): Promise<any[]> {
+  const res = await fetch(`${baseUrl}/users/${username}/following?per_page=50`, {
     headers: githubHeaders(token),
   })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   return res.json() as Promise<any[]>
 }
 
-export async function getUserFollowers(token: string, username: string): Promise<any[]> {
-  const res = await fetch(`${BASE}/users/${username}/followers?per_page=50`, {
+export async function getUserFollowers(token: string, username: string, baseUrl: string = DEFAULT_BASE): Promise<any[]> {
+  const res = await fetch(`${baseUrl}/users/${username}/followers?per_page=50`, {
     headers: githubHeaders(token),
   })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   return res.json() as Promise<any[]>
 }
 
-export async function checkIsFollowing(token: string, username: string): Promise<boolean> {
+export async function checkIsFollowing(token: string, username: string, baseUrl: string = DEFAULT_BASE): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE}/user/following/${username}`, {
+    const res = await fetch(`${baseUrl}/user/following/${username}`, {
       headers: githubHeaders(token),
     })
     return res.status === 204
@@ -721,16 +734,16 @@ export async function checkIsFollowing(token: string, username: string): Promise
   }
 }
 
-export async function followUser(token: string, username: string): Promise<void> {
-  const res = await fetch(`${BASE}/user/following/${username}`, {
+export async function followUser(token: string, username: string, baseUrl: string = DEFAULT_BASE): Promise<void> {
+  const res = await fetch(`${baseUrl}/user/following/${username}`, {
     method: 'PUT',
     headers: githubHeaders(token),
   })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
 }
 
-export async function unfollowUser(token: string, username: string): Promise<void> {
-  const res = await fetch(`${BASE}/user/following/${username}`, {
+export async function unfollowUser(token: string, username: string, baseUrl: string = DEFAULT_BASE): Promise<void> {
+  const res = await fetch(`${baseUrl}/user/following/${username}`, {
     method: 'DELETE',
     headers: githubHeaders(token),
   })
@@ -741,9 +754,9 @@ export async function unfollowUser(token: string, username: string): Promise<voi
  * Returns true if the given login is a GitHub organisation with verified domain ownership.
  * Returns false for individual users, non-existent logins, or any API error.
  */
-export async function getOrgVerified(token: string | null, orgLogin: string): Promise<boolean> {
+export async function getOrgVerified(token: string | null, orgLogin: string, baseUrl: string = DEFAULT_BASE): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE}/orgs/${orgLogin}`, { headers: githubHeaders(token) })
+    const res = await fetch(`${baseUrl}/orgs/${orgLogin}`, { headers: githubHeaders(token) })
     if (!res.ok) return false
     const data = await res.json() as Record<string, unknown>
     return data.is_verified === true
@@ -757,9 +770,10 @@ export async function getRepoTree(
   owner: string,
   name: string,
   branch: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<{ path: string; type: string; sha: string }[]> {
   const res = await fetch(
-    `${BASE}/repos/${owner}/${name}/git/trees/${branch}?recursive=1`,
+    `${baseUrl}/repos/${owner}/${name}/git/trees/${branch}?recursive=1`,
     { headers: githubHeaders(token) },
   )
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
@@ -776,11 +790,12 @@ export async function getFileContent(
   owner: string,
   name: string,
   path: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<string | null> {
   // Do NOT encodeURIComponent(path) — that encodes '/' as '%2F' which causes a 404.
   // Path segments (owner, name) are already safe; path is a tree path like src/components/Button.tsx.
   const res = await fetch(
-    `${BASE}/repos/${owner}/${name}/contents/${path}`,
+    `${baseUrl}/repos/${owner}/${name}/contents/${path}`,
     { headers: githubHeaders(token) },
   )
   if (res.status === 404) return null
@@ -795,9 +810,10 @@ export async function getFileContentWithSha(
   owner: string,
   name: string,
   path: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<{ content: string; sha: string } | null> {
   const res = await fetch(
-    `${BASE}/repos/${owner}/${name}/contents/${path}`,
+    `${baseUrl}/repos/${owner}/${name}/contents/${path}`,
     { headers: githubHeaders(token) },
   )
   if (res.status === 404) return null
@@ -815,9 +831,10 @@ export async function getBranch(
   owner: string,
   name: string,
   branch: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<{ commitSha: string; rootTreeSha: string }> {
   const res = await fetch(
-    `${BASE}/repos/${owner}/${name}/branches/${encodeURIComponent(branch)}`,
+    `${baseUrl}/repos/${owner}/${name}/branches/${encodeURIComponent(branch)}`,
     { headers: githubHeaders(token) },
   )
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
@@ -832,9 +849,10 @@ export async function getTreeBySha(
   owner: string,
   name: string,
   treeSha: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<TreeEntry[]> {
   const res = await fetch(
-    `${BASE}/repos/${owner}/${name}/git/trees/${treeSha}`,
+    `${baseUrl}/repos/${owner}/${name}/git/trees/${treeSha}`,
     { headers: githubHeaders(token) },
   )
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
@@ -850,6 +868,7 @@ export async function getRawFileBytes(
   name: string,
   branch: string,
   path: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<Buffer> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 30_000)
@@ -859,7 +878,7 @@ export async function getRawFileBytes(
     }
     if (token) headers.Authorization = `Bearer ${token}`
     const res = await fetch(
-      `${BASE}/repos/${owner}/${name}/contents/${path}?ref=${branch}`,
+      `${baseUrl}/repos/${owner}/${name}/contents/${path}?ref=${branch}`,
       { headers, signal: controller.signal },
     )
     if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
@@ -875,9 +894,10 @@ export async function getBlobBySha(
   owner: string,
   name: string,
   blobSha: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<BlobResult> {
   const res = await fetch(
-    `${BASE}/repos/${owner}/${name}/git/blobs/${blobSha}`,
+    `${baseUrl}/repos/${owner}/${name}/git/blobs/${blobSha}`,
     { headers: githubHeaders(token) },
   )
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
@@ -889,9 +909,10 @@ export async function getBlobBySha(
 
 export async function createRepo(
   token: string,
-  name: string
+  name: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<{ html_url: string }> {
-  const res = await fetch(`${BASE}/user/repos`, {
+  const res = await fetch(`${baseUrl}/user/repos`, {
     method: 'POST',
     headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, private: true, auto_init: true })
@@ -907,7 +928,8 @@ export async function putFileContents(
   path: string,
   content: string,
   message: string,
-  sha?: string
+  sha?: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<{ content: { sha: string } }> {
   const body: Record<string, string> = {
     message,
@@ -915,7 +937,7 @@ export async function putFileContents(
   }
   if (sha) body.sha = sha
   // Do NOT encodeURIComponent(path) — that encodes '/' as '%2F' causing a 404
-  const res = await fetch(`${BASE}/repos/${repoOwner}/${repoName}/contents/${path}`, {
+  const res = await fetch(`${baseUrl}/repos/${repoOwner}/${repoName}/contents/${path}`, {
     method: 'PUT',
     headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -949,8 +971,9 @@ export async function compareRefs(
   name: string,
   base: string,
   head: string,
+  baseUrl: string = DEFAULT_BASE,
 ): Promise<CompareFile[]> {
-  const url = `${BASE}/repos/${owner}/${name}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`
+  const url = `${baseUrl}/repos/${owner}/${name}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`
   const res = await fetch(url, { headers: githubHeaders(token) })
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`)
   const data = (await res.json()) as { files?: Array<{ filename: string; status: string }> }

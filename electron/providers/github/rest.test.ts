@@ -441,3 +441,42 @@ describe('payload type surface', () => {
     }
   })
 })
+
+describe('GHE baseUrl plumbing', () => {
+  beforeEach(() => mockFetch.mockReset())
+
+  it('hits a GHE base path when baseUrl is supplied as the trailing arg', async () => {
+    mockFetch.mockResolvedValue(makeResponse({
+      id: 1, name: 'r', full_name: 'o/r',
+      owner: { login: 'o', avatar_url: '' },
+      default_branch: 'main', archived: false, topics: [],
+      stargazers_count: 0, forks_count: 0, watchers_count: 0, open_issues_count: 0,
+      description: null, language: null, license: null, homepage: null, size: 0,
+      created_at: '', updated_at: '', pushed_at: '',
+    }))
+    await getRepo('tok', 'o', 'r', undefined, 'https://github.acme.com/api/v3')
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://github.acme.com/api/v3/repos/o/r',
+      expect.any(Object),
+    )
+  })
+
+  it('defaults to public api.github.com when baseUrl is omitted', async () => {
+    mockFetch.mockResolvedValue(makeResponse({
+      id: 1, name: 'r', full_name: 'o/r',
+      owner: { login: 'o', avatar_url: '' },
+      default_branch: 'main', archived: false, topics: [],
+      stargazers_count: 0, forks_count: 0, watchers_count: 0, open_issues_count: 0,
+      description: null, language: null, license: null, homepage: null, size: 0,
+      created_at: '', updated_at: '', pushed_at: '',
+    }))
+    await getRepo('tok', 'o', 'r')
+    expect((mockFetch.mock.calls[0][0] as string)).toContain('api.github.com/repos/o/r')
+  })
+
+  it('searchRepos: passes baseUrl through when supplied as the trailing arg', async () => {
+    mockFetch.mockResolvedValue(makeResponse({ items: [] }))
+    await searchRepos('tok', 'rust', 100, 'stars', 'desc', 1, 'https://github.acme.com/api/v3')
+    expect((mockFetch.mock.calls[0][0] as string)).toContain('github.acme.com/api/v3/search/repositories')
+  })
+})
