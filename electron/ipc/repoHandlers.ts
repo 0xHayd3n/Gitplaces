@@ -652,18 +652,13 @@ export function registerRepoHandlers(): void {
             (typeof first.tag_name === 'string' ? first.tag_name : null) ??
             (typeof first.tagName === 'string' ? first.tagName : null)
         }
-        if (!storedVersion) {
-          const dbRow = db.prepare('SELECT pushed_at FROM repos WHERE owner = ? AND name = ?')
-            .get(owner, name) as { pushed_at: string | null } | undefined
-          storedVersion = dbRow?.pushed_at ?? null
-        }
       } catch {
-        // Provider unknown or network failure — fall back to pushed_at if available.
-        try {
-          const dbRow = db.prepare('SELECT pushed_at FROM repos WHERE owner = ? AND name = ?')
-            .get(owner, name) as { pushed_at: string | null } | undefined
-          storedVersion = dbRow?.pushed_at ?? null
-        } catch { /* still null */ }
+        // Provider unknown or network failure — fall through to pushed_at.
+      }
+      if (!storedVersion) {
+        const dbRow = db.prepare('SELECT pushed_at FROM repos WHERE owner = ? AND name = ?')
+          .get(owner, name) as { pushed_at: string | null } | undefined
+        storedVersion = dbRow?.pushed_at ?? null
       }
       const isFork = await checkIsFork(owner, name)
       db.prepare('UPDATE repos SET stored_version = ?, is_forked = ? WHERE owner = ? AND name = ?')
