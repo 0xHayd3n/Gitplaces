@@ -558,6 +558,43 @@ export default function Discover() {
     }
   }, [])
 
+  /** Map a (viewMode, langKey, filters, subTypeKw) tuple to a `UnifiedQuery`
+   *  when the inputs are simple enough to translate cleanly across all hosts.
+   *  Returns null when the inputs need GitHub-style filtering — `language:`
+   *  qualifier, `stars:` ranges, custom subtype topic combos — that don't
+   *  translate well to GitLab/Gitea. Callers fall back to GitHub-only search
+   *  in that case. */
+  function toUnifiedQuery(
+    vm: ViewModeKey,
+    langKey: string,
+    filters: SearchFilters,
+    subTypeKw?: string,
+  ): import('../../electron/providers/discoverMerge').UnifiedQuery | null {
+    // Any cross-host-incompatible filter forces a GitHub-only fallback.
+    if (langKey) return null
+    if (filters.activity || filters.stars || filters.license) return null
+
+    // Sub-type filter: convert to a topic query when present (it's already
+    // expressed as `topic:xxx` for GitHub; we strip the prefix for the
+    // unified shape and let translateQuery re-emit it per host).
+    if (subTypeKw) {
+      const topic = subTypeKw.replace(/^topic:/, '').trim()
+      if (topic.length === 0) return null
+      return { kind: 'topic', topic }
+    }
+
+    switch (vm) {
+      case 'home':
+      case 'popular':       return { kind: 'popular' }
+      case 'agents':        return { kind: 'topic', topic: 'ai-agent' }
+      case 'hot-today':     return { kind: 'hot-today' }
+      case 'trending-week': return { kind: 'trending-week' }
+      case 'hidden-gems':   return { kind: 'hidden-gems' }
+      case 'recommended':   return null  // handled by separate IPC
+    }
+    return null
+  }
+
   function buildTrendingQuery(vm: ViewModeKey, lang: string, filters: SearchFilters, subTypeTopic?: string): string {
     const baseQ = buildViewModeQuery(vm, lang, '')
     const filterParts: string[] = []
@@ -619,9 +656,17 @@ export default function Discover() {
           : undefined
         const vm = viewMode === 'recommended' ? 'home' : viewMode
         const langKey = selectedLanguages.length === 1 ? selectedLanguages[0] : ''
-        const q = buildTrendingQuery(vm, langKey, filters ?? {}, subKw)
-        const { sort: s, order: o } = getViewModeSort(vm)
-        data = await window.api.repo.search(HOST_ID_GITHUB, q, s, o) as SavedRepo[]
+        const unified = toUnifiedQuery(vm, langKey, filters ?? {}, subKw)
+        if (unified) {
+          // Multi-host fan-out via repo:searchAll. Page 1 on initial load.
+          data = await window.api.repo.searchAll(unified, 1)
+        } else {
+          // GitHub-only path — needed when filters/language use GitHub query
+          // qualifiers that don't translate cleanly to GitLab/Gitea.
+          const q = buildTrendingQuery(vm, langKey, filters ?? {}, subKw)
+          const { sort: s, order: o } = getViewModeSort(vm)
+          data = await window.api.repo.search(HOST_ID_GITHUB, q, s, o) as SavedRepo[]
+        }
       }
       if (gen !== fetchGeneration.current) return
       setRepos(data)
@@ -943,9 +988,17 @@ export default function Discover() {
             : undefined
           const vm = viewMode === 'recommended' ? 'home' : viewMode
           const langKey = selectedLanguages.length === 1 ? selectedLanguages[0] : ''
-          const q = buildTrendingQuery(vm, langKey, appliedFilters, subKw)
-          const { sort: s, order: o } = getViewModeSort(vm)
-          newResults = await window.api.repo.search(HOST_ID_GITHUB, q, s, o, nextPage) as SavedRepo[]
+          const unified = toUnifiedQuery(vm, langKey, appliedFilters, subKw)
+          if (unified) {
+            // Multi-host fan-out via repo:searchAll for the matching page.
+            // Each host paginates independently via its own REST cursor; merge
+            // dedup is handled by hostId+hostNativeId composite at upsert time.
+            newResults = await window.api.repo.searchAll(unified, nextPage)
+          } else {
+            const q = buildTrendingQuery(vm, langKey, appliedFilters, subKw)
+            const { sort: s, order: o } = getViewModeSort(vm)
+            newResults = await window.api.repo.search(HOST_ID_GITHUB, q, s, o, nextPage) as SavedRepo[]
+          }
         }
       } else if (searchPath === 'raw') {
         const langFilter = selectedLanguages.length === 1 ? selectedLanguages[0] : undefined

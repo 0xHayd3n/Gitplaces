@@ -273,13 +273,14 @@ export function registerRepoHandlers(): void {
     return rows
   })
 
-  ipcMain.handle('repo:searchAll', async (_event, query: UnifiedQuery): Promise<SavedRepo[]> => {
+  ipcMain.handle('repo:searchAll', async (_event, query: UnifiedQuery, page?: number): Promise<SavedRepo[]> => {
     const hosts = listHosts()
     const items = await searchAllHosts(hosts, query, {
       capPerHost: 10,
       totalLimit: 30,
       timeoutMs: 4000,
       tokenForHost: (id) => getToken(id),
+      page: page ?? 1,
     })
     if (items.length === 0) return []
     const db = getDb(app.getPath('userData'))

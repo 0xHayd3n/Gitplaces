@@ -13,6 +13,7 @@ export type UnifiedQuery =
   | { kind: 'trending-week' }
   | { kind: 'hot-today' }
   | { kind: 'hidden-gems' }
+  | { kind: 'popular' }
   | { kind: 'topic'; topic: string }
   | { kind: 'free-text'; freeText: string }
 
@@ -23,6 +24,10 @@ export interface SearchAllOpts {
   timeoutMs?: number
   /** Optional token lookup. Returns null if the host is unauthenticated (anonymous mode). */
   tokenForHost?: (hostId: string) => string | null
+  /** 1-indexed page number passed to every per-host search. Each host's REST
+   *  pagination has different page sizes, so a single `page` here means
+   *  "next batch from every host" rather than a globally consistent offset. */
+  page?: number
 }
 
 interface TranslatedQuery {
@@ -43,6 +48,7 @@ export function translateQuery(hostType: HostType, q: UnifiedQuery): TranslatedQ
       case 'trending-week': return { query: `created:>${daysAgo(7)}`, sort: 'stars', order: 'desc' }
       case 'hot-today':     return { query: `pushed:>${daysAgo(1)}`,  sort: 'updated', order: 'desc' }
       case 'hidden-gems':   return { query: 'stars:50..500',          sort: 'stars',   order: 'desc' }
+      case 'popular':       return { query: 'stars:>100',             sort: 'stars',   order: 'desc' }
       case 'topic':         return { query: `topic:${q.topic}`,       sort: 'stars',   order: 'desc' }
       case 'free-text':     return { query: q.freeText,                sort: 'stars',   order: 'desc' }
     }
@@ -54,6 +60,7 @@ export function translateQuery(hostType: HostType, q: UnifiedQuery): TranslatedQ
     case 'trending-week':
     case 'hot-today':     return { query: '', sort: 'updated', order: 'desc' }
     case 'hidden-gems':   return { query: '', sort: 'stars',   order: 'desc' }
+    case 'popular':       return { query: '', sort: 'stars',   order: 'desc' }
     case 'topic':         return { query: q.topic,    sort: 'stars', order: 'desc' }
     case 'free-text':     return { query: q.freeText, sort: 'stars', order: 'desc' }
   }
@@ -74,6 +81,7 @@ export async function searchAllHosts(
 ): Promise<Repo[]> {
   const timeout = opts.timeoutMs ?? 4000
   const tokenForHost = opts.tokenForHost ?? (() => null)
+  const page = opts.page ?? 1
 
   const perHost = await Promise.all(hosts.map(async (host) => {
     const provider = getAnyProvider(host.id)
@@ -87,7 +95,7 @@ export async function searchAllHosts(
       sort: string,
       order: string,
       page: number,
-    ) => Promise<Repo[]>)(token, translated.query, opts.capPerHost, translated.sort, translated.order, 1)
+    ) => Promise<Repo[]>)(token, translated.query, opts.capPerHost, translated.sort, translated.order, page)
     const result = await withTimeout(work, timeout)
     if (!Array.isArray(result)) return []
     return result.slice(0, opts.capPerHost)

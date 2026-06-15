@@ -57,6 +57,16 @@ describe('translateQuery', () => {
     const out = translateQuery('github', { kind: 'hidden-gems' })
     expect(out.query).toContain('stars:50..500')
   })
+  it('builds GitHub popular query (stars:>100, sort by stars)', () => {
+    const out = translateQuery('github', { kind: 'popular' })
+    expect(out.query).toBe('stars:>100')
+    expect(out.sort).toBe('stars')
+  })
+  it('builds GitLab/Gitea popular query (free-text + stars sort)', () => {
+    expect(translateQuery('gitlab', { kind: 'popular' }).query).toBe('')
+    expect(translateQuery('gitlab', { kind: 'popular' }).sort).toBe('stars')
+    expect(translateQuery('gitea',  { kind: 'popular' }).sort).toBe('stars')
+  })
   it('builds GitHub topic query', () => {
     const out = translateQuery('github', { kind: 'topic', topic: 'rust' })
     expect(out.query).toContain('topic:rust')
@@ -208,5 +218,18 @@ describe('searchAllHosts', () => {
       expect.any(String),
       expect.any(Number),
     )
+  })
+
+  it('defaults to page=1 and forwards opts.page when supplied', async () => {
+    const ghHost = host('gh:api.github.com', 'github')
+    const searchSpy = vi.fn().mockResolvedValue([])
+    resolveAnyMock.mockImplementation(() => ({ searchRepos: searchSpy }))
+
+    await searchAllHosts([ghHost], { kind: 'trending-week' }, { capPerHost: 10, totalLimit: 30 })
+    expect(searchSpy.mock.calls[0][5]).toBe(1)
+
+    searchSpy.mockClear()
+    await searchAllHosts([ghHost], { kind: 'trending-week' }, { capPerHost: 10, totalLimit: 30, page: 3 })
+    expect(searchSpy.mock.calls[0][5]).toBe(3)
   })
 })
