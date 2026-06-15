@@ -417,12 +417,23 @@ export async function getStarredRepos(
   baseUrl: string,
   token: string,
 ): Promise<GiteaStarredRepo[]> {
-  // PHASE 6 FOLLOW-UP: single page only (limit=50). Phase 5 doesn't render a
-  // Gitea-aware Library view, so the first 50 entries are good enough; Phase 6
-  // can add Link-header pagination when multi-host library aggregation lands.
-  // Symmetric with the same limitation in gitlab/rest.ts → getStarredProjects.
-  const url = api(baseUrl, '/user/starred?limit=50')
-  const res = await fetch(url, { headers: giteaHeaders(token) })
-  if (!res.ok) throw await readError(res, 'getStarredRepos')
-  return res.json() as Promise<GiteaStarredRepo[]>
+  // Walk Link-header pagination (rel="next") until exhausted. Gitea caps
+  // limit at 50 server-side, so a 200-page hard cap (~10k repos) is the
+  // runaway guard. Library aggregation across hosts needs the full set,
+  // not just the first page.
+  const all: GiteaStarredRepo[] = []
+  let url: string | null = api(baseUrl, '/user/starred?limit=50&page=1')
+  const MAX_PAGES = 200
+  for (let i = 0; i < MAX_PAGES && url; i++) {
+    const res: Response = await fetch(url, { headers: giteaHeaders(token) })
+    if (!res.ok) throw await readError(res, 'getStarredRepos')
+    const page = await res.json() as GiteaStarredRepo[]
+    if (!Array.isArray(page) || page.length === 0) break
+    all.push(...page)
+    const link: string | null = res.headers.get('link')
+    if (!link) break
+    const match: RegExpMatchArray | null = link.match(/<([^>]+)>;\s*rel="next"/)
+    url = match ? match[1] : null
+  }
+  return all
 }

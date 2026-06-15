@@ -315,19 +315,61 @@ describe('starRepo / unstarRepo / isRepoStarred', () => {
 
 describe('getStarredRepos', () => {
   beforeEach(() => mockFetch.mockReset())
-  it('fetches /user/starred?limit=50 and returns the repo array', async () => {
-    mockFetch.mockResolvedValue(makeResponse([
-      { id: 1, name: 'a', full_name: 'alice/a', owner: { id: 1, login: 'alice', avatar_url: '', html_url: '' },
-        description: null, website: null, default_branch: 'main', topics: [], html_url: '', size: 0,
-        stars_count: 0, forks_count: 0, watchers_count: 0, open_issues_count: 0,
-        created_at: '', updated_at: '', archived: false, private: false },
-    ]))
+
+  function repoRow(name: string) {
+    return {
+      id: name.charCodeAt(0), name, full_name: `alice/${name}`,
+      owner: { id: 1, login: 'alice', avatar_url: '', html_url: '' },
+      description: null, website: null, default_branch: 'main', topics: [], html_url: '', size: 0,
+      stars_count: 0, forks_count: 0, watchers_count: 0, open_issues_count: 0,
+      created_at: '', updated_at: '', archived: false, private: false,
+    }
+  }
+
+  it('fetches /user/starred?limit=50&page=1 and returns the repo array', async () => {
+    mockFetch.mockResolvedValue(makeResponse([repoRow('a')]))
     const { getStarredRepos } = await import('./rest')
     const repos = await getStarredRepos(BASE, 'tok')
     expect(repos).toHaveLength(1)
     expect(repos[0].full_name).toBe('alice/a')
-    expect(mockFetch).toHaveBeenCalledWith('https://codeberg.org/api/v1/user/starred?limit=50', expect.any(Object))
+    expect(mockFetch).toHaveBeenCalledWith('https://codeberg.org/api/v1/user/starred?limit=50&page=1', expect.any(Object))
   })
+
+  it('walks Link rel="next" pages until the header is absent', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(
+        [repoRow('a')],
+        { link: '<https://codeberg.org/api/v1/user/starred?limit=50&page=2>; rel="next"' },
+      ))
+      .mockResolvedValueOnce(makeResponse(
+        [repoRow('b')],
+        { link: '<https://codeberg.org/api/v1/user/starred?limit=50&page=3>; rel="next"' },
+      ))
+      .mockResolvedValueOnce(makeResponse([repoRow('c')]))  // no link header → end of pages
+    const { getStarredRepos } = await import('./rest')
+    const repos = await getStarredRepos(BASE, 'tok')
+    expect(repos.map(r => r.name)).toEqual(['a', 'b', 'c'])
+    expect(mockFetch).toHaveBeenCalledTimes(3)
+    expect(mockFetch.mock.calls[1][0]).toBe('https://codeberg.org/api/v1/user/starred?limit=50&page=2')
+    expect(mockFetch.mock.calls[2][0]).toBe('https://codeberg.org/api/v1/user/starred?limit=50&page=3')
+  })
+
+  it('stops paginating on an empty array even if Link rel="next" is present', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(
+        [repoRow('a')],
+        { link: '<https://codeberg.org/api/v1/user/starred?limit=50&page=2>; rel="next"' },
+      ))
+      .mockResolvedValueOnce(makeResponse(
+        [],
+        { link: '<https://codeberg.org/api/v1/user/starred?limit=50&page=3>; rel="next"' },
+      ))
+    const { getStarredRepos } = await import('./rest')
+    const repos = await getStarredRepos(BASE, 'tok')
+    expect(repos).toHaveLength(1)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+  })
+
   it('throws on non-ok response', async () => {
     mockFetch.mockResolvedValue(makeResponse({ message: 'unauthorized' }, {}, false, 401))
     const { getStarredRepos } = await import('./rest')
