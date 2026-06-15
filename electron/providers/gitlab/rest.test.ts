@@ -63,23 +63,79 @@ describe('getCurrentUser', () => {
 
 describe('getServerVersion', () => {
   beforeEach(() => mockFetch.mockReset())
-  it('returns { version, revision } on success', async () => {
+
+  it('returns { ok: true, version, revision } on success', async () => {
     mockFetch.mockResolvedValue(makeResponse({ version: '16.10.0-pre', revision: 'b93c103' }))
     const v = await getServerVersion(BASE)
-    expect(v!.version).toBe('16.10.0-pre')
+    expect(v.ok).toBe(true)
+    if (v.ok) {
+      expect(v.version).toBe('16.10.0-pre')
+      expect(v.revision).toBe('b93c103')
+    }
     expect(mockFetch).toHaveBeenCalledWith('https://gitlab.com/api/v4/version', expect.any(Object))
   })
-  it('returns null when the response is not JSON or has no version field', async () => {
+
+  it('returns errorKind: "json" when response is missing the version field', async () => {
     mockFetch.mockResolvedValue(makeResponse({ unrelated: true }))
-    expect(await getServerVersion(BASE)).toBeNull()
+    const v = await getServerVersion(BASE)
+    expect(v.ok).toBe(false)
+    if (!v.ok) {
+      expect(v.errorKind).toBe('json')
+      expect(v.error).toMatch(/did not respond as a GitLab/)
+    }
   })
-  it('returns null on network failure', async () => {
-    mockFetch.mockImplementationOnce(() => Promise.reject(new Error('network')))
-    expect(await getServerVersion(BASE)).toBeNull()
+
+  it('returns errorKind: "tls" when fetch throws with a TLS-related cause code', async () => {
+    mockFetch.mockImplementationOnce(() =>
+      Promise.reject(Object.assign(new TypeError('fetch failed'), {
+        cause: { code: 'CERT_HAS_EXPIRED', message: 'certificate has expired' },
+      })),
+    )
+    const v = await getServerVersion(BASE)
+    expect(v.ok).toBe(false)
+    if (!v.ok) {
+      expect(v.errorKind).toBe('tls')
+      expect(v.error).toMatch(/CERT_HAS_EXPIRED/)
+    }
   })
-  it('returns null on non-ok status', async () => {
-    mockFetch.mockResolvedValue(makeResponse({}, {}, false, 404))
-    expect(await getServerVersion(BASE)).toBeNull()
+
+  it('returns errorKind: "network" when fetch throws with a connection cause code', async () => {
+    mockFetch.mockImplementationOnce(() =>
+      Promise.reject(Object.assign(new TypeError('fetch failed'), {
+        cause: { code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' },
+      })),
+    )
+    const v = await getServerVersion(BASE)
+    expect(v.ok).toBe(false)
+    if (!v.ok) {
+      expect(v.errorKind).toBe('network')
+      expect(v.error).toMatch(/ECONNREFUSED|gitlab\.com/)
+    }
+  })
+
+  it('returns errorKind: "network" when fetch throws a plain Error with no cause', async () => {
+    mockFetch.mockImplementationOnce(() => Promise.reject(new Error('boom')))
+    const v = await getServerVersion(BASE)
+    expect(v.ok).toBe(false)
+    if (!v.ok) {
+      expect(v.errorKind).toBe('network')
+    }
+  })
+
+  it('returns errorKind: "http" with status + body excerpt on non-2xx', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false, status: 502,
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve('Bad Gateway'),
+      headers: { get: () => null },
+    })
+    const v = await getServerVersion(BASE)
+    expect(v.ok).toBe(false)
+    if (!v.ok) {
+      expect(v.errorKind).toBe('http')
+      expect(v.error).toMatch(/502/)
+      expect(v.error).toMatch(/Bad Gateway/)
+    }
   })
 })
 
