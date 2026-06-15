@@ -32,9 +32,15 @@ export function useHostCapabilities(hostId: string | null): ProviderCapabilities
     const cached = cache.get(hostId)
     if (cached !== undefined) { setCaps(cached); return }
 
+    // Defensive: in test environments that don't fully mock window.api the
+    // hosts namespace (or getCapabilities specifically) may be absent. Treat
+    // that as "no capability information available" rather than crashing.
+    const ipc = window.api?.hosts?.getCapabilities
+    if (typeof ipc !== 'function') { setCaps(null); return }
+
     let cancelled = false
     const existing = inflight.get(hostId)
-    const promise = existing ?? window.api.hosts.getCapabilities(hostId)
+    const promise = existing ?? ipc(hostId)
       .then(c => { cache.set(hostId, c); inflight.delete(hostId); return c })
       .catch(() => { inflight.delete(hostId); return null })
     inflight.set(hostId, promise)

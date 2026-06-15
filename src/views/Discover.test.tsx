@@ -52,6 +52,7 @@ function makeDiscoverApi(overrides?: {
       repo: {
         extractColor: vi.fn().mockResolvedValue({ h: 0, s: 0, l: 0 }),
         getOgImage: vi.fn().mockResolvedValue(null),
+        searchAll: vi.fn().mockResolvedValue([]),
         search: vi.fn().mockResolvedValue([fixtureSavedRepo({
           hostNativeId: '12345',
           fullName: 'vercel/next.js',
