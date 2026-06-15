@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useHostCapabilities, _resetCapabilitiesCacheForTest } from './useHostCapabilities'
+import { useHostCapabilities, _resetCapabilitiesCacheForTest, type ProviderCapabilities } from './useHostCapabilities'
 
 const getCaps = vi.fn()
 
@@ -91,6 +91,47 @@ describe('useHostCapabilities', () => {
 
     await waitFor(() => expect(a.result.current?.vulnerabilityAlerts).toBe(true))
     expect(getCaps).toHaveBeenCalledTimes(2)
+  })
+
+  it('in-flight fetch that resolves AFTER an eviction does not repopulate the cache', async () => {
+    const { clearCachedCapabilities } = await import('./useHostCapabilities')
+    // Build a manually-resolvable promise so we can interleave eviction and
+    // resolution at known points.
+    let resolveFirst: (v: ProviderCapabilities) => void = () => {}
+    const firstFetch = new Promise<ProviderCapabilities>(res => { resolveFirst = res })
+    getCaps.mockReturnValueOnce(firstFetch)
+
+    const a = renderHook(() => useHostCapabilities('gl:gitlab.com'))
+    // Effect has started the IPC but it hasn't resolved yet.
+    await Promise.resolve()
+    expect(getCaps).toHaveBeenCalledTimes(1)
+
+    // Eviction happens DURING the in-flight fetch.
+    clearCachedCapabilities('gl:gitlab.com')
+
+    // Now resolve the in-flight fetch with stale data.
+    act(() => {
+      resolveFirst({
+        vulnerabilityAlerts: false, codeScanningAlerts: false, events: false,
+        trendingDiscovery: true, graphqlBundle: false, isVerifiedOrg: false,
+      })
+    })
+    await Promise.resolve()
+
+    // A second mount should NOT see the stale cached value — the eviction
+    // moved the tick after the fetch started, so the stale .then guard
+    // refused to write it to the cache. The second mount fires a fresh IPC.
+    getCaps.mockResolvedValueOnce({
+      vulnerabilityAlerts: true, codeScanningAlerts: false, events: false,
+      trendingDiscovery: true, graphqlBundle: false, isVerifiedOrg: false,
+    })
+    const b = renderHook(() => useHostCapabilities('gl:gitlab.com'))
+    await waitFor(() => expect(b.result.current?.vulnerabilityAlerts).toBe(true))
+    expect(getCaps).toHaveBeenCalledTimes(2)
+    // The first mount still observed its resolved (stale) caps because the
+    // listener wasn't bumped — but the cache, which seeds future mounts, is
+    // clean.
+    void a  // keep ref so React doesn't warn about an unused render
   })
 
   it('ignores capabilities-changed events for other hosts', async () => {

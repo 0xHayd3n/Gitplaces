@@ -18,29 +18,48 @@ export interface ProviderCapabilities {
 const cache = new Map<string, ProviderCapabilities | null>()
 const inflight = new Map<string, Promise<ProviderCapabilities | null>>()
 
+// Eviction tick per hostId — monotonically increases each time the cache for
+// that host is cleared. Lets hooks that mount AFTER an eviction see a
+// non-zero initial version (so their fetch effect fires correctly), and lets
+// in-flight fetches detect "I started before an eviction" and avoid
+// repopulating the cache with stale data.
+const evictionTick = new Map<string, number>()
+
+function tickOf(hostId: string): number {
+  return evictionTick.get(hostId) ?? 0
+}
+
 export function _resetCapabilitiesCacheForTest(): void {
   cache.clear()
   inflight.clear()
+  evictionTick.clear()
 }
 
 export function clearCachedCapabilities(hostId: string): void {
   cache.delete(hostId)
   inflight.delete(hostId)
+  evictionTick.set(hostId, tickOf(hostId) + 1)
 }
 
 export function useHostCapabilities(hostId: string | null): ProviderCapabilities | null {
   const [caps, setCaps] = useState<ProviderCapabilities | null>(
     () => (hostId ? cache.get(hostId) ?? null : null),
   )
-  // Bumped by the IPC-event subscription below; re-triggers the fetch effect.
-  const [version, setVersion] = useState(0)
+  // Initialize from the module-level tick. If eviction happened before this
+  // mount (e.g. another hook instance cleared the cache between component
+  // creation and effect run), a non-zero starting version means the fetch
+  // effect's [hostId, version] dep array will have the right value on first
+  // run without needing a setVersion catch-up.
+  const [version, setVersion] = useState<number>(
+    () => hostId ? tickOf(hostId) : 0,
+  )
 
   useEffect(() => {
     if (!hostId) return
     const handler = (data: { hostId: string }) => {
       if (data?.hostId === hostId) {
         clearCachedCapabilities(hostId)
-        setVersion(v => v + 1)
+        setVersion(tickOf(hostId))
       }
     }
     const on = window.api?.hosts?.onCapabilitiesChanged
@@ -68,8 +87,16 @@ export function useHostCapabilities(hostId: string | null): ProviderCapabilities
       // chained first and then set, a concurrent caller landing between the
       // chain and the set would see no inflight entry, fire a duplicate IPC,
       // and overwrite our entry on its own set.
+      const startTick = tickOf(hostId)
       promise = ipc(hostId)
-        .then(c => { cache.set(hostId, c); inflight.delete(hostId); return c })
+        .then(c => {
+          // Only commit to the cache if no eviction happened during the
+          // fetch — otherwise the value was computed against pre-eviction
+          // auth state and would re-stale the cache as soon as it lands.
+          if (tickOf(hostId) === startTick) cache.set(hostId, c)
+          inflight.delete(hostId)
+          return c
+        })
         .catch(() => { inflight.delete(hostId); return null })
       inflight.set(hostId, promise)
     }
