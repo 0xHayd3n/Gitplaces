@@ -147,6 +147,20 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
     return provider.capabilities()
   })
 
+  ipcMain.handle('hosts:healthCheck', async (): Promise<Record<string, { ok: true } | { ok: false; error: string }>> => {
+    const out: Record<string, { ok: true } | { ok: false; error: string }> = {}
+    await Promise.all(listHosts().map(async (host) => {
+      // GitHub doesn't expose /version the same way; assume reachable.
+      if (host.type === 'github') { out[host.id] = { ok: true }; return }
+
+      const v = host.type === 'gitlab'
+        ? await getGitLabServerVersion(host.baseUrl)
+        : await getGiteaServerVersion(host.baseUrl)
+      out[host.id] = v.ok ? { ok: true } : { ok: false, error: v.error }
+    }))
+    return out
+  })
+
   // ── Device flow ─────────────────────────────────────────────────
   ipcMain.handle('hosts:startDeviceFlow', async (_event, hostId: string) => {
     const provider = getAnyProvider(hostId)

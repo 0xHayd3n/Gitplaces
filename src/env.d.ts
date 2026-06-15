@@ -132,6 +132,7 @@ declare global {
         clearToken: (hostId: string) => Promise<void>
         getConnectedUser: (hostId: string) => Promise<User | null>
         getCapabilities: (hostId: string) => Promise<import('../electron/providers/types').ProviderCapabilities | null>
+        healthCheck: () => Promise<Record<string, { ok: true } | { ok: false; error: string }>>
         startDeviceFlow: (hostId: string) => Promise<{
           deviceCode: string
           userCode: string
