@@ -30,6 +30,7 @@ import { setGitHubUser, clearGitHubUser } from '../store'
 import { getDb } from '../db'
 import { initTopicCache } from '../services/topicCacheService'
 import { getServerVersion as getGitLabServerVersion } from '../providers/gitlab/rest'
+import { getServerVersion as getGiteaServerVersion } from '../providers/gitea/rest'
 
 interface AddHostInput {
   type: HostType
@@ -85,7 +86,14 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
       return { ok: false, error: `${input.baseUrl} did not respond as a GitLab instance (no /api/v4/version)` }
     }
 
-    // Gitea lands in Phase 5.
+    if (input.type === 'gitea') {
+      const v = await getGiteaServerVersion(input.baseUrl)
+      if (v && typeof v.version === 'string' && v.version.length > 0) {
+        return { ok: true }
+      }
+      return { ok: false, error: `${input.baseUrl} did not respond as a Gitea instance (no /api/v1/version)` }
+    }
+
     return { ok: false, error: `Probe not implemented for host type "${input.type}" yet` }
   })
 
