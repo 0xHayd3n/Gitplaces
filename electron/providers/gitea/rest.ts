@@ -114,16 +114,52 @@ async function readError(res: Response, op: string): Promise<Error> {
 
 // ── Server version (probe target) ────────────────────────────────────────────
 
-export async function getServerVersion(baseUrl: string): Promise<{ version: string } | null> {
-  try {
-    const res = await fetch(api(baseUrl, '/version'), { headers: giteaHeaders(null) })
-    if (!res.ok) return null
-    const body = await res.json() as { version?: unknown }
-    if (typeof body?.version !== 'string') return null
-    return { version: body.version }
-  } catch {
-    return null
+export type ServerVersionResult =
+  | { ok: true; version: string }
+  | { ok: false; errorKind: 'tls' | 'network' | 'http' | 'json'; error: string }
+
+const TLS_CODE_RE = /^(CERT_|SELF_SIGNED|DEPTH_ZERO|UNABLE_TO_VERIFY|ERR_TLS|ERR_SSL)/i
+const NETWORK_CODE_RE = /^(ENOTFOUND|ECONNREFUSED|ECONNRESET|EHOSTUNREACH|ETIMEDOUT|EPIPE|ENETUNREACH|EAI_AGAIN)$/
+
+function classifyFetchError(err: unknown, baseUrl: string): ServerVersionResult {
+  const cause = (err as { cause?: { code?: string; message?: string } })?.cause
+  const code = typeof cause?.code === 'string' ? cause.code : ''
+  if (TLS_CODE_RE.test(code)) {
+    return { ok: false, errorKind: 'tls', error: `TLS handshake failed (${code})` }
   }
+  if (NETWORK_CODE_RE.test(code)) {
+    return { ok: false, errorKind: 'network', error: `Could not reach ${baseUrl} (${code})` }
+  }
+  const msg = (err as Error)?.message ?? String(err)
+  return { ok: false, errorKind: 'network', error: `Could not reach ${baseUrl} — ${msg}` }
+}
+
+export async function getServerVersion(baseUrl: string): Promise<ServerVersionResult> {
+  let res: Response
+  try {
+    res = await fetch(api(baseUrl, '/version'), { headers: giteaHeaders(null) })
+  } catch (err) {
+    return classifyFetchError(err, baseUrl)
+  }
+  if (!res.ok) {
+    let body = ''
+    try { body = (await res.text()).slice(0, 200) } catch { /* ignore */ }
+    return {
+      ok: false,
+      errorKind: 'http',
+      error: body ? `HTTP ${res.status} — ${body}` : `HTTP ${res.status}`,
+    }
+  }
+  let body: { version?: unknown }
+  try {
+    body = await res.json() as { version?: unknown }
+  } catch {
+    return { ok: false, errorKind: 'json', error: `${baseUrl} did not respond as a Gitea instance (invalid JSON)` }
+  }
+  if (typeof body?.version !== 'string' || body.version.length === 0) {
+    return { ok: false, errorKind: 'json', error: `${baseUrl} did not respond as a Gitea instance (no /api/v1/version)` }
+  }
+  return { ok: true, version: body.version }
 }
 
 // ── Auth / identity ─────────────────────────────────────────────────────────

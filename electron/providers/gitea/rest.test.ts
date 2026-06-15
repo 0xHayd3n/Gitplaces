@@ -64,28 +64,77 @@ describe('getCurrentUser', () => {
 
 describe('getServerVersion', () => {
   beforeEach(() => mockFetch.mockReset())
-  it('returns { version } on success', async () => {
+
+  it('returns { ok: true, version } on success', async () => {
     mockFetch.mockResolvedValue(makeResponse({ version: '1.21.0+gitea-x' }))
     const v = await getServerVersion(BASE)
-    expect(v!.version).toBe('1.21.0+gitea-x')
+    expect(v.ok).toBe(true)
+    if (v.ok) expect(v.version).toBe('1.21.0+gitea-x')
     expect(mockFetch).toHaveBeenCalledWith('https://codeberg.org/api/v1/version', expect.any(Object))
   })
+
   it('normalizes a trailing slash on the base URL', async () => {
     mockFetch.mockResolvedValue(makeResponse({ version: '1.22.0' }))
     await getServerVersion('https://codeberg.org/')
     expect(mockFetch).toHaveBeenCalledWith('https://codeberg.org/api/v1/version', expect.any(Object))
   })
-  it('returns null when the response is JSON without a version field', async () => {
+
+  it('returns errorKind: "json" when the response has no version field', async () => {
     mockFetch.mockResolvedValue(makeResponse({ unrelated: true }))
-    expect(await getServerVersion(BASE)).toBeNull()
+    const v = await getServerVersion(BASE)
+    expect(v.ok).toBe(false)
+    if (!v.ok) {
+      expect(v.errorKind).toBe('json')
+      expect(v.error).toMatch(/did not respond as a Gitea/)
+    }
   })
-  it('returns null on network failure', async () => {
-    mockFetch.mockImplementationOnce(() => Promise.reject(new Error('network')))
-    expect(await getServerVersion(BASE)).toBeNull()
+
+  it('returns errorKind: "tls" on a TLS cause code', async () => {
+    mockFetch.mockImplementationOnce(() =>
+      Promise.reject(Object.assign(new TypeError('fetch failed'), {
+        cause: { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' },
+      })),
+    )
+    const v = await getServerVersion(BASE)
+    expect(v.ok).toBe(false)
+    if (!v.ok) {
+      expect(v.errorKind).toBe('tls')
+      expect(v.error).toMatch(/UNABLE_TO_VERIFY_LEAF_SIGNATURE/)
+    }
   })
-  it('returns null on non-ok status', async () => {
-    mockFetch.mockResolvedValue(makeResponse({}, {}, false, 404))
-    expect(await getServerVersion(BASE)).toBeNull()
+
+  it('returns errorKind: "network" on a connection cause code', async () => {
+    mockFetch.mockImplementationOnce(() =>
+      Promise.reject(Object.assign(new TypeError('fetch failed'), {
+        cause: { code: 'ENOTFOUND' },
+      })),
+    )
+    const v = await getServerVersion(BASE)
+    expect(v.ok).toBe(false)
+    if (!v.ok) expect(v.errorKind).toBe('network')
+  })
+
+  it('returns errorKind: "network" on a plain Error reject with no cause', async () => {
+    mockFetch.mockImplementationOnce(() => Promise.reject(new Error('boom')))
+    const v = await getServerVersion(BASE)
+    expect(v.ok).toBe(false)
+    if (!v.ok) expect(v.errorKind).toBe('network')
+  })
+
+  it('returns errorKind: "http" with status on non-2xx', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false, status: 503,
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve('Service Unavailable'),
+      headers: { get: () => null },
+    })
+    const v = await getServerVersion(BASE)
+    expect(v.ok).toBe(false)
+    if (!v.ok) {
+      expect(v.errorKind).toBe('http')
+      expect(v.error).toMatch(/503/)
+      expect(v.error).toMatch(/Service Unavailable/)
+    }
   })
 })
 
