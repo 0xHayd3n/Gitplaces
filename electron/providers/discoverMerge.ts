@@ -9,13 +9,20 @@ import type { Repo } from '../../src/types/repo'
 import type { HostInstance, HostType } from './types'
 import { getAnyProvider } from './registry'
 
+export interface UnifiedFilters {
+  language?: string
+  minStars?: number
+  license?: string
+  activityWindow?: 'week' | 'month' | 'halfyear'
+}
+
 export type UnifiedQuery =
-  | { kind: 'trending-week' }
-  | { kind: 'hot-today' }
-  | { kind: 'hidden-gems' }
-  | { kind: 'popular' }
-  | { kind: 'topic'; topic: string }
-  | { kind: 'free-text'; freeText: string }
+  | { kind: 'trending-week'; filters?: UnifiedFilters }
+  | { kind: 'hot-today'; filters?: UnifiedFilters }
+  | { kind: 'hidden-gems'; filters?: UnifiedFilters }
+  | { kind: 'popular'; filters?: UnifiedFilters }
+  | { kind: 'topic'; topic: string; filters?: UnifiedFilters }
+  | { kind: 'free-text'; freeText: string; filters?: UnifiedFilters }
 
 export interface SearchAllOpts {
   capPerHost: number
@@ -34,6 +41,12 @@ interface TranslatedQuery {
   query: string
   sort: string
   order: 'asc' | 'desc'
+  /** When set, applied to each per-host result list before the host's
+   *  contribution is sliced to capPerHost. Used by GitLab/Gitea to enforce
+   *  filters their search API can't express natively (minStars, license,
+   *  activity window). GitHub returns undefined here — its query qualifiers
+   *  do native filtering. */
+  postFilter?: (repo: Repo) => boolean
 }
 
 function daysAgo(n: number): string {
@@ -42,27 +55,79 @@ function daysAgo(n: number): string {
   return d.toISOString().split('T')[0]
 }
 
+function activityCutoffMs(window: UnifiedFilters['activityWindow']): number | null {
+  switch (window) {
+    case 'week':     return 7 * 86400_000
+    case 'month':    return 30 * 86400_000
+    case 'halfyear': return 182 * 86400_000
+    default:         return null
+  }
+}
+
+function activityWindowDays(w: UnifiedFilters['activityWindow']): number {
+  switch (w) {
+    case 'week':     return 7
+    case 'month':    return 30
+    case 'halfyear': return 182
+    default:         return 365
+  }
+}
+
+function makePostFilter(filters: UnifiedFilters | undefined): TranslatedQuery['postFilter'] | undefined {
+  if (!filters) return undefined
+  const { minStars, license, activityWindow, language } = filters
+  const activityMs = activityCutoffMs(activityWindow)
+  if (minStars == null && !license && activityMs == null && !language) return undefined
+  return (r: Repo) => {
+    if (minStars != null && r.stars < minStars) return false
+    if (license && (r.license ?? '').toLowerCase() !== license.toLowerCase()) return false
+    if (language && (r.language ?? '').toLowerCase() !== language.toLowerCase()) return false
+    if (activityMs != null) {
+      const pushedAt = r.pushedAt ? new Date(r.pushedAt).getTime() : 0
+      if (Date.now() - pushedAt > activityMs) return false
+    }
+    return true
+  }
+}
+
+function githubFilterQualifiers(filters: UnifiedFilters | undefined): string {
+  if (!filters) return ''
+  const parts: string[] = []
+  if (filters.language) parts.push(`language:${filters.language}`)
+  if (filters.minStars != null) parts.push(`stars:>=${filters.minStars}`)
+  if (filters.license) parts.push(`license:${filters.license}`)
+  if (filters.activityWindow) {
+    parts.push(`pushed:>${daysAgo(activityWindowDays(filters.activityWindow))}`)
+  }
+  return parts.join(' ')
+}
+
 export function translateQuery(hostType: HostType, q: UnifiedQuery): TranslatedQuery {
+  const filterQuals = githubFilterQualifiers(q.filters)
+  const compose = (base: string): string => [base, filterQuals].filter(Boolean).join(' ')
+
   if (hostType === 'github') {
     switch (q.kind) {
-      case 'trending-week': return { query: `created:>${daysAgo(7)}`, sort: 'stars', order: 'desc' }
-      case 'hot-today':     return { query: `pushed:>${daysAgo(1)}`,  sort: 'updated', order: 'desc' }
-      case 'hidden-gems':   return { query: 'stars:50..500',          sort: 'stars',   order: 'desc' }
-      case 'popular':       return { query: 'stars:>100',             sort: 'stars',   order: 'desc' }
-      case 'topic':         return { query: `topic:${q.topic}`,       sort: 'stars',   order: 'desc' }
-      case 'free-text':     return { query: q.freeText,                sort: 'stars',   order: 'desc' }
+      case 'trending-week': return { query: compose(`created:>${daysAgo(7)}`), sort: 'stars', order: 'desc' }
+      case 'hot-today':     return { query: compose(`pushed:>${daysAgo(1)}`),  sort: 'updated', order: 'desc' }
+      case 'hidden-gems':   return { query: compose('stars:50..500'),          sort: 'stars',   order: 'desc' }
+      case 'popular':       return { query: compose('stars:>100'),             sort: 'stars',   order: 'desc' }
+      case 'topic':         return { query: compose(`topic:${q.topic}`),       sort: 'stars',   order: 'desc' }
+      case 'free-text':     return { query: compose(q.freeText),                sort: 'stars',   order: 'desc' }
     }
   }
-  // GitLab + Gitea: free-text search; we let recency sort do the heavy lifting
-  // and rank by pushedAt at merge. Per-host date-range filtering is a Phase 7
-  // polish item (each host's query syntax is coarser than GitHub's).
+  // GitLab + Gitea: encode language natively as the search string when no
+  // other query is present; push the remaining filters (minStars, license,
+  // activityWindow, language exact match) into postFilter for client-side
+  // filtering after the per-host fetch.
+  const postFilter = makePostFilter(q.filters)
   switch (q.kind) {
     case 'trending-week':
-    case 'hot-today':     return { query: '', sort: 'updated', order: 'desc' }
-    case 'hidden-gems':   return { query: '', sort: 'stars',   order: 'desc' }
-    case 'popular':       return { query: '', sort: 'stars',   order: 'desc' }
-    case 'topic':         return { query: q.topic,    sort: 'stars', order: 'desc' }
-    case 'free-text':     return { query: q.freeText, sort: 'stars', order: 'desc' }
+    case 'hot-today':     return { query: q.filters?.language ?? '', sort: 'updated', order: 'desc', postFilter }
+    case 'hidden-gems':   return { query: q.filters?.language ?? '', sort: 'stars',   order: 'desc', postFilter }
+    case 'popular':       return { query: q.filters?.language ?? '', sort: 'stars',   order: 'desc', postFilter }
+    case 'topic':         return { query: q.topic,    sort: 'stars', order: 'desc', postFilter }
+    case 'free-text':     return { query: q.freeText, sort: 'stars', order: 'desc', postFilter }
   }
 }
 
@@ -98,7 +163,8 @@ export async function searchAllHosts(
     ) => Promise<Repo[]>)(token, translated.query, opts.capPerHost, translated.sort, translated.order, page)
     const result = await withTimeout(work, timeout)
     if (!Array.isArray(result)) return []
-    return result.slice(0, opts.capPerHost)
+    const filtered = translated.postFilter ? result.filter(translated.postFilter) : result
+    return filtered.slice(0, opts.capPerHost)
   }))
 
   const merged = perHost.flat()

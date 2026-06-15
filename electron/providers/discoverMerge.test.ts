@@ -85,6 +85,89 @@ describe('translateQuery', () => {
   })
 })
 
+describe('translateQuery — filters', () => {
+  it('GitHub: encodes language + minStars + license + activityWindow into the query', () => {
+    const out = translateQuery('github', {
+      kind: 'popular',
+      filters: {
+        language: 'typescript',
+        minStars: 1000,
+        license: 'mit',
+        activityWindow: 'week',
+      },
+    })
+    expect(out.query).toContain('stars:>100')
+    expect(out.query).toContain('language:typescript')
+    expect(out.query).toContain('stars:>=1000')
+    expect(out.query).toContain('license:mit')
+    expect(out.query).toMatch(/pushed:>\d{4}-\d{2}-\d{2}/)
+    expect(out.postFilter).toBeUndefined()
+  })
+
+  it('GitLab: encodes language via query; postFilter applies minStars + license + activityWindow', () => {
+    const out = translateQuery('gitlab', {
+      kind: 'topic',
+      topic: 'rust',
+      filters: { language: 'rust', minStars: 1000, license: 'mit', activityWindow: 'week' },
+    })
+    expect(out.query).toBe('rust')
+    expect(typeof out.postFilter).toBe('function')
+    const baseRepo = {
+      hostId: 'gl:gitlab.com', hostType: 'gitlab' as const, hostNativeId: 1,
+      fullName: 'o/n', owner: 'o', name: 'n', htmlUrl: '', homepageUrl: null,
+      description: null, language: 'Rust', topics: [], license: 'MIT',
+      defaultBranch: 'main', archived: false, size: 0, stars: 5000, forks: 0,
+      watchers: 0, openIssues: 0, createdAt: '', updatedAt: '', pushedAt: new Date().toISOString(),
+      ownerAvatarUrl: '',
+    }
+    expect(out.postFilter!(baseRepo)).toBe(true)
+    expect(out.postFilter!({ ...baseRepo, stars: 50 })).toBe(false)
+    expect(out.postFilter!({ ...baseRepo, license: 'Apache-2.0' })).toBe(false)
+    const longAgo = new Date(Date.now() - 60 * 86400_000).toISOString()
+    expect(out.postFilter!({ ...baseRepo, pushedAt: longAgo })).toBe(false)
+  })
+
+  it('Gitea: same postFilter-driven shape as GitLab', () => {
+    const out = translateQuery('gitea', {
+      kind: 'topic',
+      topic: 'rust',
+      filters: { minStars: 1000 },
+    })
+    expect(typeof out.postFilter).toBe('function')
+    const baseRepo = {
+      hostId: 'gt:codeberg.org', hostType: 'gitea' as const, hostNativeId: 1,
+      fullName: 'o/n', owner: 'o', name: 'n', htmlUrl: '', homepageUrl: null,
+      description: null, language: 'Rust', topics: [], license: null,
+      defaultBranch: 'main', archived: false, size: 0, stars: 2000, forks: 0,
+      watchers: 0, openIssues: 0, createdAt: '', updatedAt: '', pushedAt: '',
+      ownerAvatarUrl: '',
+    }
+    expect(out.postFilter!(baseRepo)).toBe(true)
+    expect(out.postFilter!({ ...baseRepo, stars: 50 })).toBe(false)
+  })
+
+  it('searchAllHosts applies postFilter to each host result before merging', async () => {
+    const ghHost = host('gh:api.github.com', 'github')
+    const glHost = host('gl:gitlab.com', 'gitlab')
+    resolveAnyMock.mockImplementation((hostId: string) => {
+      if (hostId === 'gh:api.github.com') return {
+        searchRepos: vi.fn().mockResolvedValue([repo('gh:api.github.com', 'a', '2026-06-14T10:00:00Z', 5000)]),
+      }
+      if (hostId === 'gl:gitlab.com') return {
+        searchRepos: vi.fn().mockResolvedValue([
+          repo('gl:gitlab.com', 'b', '2026-06-13T10:00:00Z', 2000),
+          repo('gl:gitlab.com', 'c', '2026-06-12T10:00:00Z', 50),
+        ]),
+      }
+      return null
+    })
+    const out = await searchAllHosts([ghHost, glHost], {
+      kind: 'topic', topic: 'rust', filters: { minStars: 1000 },
+    }, { capPerHost: 10, totalLimit: 30 })
+    expect(out.map(r => r.name).sort()).toEqual(['a', 'b'])
+  })
+})
+
 describe('searchAllHosts', () => {
   beforeEach(() => resolveAnyMock.mockReset())
 
