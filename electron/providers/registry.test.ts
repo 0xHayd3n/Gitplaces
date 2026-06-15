@@ -1,8 +1,9 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
 import { HOST_ID_GITHUB } from './types'
-import { getProvider, getAnyProvider, getDefaultProvider, _resetGitLabCacheForTest, _resetGiteaCacheForTest } from './registry'
-import { GitHubProvider } from './github'
+import { getProvider, getAnyProvider, getDefaultProvider, _resetGitLabCacheForTest, _resetGiteaCacheForTest, _resetGitHubCacheForTest } from './registry'
+import { GitHubProvider, githubProvider } from './github'
+import { addHost } from './hostConfig'
 import { GitLabProvider } from './gitlab'
 import { GiteaProvider } from './gitea'
 import { setHostConfigBackend, seedDefaultHosts, type HostConfigBackend } from './hostConfig'
@@ -20,6 +21,7 @@ describe('registry', () => {
   beforeEach(() => {
     _resetGitLabCacheForTest()
     _resetGiteaCacheForTest()
+    _resetGitHubCacheForTest()
     setHostConfigBackend(makeMapBackend())
     seedDefaultHosts()
   })
@@ -89,5 +91,49 @@ describe('registry', () => {
 
   it('getDefaultProvider returns the GitHub provider', () => {
     expect(getDefaultProvider()).toBeInstanceOf(GitHubProvider)
+  })
+})
+
+describe('registry — GitHub Enterprise', () => {
+  beforeEach(() => {
+    _resetGitLabCacheForTest()
+    _resetGiteaCacheForTest()
+    _resetGitHubCacheForTest()
+    setHostConfigBackend(makeMapBackend())
+    seedDefaultHosts()
+  })
+
+  it('mints a per-hostId GitHubProvider for a non-default gh: hostId', () => {
+    addHost({ type: 'github', baseUrl: 'https://github.acme.com/api/v3', label: 'Acme' })
+    const provider = getAnyProvider('gh:github.acme.com/api/v3')
+    expect(provider).toBeInstanceOf(GitHubProvider)
+    expect((provider as GitHubProvider).baseUrl).toBe('https://github.acme.com/api/v3')
+    expect((provider as GitHubProvider).hostId).toBe('gh:github.acme.com/api/v3')
+  })
+
+  it('caches the GHE provider — repeated lookups return the same instance', () => {
+    addHost({ type: 'github', baseUrl: 'https://github.acme.com/api/v3', label: 'Acme' })
+    const a = getAnyProvider('gh:github.acme.com/api/v3')
+    const b = getAnyProvider('gh:github.acme.com/api/v3')
+    expect(a).toBe(b)
+  })
+
+  it('GHE provider is distinct from the public-instance singleton', () => {
+    addHost({ type: 'github', baseUrl: 'https://github.acme.com/api/v3', label: 'Acme' })
+    const ghe = getAnyProvider('gh:github.acme.com/api/v3')
+    const pub = getAnyProvider(HOST_ID_GITHUB)
+    expect(ghe).not.toBe(pub)
+    expect(pub).toBe(githubProvider)
+  })
+
+  it('returns null for a gh: hostId not present in hostConfig', () => {
+    expect(getAnyProvider('gh:unknown.acme.com')).toBeNull()
+  })
+
+  it('getProvider (narrow accessor) returns the GHE GitHubProvider too', () => {
+    addHost({ type: 'github', baseUrl: 'https://github.acme.com/api/v3', label: 'Acme' })
+    const p = getProvider('gh:github.acme.com/api/v3')
+    expect(p).toBeInstanceOf(GitHubProvider)
+    expect(p?.baseUrl).toBe('https://github.acme.com/api/v3')
   })
 })

@@ -30,11 +30,22 @@ import { getHost } from './hostConfig'
 
 export type AnyProvider = GitHubProvider | GitLabProvider | GiteaProvider
 
+const githubProviders = new Map<string, GitHubProvider>()
 const gitlabProviders = new Map<string, GitLabProvider>()
 const giteaProviders = new Map<string, GiteaProvider>()
 
 function resolveAny(hostId: string): AnyProvider | null {
   if (hostId === HOST_ID_GITHUB) return githubProvider
+
+  if (hostId.startsWith('gh:')) {
+    const cached = githubProviders.get(hostId)
+    if (cached) return cached
+    const host = getHost(hostId)
+    if (!host || host.type !== 'github') return null
+    const inst = new GitHubProvider(hostId, host.baseUrl)
+    githubProviders.set(hostId, inst)
+    return inst
+  }
 
   if (hostId.startsWith('gl:')) {
     const cached = gitlabProviders.get(hostId)
@@ -80,6 +91,15 @@ export function getDefaultProvider(): GitHubProvider {
  */
 export function _resetGitLabCacheForTest(): void {
   gitlabProviders.clear()
+}
+
+/**
+ * Test-only: drop the lazy GHE provider cache. The public-instance
+ * singleton (`githubProvider`) is never cached here, so this only
+ * affects user-added GitHub Enterprise hosts.
+ */
+export function _resetGitHubCacheForTest(): void {
+  githubProviders.clear()
 }
 
 /**
