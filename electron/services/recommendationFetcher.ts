@@ -3,6 +3,11 @@ import { searchRepos } from '../providers/github'
 import type { GitHubRepo } from '../providers/github'
 import type { CorpusStats, UserProfile } from '../../src/types/recommendation'
 import { getSubTypeKeyword } from '../../src/lib/discoverQueries'
+import { listHosts } from '../providers/hostConfig'
+import { getToken } from '../providers/tokenStore'
+import { searchAllHosts, type UnifiedQuery } from '../providers/discoverMerge'
+import { repoToGitHubShape } from '../providers/github/normalize'
+import { HOST_ID_GITHUB } from '../providers/types'
 
 export interface QueryPlan {
   topic: string
@@ -141,27 +146,109 @@ function buildSearchQuery(plan: QueryPlan): string {
   }
 }
 
+/** A QueryPlan in unified shape if it can be translated cross-host; null
+ *  otherwise (e.g. pair / longTail / language plans use compound GitHub
+ *  qualifiers that don't translate cleanly to GitLab/Gitea). */
+function planToUnifiedQuery(plan: QueryPlan): UnifiedQuery | null {
+  switch (plan.kind) {
+    case 'topic':
+    case 'engagement':
+    case 'rareTopic':
+      return plan.topic ? { kind: 'topic', topic: plan.topic } : null
+    case 'subType': {
+      // subType plans store the GitHub-shaped keyword (e.g. "topic:ai-coding"
+      // or a free phrase). Strip the qualifier prefix for the unified shape.
+      const topic = plan.topic.replace(/^topic:/, '').trim()
+      return topic ? { kind: 'topic', topic } : null
+    }
+    case 'coldStart':
+      return { kind: 'popular' }
+    // pair (two-topic), longTail (star-ceiling), language (language qualifier)
+    // are GitHub-specific. Skip cross-host fan-out for these plans — they
+    // still run against GitHub via searchRepos as before.
+    case 'pair':
+    case 'longTail':
+    case 'language':
+      return null
+  }
+}
+
+// `_hostId` is optional so legacy tests / callers that hand-build GitHubRepo
+// fixtures keep type-checking. The IPC upsert defaults missing values to
+// HOST_ID_GITHUB; the multi-host fetcher always populates it.
+export type CandidateRepo = GitHubRepo & { _hostId?: string }
+
+/** Fetch recommendation candidates. Pulls from GitHub (preserving the rich
+ *  query semantics of the legacy QueryPlan system) AND fans the
+ *  translatable plan kinds out across every other configured host via
+ *  searchAllHosts. Returns a unified GitHubRepo-shaped list — the
+ *  recommendation engine doesn't know or care about hostId; only the IPC
+ *  upsert reads `_hostId` to tag DB rows correctly. */
 export async function fetchCandidates(
   token: string | null,
   queries: QueryPlan[],
   page: number = 1,
-): Promise<GitHubRepo[]> {
-  const seen = new Set<number>()
-  const merged: GitHubRepo[] = []
+): Promise<CandidateRepo[]> {
+  const seen = new Set<string>()
+  const merged: CandidateRepo[] = []
 
-  const results = await Promise.allSettled(
-    queries.map(async (q) => searchRepos(token, buildSearchQuery(q), q.perPage, q.sort, 'desc', page))
-  )
-
-  for (const r of results) {
-    if (r.status === 'fulfilled') {
-      for (const repo of r.value) {
-        if (!seen.has(repo.id)) {
-          seen.add(repo.id)
-          merged.push(repo)
-        }
+  function push(repos: CandidateRepo[]): void {
+    for (const r of repos) {
+      // Dedup by hostId+id — preserves the legacy intra-host numeric-id dedup
+      // while preventing cross-host collisions (each provider's id space is
+      // independent so the same number can mean two different repos).
+      const key = `${r._hostId ?? HOST_ID_GITHUB}:${r.id}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        merged.push(r)
       }
     }
   }
+
+  // GitHub path — preserves the legacy buildSearchQuery semantics.
+  const ghResults = await Promise.allSettled(
+    queries.map(async (q) => searchRepos(token, buildSearchQuery(q), q.perPage, q.sort, 'desc', page)),
+  )
+  for (const r of ghResults) {
+    if (r.status === 'fulfilled') {
+      push(r.value.map(repo => ({ ...repo, _hostId: HOST_ID_GITHUB })))
+    }
+  }
+
+  // Other-host path — translate each plan that maps cleanly to UnifiedQuery
+  // and fan out via searchAllHosts (which excludes GitHub from its results
+  // implicitly by virtue of our explicit GitHub branch above). The user's
+  // configured hosts other than GitHub contribute up to capPerHost results
+  // per plan-translatable query; merge dedup is by composite key.
+  //
+  // Defensive: listHosts() throws if hostConfig backend isn't initialized
+  // (legacy unit tests that mock fetchCandidates don't bootstrap it). Treat
+  // that as "no extra hosts" and skip the fan-out.
+  let allHosts: ReturnType<typeof listHosts>
+  try {
+    allHosts = listHosts().filter(h => h.id !== HOST_ID_GITHUB)
+  } catch {
+    allHosts = []
+  }
+  if (allHosts.length > 0) {
+    const unifiedQueries = queries
+      .map(planToUnifiedQuery)
+      .filter((q): q is UnifiedQuery => q !== null)
+    const otherResults = await Promise.allSettled(
+      unifiedQueries.map(uq => searchAllHosts(allHosts, uq, {
+        capPerHost: 10,
+        totalLimit: 30,
+        timeoutMs: 4000,
+        tokenForHost: (id) => getToken(id),
+        page,
+      })),
+    )
+    for (const r of otherResults) {
+      if (r.status === 'fulfilled') {
+        push(r.value.map(repoToGitHubShape))
+      }
+    }
+  }
+
   return merged
 }

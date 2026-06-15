@@ -9,7 +9,8 @@ import type Database from 'better-sqlite3'
 import { rankCandidates } from '../services/recommendationEngine'
 import { buildUserProfile } from '../services/userProfile'
 import { computeCorpusStats } from '../services/corpusStats'
-import { planQueries, fetchCandidates } from '../services/recommendationFetcher'
+import { planQueries, fetchCandidates, type CandidateRepo } from '../services/recommendationFetcher'
+import { HOST_ID_GITHUB } from '../providers/types'
 import { getRecentClicks, pruneOldEvents } from '../services/engagementTracker'
 import { cascadeRepoId } from '../db-helpers'
 import type { RecommendationResponse, RecommendationItem } from '../../src/types/recommendation'
@@ -62,18 +63,19 @@ function maybePrune(db: Database.Database): void {
 // ---------------------------------------------------------------------------
 function upsertCandidates(
   db: Database.Database,
-  candidates: Awaited<ReturnType<typeof fetchCandidates>>,
+  candidates: CandidateRepo[],
   profileHash: string,
 ): void {
   const now = new Date().toISOString()
 
   const upsert = db.prepare(`
-    INSERT INTO repos (id, owner, name, description, language, topics, stars, forks, license,
+    INSERT INTO repos (id, host_id, owner, name, description, language, topics, stars, forks, license,
                        homepage, updated_at, pushed_at, created_at, saved_at, type, banner_svg,
                        discovered_at, discover_query, watchers, size, open_issues, default_branch, avatar_url,
                        type_bucket, type_sub)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
+      host_id        = excluded.host_id,
       owner          = excluded.owner,
       name           = excluded.name,
       description    = excluded.description,
@@ -100,6 +102,7 @@ function upsertCandidates(
   db.transaction(() => {
     for (const repo of candidates) {
       const rid = String(repo.id)
+      const hostId = repo._hostId ?? HOST_ID_GITHUB
       cascadeRepoId(db, repo.owner.login, repo.name, rid)
       const classified = classifyRepoBucket({
         name: repo.name,
@@ -107,7 +110,7 @@ function upsertCandidates(
         topics: repo.topics ?? [],
       })
       upsert.run(
-        rid, repo.owner.login, repo.name, repo.description, repo.language,
+        rid, hostId, repo.owner.login, repo.name, repo.description, repo.language,
         JSON.stringify(repo.topics ?? []), repo.stargazers_count, repo.forks_count,
         repo.license?.spdx_id ?? null, repo.homepage, repo.updated_at, repo.pushed_at,
         repo.created_at ?? null,

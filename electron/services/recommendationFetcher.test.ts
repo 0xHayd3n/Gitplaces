@@ -141,6 +141,15 @@ describe('fetchCandidates', () => {
     ])
     expect(result.map((r) => r.id).sort()).toEqual([1, 3])
   })
+
+  it('tags every GitHub candidate with _hostId so the IPC upsert can write host_id', async () => {
+    mockSearch.mockResolvedValueOnce([ghRepo({ id: 42 })])
+    const result = await fetchCandidates('token', [
+      { topic: 'rust', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
+    ])
+    expect(result).toHaveLength(1)
+    expect(result[0]._hostId).toBe('gh:api.github.com')
+  })
 })
 
 // ── New planQueries (extended) tests ─────────────────────────────────────────
