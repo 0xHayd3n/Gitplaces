@@ -61,7 +61,7 @@ describe('hosts:probe — GitLab', () => {
     const probe = handlers.get('hosts:probe')!
     const out = await probe({}, { type: 'gitlab', baseUrl: 'https://nope.example' }) as { ok: boolean; error?: string }
     expect(out.ok).toBe(false)
-    expect(out.error).toMatch(/did not respond as a GitLab/i)
+    expect(out.error).toMatch(/could not reach https:\/\/nope\.example/i)
   })
 
   it('returns { ok: false } when the response is not a GitLab version JSON', async () => {
@@ -76,15 +76,17 @@ describe('hosts:probe — GitLab', () => {
     expect(out.error).toMatch(/did not respond as a GitLab/i)
   })
 
-  it('returns { ok: false } on HTTP error status', async () => {
+  it('returns { ok: false } on HTTP error status with status code surfaced', async () => {
     mockFetch.mockResolvedValue({
       ok: false, status: 404,
       json: () => Promise.resolve({ message: '404 Not Found' }),
+      text: () => Promise.resolve('404 Not Found'),
       headers: { get: () => null },
     })
     const probe = handlers.get('hosts:probe')!
-    const out = await probe({}, { type: 'gitlab', baseUrl: 'https://example.com' }) as { ok: boolean }
+    const out = await probe({}, { type: 'gitlab', baseUrl: 'https://example.com' }) as { ok: boolean; error?: string }
     expect(out.ok).toBe(false)
+    expect(out.error).toMatch(/HTTP 404/)
   })
 
   it('still returns ok:true for the GitHub probe of api.github.com', async () => {
@@ -139,7 +141,7 @@ describe('hosts:probe — Gitea', () => {
     const probe = handlers.get('hosts:probe')!
     const out = await probe({}, { type: 'gitea', baseUrl: 'https://nope.example' }) as { ok: boolean; error?: string }
     expect(out.ok).toBe(false)
-    expect(out.error).toMatch(/did not respond as a Gitea/i)
+    expect(out.error).toMatch(/could not reach https:\/\/nope\.example/i)
   })
 
   it('returns { ok: false } when the response is not a Gitea version JSON', async () => {
@@ -154,14 +156,72 @@ describe('hosts:probe — Gitea', () => {
     expect(out.error).toMatch(/did not respond as a Gitea/i)
   })
 
-  it('returns { ok: false } on HTTP error status', async () => {
+  it('returns { ok: false } on HTTP error status with status code surfaced', async () => {
     mockFetch.mockResolvedValue({
       ok: false, status: 404,
       json: () => Promise.resolve({ message: '404 Not Found' }),
+      text: () => Promise.resolve('404 Not Found'),
       headers: { get: () => null },
     })
     const probe = handlers.get('hosts:probe')!
-    const out = await probe({}, { type: 'gitea', baseUrl: 'https://example.com' }) as { ok: boolean }
+    const out = await probe({}, { type: 'gitea', baseUrl: 'https://example.com' }) as { ok: boolean; error?: string }
     expect(out.ok).toBe(false)
+    expect(out.error).toMatch(/HTTP 404/)
+  })
+})
+
+describe('hosts:probe — kind-specific surfacing', () => {
+  beforeEach(() => mockFetch.mockReset())
+
+  it('surfaces TLS handshake errors with the cert code', async () => {
+    mockFetch.mockImplementationOnce(() =>
+      Promise.reject(Object.assign(new TypeError('fetch failed'), {
+        cause: { code: 'CERT_HAS_EXPIRED' },
+      })),
+    )
+    const probe = handlers.get('hosts:probe')!
+    const out = await probe({}, { type: 'gitlab', baseUrl: 'https://expired.example' }) as { ok: boolean; error: string }
+    expect(out.ok).toBe(false)
+    expect(out.error).toMatch(/TLS handshake failed/i)
+    expect(out.error).toMatch(/CERT_HAS_EXPIRED/)
+  })
+
+  it('surfaces DNS / refused connections with "Could not reach"', async () => {
+    mockFetch.mockImplementationOnce(() =>
+      Promise.reject(Object.assign(new TypeError('fetch failed'), {
+        cause: { code: 'ENOTFOUND' },
+      })),
+    )
+    const probe = handlers.get('hosts:probe')!
+    const out = await probe({}, { type: 'gitea', baseUrl: 'https://nope.example' }) as { ok: boolean; error: string }
+    expect(out.ok).toBe(false)
+    expect(out.error).toMatch(/could not reach https:\/\/nope\.example/i)
+    expect(out.error).toMatch(/ENOTFOUND/)
+  })
+
+  it('surfaces HTTP errors with status + body excerpt', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false, status: 500,
+      json: () => Promise.resolve({}),
+      text: () => Promise.resolve('Internal Server Error'),
+      headers: { get: () => null },
+    })
+    const probe = handlers.get('hosts:probe')!
+    const out = await probe({}, { type: 'gitlab', baseUrl: 'https://broken.example' }) as { ok: boolean; error: string }
+    expect(out.ok).toBe(false)
+    expect(out.error).toMatch(/HTTP 500/)
+    expect(out.error).toMatch(/Internal Server Error/)
+  })
+
+  it('surfaces JSON-mismatch with the canonical "did not respond as a" message', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true, status: 200,
+      json: () => Promise.resolve({ html: '<title>not gitea</title>' }),
+      headers: { get: () => null },
+    })
+    const probe = handlers.get('hosts:probe')!
+    const out = await probe({}, { type: 'gitea', baseUrl: 'https://wrong.example' }) as { ok: boolean; error: string }
+    expect(out.ok).toBe(false)
+    expect(out.error).toMatch(/did not respond as a Gitea/)
   })
 })
