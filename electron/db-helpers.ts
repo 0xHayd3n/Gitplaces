@@ -90,6 +90,9 @@ export function cascadeRepoId(db: Database.Database, owner: string, name: string
     db.prepare('UPDATE collection_repos SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
     db.prepare('UPDATE skills SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
     db.prepare('UPDATE sub_skills SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
+    db.prepare('UPDATE last_commits SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
+    db.prepare('UPDATE compare_diffs SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
+    db.prepare('UPDATE repo_notes SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
     db.prepare('DELETE FROM repos WHERE id = ?').run(oldId)
   } else {
     // Target id is free — just rename
@@ -97,6 +100,9 @@ export function cascadeRepoId(db: Database.Database, owner: string, name: string
     db.prepare('UPDATE collection_repos SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
     db.prepare('UPDATE skills SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
     db.prepare('UPDATE sub_skills SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
+    db.prepare('UPDATE last_commits SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
+    db.prepare('UPDATE compare_diffs SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
+    db.prepare('UPDATE repo_notes SET repo_id = ? WHERE repo_id = ?').run(newId, oldId)
   }
 }
 
