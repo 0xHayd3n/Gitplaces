@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, type ReactNode, type FormEvent } from 'react'
 import type { User } from '../../types/repo'
+import { clearCachedCapabilities } from '../../hooks/useHostCapabilities'
 
 // Mirror the shape declared in electron/preload.ts → hosts.list.
 // Renderer-local copy so we don't have to import from the electron tree at runtime.
@@ -114,6 +115,9 @@ export default function ConnectionsPanel() {
     setStatuses(prev => ({ ...prev, [host.id]: { ...(prev[host.id] ?? { user: null, loading: false }), error: null } }))
     try {
       const result = await window.api.hosts.setToken(host.id, pat)
+      // Drop the capability cache locally before the broadcast round-trip
+      // arrives — keeps any mounted hook from briefly showing pre-auth caps.
+      clearCachedCapabilities(host.id)
       setStatuses(prev => ({ ...prev, [host.id]: { user: result.user, loading: false, error: null } }))
       setPatDraft(prev => ({ ...prev, [host.id]: '' }))
     } catch (e) {
@@ -128,6 +132,7 @@ export default function ConnectionsPanel() {
     setDisconnecting(prev => ({ ...prev, [host.id]: true }))
     try {
       await window.api.hosts.clearToken(host.id)
+      clearCachedCapabilities(host.id)
       setStatuses(prev => ({ ...prev, [host.id]: { user: null, loading: false, error: null } }))
     } catch (e) {
       const message = (e as Error).message ?? 'Failed to disconnect.'
