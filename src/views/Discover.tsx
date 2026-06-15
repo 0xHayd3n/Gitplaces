@@ -350,11 +350,7 @@ export default function Discover() {
         return
       }
       try {
-        const q = buildViewModeQuery('hot-today', '', '')
-        const { sort, order } = getViewModeSort('hot-today')
-        // search statically returns Repo[] but the handler emits SavedRepo[]
-        // (rows go through repoRowToSavedRepo). Safe to widen here.
-        const data = await window.api.repo.search(HOST_ID_GITHUB, q, sort, order) as SavedRepo[]
+        const data = await window.api.repo.searchAll({ kind: 'hot-today' })
         _hotTodayModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedHotToday(data)
         setHotTodayRowRepos(data)
@@ -371,9 +367,7 @@ export default function Discover() {
         return
       }
       try {
-        const q = buildViewModeQuery('trending-week', '', '')
-        const { sort, order } = getViewModeSort('trending-week')
-        const data = await window.api.repo.search(HOST_ID_GITHUB, q, sort, order) as SavedRepo[]
+        const data = await window.api.repo.searchAll({ kind: 'trending-week' })
         _trendingWeekModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedTrendingWeek(data)
         setTrendingWeekRowRepos(data)
@@ -390,9 +384,7 @@ export default function Discover() {
         return
       }
       try {
-        const q = buildViewModeQuery('hidden-gems', '', '')
-        const { sort, order } = getViewModeSort('hidden-gems')
-        const data = await window.api.repo.search(HOST_ID_GITHUB, q, sort, order) as SavedRepo[]
+        const data = await window.api.repo.searchAll({ kind: 'hidden-gems' })
         _hiddenGemsModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedHiddenGems(data)
         setHiddenGemsRowRepos(data)
@@ -417,9 +409,7 @@ export default function Discover() {
         return
       }
       try {
-        const q = buildViewModeQuery('agents', '', '')
-        const { sort, order } = getViewModeSort('agents')
-        const data = await window.api.repo.search(HOST_ID_GITHUB, q, sort, order) as SavedRepo[]
+        const data = await window.api.repo.searchAll({ kind: 'topic', topic: 'ai-agent' })
         _agentsModuleCache = { repos: data, fetchedAt: Date.now() }
         saveCachedAgents(data)
         setAgentsRowRepos(data)
