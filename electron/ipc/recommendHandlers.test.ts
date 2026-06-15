@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { computeProfileHash } from './recommendHandlers'
-import type { GitHubRepo } from '../providers/github'
+import type { Repo } from '../../src/types/repo'
 
 // ---------------------------------------------------------------------------
 // Mock electron, DB, store, and external helpers BEFORE importing the handler
@@ -69,28 +69,31 @@ vi.mock('../services/engagementTracker', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeGitHubRepo(id: number): GitHubRepo {
+function makeGitHubRepo(id: number): Repo {
   return {
-    id,
-    full_name: `owner/repo-${id}`,
+    hostId: 'gh:api.github.com',
+    hostType: 'github',
+    hostNativeId: id,
+    fullName: `owner/repo-${id}`,
+    owner: 'owner',
     name: `repo-${id}`,
-    html_url: `https://github.com/owner/repo-${id}`,
-    owner: { login: 'owner', avatar_url: '' },
+    htmlUrl: `https://github.com/owner/repo-${id}`,
+    homepageUrl: null,
     description: 'test repo',
     language: 'TypeScript',
     topics: ['typescript'],
-    stargazers_count: 100,
-    forks_count: 10,
-    watchers_count: 100,
-    open_issues_count: 5,
-    size: 1000,
     license: null,
-    homepage: null,
-    updated_at: '2024-01-01T00:00:00Z',
-    pushed_at: '2024-01-01T00:00:00Z',
-    created_at: '2023-01-01T00:00:00Z',
-    default_branch: 'main',
+    defaultBranch: 'main',
     archived: false,
+    size: 1000,
+    stars: 100,
+    forks: 10,
+    watchers: 100,
+    openIssues: 5,
+    createdAt: '2023-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    pushedAt: '2024-01-01T00:00:00Z',
+    ownerAvatarUrl: '',
   }
 }
 

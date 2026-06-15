@@ -10,7 +10,6 @@ import { rankCandidates } from '../services/recommendationEngine'
 import { buildUserProfile } from '../services/userProfile'
 import { computeCorpusStats } from '../services/corpusStats'
 import { planQueries, fetchCandidates, type CandidateRepo } from '../services/recommendationFetcher'
-import { HOST_ID_GITHUB } from '../providers/types'
 import { getRecentClicks, pruneOldEvents } from '../services/engagementTracker'
 import { cascadeRepoId } from '../db-helpers'
 import type { RecommendationResponse, RecommendationItem } from '../../src/types/recommendation'
@@ -101,21 +100,20 @@ function upsertCandidates(
 
   db.transaction(() => {
     for (const repo of candidates) {
-      const rid = String(repo.id)
-      const hostId = repo._hostId ?? HOST_ID_GITHUB
-      cascadeRepoId(db, repo.owner.login, repo.name, rid)
+      const rid = String(repo.hostNativeId)
+      cascadeRepoId(db, repo.owner, repo.name, rid)
       const classified = classifyRepoBucket({
         name: repo.name,
         description: repo.description,
         topics: repo.topics ?? [],
       })
       upsert.run(
-        rid, hostId, repo.owner.login, repo.name, repo.description, repo.language,
-        JSON.stringify(repo.topics ?? []), repo.stargazers_count, repo.forks_count,
-        repo.license?.spdx_id ?? null, repo.homepage, repo.updated_at, repo.pushed_at,
-        repo.created_at ?? null,
-        now, `recommended:${profileHash}`, repo.watchers_count, repo.size, repo.open_issues_count,
-        repo.default_branch ?? 'main', repo.owner.avatar_url ?? null,
+        rid, repo.hostId, repo.owner, repo.name, repo.description, repo.language,
+        JSON.stringify(repo.topics ?? []), repo.stars, repo.forks,
+        repo.license, repo.homepageUrl, repo.updatedAt, repo.pushedAt,
+        repo.createdAt ?? null,
+        now, `recommended:${profileHash}`, repo.watchers, repo.size, repo.openIssues,
+        repo.defaultBranch, repo.ownerAvatarUrl,
         classified?.bucket ?? null, classified?.subType ?? null,
       )
     }
@@ -123,14 +121,14 @@ function upsertCandidates(
 
   // Non-blocking: extract dominant colour
   setImmediate(() => {
-    const needColor = candidates.filter(r => r.owner.avatar_url)
+    const needColor = candidates.filter(r => r.ownerAvatarUrl)
     void poolAll(needColor, 3, async (repo) => {
       const row = db.prepare('SELECT banner_color FROM repos WHERE owner = ? AND name = ?')
-        .get(repo.owner.login, repo.name) as { banner_color: string | null } | undefined
+        .get(repo.owner, repo.name) as { banner_color: string | null } | undefined
       if (row?.banner_color) return
-      const color = await extractDominantColor(repo.owner.avatar_url!)
+      const color = await extractDominantColor(repo.ownerAvatarUrl)
       db.prepare('UPDATE repos SET banner_color = ? WHERE owner = ? AND name = ?')
-        .run(JSON.stringify(color), repo.owner.login, repo.name)
+        .run(JSON.stringify(color), repo.owner, repo.name)
     })
   })
 }
@@ -140,9 +138,9 @@ function upsertCandidates(
 // ---------------------------------------------------------------------------
 function readBackRows(
   db: Database.Database,
-  githubRepos: Awaited<ReturnType<typeof fetchCandidates>>,
+  candidates: Awaited<ReturnType<typeof fetchCandidates>>,
 ): Map<string, RepoRow> {
-  const ids = githubRepos.map(c => String(c.id))
+  const ids = candidates.map(c => String(c.hostNativeId))
   if (ids.length === 0) return new Map()
   const placeholders = ids.map(() => '?').join(',')
   const rows = db.prepare(`SELECT * FROM repos WHERE id IN (${placeholders})`).all(...ids) as RepoRow[]
@@ -203,7 +201,7 @@ export async function getRecommendedHandler(
     const coldByIdMap = readBackRows(db, coldCandidates)
     const items: RecommendationItem[] = coldCandidates
       .map((repo): RecommendationItem | null => {
-        const row = coldByIdMap.get(String(repo.id))
+        const row = coldByIdMap.get(String(repo.hostNativeId))
         if (!row) return null
         return {
           repo: repoRowToSavedRepo(row), score: 0,
@@ -235,10 +233,10 @@ export async function getRecommendedHandler(
   const githubUsernameRow = db.prepare("SELECT value FROM settings WHERE key = 'github_username'").get() as { value: string } | undefined
   const githubUsername = githubUsernameRow?.value?.toLowerCase() ?? null
   candidates = candidates.filter((c) =>
-    !existingIds.has(String(c.id)) &&
-    !excludeSet.has(String(c.id)) &&
-    !profile.engagement.clickedRepoIds.has(String(c.id)) &&
-    (!githubUsername || c.owner.login.toLowerCase() !== githubUsername)
+    !existingIds.has(String(c.hostNativeId)) &&
+    !excludeSet.has(String(c.hostNativeId)) &&
+    !profile.engagement.clickedRepoIds.has(String(c.hostNativeId)) &&
+    (!githubUsername || c.owner.toLowerCase() !== githubUsername)
   )
 
   const ranked = rankCandidates(candidates, profile, corpus)
@@ -248,7 +246,7 @@ export async function getRecommendedHandler(
 
   const items: RecommendationItem[] = ranked
     .map((item): RecommendationItem | null => {
-      const row = byIdMap.get(String(item.repo.id))
+      const row = byIdMap.get(String(item.repo.hostNativeId))
       if (!row) return null
       return { ...item, repo: repoRowToSavedRepo(row) }
     })
@@ -267,7 +265,7 @@ export async function getRecommendedHandler(
       const coldByIdMap = readBackRows(db, coldCandidates)
       const fallbackItems: RecommendationItem[] = coldCandidates
         .map((repo): RecommendationItem | null => {
-          const row = coldByIdMap.get(String(repo.id))
+          const row = coldByIdMap.get(String(repo.hostNativeId))
           if (!row) return null
           return {
             repo: repoRowToSavedRepo(row), score: 0,
