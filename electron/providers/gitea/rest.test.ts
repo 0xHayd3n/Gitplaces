@@ -237,12 +237,20 @@ describe('starRepo / unstarRepo / isRepoStarred', () => {
     expect(url).toBe('https://codeberg.org/api/v1/user/starred/alice/demo')
     expect((init as { method: string }).method).toBe('PUT')
   })
+  it('star tolerates 304 (already starred) without throwing', async () => {
+    mockFetch.mockResolvedValue(makeResponse({}, {}, false, 304))
+    await expect(starRepo(BASE, 'tok', 'alice', 'demo')).resolves.toBeUndefined()
+  })
   it('unstar DELETEs the same path', async () => {
     mockFetch.mockResolvedValue(makeResponse({}, {}, true, 204))
     await unstarRepo(BASE, 'tok', 'alice', 'demo')
     const [url, init] = mockFetch.mock.calls[0]
     expect(url).toBe('https://codeberg.org/api/v1/user/starred/alice/demo')
     expect((init as { method: string }).method).toBe('DELETE')
+  })
+  it('unstar tolerates 404 (was not starred) without throwing', async () => {
+    mockFetch.mockResolvedValue(makeResponse({}, {}, false, 404))
+    await expect(unstarRepo(BASE, 'tok', 'alice', 'demo')).resolves.toBeUndefined()
   })
   it('isRepoStarred GETs /user/starred/{owner}/{name} and treats 204 as true, 404 as false', async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, {}, true, 204))
@@ -253,6 +261,28 @@ describe('starRepo / unstarRepo / isRepoStarred', () => {
   it('isRepoStarred returns false when no token is supplied (no auth → not starred)', async () => {
     expect(await isRepoStarred(BASE, null, 'alice', 'demo')).toBe(false)
     expect(mockFetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('getStarredRepos', () => {
+  beforeEach(() => mockFetch.mockReset())
+  it('fetches /user/starred?limit=50 and returns the repo array', async () => {
+    mockFetch.mockResolvedValue(makeResponse([
+      { id: 1, name: 'a', full_name: 'alice/a', owner: { id: 1, login: 'alice', avatar_url: '', html_url: '' },
+        description: null, website: null, default_branch: 'main', topics: [], html_url: '', size: 0,
+        stars_count: 0, forks_count: 0, watchers_count: 0, open_issues_count: 0,
+        created_at: '', updated_at: '', archived: false, private: false },
+    ]))
+    const { getStarredRepos } = await import('./rest')
+    const repos = await getStarredRepos(BASE, 'tok')
+    expect(repos).toHaveLength(1)
+    expect(repos[0].full_name).toBe('alice/a')
+    expect(mockFetch).toHaveBeenCalledWith('https://codeberg.org/api/v1/user/starred?limit=50', expect.any(Object))
+  })
+  it('throws on non-ok response', async () => {
+    mockFetch.mockResolvedValue(makeResponse({ message: 'unauthorized' }, {}, false, 401))
+    const { getStarredRepos } = await import('./rest')
+    await expect(getStarredRepos(BASE, 'tok')).rejects.toThrow(/Gitea API error: 401/)
   })
 })
 

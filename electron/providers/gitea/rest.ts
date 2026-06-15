@@ -150,6 +150,12 @@ export async function getRepo(
 
 const SEARCH_SORT = new Set(['stars', 'updated', 'forks', 'created'])
 
+// Default per-page = 50, NOT 100 like the GitLab parallel. Gitea's
+// /repos/search hard-caps `limit` at 50 server-side (Codeberg and most other
+// Gitea instances configure ROUTE_RATELIMIT / DEFAULT_PAGING_NUM around this
+// value). Requesting 100 silently returns 50 anyway. Phase 6's discoverMerge
+// caps each host at 10, so this default is only exercised by the Library /
+// starred views.
 export async function searchRepos(
   baseUrl: string,
   token: string | null,
@@ -355,6 +361,10 @@ export async function getStarredRepos(
   baseUrl: string,
   token: string,
 ): Promise<GiteaStarredRepo[]> {
+  // PHASE 6 FOLLOW-UP: single page only (limit=50). Phase 5 doesn't render a
+  // Gitea-aware Library view, so the first 50 entries are good enough; Phase 6
+  // can add Link-header pagination when multi-host library aggregation lands.
+  // Symmetric with the same limitation in gitlab/rest.ts → getStarredProjects.
   const url = api(baseUrl, '/user/starred?limit=50')
   const res = await fetch(url, { headers: giteaHeaders(token) })
   if (!res.ok) throw await readError(res, 'getStarredRepos')
