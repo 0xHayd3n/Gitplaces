@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest'
 import { rankCandidates, findAnchors } from './recommendationEngine'
 import { computeCorpusStats } from './corpusStats'
 import { buildUserProfile } from './userProfile'
-import type { GitHubRepo } from '../providers/github'
+import type { Repo } from '../../src/types/repo'
 
 const NOW = Date.UTC(2026, 3, 15)
 const DAY = 24 * 60 * 60 * 1000
@@ -27,19 +27,31 @@ function userRepo(o: any) {
   }
 }
 
-function ghRepo(o: any): GitHubRepo {
+function ghRepo(o: any): Repo {
   return {
-    id: o.id, full_name: `${o.owner ?? 'oo'}/${o.name ?? 'rr'}`, name: o.name ?? 'rr',
-    html_url: `https://github.com/${o.owner ?? 'oo'}/${o.name ?? 'rr'}`,
-    owner: { login: o.owner ?? 'oo', avatar_url: '' },
-    description: o.description ?? null, language: o.language ?? null,
-    topics: o.topics ?? [], stargazers_count: o.stars ?? 100,
-    forks_count: 0, watchers_count: 0, open_issues_count: 0, size: 0,
-    license: null, homepage: null,
-    updated_at: new Date(NOW).toISOString(),
-    pushed_at: o.pushed_at ?? new Date(NOW - 10 * DAY).toISOString(),
-    created_at: new Date(NOW - 365 * DAY).toISOString(),
-    default_branch: 'main', archived: o.archived ?? false,
+    hostId: 'gh:api.github.com',
+    hostType: 'github',
+    hostNativeId: o.id,
+    fullName: `${o.owner ?? 'oo'}/${o.name ?? 'rr'}`,
+    owner: o.owner ?? 'oo',
+    name: o.name ?? 'rr',
+    htmlUrl: `https://github.com/${o.owner ?? 'oo'}/${o.name ?? 'rr'}`,
+    homepageUrl: null,
+    description: o.description ?? null,
+    language: o.language ?? null,
+    topics: o.topics ?? [],
+    license: null,
+    defaultBranch: 'main',
+    archived: o.archived ?? false,
+    size: 0,
+    stars: o.stars ?? 100,
+    forks: 0,
+    watchers: 0,
+    openIssues: 0,
+    createdAt: new Date(NOW - 365 * DAY).toISOString(),
+    updatedAt: new Date(NOW).toISOString(),
+    pushedAt: o.pushed_at ?? new Date(NOW - 10 * DAY).toISOString(),
+    ownerAvatarUrl: '',
   }
 }
 
@@ -72,7 +84,7 @@ describe('rankCandidates (orchestrator)', () => {
       ghRepo({ id: 2, topics: ['rust'] }),
     ]
     const ranked = rankCandidates(candidates, profile, corpus, NOW)
-    expect(ranked[0].repo.id).toBe(2)
+    expect(ranked[0].repo.hostNativeId).toBe(2)
   })
 
   it('archived repos rank below non-archived even with topic match', () => {
@@ -84,7 +96,7 @@ describe('rankCandidates (orchestrator)', () => {
       ghRepo({ id: 2, topics: ['rust'], archived: false }),
     ]
     const ranked = rankCandidates(candidates, profile, corpus, NOW)
-    expect(ranked[0].repo.id).toBe(2)
+    expect(ranked[0].repo.hostNativeId).toBe(2)
   })
 
   it('filters out candidates with no anchors (Fix G: drop unexplainable recs)', () => {
@@ -96,7 +108,7 @@ describe('rankCandidates (orchestrator)', () => {
       ghRepo({ id: 2, topics: ['totally-unrelated-xyz'] }), // no topic/bucket/lang match → no anchor
     ]
     const ranked = rankCandidates(candidates, profile, corpus, NOW)
-    expect(ranked.map(r => r.repo.id)).toEqual([1])
+    expect(ranked.map(r => r.repo.hostNativeId)).toEqual([1])
   })
 
   it('falls back to top reranked when every candidate is anchorless (Fix G defensive)', () => {
@@ -125,9 +137,9 @@ describe('rankCandidates (orchestrator)', () => {
     ]
     const ranked = rankCandidates(candidates, profile, corpus, NOW)
     // #1 first by score; #3 should appear before #2 due to MMR diversity
-    expect(ranked[0].repo.id).toBe(1)
-    const id3Pos = ranked.findIndex(r => r.repo.id === 3)
-    const id2Pos = ranked.findIndex(r => r.repo.id === 2)
+    expect(ranked[0].repo.hostNativeId).toBe(1)
+    const id3Pos = ranked.findIndex(r => r.repo.hostNativeId === 3)
+    const id2Pos = ranked.findIndex(r => r.repo.hostNativeId === 2)
     expect(id3Pos).toBeLessThan(id2Pos)
   })
 })

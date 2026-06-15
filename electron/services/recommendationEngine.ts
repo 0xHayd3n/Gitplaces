@@ -1,6 +1,6 @@
 // electron/services/recommendationEngine.ts
 import type { CorpusStats, UserProfile, ScoreBreakdown, Anchor } from '../../src/types/recommendation'
-import type { GitHubRepo } from '../providers/github'
+import type { Repo } from '../../src/types/repo'
 import { classifyRepoBucket } from '../../src/lib/classifyRepoType'
 import { scoreTopic } from './signals/topicSignal'
 import { scoreDescription, tokenizeDescription } from './signals/descriptionSignal'
@@ -42,7 +42,7 @@ const ANCHOR_DIVERSIFY_POOL = 10
 const ANCHOR_USAGE_PENALTY = 0.3
 
 export interface RankedItem {
-  repo: GitHubRepo
+  repo: Repo
   score: number
   scoreBreakdown: ScoreBreakdown
   anchors: Anchor[]
@@ -59,10 +59,13 @@ interface ScoringCandidate {
   pushed_at: string | null
   archived: boolean
   owner: string
-  id: number
+  /** Composite host-prefixed id, e.g. "gh:api.github.com:42" — used inside
+   *  the engine for dedup. Replaces the legacy `id: number` since each host
+   *  has its own numeric id space and cross-host collisions are possible. */
+  id: string
 }
 
-function toScoringCandidate(repo: GitHubRepo): ScoringCandidate {
+function toScoringCandidate(repo: Repo): ScoringCandidate {
   const topics = Array.isArray(repo.topics) ? repo.topics : []
   const classification = classifyRepoBucket({
     name: repo.name,
@@ -75,11 +78,11 @@ function toScoringCandidate(repo: GitHubRepo): ScoringCandidate {
     type_bucket: classification?.bucket ?? null,
     type_sub:    classification?.subType ?? null,
     language:    repo.language ?? null,
-    stars:       repo.stargazers_count ?? 0,
-    pushed_at:   repo.pushed_at ?? null,
-    archived:    repo.archived ?? false,
-    owner:       repo.owner.login,
-    id:          repo.id,
+    stars:       repo.stars,
+    pushed_at:   repo.pushedAt,
+    archived:    repo.archived,
+    owner:       repo.owner,
+    id:          `${repo.hostId}:${repo.hostNativeId}`,
   }
 }
 
@@ -94,7 +97,7 @@ function safeParseTopics(raw: string | null): string[] {
 }
 
 export function rankCandidates(
-  candidates: GitHubRepo[],
+  candidates: Repo[],
   profile: UserProfile,
   corpus: CorpusStats,
   now?: number,
@@ -133,7 +136,7 @@ export function rankCandidates(
     const score = Math.max(0, positiveScore - categoryMismatchPenalty(sc, profile))
 
     const rerankRepo = {
-      id: String(repo.id),
+      id: sc.id,  // composite "${hostId}:${hostNativeId}" — unique across hosts
       topics: sc.topics,
       bucket: sc.type_bucket,
       sub:    sc.type_sub,
