@@ -11,9 +11,9 @@
 import type Database from 'better-sqlite3'
 import * as rest from './rest'
 import * as graphql from './graphql'
-import { githubUserToUser } from './normalize'
+import { githubUserToUser, githubRepoToRepo } from './normalize'
 import { HOST_ID_GITHUB, type ProviderCapabilities } from '../types'
-import type { User } from '../../../src/types/repo'
+import type { User, Repo } from '../../../src/types/repo'
 
 const CAPS: ProviderCapabilities = {
   vulnerabilityAlerts: true,
@@ -43,6 +43,36 @@ export class GitHubProvider {
   async getCurrentUser(token: string): Promise<User> {
     const raw = await rest.getUser(token)
     return githubUserToUser(raw)
+  }
+
+  // ── Canonical-shape repo wrappers ──────────────────────────────
+  //
+  // GitLab/Gitea providers return canonical `Repo` directly. These wrappers
+  // give the GitHub provider the same surface so repoHandlers consumes one
+  // shape regardless of host. The raw `getRepo` / `searchRepos` methods stay
+  // for GraphQL bundle paths and any callers that still need GitHub-native
+  // fields (`stargazers_count`, `license.spdx_id`, etc.).
+
+  async getRepoNormalized(
+    token: string | null,
+    owner: string,
+    name: string,
+    db?: Database.Database,
+  ): Promise<Repo> {
+    const raw = await rest.getRepo(token, owner, name, db)
+    return githubRepoToRepo(raw)
+  }
+
+  async searchReposNormalized(
+    token: string | null,
+    query: string,
+    perPage = 100,
+    sort = 'stars',
+    order = 'desc',
+    page = 1,
+  ): Promise<Repo[]> {
+    const items = await rest.searchRepos(token, query, perPage, sort, order, page)
+    return items.map(githubRepoToRepo)
   }
 
   // ── Repo metadata ──────────────────────────────────────────────
