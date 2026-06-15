@@ -639,24 +639,32 @@ export function registerRepoHandlers(): void {
     const saved = db.prepare('SELECT language FROM repos WHERE id = ?').get(`${owner}/${name}`) as { language: string | null } | undefined
     enqueueRepo({ repoId: `${owner}/${name}`, owner, name, language: saved?.language ?? null, priority: 'high' })
     setImmediate(async () => {
-      // PHASE 7 FOLLOW-UP: this stored_version probe is hard-wired to GitHub's
-      // /releases/latest endpoint. For Codeberg / GitLab / self-hosted hosts
-      // this fetch either 404s or hits an unrelated repo with the same slug —
-      // a Phase 7 task should route through `provider.getReleases` instead.
-      const token = getToken(hostId) ?? null
-      const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
-      if (token) headers.Authorization = `Bearer ${token}`
       let storedVersion: string | null = null
       try {
-        const relRes = await fetch(`https://api.github.com/repos/${owner}/${name}/releases/latest`, { headers })
-        if (relRes.ok) {
-          const rel = await relRes.json() as { tag_name: string }
-          storedVersion = rel.tag_name
-        } else {
-          const dbRow = db.prepare('SELECT pushed_at FROM repos WHERE owner = ? AND name = ?').get(owner, name) as { pushed_at: string | null } | undefined
+        const { provider, token } = resolveAny(hostId)
+        const releases = await provider.getReleases(token, owner, name)
+        if (Array.isArray(releases) && releases.length > 0) {
+          // GitHubProvider.getReleases returns raw GitHubRelease[] (snake_case
+          // `tag_name`). GitLab/Gitea providers return canonical Release[]
+          // (camelCase `tagName`). Read whichever is present.
+          const first = releases[0] as unknown as Record<string, unknown>
+          storedVersion =
+            (typeof first.tag_name === 'string' ? first.tag_name : null) ??
+            (typeof first.tagName === 'string' ? first.tagName : null)
+        }
+        if (!storedVersion) {
+          const dbRow = db.prepare('SELECT pushed_at FROM repos WHERE owner = ? AND name = ?')
+            .get(owner, name) as { pushed_at: string | null } | undefined
           storedVersion = dbRow?.pushed_at ?? null
         }
-      } catch { /* network failure — leave stored_version null */ }
+      } catch {
+        // Provider unknown or network failure — fall back to pushed_at if available.
+        try {
+          const dbRow = db.prepare('SELECT pushed_at FROM repos WHERE owner = ? AND name = ?')
+            .get(owner, name) as { pushed_at: string | null } | undefined
+          storedVersion = dbRow?.pushed_at ?? null
+        } catch { /* still null */ }
+      }
       const isFork = await checkIsFork(owner, name)
       db.prepare('UPDATE repos SET stored_version = ?, is_forked = ? WHERE owner = ? AND name = ?')
         .run(storedVersion, isFork ? 1 : 0, owner, name)
