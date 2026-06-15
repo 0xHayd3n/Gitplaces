@@ -131,6 +131,7 @@ declare global {
         setToken: (hostId: string, token: string) => Promise<{ user: User }>
         clearToken: (hostId: string) => Promise<void>
         getConnectedUser: (hostId: string) => Promise<User | null>
+        getCapabilities: (hostId: string) => Promise<import('../electron/providers/types').ProviderCapabilities | null>
         startDeviceFlow: (hostId: string) => Promise<{
           deviceCode: string
           userCode: string

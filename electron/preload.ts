@@ -122,6 +122,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('hosts:clearToken', hostId) as Promise<void>,
     getConnectedUser: (hostId: string) =>
       ipcRenderer.invoke('hosts:getConnectedUser', hostId) as Promise<import('../src/types/repo').User | null>,
+    getCapabilities: (hostId: string) =>
+      ipcRenderer.invoke('hosts:getCapabilities', hostId) as Promise<import('./providers/types').ProviderCapabilities | null>,
     startDeviceFlow: (hostId: string) =>
       ipcRenderer.invoke('hosts:startDeviceFlow', hostId) as Promise<{
         deviceCode: string

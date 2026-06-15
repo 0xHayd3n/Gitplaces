@@ -134,6 +134,12 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
     }
   })
 
+  ipcMain.handle('hosts:getCapabilities', (_event, hostId: string) => {
+    const provider = getAnyProvider(hostId)
+    if (!provider) return null
+    return provider.capabilities()
+  })
+
   // ── Device flow ─────────────────────────────────────────────────
   ipcMain.handle('hosts:startDeviceFlow', async (_event, hostId: string) => {
     const provider = getAnyProvider(hostId)
