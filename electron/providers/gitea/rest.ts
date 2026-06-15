@@ -316,16 +316,24 @@ export async function getTreeBySha(
   name: string,
   treeSha: string,
 ): Promise<GiteaTreeEntry[]> {
-  // PHASE 6 FOLLOW-UP: Gitea's tree endpoint may truncate large repos
-  // (response.truncated === true) and supports per_page pagination via
-  // ?page=&per_page=. Phase 5's UI never invokes this (renderer doesn't
-  // browse non-GitHub repos yet) so the single-page recursive call is good
-  // enough; Phase 6 can add a pagination loop when wiring multi-host browsing.
-  const url = api(baseUrl, `/repos/${owner}/${name}/git/trees/${encodeURIComponent(treeSha)}?recursive=true`)
-  const res = await fetch(url, { headers: giteaHeaders(token) })
-  if (!res.ok) throw await readError(res, 'getTreeBySha')
-  const body = await res.json() as GiteaTreeResponse
-  return Array.isArray(body?.tree) ? body.tree : []
+  // Gitea returns `truncated: true` when the recursive tree exceeds the
+  // server's per-call cap (commonly 1000 entries). Walk pages via
+  // ?page=&per_page= until the response is no longer truncated. Hard-cap at
+  // 200 pages (~200k entries) so a misbehaving instance can't loop forever.
+  const all: GiteaTreeEntry[] = []
+  let page = 1
+  const MAX_PAGES = 200
+  for (; page <= MAX_PAGES; page++) {
+    const url = api(baseUrl, `/repos/${owner}/${name}/git/trees/${encodeURIComponent(treeSha)}?recursive=true&per_page=1000&page=${page}`)
+    const res = await fetch(url, { headers: giteaHeaders(token) })
+    if (!res.ok) throw await readError(res, 'getTreeBySha')
+    const body = await res.json() as GiteaTreeResponse
+    const entries = Array.isArray(body?.tree) ? body.tree : []
+    all.push(...entries)
+    if (entries.length === 0) break
+    if (!body?.truncated) break
+  }
+  return all
 }
 
 export async function getBlobBySha(

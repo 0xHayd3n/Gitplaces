@@ -337,7 +337,7 @@ describe('getStarredRepos', () => {
 
 describe('getTreeBySha', () => {
   beforeEach(() => mockFetch.mockReset())
-  it('hits /git/trees/{sha}?recursive=true', async () => {
+  it('hits /git/trees/{sha}?recursive=true&per_page=1000&page=1', async () => {
     mockFetch.mockResolvedValue(makeResponse({
       sha: 'sha-root',
       tree: [{ sha: 'sha-a', path: 'README.md', type: 'blob', mode: '100644', size: 12 }],
@@ -348,11 +348,46 @@ describe('getTreeBySha', () => {
     expect(entries[0].path).toBe('README.md')
     expect(entries[0].type).toBe('blob')
     const call = mockFetch.mock.calls[0][0] as string
-    expect(call).toBe('https://codeberg.org/api/v1/repos/alice/demo/git/trees/sha-root?recursive=true')
+    expect(call).toBe('https://codeberg.org/api/v1/repos/alice/demo/git/trees/sha-root?recursive=true&per_page=1000&page=1')
   })
   it('returns [] when the response envelope is malformed', async () => {
     mockFetch.mockResolvedValue(makeResponse({ sha: 'sha-root' }))
     expect(await getTreeBySha(BASE, 'tok', 'alice', 'demo', 'sha-root')).toEqual([])
+  })
+  it('walks pages while truncated:true, concatenating tree entries', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse({
+        sha: 'sha-root',
+        tree: [{ sha: 'sha-a', path: 'a', type: 'blob', mode: '100644' }],
+        truncated: true,
+      }))
+      .mockResolvedValueOnce(makeResponse({
+        sha: 'sha-root',
+        tree: [{ sha: 'sha-b', path: 'b', type: 'blob', mode: '100644' }],
+        truncated: true,
+      }))
+      .mockResolvedValueOnce(makeResponse({
+        sha: 'sha-root',
+        tree: [{ sha: 'sha-c', path: 'c', type: 'blob', mode: '100644' }],
+        truncated: false,
+      }))
+    const entries = await getTreeBySha(BASE, 'tok', 'alice', 'demo', 'sha-root')
+    expect(entries.map(e => e.path)).toEqual(['a', 'b', 'c'])
+    expect(mockFetch).toHaveBeenCalledTimes(3)
+    expect((mockFetch.mock.calls[1][0] as string)).toContain('page=2')
+    expect((mockFetch.mock.calls[2][0] as string)).toContain('page=3')
+  })
+  it('stops paginating if a page returns no entries (defensive guard)', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse({
+        sha: 'sha-root',
+        tree: [{ sha: 'sha-a', path: 'a', type: 'blob', mode: '100644' }],
+        truncated: true,
+      }))
+      .mockResolvedValueOnce(makeResponse({ sha: 'sha-root', tree: [], truncated: true }))
+    const entries = await getTreeBySha(BASE, 'tok', 'alice', 'demo', 'sha-root')
+    expect(entries).toHaveLength(1)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
   })
 })
 
