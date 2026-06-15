@@ -22,7 +22,16 @@
 import { etagFetch } from '../../githubFetch'
 import type Database from 'better-sqlite3'
 
-const ENDPOINT = 'https://api.github.com/graphql'
+const DEFAULT_GRAPHQL_ENDPOINT = 'https://api.github.com/graphql'
+
+/** Compute the GraphQL endpoint URL for a given GitHub baseUrl.
+ *  - api.github.com → api.github.com/graphql
+ *  - GHE github.acme.com/api/v3 → github.acme.com/api/graphql */
+export function graphqlEndpointFor(baseUrl: string): string {
+  if (baseUrl === 'https://api.github.com') return DEFAULT_GRAPHQL_ENDPOINT
+  const root = baseUrl.replace(/\/api\/v3\/?$/, '').replace(/\/+$/, '')
+  return `${root}/api/graphql`
+}
 
 const REPO_BUNDLE_QUERY = /* GraphQL */ `
   query RepoBundle($owner: String!, $name: String!) {
@@ -248,6 +257,7 @@ export async function fetchRepoBundle(
   token: string,
   owner: string,
   name: string,
+  graphqlUrl: string = DEFAULT_GRAPHQL_ENDPOINT,
 ): Promise<RepoBundle | null> {
   const headers: HeadersInit = {
     Authorization: `bearer ${token}`,
@@ -259,7 +269,7 @@ export async function fetchRepoBundle(
   // GraphQL POST requests don't benefit from ETag/If-None-Match (the etag
   // depends on the request body). We still go direct; the surrounding TTL
   // caches in main.ts handle warm-visit deduplication for the underlying data.
-  const res = await fetch(ENDPOINT, {
+  const res = await fetch(graphqlUrl, {
     method: 'POST',
     headers,
     body,
@@ -313,6 +323,7 @@ export async function fetchLastCommitsForPaths(
   name: string,
   branch: string,
   paths: readonly string[],
+  graphqlUrl: string = DEFAULT_GRAPHQL_ENDPOINT,
 ): Promise<Map<string, LastCommitInfo | null>> {
   const result = new Map<string, LastCommitInfo | null>()
   if (paths.length === 0) return result
@@ -347,7 +358,7 @@ export async function fetchLastCommitsForPaths(
       'Content-Type': 'application/json',
     }
 
-    const res = await fetch(ENDPOINT, {
+    const res = await fetch(graphqlUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({ query, variables }),
