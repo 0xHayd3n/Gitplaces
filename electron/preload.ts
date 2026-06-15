@@ -126,6 +126,18 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('hosts:getCapabilities', hostId) as Promise<import('./providers/types').ProviderCapabilities | null>,
     healthCheck: () =>
       ipcRenderer.invoke('hosts:healthCheck') as Promise<Record<string, { ok: true } | { ok: false; error: string }>>,
+    onCapabilitiesChanged: (cb: (event: { hostId: string }) => void) => {
+      const wrapper = (_: unknown, data: { hostId: string }) => cb(data)
+      callbackWrappers.set(cb, wrapper)
+      ipcRenderer.on('hosts:capabilities-changed', wrapper)
+    },
+    offCapabilitiesChanged: (cb: (event: { hostId: string }) => void) => {
+      const wrapper = callbackWrappers.get(cb)
+      if (wrapper) {
+        ipcRenderer.removeListener('hosts:capabilities-changed', wrapper)
+        callbackWrappers.delete(cb)
+      }
+    },
     startDeviceFlow: (hostId: string) =>
       ipcRenderer.invoke('hosts:startDeviceFlow', hostId) as Promise<{
         deviceCode: string

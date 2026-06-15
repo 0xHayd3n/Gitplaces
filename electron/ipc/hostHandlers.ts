@@ -60,6 +60,16 @@ function formatProbeError(v: ServerVersionFailure): string {
   }
 }
 
+function broadcastCapabilitiesChanged(
+  getMainWindow: () => BrowserWindow | null,
+  hostId: string,
+): void {
+  const win = getMainWindow()
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('hosts:capabilities-changed', { hostId })
+  }
+}
+
 /**
  * Registers every `hosts:*` IPC handler. The `getMainWindow` callback gives
  * the login-popup a parent BrowserWindow — main.ts owns the singleton
@@ -81,6 +91,7 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
     }
     clearToken(hostId)
     removeHost(hostId)
+    broadcastCapabilitiesChanged(getMainWindow, hostId)
   })
 
   ipcMain.handle('hosts:probe', async (_event, input: ProbeInput): Promise<ProbeResult> => {
@@ -117,6 +128,7 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
       const db = getDb(app.getPath('userData'))
       db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('github_username', user.login)
     }
+    broadcastCapabilitiesChanged(getMainWindow, hostId)
     return { user }
   })
 
@@ -127,6 +139,7 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
       const db = getDb(app.getPath('userData'))
       db.prepare('DELETE FROM settings WHERE key = ?').run('github_username')
     }
+    broadcastCapabilitiesChanged(getMainWindow, hostId)
   })
 
   ipcMain.handle('hosts:getConnectedUser', async (_event, hostId: string) => {
@@ -189,6 +202,7 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
         db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('github_username', user.login)
         initTopicCache(token).catch(() => {}) // Non-blocking
       }
+      broadcastCapabilitiesChanged(getMainWindow, hostId)
       return { user }
     } finally {
       closeLoginPopup()

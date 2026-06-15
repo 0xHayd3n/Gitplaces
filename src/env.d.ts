@@ -133,6 +133,8 @@ declare global {
         getConnectedUser: (hostId: string) => Promise<User | null>
         getCapabilities: (hostId: string) => Promise<import('../electron/providers/types').ProviderCapabilities | null>
         healthCheck: () => Promise<Record<string, { ok: true } | { ok: false; error: string }>>
+        onCapabilitiesChanged: (cb: (event: { hostId: string }) => void) => void
+        offCapabilitiesChanged: (cb: (event: { hostId: string }) => void) => void
         startDeviceFlow: (hostId: string) => Promise<{
           deviceCode: string
           userCode: string
