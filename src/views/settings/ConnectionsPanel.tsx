@@ -440,7 +440,7 @@ export default function ConnectionsPanel() {
                   >
                     <option value="gitlab">GitLab</option>
                     <option value="gitea">Gitea</option>
-                    <option value="github">GitHub Enterprise (probe only)</option>
+                    <option value="github">GitHub Enterprise</option>
                   </select>
                 </label>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 320px' }}>
