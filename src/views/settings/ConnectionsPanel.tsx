@@ -69,7 +69,7 @@ export default function ConnectionsPanel() {
 
   // Add-a-host form state.
   const [showAddForm, setShowAddForm] = useState(false)
-  const [addType, setAddType] = useState<'gitlab' | 'gitea'>('gitlab')
+  const [addType, setAddType] = useState<'github' | 'gitlab' | 'gitea'>('gitlab')
   const [addBaseUrl, setAddBaseUrl] = useState('')
   const [addLabel, setAddLabel] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
@@ -435,11 +435,12 @@ export default function ConnectionsPanel() {
                   <select
                     className="settings-input"
                     value={addType}
-                    onChange={e => setAddType(e.target.value as 'gitlab' | 'gitea')}
+                    onChange={e => setAddType(e.target.value as 'github' | 'gitlab' | 'gitea')}
                     disabled={addBusy}
                   >
                     <option value="gitlab">GitLab</option>
                     <option value="gitea">Gitea</option>
+                    <option value="github">GitHub Enterprise (probe only)</option>
                   </select>
                 </label>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 320px' }}>

@@ -32,6 +32,7 @@ import { getDb } from '../db'
 import { initTopicCache } from '../services/topicCacheService'
 import { getServerVersion as getGitLabServerVersion } from '../providers/gitlab/rest'
 import { getServerVersion as getGiteaServerVersion } from '../providers/gitea/rest'
+import { getServerVersion as getGitHubServerVersion } from '../providers/github/rest'
 
 interface AddHostInput {
   type: HostType
@@ -105,8 +106,9 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
 
   ipcMain.handle('hosts:probe', async (_event, input: ProbeInput): Promise<ProbeResult> => {
     if (input.type === 'github') {
-      if (input.baseUrl === 'https://api.github.com') return { ok: true }
-      return { ok: false, error: 'GitHub Enterprise probes are not supported yet' }
+      const v = await getGitHubServerVersion(input.baseUrl)
+      if (v.ok) return { ok: true }
+      return { ok: false, error: formatProbeError(v) }
     }
 
     if (input.type === 'gitlab') {

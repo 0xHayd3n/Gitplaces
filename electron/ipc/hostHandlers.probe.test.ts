@@ -227,3 +227,49 @@ describe('hosts:probe — kind-specific surfacing', () => {
     expect(out.error).toMatch(/did not respond as a Gitea/)
   })
 })
+
+describe('hosts:probe — GitHub Enterprise', () => {
+  beforeEach(() => mockFetch.mockReset())
+
+  it('short-circuits api.github.com with ok:true and no network call', async () => {
+    const probe = handlers.get('hosts:probe')!
+    const out = await probe({}, { type: 'github', baseUrl: 'https://api.github.com' })
+    expect(out).toEqual({ ok: true })
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('hits /api/v3/meta for a GHE base URL and accepts an installed_version response', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true, status: 200,
+      json: () => Promise.resolve({ installed_version: '3.10.0' }),
+      headers: { get: () => null },
+    })
+    const probe = handlers.get('hosts:probe')!
+    const out = await probe({}, { type: 'github', baseUrl: 'https://github.acme.com' })
+    expect(out).toEqual({ ok: true })
+    expect(mockFetch).toHaveBeenCalledWith('https://github.acme.com/api/v3/meta', expect.any(Object))
+  })
+
+  it('rejects when /api/v3/meta lacks installed_version (probably api.github.com or a misdirected response)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true, status: 200,
+      json: () => Promise.resolve({ verifiable_password_authentication: true }),
+      headers: { get: () => null },
+    })
+    const probe = handlers.get('hosts:probe')!
+    const out = await probe({}, { type: 'github', baseUrl: 'https://wrong.example' }) as { ok: boolean; error: string }
+    expect(out.ok).toBe(false)
+    expect(out.error).toMatch(/did not respond as a GitHub Enterprise/)
+  })
+
+  it('surfaces TLS errors for GHE URLs', async () => {
+    mockFetch.mockImplementationOnce(() =>
+      Promise.reject(Object.assign(new TypeError('fetch failed'), { cause: { code: 'CERT_HAS_EXPIRED' } })),
+    )
+    const probe = handlers.get('hosts:probe')!
+    const out = await probe({}, { type: 'github', baseUrl: 'https://expired.acme.com' }) as { ok: boolean; error: string }
+    expect(out.ok).toBe(false)
+    expect(out.error).toMatch(/TLS handshake failed/i)
+    expect(out.error).toMatch(/CERT_HAS_EXPIRED/)
+  })
+})

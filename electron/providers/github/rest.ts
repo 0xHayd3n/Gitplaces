@@ -2,6 +2,86 @@ export const CLIENT_ID = 'Ov23liJxy53KWDh27mQx'
 const BASE = 'https://api.github.com'
 const SCOPE = 'read:user,repo'
 
+// ── Server version probe (GHE detection) ────────────────────────────────────
+//
+// GitHub Enterprise Server exposes /api/v3/meta with an `installed_version`
+// field; public api.github.com's /meta returns the same shape WITHOUT that
+// field. Phase 7 wires the probe so users can validate a GHE URL before
+// adding it. Full GHE operations (setToken, repo:get, etc.) are NOT yet
+// plumbed — every other function in this file hardcodes BASE — so a gh:
+// host other than api.github.com gets recorded in hostConfig but the
+// registry returns null for it, meaning repo:* / hosts:setToken against it
+// throw "Unknown host" with a clear message. Full GHE integration is Phase
+// 8 scope (widening every BASE reference here + graphql.ts + the registry).
+
+export type GitHubServerVersionResult =
+  | { ok: true; version: string; flavor: 'github.com' | 'ghe' }
+  | { ok: false; errorKind: 'tls' | 'network' | 'http' | 'json'; error: string }
+
+const GH_TLS_CODE_RE = /^(CERT_|SELF_SIGNED|DEPTH_ZERO|UNABLE_TO_VERIFY|ERR_TLS|ERR_SSL)/i
+const GH_NETWORK_CODE_RE = /^(ENOTFOUND|ECONNREFUSED|ECONNRESET|EHOSTUNREACH|ETIMEDOUT|EPIPE|ENETUNREACH|EAI_AGAIN)$/
+
+function classifyGhFetchError(err: unknown, baseUrl: string): GitHubServerVersionResult {
+  const cause = (err as { cause?: { code?: string; message?: string } })?.cause
+  const code = typeof cause?.code === 'string' ? cause.code : ''
+  if (GH_TLS_CODE_RE.test(code)) {
+    return {
+      ok: false,
+      errorKind: 'tls',
+      error: `TLS handshake failed (self-signed cert? expired? — ${code})`,
+    }
+  }
+  if (GH_NETWORK_CODE_RE.test(code)) {
+    return {
+      ok: false,
+      errorKind: 'network',
+      error: `Could not reach ${baseUrl} — check the URL (${code})`,
+    }
+  }
+  const msg = (err as Error)?.message ?? String(err)
+  return {
+    ok: false,
+    errorKind: 'network',
+    error: `Could not reach ${baseUrl} — check the URL (${msg})`,
+  }
+}
+
+/** Probe a GitHub instance. For public github.com (`https://api.github.com`)
+ *  returns a fast-path success without a network round-trip. For everything
+ *  else, hits `/api/v3/meta` and looks for the `installed_version` field that
+ *  GHE includes and api.github.com omits. */
+export async function getServerVersion(baseUrl: string): Promise<GitHubServerVersionResult> {
+  if (baseUrl === 'https://api.github.com' || baseUrl === BASE) {
+    return { ok: true, version: 'github.com', flavor: 'github.com' }
+  }
+  const url = `${baseUrl.replace(/\/+$/, '')}/api/v3/meta`
+  let res: Response
+  try {
+    res = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } })
+  } catch (err) {
+    return classifyGhFetchError(err, baseUrl)
+  }
+  if (!res.ok) {
+    let body = ''
+    try { body = (await res.text()).slice(0, 200) } catch { /* ignore */ }
+    return {
+      ok: false,
+      errorKind: 'http',
+      error: body ? `HTTP ${res.status} — ${body}` : `HTTP ${res.status}`,
+    }
+  }
+  let body: { installed_version?: unknown }
+  try {
+    body = await res.json() as { installed_version?: unknown }
+  } catch {
+    return { ok: false, errorKind: 'json', error: `${baseUrl} did not respond as a GitHub Enterprise instance (invalid JSON)` }
+  }
+  if (typeof body?.installed_version !== 'string' || body.installed_version.length === 0) {
+    return { ok: false, errorKind: 'json', error: `${baseUrl} did not respond as a GitHub Enterprise instance (no installed_version in /api/v3/meta)` }
+  }
+  return { ok: true, version: body.installed_version, flavor: 'ghe' }
+}
+
 // Accept null — omit Authorization header for unauthenticated calls (60 req/hr)
 export function githubHeaders(token: string | null): Record<string, string> {
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
