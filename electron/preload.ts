@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('repo:get', hostId, owner, name) as Promise<import('../src/types/repo').SavedRepo | null>,
     search: (hostId: string, query: string, sort?: string, order?: string, page?: number) =>
       ipcRenderer.invoke('repo:search', hostId, query, sort, order, page) as Promise<import('../src/types/repo').Repo[]>,
+    searchAll: (query: import('./providers/discoverMerge').UnifiedQuery) =>
+      ipcRenderer.invoke('repo:searchAll', query) as Promise<import('../src/types/repo').SavedRepo[]>,
     getReadme: (hostId: string, owner: string, name: string) =>
       ipcRenderer.invoke('repo:getReadme', hostId, owner, name) as Promise<string | null>,
     getFileContent: (hostId: string, owner: string, name: string, path: string) =>

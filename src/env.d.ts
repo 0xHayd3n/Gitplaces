@@ -50,6 +50,7 @@ declare global {
         getOgImage: (owner: string, name: string) => Promise<string | null>
         get: (hostId: string, owner: string, name: string) => Promise<SavedRepo | null>
         search: (hostId: string, query: string, sort?: string, order?: string, page?: number) => Promise<Repo[]>
+        searchAll: (query: import('../electron/providers/discoverMerge').UnifiedQuery) => Promise<SavedRepo[]>
         getReadme: (hostId: string, owner: string, name: string) => Promise<string | null>
         getFileContent: (hostId: string, owner: string, name: string, path: string) => Promise<string | null>
         getReleases: (hostId: string, owner: string, name: string) => Promise<Release[] | null>

@@ -7,13 +7,14 @@
 
 import { ipcMain, app } from 'electron'
 import { getDb } from '../db'
-import { getProvider } from '../providers/registry'
+import { getProvider, getAnyProvider, type AnyProvider } from '../providers/registry'
 import { getToken } from '../providers/tokenStore'
 import {
-  githubRepoToRepo,
   githubReleaseToRelease,
-  githubStarredToStarredEntry,
+  githubRepoToRepo,
 } from '../providers/github/normalize'
+import { listHosts } from '../providers/hostConfig'
+import { searchAllHosts, type UnifiedQuery } from '../providers/discoverMerge'
 import { repoRowToSavedRepo } from '../repoNormalize'
 import { classifyRepoBucket } from '../../src/lib/classifyRepoType'
 import { extractDominantColor } from '../color-extractor'
@@ -26,13 +27,101 @@ import { enqueueRepo } from '../services/verificationService'
 import { LRUCache } from '../lruCache'
 import type { RepoRow } from '../db-row-types'
 import type { GitHubProvider, LastCommitInfo, CompareSummary } from '../providers/github'
-import type { SavedRepo } from '../../src/types/repo'
+import type { Repo, SavedRepo, StarredEntry } from '../../src/types/repo'
 
-function resolve(hostId: string) {
+/** Narrow accessor: returns only when the host is GitHub. Use for handlers
+ *  that call GitHub-specific methods (fetchBundle, getCompare, getReceivedEvents,
+ *  getMyRepos, compareRefs, getLastCommitsForPaths). */
+function resolve(hostId: string): { provider: GitHubProvider; token: string | null } {
   const provider = getProvider(hostId)
   if (!provider) throw new Error(`Unknown host: ${hostId}`)
   const token = getToken(hostId)
-  return { provider: provider as GitHubProvider, token }
+  return { provider, token }
+}
+
+/** Wide accessor: returns any registered provider. Use for handlers whose
+ *  contract maps onto every host (getReadme, getReleases, star, etc.). */
+function resolveAny(hostId: string): { provider: AnyProvider; token: string | null } {
+  const provider = getAnyProvider(hostId)
+  if (!provider) throw new Error(`Unknown host: ${hostId}`)
+  const token = getToken(hostId)
+  return { provider, token }
+}
+
+/** Shared upsert helper for `repo:search` and `repo:searchAll`. Writes each
+ *  canonical Repo into the DB tagged with its hostId, kicks off background
+ *  banner-color extraction, and returns the resulting SavedRepo[] (read back
+ *  from the DB so caller-visible state matches whatever discovered_at /
+ *  banner_color / saved_at the row had). */
+function upsertReposToDb(
+  db: ReturnType<typeof getDb>,
+  items: Repo[],
+  discoverQuery: string,
+): SavedRepo[] {
+  const now = new Date().toISOString()
+  const upsert = db.prepare(`
+    INSERT INTO repos (id, host_id, owner, name, description, language, topics, stars, forks, license,
+                       homepage, updated_at, pushed_at, created_at, saved_at, type, banner_svg,
+                       discovered_at, discover_query, watchers, size, open_issues, default_branch, avatar_url,
+                       type_bucket, type_sub)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      host_id        = excluded.host_id,
+      owner          = excluded.owner,
+      name           = excluded.name,
+      description    = excluded.description,
+      language       = excluded.language,
+      topics         = excluded.topics,
+      stars          = excluded.stars,
+      forks          = excluded.forks,
+      updated_at     = excluded.updated_at,
+      pushed_at      = excluded.pushed_at,
+      created_at     = excluded.created_at,
+      discovered_at  = excluded.discovered_at,
+      discover_query = excluded.discover_query,
+      watchers       = excluded.watchers,
+      size           = excluded.size,
+      open_issues    = excluded.open_issues,
+      default_branch = excluded.default_branch,
+      avatar_url     = COALESCE(excluded.avatar_url, repos.avatar_url),
+      saved_at       = repos.saved_at,
+      banner_color   = repos.banner_color,
+      type_bucket    = excluded.type_bucket,
+      type_sub       = excluded.type_sub
+  `)
+
+  db.transaction(() => {
+    for (const repo of items) {
+      const rid = String(repo.hostNativeId)
+      cascadeRepoId(db, repo.owner, repo.name, rid)
+      const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: repo.topics })
+      upsert.run(
+        rid, repo.hostId, repo.owner, repo.name, repo.description, repo.language,
+        JSON.stringify(repo.topics), repo.stars, repo.forks,
+        repo.license, repo.homepageUrl, repo.updatedAt, repo.pushedAt,
+        repo.createdAt,
+        now, discoverQuery, repo.watchers, repo.size, repo.openIssues,
+        repo.defaultBranch, repo.ownerAvatarUrl,
+        classified?.bucket ?? null, classified?.subType ?? null,
+      )
+    }
+  })()
+
+  setImmediate(() => {
+    void poolAll(items.filter(r => r.ownerAvatarUrl), 3, async (repo) => {
+      const row = db.prepare('SELECT banner_color FROM repos WHERE owner = ? AND name = ?')
+        .get(repo.owner, repo.name) as { banner_color: string | null } | undefined
+      if (row?.banner_color) return
+      const color = await extractDominantColor(repo.ownerAvatarUrl)
+      db.prepare('UPDATE repos SET banner_color = ? WHERE owner = ? AND name = ?')
+        .run(JSON.stringify(color), repo.owner, repo.name)
+    })
+  })
+
+  return items
+    .map(r => db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(r.owner, r.name) as RepoRow | undefined)
+    .filter((row): row is RepoRow => Boolean(row))
+    .map(repoRowToSavedRepo)
 }
 
 // ── In-memory caches (mirror the github:* equivalents in main.ts) ────────────
@@ -51,7 +140,7 @@ const BRANCH_TTL = 5 * 60 * 1000
 export function registerRepoHandlers(): void {
   // ── Read ────────────────────────────────────────────────────────
   ipcMain.handle('repo:get', async (_event, hostId: string, owner: string, name: string) => {
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     if (!token) return null
     const db = getDb(app.getPath('userData'))
 
@@ -60,24 +149,30 @@ export function registerRepoHandlers(): void {
     ).get(owner, name, Date.now() - REPO_FETCH_TTL_MS) as RepoRow | undefined
     if (fresh) return repoRowToSavedRepo(fresh)
 
-    let repo: Awaited<ReturnType<GitHubProvider['getRepo']>>
+    let repo: Repo
     try {
-      repo = await provider.getRepo(token, owner, name, db)
+      // GitHub's narrow surface still exposes the raw getRepo for the GraphQL
+      // bundle path; getRepoNormalized wraps it. GitLab/Gitea only expose
+      // getRepo (already canonical). The `in` check dispatches at runtime.
+      repo = await ('getRepoNormalized' in provider
+        ? provider.getRepoNormalized(token, owner, name, db)
+        : provider.getRepo(token, owner, name))
     } catch {
       const row = db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(owner, name) as RepoRow | undefined
       return row ? repoRowToSavedRepo(row) : null
     }
 
-    const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: repo.topics ?? [] })
-    const rid = String(repo.id)
+    const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: repo.topics })
+    const rid = String(repo.hostNativeId)
     cascadeRepoId(db, owner, name, rid)
     db.prepare(`
-      INSERT INTO repos (id, owner, name, description, language, topics, stars, forks, license,
+      INSERT INTO repos (id, host_id, owner, name, description, language, topics, stars, forks, license,
                          homepage, updated_at, pushed_at, created_at, saved_at, type, banner_svg,
                          discovered_at, discover_query, watchers, size, open_issues, default_branch, avatar_url,
                          type_bucket, type_sub)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
+        host_id        = excluded.host_id,
         owner          = excluded.owner,
         name           = excluded.name,
         description    = excluded.description,
@@ -100,23 +195,23 @@ export function registerRepoHandlers(): void {
         type_bucket    = excluded.type_bucket,
         type_sub       = excluded.type_sub
     `).run(
-      String(repo.id), owner, name, repo.description, repo.language,
-      JSON.stringify(repo.topics ?? []), repo.stargazers_count, repo.forks_count,
-      repo.license?.spdx_id ?? null, repo.homepage, repo.updated_at, repo.pushed_at,
-      repo.created_at ?? null,
-      repo.watchers_count, repo.size, repo.open_issues_count,
-      repo.default_branch ?? 'main', repo.owner.avatar_url ?? null,
+      rid, hostId, owner, name, repo.description, repo.language,
+      JSON.stringify(repo.topics), repo.stars, repo.forks,
+      repo.license, repo.homepageUrl, repo.updatedAt, repo.pushedAt,
+      repo.createdAt,
+      repo.watchers, repo.size, repo.openIssues,
+      repo.defaultBranch, repo.ownerAvatarUrl,
       classified?.bucket ?? null, classified?.subType ?? null,
     )
 
     db.prepare('UPDATE repos SET fetched_at = ? WHERE owner = ? AND name = ?')
       .run(Date.now(), owner, name)
 
-    if (repo.owner.avatar_url) {
+    if (repo.ownerAvatarUrl) {
       const existing = db.prepare('SELECT banner_color FROM repos WHERE owner = ? AND name = ?')
         .get(owner, name) as { banner_color: string | null } | undefined
       if (!existing?.banner_color) {
-        extractDominantColor(repo.owner.avatar_url)
+        extractDominantColor(repo.ownerAvatarUrl)
           .then(color => {
             db.prepare('UPDATE repos SET banner_color = ? WHERE owner = ? AND name = ?')
               .run(JSON.stringify(color), owner, name)
@@ -130,18 +225,20 @@ export function registerRepoHandlers(): void {
   })
 
   ipcMain.handle('repo:search', async (_event, hostId: string, query: string, sort?: string, order?: string, page?: number) => {
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     if (!token) return []
-    const cacheKey = `${query}:${sort ?? 'stars'}:${order ?? 'desc'}:${page ?? 1}`
+    const cacheKey = `${hostId}:${query}:${sort ?? 'stars'}:${order ?? 'desc'}:${page ?? 1}`
 
     const cached = searchReposCache.get(cacheKey)
     if (cached && Date.now() - cached.ts < SEARCH_REPOS_TTL) {
       return cached.rows
     }
 
-    let items: import('../providers/github').GitHubRepo[]
+    let items: Repo[]
     try {
-      items = await provider.searchRepos(token, query, 100, sort ?? 'stars', order ?? 'desc', page ?? 1)
+      items = await ('searchReposNormalized' in provider
+        ? provider.searchReposNormalized(token, query, 100, sort ?? 'stars', order ?? 'desc', page ?? 1)
+        : provider.searchRepos(token, query, 100, sort ?? 'stars', order ?? 'desc', page ?? 1))
     } catch (err) {
       const msg = String(err)
       if (/\b(403|429)\b/.test(msg)) {
@@ -166,89 +263,36 @@ export function registerRepoHandlers(): void {
     if (items.length === 0) return []
 
     const db = getDb(app.getPath('userData'))
-    const now = new Date().toISOString()
-
-    const upsert = db.prepare(`
-      INSERT INTO repos (id, owner, name, description, language, topics, stars, forks, license,
-                         homepage, updated_at, pushed_at, created_at, saved_at, type, banner_svg,
-                         discovered_at, discover_query, watchers, size, open_issues, default_branch, avatar_url,
-                         type_bucket, type_sub)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        owner          = excluded.owner,
-        name           = excluded.name,
-        description    = excluded.description,
-        language       = excluded.language,
-        topics         = excluded.topics,
-        stars          = excluded.stars,
-        forks          = excluded.forks,
-        updated_at     = excluded.updated_at,
-        pushed_at      = excluded.pushed_at,
-        created_at     = excluded.created_at,
-        discovered_at  = excluded.discovered_at,
-        discover_query = excluded.discover_query,
-        watchers       = excluded.watchers,
-        size           = excluded.size,
-        open_issues    = excluded.open_issues,
-        default_branch = excluded.default_branch,
-        avatar_url     = COALESCE(excluded.avatar_url, repos.avatar_url),
-        saved_at       = repos.saved_at,
-        banner_color   = repos.banner_color,
-        type_bucket    = excluded.type_bucket,
-        type_sub       = excluded.type_sub
-    `)
-
-    db.transaction(() => {
-      for (const repo of items) {
-        const rid = String(repo.id)
-        cascadeRepoId(db, repo.owner.login, repo.name, rid)
-        const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: repo.topics ?? [] })
-        upsert.run(
-          rid, repo.owner.login, repo.name, repo.description, repo.language,
-          JSON.stringify(repo.topics ?? []), repo.stargazers_count, repo.forks_count,
-          repo.license?.spdx_id ?? null, repo.homepage, repo.updated_at, repo.pushed_at,
-          repo.created_at ?? null,
-          now, query, repo.watchers_count, repo.size, repo.open_issues_count,
-          repo.default_branch ?? 'main', repo.owner.avatar_url ?? null,
-          classified?.bucket ?? null, classified?.subType ?? null,
-        )
-      }
-    })()
-
-    setImmediate(() => {
-      const needColor = items.filter(r => r.owner.avatar_url)
-      void poolAll(needColor, 3, async (repo) => {
-        const row = db.prepare('SELECT banner_color FROM repos WHERE owner = ? AND name = ?')
-          .get(repo.owner.login, repo.name) as { banner_color: string | null } | undefined
-        if (row?.banner_color) return
-        const color = await extractDominantColor(repo.owner.avatar_url!)
-        db.prepare('UPDATE repos SET banner_color = ? WHERE owner = ? AND name = ?')
-          .run(JSON.stringify(color), repo.owner.login, repo.name)
-      })
-    })
-
-    const rows = items
-      .map(r => db.prepare('SELECT * FROM repos WHERE owner = ? AND name = ?').get(r.owner.login, r.name) as RepoRow | undefined)
-      .filter((row): row is RepoRow => Boolean(row))
-      .map(repoRowToSavedRepo)
-
+    const rows = upsertReposToDb(db, items, query)
     searchReposCache.set(cacheKey, { rows, ts: Date.now() })
-
     return rows
   })
 
+  ipcMain.handle('repo:searchAll', async (_event, query: UnifiedQuery): Promise<SavedRepo[]> => {
+    const hosts = listHosts()
+    const items = await searchAllHosts(hosts, query, {
+      capPerHost: 10,
+      totalLimit: 30,
+      timeoutMs: 4000,
+      tokenForHost: (id) => getToken(id),
+    })
+    if (items.length === 0) return []
+    const db = getDb(app.getPath('userData'))
+    return upsertReposToDb(db, items, JSON.stringify(query))
+  })
+
   ipcMain.handle('repo:getReadme', async (_event, hostId: string, owner: string, name: string) => {
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     return provider.getReadme(token, owner, name)
   })
 
   ipcMain.handle('repo:getFileContent', async (_event, hostId: string, owner: string, name: string, path: string) => {
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     return provider.getFileContent(token, owner, name, path)
   })
 
   ipcMain.handle('repo:getReleases', async (_event, hostId: string, owner: string, name: string) => {
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     if (!token) return []
     const db = getDb(app.getPath('userData'))
 
@@ -263,11 +307,17 @@ export function registerRepoHandlers(): void {
     }
 
     try {
+      // GitHub's getReleases returns raw `GitHubRelease[]` (snake_case). GitLab
+      // and Gitea already return canonical `Release[]`. We persist raw shapes
+      // for GitHub (so the JSON cache round-trips through the existing
+      // normalizer) and canonical shapes for the others.
       const fresh = await provider.getReleases(token, owner, name, db)
       db.prepare(
         'INSERT OR REPLACE INTO repo_releases_cache (owner, name, fetched_at, data) VALUES (?,?,?,?)'
       ).run(owner, name, Date.now(), JSON.stringify(fresh))
-      return fresh.map(githubReleaseToRelease)
+      return Array.isArray(fresh) && fresh.length > 0 && 'tag_name' in fresh[0]
+        ? (fresh as import('../providers/github').GitHubRelease[]).map(githubReleaseToRelease)
+        : fresh as import('../../src/types/repo').Release[]
     } catch {
       if (cached) {
         try {
@@ -285,7 +335,7 @@ export function registerRepoHandlers(): void {
     if (cached && Date.now() - cached.timestamp < BRANCH_TTL) {
       return { rootTreeSha: cached.rootTreeSha }
     }
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     const result = await provider.getBranch(token, owner, name, branch)
     branchCache.set(key, { rootTreeSha: result.rootTreeSha, timestamp: Date.now() })
     return { rootTreeSha: result.rootTreeSha }
@@ -294,23 +344,33 @@ export function registerRepoHandlers(): void {
   ipcMain.handle('repo:getTree', async (_event, hostId: string, owner: string, name: string, treeSha: string) => {
     const cached = treeCache.get(treeSha)
     if (cached) return cached
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     const entries = await provider.getTreeBySha(token, owner, name, treeSha)
-    treeCache.set(treeSha, entries)
-    return entries
+    // Normalize at the boundary: GitLab tree entries use `id` for the sha
+    // field; GitHub and Gitea use `sha`. The canonical TreeEntry only models
+    // blob + tree entries — submodule entries (type 'commit') aren't rendered
+    // by the file browser, so they're filtered here rather than widening the
+    // shared type.
+    const normalized: import('../providers/github').TreeEntry[] = (entries as unknown[]).flatMap(e => {
+      const v = e as { sha?: string; id?: string; path: string; type: string; mode: string; size?: number }
+      if (v.type !== 'blob' && v.type !== 'tree') return []
+      return [{ sha: v.sha ?? v.id ?? '', path: v.path, type: v.type, mode: v.mode, size: v.size }]
+    })
+    treeCache.set(treeSha, normalized)
+    return normalized
   })
 
   ipcMain.handle('repo:getBlob', async (_event, hostId: string, owner: string, name: string, blobSha: string) => {
     const cached = blobCache.get(blobSha)
     if (cached) return cached
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     const result = await provider.getBlobBySha(token, owner, name, blobSha)
     blobCache.set(blobSha, result)
     return result
   })
 
   ipcMain.handle('repo:getRawFile', async (_event, hostId: string, owner: string, name: string, branch: string, path: string) => {
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     const buf = await provider.getRawFileBytes(token, owner, name, branch, path)
     return buf
   })
@@ -497,16 +557,19 @@ export function registerRepoHandlers(): void {
     return repos.map(githubRepoToRepo)
   })
 
-  ipcMain.handle('repo:getMyStarred', async (_event, hostId: string, _force?: boolean) => {
-    const { provider, token } = resolve(hostId)
+  ipcMain.handle('repo:getMyStarred', async (_event, hostId: string, _force?: boolean): Promise<StarredEntry[]> => {
+    const { provider, token } = resolveAny(hostId)
     if (!token) return []
-    const items = await provider.getStarred(token)
-    return items.map(githubStarredToStarredEntry)
+    // GitHub's narrow surface still exposes raw getStarred for legacy callers;
+    // getStarredNormalized wraps it. GitLab/Gitea getStarred returns canonical.
+    return await ('getStarredNormalized' in provider
+      ? provider.getStarredNormalized(token)
+      : provider.getStarred(token))
   })
 
   // ── Mutate ──────────────────────────────────────────────────────
   ipcMain.handle('repo:star', async (_event, hostId: string, owner: string, name: string) => {
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     if (!token) throw new Error('Not connected')
     await provider.starRepo(token, owner, name)
     const db = getDb(app.getPath('userData'))
@@ -524,7 +587,7 @@ export function registerRepoHandlers(): void {
   })
 
   ipcMain.handle('repo:unstar', async (_event, hostId: string, owner: string, name: string) => {
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     if (!token) throw new Error('Not connected')
     await provider.unstarRepo(token, owner, name)
     const db = getDb(app.getPath('userData'))
@@ -535,7 +598,7 @@ export function registerRepoHandlers(): void {
   })
 
   ipcMain.handle('repo:isStarred', async (_event, hostId: string, owner: string, name: string) => {
-    const { provider, token } = resolve(hostId)
+    const { provider, token } = resolveAny(hostId)
     const db = getDb(app.getPath('userData'))
 
     const cached = db.prepare(

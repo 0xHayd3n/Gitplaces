@@ -11,9 +11,9 @@
 import type Database from 'better-sqlite3'
 import * as rest from './rest'
 import * as graphql from './graphql'
-import { githubUserToUser, githubRepoToRepo } from './normalize'
+import { githubUserToUser, githubRepoToRepo, githubStarredToStarredEntry } from './normalize'
 import { HOST_ID_GITHUB, type ProviderCapabilities } from '../types'
-import type { User, Repo } from '../../../src/types/repo'
+import type { User, Repo, StarredEntry } from '../../../src/types/repo'
 
 const CAPS: ProviderCapabilities = {
   vulnerabilityAlerts: true,
@@ -73,6 +73,11 @@ export class GitHubProvider {
   ): Promise<Repo[]> {
     const items = await rest.searchRepos(token, query, perPage, sort, order, page)
     return items.map(githubRepoToRepo)
+  }
+
+  async getStarredNormalized(token: string): Promise<StarredEntry[]> {
+    const raw = await rest.getStarred(token)
+    return raw.map(githubStarredToStarredEntry)
   }
 
   // ── Repo metadata ──────────────────────────────────────────────
