@@ -11,9 +11,10 @@ export interface ProviderCapabilities {
   isVerifiedOrg: boolean
 }
 
-// Module-level cache: provider capabilities don't change in-process, so first
-// fetch wins forever. Renderer hooks reuse the resolved promise so concurrent
-// callers don't fan out to multiple IPC round-trips.
+// Module-level cache. Capabilities can change in-process when auth state for a
+// host flips (e.g. a token that newly unlocks vulnerability alerts), so the
+// main process broadcasts 'hosts:capabilities-changed' on setToken/clearToken;
+// the hook listens and re-fetches the affected hostId.
 const cache = new Map<string, ProviderCapabilities | null>()
 const inflight = new Map<string, Promise<ProviderCapabilities | null>>()
 
@@ -22,10 +23,32 @@ export function _resetCapabilitiesCacheForTest(): void {
   inflight.clear()
 }
 
+export function clearCachedCapabilities(hostId: string): void {
+  cache.delete(hostId)
+  inflight.delete(hostId)
+}
+
 export function useHostCapabilities(hostId: string | null): ProviderCapabilities | null {
   const [caps, setCaps] = useState<ProviderCapabilities | null>(
     () => (hostId ? cache.get(hostId) ?? null : null),
   )
+  // Bumped by the IPC-event subscription below; re-triggers the fetch effect.
+  const [version, setVersion] = useState(0)
+
+  useEffect(() => {
+    if (!hostId) return
+    const handler = (data: { hostId: string }) => {
+      if (data?.hostId === hostId) {
+        clearCachedCapabilities(hostId)
+        setVersion(v => v + 1)
+      }
+    }
+    const on = window.api?.hosts?.onCapabilitiesChanged
+    const off = window.api?.hosts?.offCapabilitiesChanged
+    if (typeof on !== 'function' || typeof off !== 'function') return
+    on(handler)
+    return () => { off(handler) }
+  }, [hostId])
 
   useEffect(() => {
     if (!hostId) { setCaps(null); return }
@@ -52,7 +75,7 @@ export function useHostCapabilities(hostId: string | null): ProviderCapabilities
     }
     promise.then(c => { if (!cancelled) setCaps(c) })
     return () => { cancelled = true }
-  }, [hostId])
+  }, [hostId, version])
 
   return caps
 }
