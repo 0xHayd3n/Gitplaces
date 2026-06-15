@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, type ReactNode, type FormEvent } from 'react'
 import type { User } from '../../types/repo'
 
 // Mirror the shape declared in electron/preload.ts → hosts.list.
@@ -12,11 +12,11 @@ interface HostInstance {
   webUrl?: string
 }
 
+const HOST_ID_GITHUB = 'gh:api.github.com'
+
 function patDocsUrl(host: HostInstance): string {
   // For gitlab + gitea, deep-link to the matching path on the host's own
-  // webUrl (or API baseUrl when there's no explicit webUrl). This is what
-  // makes self-hosted instances open *their own* token-settings page in
-  // Phase 7, while gitlab.com still points at gitlab.com/-/user_settings/...
+  // webUrl (or API baseUrl when there's no explicit webUrl).
   const base = (host.webUrl ?? host.baseUrl).replace(/\/+$/, '')
   switch (host.type) {
     case 'github': return 'https://github.com/settings/tokens'
@@ -50,12 +50,24 @@ interface HostStatus {
   error: string | null
 }
 
+type HealthStatus = { ok: true } | { ok: false; error: string }
+
 export default function ConnectionsPanel() {
   const [hosts, setHosts] = useState<HostInstance[]>([])
   const [statuses, setStatuses] = useState<Record<string, HostStatus>>({})
+  const [health, setHealth] = useState<Record<string, HealthStatus>>({})
   const [patDraft, setPatDraft] = useState<Record<string, string>>({})
   const [connecting, setConnecting] = useState<Record<string, boolean>>({})
   const [disconnecting, setDisconnecting] = useState<Record<string, boolean>>({})
+  const [removing, setRemoving] = useState<Record<string, boolean>>({})
+
+  // Add-a-host form state.
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [addType, setAddType] = useState<'gitlab' | 'gitea'>('gitlab')
+  const [addBaseUrl, setAddBaseUrl] = useState('')
+  const [addLabel, setAddLabel] = useState('')
+  const [addError, setAddError] = useState<string | null>(null)
+  const [addBusy, setAddBusy] = useState(false)
 
   const refreshHost = useCallback(async (hostId: string) => {
     setStatuses(prev => ({ ...prev, [hostId]: { ...(prev[hostId] ?? { user: null, error: null }), loading: true } }))
@@ -67,17 +79,33 @@ export default function ConnectionsPanel() {
     }
   }, [])
 
+  const loadHosts = useCallback(async (): Promise<HostInstance[]> => {
+    const list = await window.api.hosts.list() as HostInstance[]
+    setHosts(list)
+    return list
+  }, [])
+
+  const runHealthCheck = useCallback(async () => {
+    try {
+      const result = await window.api.hosts.healthCheck()
+      setHealth(result)
+    } catch {
+      // non-critical — leave previous health state in place
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     async function load() {
-      const list = await window.api.hosts.list() as HostInstance[]
+      const list = await loadHosts()
       if (cancelled) return
-      setHosts(list)
       await Promise.all(list.map(h => refreshHost(h.id)))
+      if (cancelled) return
+      void runHealthCheck()
     }
     load()
     return () => { cancelled = true }
-  }, [refreshHost])
+  }, [loadHosts, refreshHost, runHealthCheck])
 
   const handleConnect = useCallback(async (host: HostInstance) => {
     const pat = (patDraft[host.id] ?? '').trim()
@@ -109,9 +137,58 @@ export default function ConnectionsPanel() {
     }
   }, [])
 
+  const handleRemove = useCallback(async (host: HostInstance) => {
+    if (host.id === HOST_ID_GITHUB) return
+    setRemoving(prev => ({ ...prev, [host.id]: true }))
+    try {
+      await window.api.hosts.remove(host.id)
+      await loadHosts()
+      setHealth(prev => {
+        const next = { ...prev }
+        delete next[host.id]
+        return next
+      })
+    } catch (e) {
+      setStatuses(prev => ({ ...prev, [host.id]: { ...(prev[host.id] ?? { user: null, loading: false }), error: (e as Error).message } }))
+    } finally {
+      setRemoving(prev => ({ ...prev, [host.id]: false }))
+    }
+  }, [loadHosts])
+
   const handleOpenPatDocs = useCallback((host: HostInstance) => {
     void window.api.openExternal(patDocsUrl(host))
   }, [])
+
+  const handleAddSubmit = useCallback(async (e: FormEvent) => {
+    e.preventDefault()
+    const baseUrl = addBaseUrl.trim().replace(/\/+$/, '')
+    const label = addLabel.trim() || baseUrl
+    if (!baseUrl) { setAddError('Enter a base URL.'); return }
+    if (!/^https?:\/\//i.test(baseUrl)) { setAddError('Base URL must start with https:// or http://.'); return }
+
+    setAddBusy(true)
+    setAddError(null)
+    try {
+      const probe = await window.api.hosts.probe({ type: addType, baseUrl })
+      if (!probe.ok) {
+        setAddError(probe.error ?? 'Probe failed.')
+        return
+      }
+      await window.api.hosts.add({ type: addType, baseUrl, label, webUrl: baseUrl })
+      const list = await loadHosts()
+      const newHost = list.find(h => h.baseUrl === baseUrl)
+      if (newHost) await refreshHost(newHost.id)
+      void runHealthCheck()
+      // Reset form
+      setAddBaseUrl('')
+      setAddLabel('')
+      setShowAddForm(false)
+    } catch (err) {
+      setAddError((err as Error).message ?? 'Failed to add host.')
+    } finally {
+      setAddBusy(false)
+    }
+  }, [addType, addBaseUrl, addLabel, loadHosts, refreshHost, runHealthCheck])
 
   return (
     <>
@@ -134,8 +211,12 @@ export default function ConnectionsPanel() {
             const user = status?.user ?? null
             const isConnecting = connecting[host.id] ?? false
             const isDisconnecting = disconnecting[host.id] ?? false
+            const isRemoving = removing[host.id] ?? false
             const draft = patDraft[host.id] ?? ''
             const error = status?.error ?? null
+            const hostHealth = health[host.id]
+            const isUnreachable = hostHealth && hostHealth.ok === false
+            const canRemove = host.id !== HOST_ID_GITHUB
 
             return (
               <div key={host.id}>
@@ -144,7 +225,20 @@ export default function ConnectionsPanel() {
                     {HOST_ICONS[host.type]}
                   </div>
                   <div className="connector-info">
-                    <div className="connector-name">{host.label}</div>
+                    <div className="connector-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {isUnreachable && (
+                        <span
+                          aria-label="Unreachable"
+                          title="Unreachable"
+                          style={{
+                            width: 8, height: 8, borderRadius: 4,
+                            background: 'var(--danger, #d33)',
+                            display: 'inline-block',
+                          }}
+                        />
+                      )}
+                      {host.label}
+                    </div>
                     <div className="connector-desc">
                       {status?.loading
                         ? 'Checking…'
@@ -199,8 +293,28 @@ export default function ConnectionsPanel() {
                         </button>
                       </form>
                     )}
+                    {canRemove && (
+                      <button
+                        aria-label={`Remove ${host.label}`}
+                        title={`Remove ${host.label}`}
+                        className="settings-btn settings-btn--link connector-remove-btn"
+                        disabled={isRemoving}
+                        onClick={() => handleRemove(host)}
+                        style={{ marginLeft: 8 }}
+                      >
+                        {isRemoving ? '…' : 'Remove'}
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {isUnreachable && (
+                  <div className="connector-row connector-row--log">
+                    <p className="settings-hint error" style={{ margin: 0 }}>
+                      Unreachable: {hostHealth.error}
+                    </p>
+                  </div>
+                )}
 
                 {error && (
                   <div className="connector-row connector-row--log">
@@ -210,6 +324,85 @@ export default function ConnectionsPanel() {
               </div>
             )
           })}
+        </div>
+      </div>
+
+      <div className="settings-group" style={{ marginTop: 16 }}>
+        <div className="settings-group-body">
+          {!showAddForm ? (
+            <button
+              type="button"
+              className="settings-btn"
+              onClick={() => setShowAddForm(true)}
+            >
+              Add a host…
+            </button>
+          ) : (
+            <form
+              onSubmit={handleAddSubmit}
+              style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
+            >
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span className="settings-hint" style={{ fontSize: 12 }}>Type</span>
+                  <select
+                    className="settings-input"
+                    value={addType}
+                    onChange={e => setAddType(e.target.value as 'gitlab' | 'gitea')}
+                    disabled={addBusy}
+                  >
+                    <option value="gitlab">GitLab</option>
+                    <option value="gitea">Gitea</option>
+                  </select>
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 320px' }}>
+                  <span className="settings-hint" style={{ fontSize: 12 }}>Base URL</span>
+                  <input
+                    className="settings-input"
+                    type="url"
+                    placeholder="https://gitlab.acme.com"
+                    value={addBaseUrl}
+                    onChange={e => setAddBaseUrl(e.target.value)}
+                    disabled={addBusy}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </label>
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 200px' }}>
+                  <span className="settings-hint" style={{ fontSize: 12 }}>Label</span>
+                  <input
+                    className="settings-input"
+                    type="text"
+                    placeholder="Acme GitLab"
+                    value={addLabel}
+                    onChange={e => setAddLabel(e.target.value)}
+                    disabled={addBusy}
+                  />
+                </label>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" className="settings-btn" disabled={addBusy}>
+                  {addBusy ? 'Probing…' : 'Add host'}
+                </button>
+                <button
+                  type="button"
+                  className="settings-btn settings-btn--link"
+                  onClick={() => {
+                    setShowAddForm(false)
+                    setAddError(null)
+                    setAddBaseUrl('')
+                    setAddLabel('')
+                  }}
+                  disabled={addBusy}
+                >
+                  Cancel
+                </button>
+              </div>
+              {addError && (
+                <p className="settings-hint error" style={{ margin: 0 }}>{addError}</p>
+              )}
+            </form>
+          )}
         </div>
       </div>
     </>
