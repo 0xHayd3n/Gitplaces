@@ -118,7 +118,7 @@ describe('fetchCandidates', () => {
       { topic: 'rust', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
       { topic: 'cli', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
     ])
-    expect(result.map((r) => r.id).sort()).toEqual([1, 2, 3])
+    expect(result.map((r) => r.hostNativeId).sort()).toEqual([1, 2, 3])
   })
 
   it('executes cold-start query when kind is coldStart', async () => {
@@ -139,16 +139,17 @@ describe('fetchCandidates', () => {
       { topic: 'b', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
       { topic: 'c', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
     ])
-    expect(result.map((r) => r.id).sort()).toEqual([1, 3])
+    expect(result.map((r) => r.hostNativeId).sort()).toEqual([1, 3])
   })
 
-  it('tags every GitHub candidate with _hostId so the IPC upsert can write host_id', async () => {
+  it('tags every GitHub candidate with hostId so the IPC upsert can write host_id', async () => {
     mockSearch.mockResolvedValueOnce([ghRepo({ id: 42 })])
     const result = await fetchCandidates('token', [
       { topic: 'rust', kind: 'topic', coldStart: false, perPage: 30, sort: '' },
     ])
     expect(result).toHaveLength(1)
-    expect(result[0]._hostId).toBe('gh:api.github.com')
+    expect(result[0].hostId).toBe('gh:api.github.com')
+    expect(result[0].hostNativeId).toBe(42)
   })
 })
 

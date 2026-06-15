@@ -1,12 +1,12 @@
 // electron/services/recommendationFetcher.ts
 import { searchRepos } from '../providers/github'
-import type { GitHubRepo } from '../providers/github'
+import { githubRepoToRepo } from '../providers/github/normalize'
+import type { Repo } from '../../src/types/repo'
 import type { CorpusStats, UserProfile } from '../../src/types/recommendation'
 import { getSubTypeKeyword } from '../../src/lib/discoverQueries'
 import { listHosts } from '../providers/hostConfig'
 import { getToken } from '../providers/tokenStore'
 import { searchAllHosts, type UnifiedQuery } from '../providers/discoverMerge'
-import { repoToGitHubShape } from '../providers/github/normalize'
 import { HOST_ID_GITHUB } from '../providers/types'
 
 export interface QueryPlan {
@@ -173,10 +173,10 @@ function planToUnifiedQuery(plan: QueryPlan): UnifiedQuery | null {
   }
 }
 
-// `_hostId` is optional so legacy tests / callers that hand-build GitHubRepo
-// fixtures keep type-checking. The IPC upsert defaults missing values to
-// HOST_ID_GITHUB; the multi-host fetcher always populates it.
-export type CandidateRepo = GitHubRepo & { _hostId?: string }
+/** Phase 8: `CandidateRepo` is just `Repo`. The Phase 7 shim that tagged a
+ *  GitHubRepo with `_hostId` is gone — every candidate is already in
+ *  canonical shape with a real `hostId` field. */
+export type CandidateRepo = Repo
 
 /** Fetch recommendation candidates. Pulls from GitHub (preserving the rich
  *  query semantics of the legacy QueryPlan system) AND fans the
@@ -194,10 +194,11 @@ export async function fetchCandidates(
 
   function push(repos: CandidateRepo[]): void {
     for (const r of repos) {
-      // Dedup by hostId+id — preserves the legacy intra-host numeric-id dedup
-      // while preventing cross-host collisions (each provider's id space is
-      // independent so the same number can mean two different repos).
-      const key = `${r._hostId ?? HOST_ID_GITHUB}:${r.id}`
+      // Dedup by hostId+hostNativeId composite — preserves intra-host
+      // numeric dedup while preventing cross-host collisions (each provider's
+      // id space is independent so the same number can mean two different
+      // repos).
+      const key = `${r.hostId}:${r.hostNativeId}`
       if (!seen.has(key)) {
         seen.add(key)
         merged.push(r)
@@ -205,21 +206,20 @@ export async function fetchCandidates(
     }
   }
 
-  // GitHub path — preserves the legacy buildSearchQuery semantics.
+  // GitHub path — preserves the legacy buildSearchQuery semantics. Raw
+  // GitHubRepo results normalize to canonical Repo via githubRepoToRepo
+  // (which stamps hostId / hostType / camelCase fields).
   const ghResults = await Promise.allSettled(
     queries.map(async (q) => searchRepos(token, buildSearchQuery(q), q.perPage, q.sort, 'desc', page)),
   )
   for (const r of ghResults) {
     if (r.status === 'fulfilled') {
-      push(r.value.map(repo => ({ ...repo, _hostId: HOST_ID_GITHUB })))
+      push(r.value.map(githubRepoToRepo))
     }
   }
 
   // Other-host path — translate each plan that maps cleanly to UnifiedQuery
-  // and fan out via searchAllHosts (which excludes GitHub from its results
-  // implicitly by virtue of our explicit GitHub branch above). The user's
-  // configured hosts other than GitHub contribute up to capPerHost results
-  // per plan-translatable query; merge dedup is by composite key.
+  // and fan out via searchAllHosts (which already returns canonical Repo[]).
   //
   // Defensive: listHosts() throws if hostConfig backend isn't initialized
   // (legacy unit tests that mock fetchCandidates don't bootstrap it). Treat
@@ -245,7 +245,7 @@ export async function fetchCandidates(
     )
     for (const r of otherResults) {
       if (r.status === 'fulfilled') {
-        push(r.value.map(repoToGitHubShape))
+        push(r.value)  // already canonical Repo[]
       }
     }
   }
