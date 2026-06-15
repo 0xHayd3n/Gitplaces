@@ -109,3 +109,15 @@ export function _resetGitHubCacheForTest(): void {
 export function _resetGiteaCacheForTest(): void {
   giteaProviders.clear()
 }
+
+/**
+ * Production cache eviction. Called from `hosts:remove` so a host that's
+ * removed and re-added at the same hostId doesn't keep a stale provider
+ * pinned to the previous baseUrl. The public-instance singleton
+ * (`githubProvider`) is never cached here, so HOST_ID_GITHUB is a no-op.
+ */
+export function invalidateProviderCache(hostId: string): void {
+  githubProviders.delete(hostId)
+  gitlabProviders.delete(hostId)
+  giteaProviders.delete(hostId)
+}

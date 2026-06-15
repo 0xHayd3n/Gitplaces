@@ -23,7 +23,7 @@ import {
   setToken,
   clearToken,
 } from '../providers/tokenStore'
-import { getAnyProvider } from '../providers/registry'
+import { getAnyProvider, invalidateProviderCache } from '../providers/registry'
 import { HOST_ID_GITHUB, type HostInstance, type HostType } from '../providers/types'
 import { openLoginPopup, closeLoginPopup } from '../githubLoginPopup'
 import { getDeviceFlowAbort, setDeviceFlowAbort } from '../services/deviceFlowState'
@@ -101,6 +101,10 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
     }
     clearToken(hostId)
     removeHost(hostId)
+    // Drop the registry's cached provider instance so a future `hosts:add`
+    // at the same hostId (e.g. user removes then re-adds the same baseUrl)
+    // gets a fresh provider rather than reusing the stale one.
+    invalidateProviderCache(hostId)
     broadcastCapabilitiesChanged(getMainWindow, hostId)
   })
 

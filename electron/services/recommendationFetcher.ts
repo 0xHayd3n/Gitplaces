@@ -181,9 +181,9 @@ export type CandidateRepo = Repo
 /** Fetch recommendation candidates. Pulls from GitHub (preserving the rich
  *  query semantics of the legacy QueryPlan system) AND fans the
  *  translatable plan kinds out across every other configured host via
- *  searchAllHosts. Returns a unified GitHubRepo-shaped list — the
- *  recommendation engine doesn't know or care about hostId; only the IPC
- *  upsert reads `_hostId` to tag DB rows correctly. */
+ *  searchAllHosts. Returns a unified canonical `Repo[]` — every candidate
+ *  carries its own `hostId`/`hostNativeId` so the engine + IPC upsert can
+ *  attribute rows to the right host without a shim. */
 export async function fetchCandidates(
   token: string | null,
   queries: QueryPlan[],

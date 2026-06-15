@@ -100,6 +100,14 @@ function upsertCandidates(
 
   db.transaction(() => {
     for (const repo of candidates) {
+      // PHASE 9 FOLLOW-UP: `repos.id` PK is the host's native numeric id as
+      // a string — two repos with the same numeric id across different hosts
+      // (e.g. GitLab #42 and Codeberg #42) collide on `ON CONFLICT(id)` and
+      // silently overwrite each other. Real-world collision probability is
+      // low (id ranges across hosts barely overlap) but it's a correctness
+      // hole. Phase 9 should migrate the PK to (id, host_id) composite or
+      // pre-compose `${hostId}:${hostNativeId}` here. Same comment applies
+      // to repoHandlers.ts upsertReposToDb + the repo:get handler.
       const rid = String(repo.hostNativeId)
       cascadeRepoId(db, repo.owner, repo.name, rid)
       const classified = classifyRepoBucket({
