@@ -348,17 +348,24 @@ export async function getTreeBySha(
   name: string,
   treeSha: string,
 ): Promise<GitLabTreeEntry[]> {
-  // PHASE 6 FOLLOW-UP: GitLab's tree endpoint caps each page at 100 entries.
-  // Repos with thousands of entries (gitlab-org/gitlab, etc.) silently lose
-  // anything past the first page. GitHub's Git Data API returns the full tree
-  // in one call; GitLab requires Link-header pagination here. Phase 4's UI
-  // never invokes this (renderer doesn't browse non-GitHub repos yet), so we
-  // accept the truncation until Phase 6 wires multi-host repo browsing.
-  const url = api(baseUrl, `/projects/${projectId(owner, name)}/repository/tree?ref=${encodeURIComponent(treeSha)}&recursive=true&per_page=100`)
-  const res = await fetch(url, { headers: gitlabHeaders(token) })
-  if (!res.ok) throw await readError(res, 'getTreeBySha')
-  const entries = await res.json() as Array<{ id: string; name: string; type: 'blob' | 'tree'; path: string; mode: string }>
-  return entries
+  // GitLab caps each tree page at 100 entries. Walk pages via the
+  // `x-next-page` response header until empty. Hard-cap at 200 pages
+  // (~20k entries) so a misbehaving instance can't loop forever.
+  const all: GitLabTreeEntry[] = []
+  let page = 1
+  const MAX_PAGES = 200
+  for (; page <= MAX_PAGES; page++) {
+    const url = api(baseUrl, `/projects/${projectId(owner, name)}/repository/tree?ref=${encodeURIComponent(treeSha)}&recursive=true&per_page=100&page=${page}`)
+    const res = await fetch(url, { headers: gitlabHeaders(token) })
+    if (!res.ok) throw await readError(res, 'getTreeBySha')
+    const entries = await res.json() as Array<{ id: string; name: string; type: 'blob' | 'tree'; path: string; mode: string }>
+    all.push(...entries)
+    const next = res.headers.get('x-next-page')
+    if (!next || next.length === 0) break
+    // Some instances return empty body before x-next-page is dropped — guard.
+    if (entries.length === 0) break
+  }
+  return all
 }
 
 export async function getBlobBySha(

@@ -280,7 +280,7 @@ describe('starProject / unstarProject', () => {
 
 describe('getTreeBySha', () => {
   beforeEach(() => mockFetch.mockReset())
-  it('hits /repository/tree?ref={treeSha}&recursive=true&per_page=100', async () => {
+  it('hits /repository/tree?ref={treeSha}&recursive=true&per_page=100&page=1', async () => {
     mockFetch.mockResolvedValue(makeResponse([
       { id: 'sha-a', name: 'README.md', type: 'blob', path: 'README.md', mode: '100644' },
     ]))
@@ -289,7 +289,40 @@ describe('getTreeBySha', () => {
     expect(entries[0].path).toBe('README.md')
     expect(entries[0].type).toBe('blob')
     const call = mockFetch.mock.calls[0][0] as string
-    expect(call).toContain('/api/v4/projects/alice%2Fdemo/repository/tree?ref=sha-root&recursive=true&per_page=100')
+    expect(call).toContain('/api/v4/projects/alice%2Fdemo/repository/tree?ref=sha-root&recursive=true&per_page=100&page=1')
+  })
+
+  it('walks x-next-page until the header is empty, concatenating all pages', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(
+        [{ id: 'sha-a', name: 'a', type: 'blob', path: 'a', mode: '100644' }],
+        { 'x-next-page': '2' },
+      ))
+      .mockResolvedValueOnce(makeResponse(
+        [{ id: 'sha-b', name: 'b', type: 'blob', path: 'b', mode: '100644' }],
+        { 'x-next-page': '3' },
+      ))
+      .mockResolvedValueOnce(makeResponse(
+        [{ id: 'sha-c', name: 'c', type: 'blob', path: 'c', mode: '100644' }],
+        { 'x-next-page': '' },
+      ))
+    const entries = await getTreeBySha(BASE, 'tok', 'alice', 'demo', 'sha-root')
+    expect(entries.map(e => e.path)).toEqual(['a', 'b', 'c'])
+    expect(mockFetch).toHaveBeenCalledTimes(3)
+    expect((mockFetch.mock.calls[1][0] as string)).toContain('page=2')
+    expect((mockFetch.mock.calls[2][0] as string)).toContain('page=3')
+  })
+
+  it('stops paginating if a page returns an empty array (defensive guard)', async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse(
+        [{ id: 'sha-a', name: 'a', type: 'blob', path: 'a', mode: '100644' }],
+        { 'x-next-page': '2' },
+      ))
+      .mockResolvedValueOnce(makeResponse([], { 'x-next-page': '3' }))
+    const entries = await getTreeBySha(BASE, 'tok', 'alice', 'demo', 'sha-root')
+    expect(entries).toHaveLength(1)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
   })
 })
 
