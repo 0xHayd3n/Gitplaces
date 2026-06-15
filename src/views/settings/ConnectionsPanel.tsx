@@ -62,6 +62,11 @@ export default function ConnectionsPanel() {
   const [disconnecting, setDisconnecting] = useState<Record<string, boolean>>({})
   const [removing, setRemoving] = useState<Record<string, boolean>>({})
 
+  // Per-host label-edit state. When `editingLabel[hostId]` is a string, the
+  // label cell renders as an input; null means the label is in display mode.
+  const [editingLabel, setEditingLabel] = useState<Record<string, string | null>>({})
+  const [labelBusy, setLabelBusy] = useState<Record<string, boolean>>({})
+
   // Add-a-host form state.
   const [showAddForm, setShowAddForm] = useState(false)
   const [addType, setAddType] = useState<'gitlab' | 'gitea'>('gitlab')
@@ -164,6 +169,35 @@ export default function ConnectionsPanel() {
     void window.api.openExternal(patDocsUrl(host))
   }, [])
 
+  const handleStartEditLabel = useCallback((host: HostInstance) => {
+    setEditingLabel(prev => ({ ...prev, [host.id]: host.label }))
+  }, [])
+
+  const handleCancelEditLabel = useCallback((hostId: string) => {
+    setEditingLabel(prev => ({ ...prev, [hostId]: null }))
+  }, [])
+
+  const handleSaveLabel = useCallback(async (host: HostInstance) => {
+    const draft = (editingLabel[host.id] ?? '').trim()
+    if (draft.length === 0 || draft === host.label) {
+      setEditingLabel(prev => ({ ...prev, [host.id]: null }))
+      return
+    }
+    setLabelBusy(prev => ({ ...prev, [host.id]: true }))
+    try {
+      await window.api.hosts.setLabel(host.id, draft)
+      await loadHosts()
+      setEditingLabel(prev => ({ ...prev, [host.id]: null }))
+    } catch (e) {
+      setStatuses(prev => ({
+        ...prev,
+        [host.id]: { ...(prev[host.id] ?? { user: null, loading: false }), error: (e as Error).message },
+      }))
+    } finally {
+      setLabelBusy(prev => ({ ...prev, [host.id]: false }))
+    }
+  }, [editingLabel, loadHosts])
+
   const handleAddSubmit = useCallback(async (e: FormEvent) => {
     e.preventDefault()
     const baseUrl = addBaseUrl.trim().replace(/\/+$/, '')
@@ -246,7 +280,51 @@ export default function ConnectionsPanel() {
                           }}
                         />
                       )}
-                      {host.label}
+                      {editingLabel[host.id] != null ? (
+                        <form
+                          style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}
+                          onSubmit={e => { e.preventDefault(); void handleSaveLabel(host) }}
+                        >
+                          <input
+                            className="settings-input"
+                            type="text"
+                            value={editingLabel[host.id] ?? ''}
+                            onChange={e => setEditingLabel(prev => ({ ...prev, [host.id]: e.target.value }))}
+                            disabled={labelBusy[host.id] ?? false}
+                            autoFocus
+                            style={{ minWidth: 160 }}
+                          />
+                          <button
+                            type="submit"
+                            className="settings-btn settings-btn--link"
+                            disabled={labelBusy[host.id] ?? false}
+                          >
+                            {labelBusy[host.id] ? 'Saving…' : 'Save'}
+                          </button>
+                          <button
+                            type="button"
+                            className="settings-btn settings-btn--link"
+                            onClick={() => handleCancelEditLabel(host.id)}
+                            disabled={labelBusy[host.id] ?? false}
+                          >
+                            Cancel
+                          </button>
+                        </form>
+                      ) : (
+                        <>
+                          <span>{host.label}</span>
+                          <button
+                            type="button"
+                            aria-label={`Edit label for ${host.label}`}
+                            title="Edit label"
+                            className="settings-btn settings-btn--link"
+                            onClick={() => handleStartEditLabel(host)}
+                            style={{ padding: '0 4px', fontSize: 11 }}
+                          >
+                            Edit
+                          </button>
+                        </>
+                      )}
                     </div>
                     <div className="connector-desc">
                       {status?.loading

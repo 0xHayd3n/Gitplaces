@@ -16,6 +16,7 @@ import {
   getHost,
   addHost,
   removeHost,
+  setHostLabel,
 } from '../providers/hostConfig'
 import {
   getToken,
@@ -83,6 +84,14 @@ export function registerHostHandlers(getMainWindow: () => BrowserWindow | null =
 
   ipcMain.handle('hosts:add', (_event, input: AddHostInput): HostInstance => {
     return addHost(input)
+  })
+
+  ipcMain.handle('hosts:setLabel', (_event, hostId: string, label: string): HostInstance => {
+    const trimmed = label.trim()
+    if (trimmed.length === 0) throw new Error('Label cannot be empty')
+    const updated = setHostLabel(hostId, trimmed)
+    if (!updated) throw new Error(`Unknown host: ${hostId}`)
+    return updated
   })
 
   ipcMain.handle('hosts:remove', (_event, hostId: string) => {

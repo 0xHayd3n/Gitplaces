@@ -76,6 +76,19 @@ export function removeHost(id: string): void {
   writeAll(readAll().filter(h => h.id !== id))
 }
 
+/** Updates a host's user-editable label. Returns the updated HostInstance,
+ *  or null if no host with that id exists. */
+export function setHostLabel(id: string, label: string): HostInstance | null {
+  const list = readAll()
+  const idx = list.findIndex(h => h.id === id)
+  if (idx === -1) return null
+  const updated: HostInstance = { ...list[idx], label }
+  const next = [...list]
+  next[idx] = updated
+  writeAll(next)
+  return updated
+}
+
 const DEFAULT_HOSTS: ReadonlyArray<Omit<HostInstance, 'addedAt'>> = [
   { id: HOST_ID_GITHUB, type: 'github', baseUrl: 'https://api.github.com', label: 'GitHub' },
   { id: 'gl:gitlab.com', type: 'gitlab', baseUrl: 'https://gitlab.com', label: 'GitLab.com' },

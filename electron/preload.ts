@@ -114,6 +114,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('hosts:add', input) as Promise<import('./providers/types').HostInstance>,
     remove: (hostId: string) =>
       ipcRenderer.invoke('hosts:remove', hostId) as Promise<void>,
+    setLabel: (hostId: string, label: string) =>
+      ipcRenderer.invoke('hosts:setLabel', hostId, label) as Promise<import('./providers/types').HostInstance>,
     probe: (input: { type: import('./providers/types').HostType; baseUrl: string }) =>
       ipcRenderer.invoke('hosts:probe', input) as Promise<{ ok: boolean; error?: string }>,
     setToken: (hostId: string, token: string) =>

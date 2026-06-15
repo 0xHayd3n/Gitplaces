@@ -124,6 +124,7 @@ declare global {
           webUrl?: string
         }) => Promise<import('../electron/providers/types').HostInstance>
         remove: (hostId: string) => Promise<void>
+        setLabel: (hostId: string, label: string) => Promise<import('../electron/providers/types').HostInstance>
         probe: (input: {
           type: import('../electron/providers/types').HostType
           baseUrl: string
