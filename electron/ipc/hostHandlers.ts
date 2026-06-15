@@ -52,12 +52,12 @@ interface ProbeResult {
 type ServerVersionFailure = { ok: false; errorKind: 'tls' | 'network' | 'http' | 'json'; error: string }
 
 function formatProbeError(v: ServerVersionFailure): string {
-  switch (v.errorKind) {
-    case 'tls':     return `TLS handshake failed (self-signed cert? expired?) — ${v.error}`
-    case 'network': return v.error  // already starts with "Could not reach …"
-    case 'http':    return v.error  // already includes status + body excerpt
-    case 'json':    return v.error  // already mentions "did not respond as a <kind>"
-  }
+  // Each errorKind's `error` string is already a complete user-facing message
+  // ("TLS handshake failed (CERT_HAS_EXPIRED)", "Could not reach https://… (ENOTFOUND)",
+  // "HTTP 404 — Not Found", "https://… did not respond as a GitLab instance (…)").
+  // Pass through unchanged — the kind tag itself is the discriminant for any
+  // future per-kind UI treatment in the renderer.
+  return v.error
 }
 
 function broadcastCapabilitiesChanged(
