@@ -315,4 +315,42 @@ describe('searchAllHosts', () => {
     await searchAllHosts([ghHost], { kind: 'trending-week' }, { capPerHost: 10, totalLimit: 30, page: 3 })
     expect(searchSpy.mock.calls[0][5]).toBe(3)
   })
+
+  it('prefers searchReposNormalized when the provider exposes it — GitHub raw vs canonical shape split', async () => {
+    // GitHub's provider has BOTH `searchRepos` (raw GitHubRepo shape with
+    // snake_case `pushed_at`) and `searchReposNormalized` (canonical Repo
+    // with camelCase `pushedAt`). Calling `searchRepos` and trusting the
+    // cast lets raw items reach the sort, which then crashes on
+    // `undefined.localeCompare`.
+    //
+    // The provider object below uses real methods that read `this.baseUrl`,
+    // so the test ALSO catches a regression where someone extracts the
+    // method to a variable and detaches `this` — see GitHubProvider.
+    const ghHost = host('gh:api.github.com', 'github')
+    let normalizedCalls = 0
+    let rawCalls = 0
+    const provider = {
+      baseUrl: 'https://api.github.com',
+      searchReposNormalized(this: { baseUrl: string }): Promise<Repo[]> {
+        if (!this || !this.baseUrl) throw new Error('this lost — searchReposNormalized called without instance binding')
+        normalizedCalls++
+        return Promise.resolve([repo('gh:api.github.com', 'a', '2026-06-14T10:00:00Z')])
+      },
+      searchRepos(this: { baseUrl: string }): Promise<Repo[]> {
+        rawCalls++
+        // Raw GitHub shape — would crash the sort if it slipped through.
+        return Promise.resolve([
+          { id: 1, name: 'a', owner: { login: 'gh' }, pushed_at: '2026-06-14T10:00:00Z' } as unknown as Repo,
+        ])
+      },
+    }
+    resolveAnyMock.mockImplementation(() => provider)
+
+    const out = await searchAllHosts([ghHost], { kind: 'trending-week' }, { capPerHost: 10, totalLimit: 30 })
+
+    expect(normalizedCalls).toBe(1)
+    expect(rawCalls).toBe(0)
+    expect(out).toHaveLength(1)
+    expect(out[0].pushedAt).toBe('2026-06-14T10:00:00Z')
+  })
 })

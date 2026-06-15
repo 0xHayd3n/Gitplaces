@@ -153,14 +153,19 @@ export async function searchAllHosts(
     if (!provider) return []
     const translated = translateQuery(host.type, query)
     const token = tokenForHost(host.id)
-    const work = (provider.searchRepos as (
-      token: string | null,
-      query: string,
-      perPage: number,
-      sort: string,
-      order: string,
-      page: number,
-    ) => Promise<Repo[]>)(token, translated.query, opts.capPerHost, translated.sort, translated.order, page)
+    // GitHubProvider exposes BOTH `searchRepos` (raw GitHubRepo shape with
+    // snake_case `pushed_at`) and `searchReposNormalized` (canonical Repo).
+    // GitLab/Gitea only expose `searchRepos` which already returns canonical.
+    // Feature-detect and CALL inline — extracting the method to a variable
+    // would detach `this`, breaking `searchReposNormalized` which reads
+    // `this.baseUrl`. Matches the dispatch in repoHandlers.ts (repo:search).
+    const work = 'searchReposNormalized' in provider
+      ? (provider as { searchReposNormalized: (
+          token: string | null, query: string, perPage: number, sort: string, order: string, page: number,
+        ) => Promise<Repo[]> }).searchReposNormalized(token, translated.query, opts.capPerHost, translated.sort, translated.order, page)
+      : (provider.searchRepos as (
+          token: string | null, query: string, perPage: number, sort: string, order: string, page: number,
+        ) => Promise<Repo[]>)(token, translated.query, opts.capPerHost, translated.sort, translated.order, page)
     const result = await withTimeout(work, timeout)
     if (!Array.isArray(result)) return []
     const filtered = translated.postFilter ? result.filter(translated.postFilter) : result
