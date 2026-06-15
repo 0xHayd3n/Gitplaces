@@ -3,6 +3,7 @@ import path from 'path'
 import { randomUUID } from 'node:crypto'
 import { slugifyName, dedupeHandle } from '../src/utils/agentSlug'
 import { hashHandleToColor } from '../src/utils/colorHarmony'
+import { migrateRepoIdHostPrefix } from './db-helpers'
 
 export function initSchema(db: Database.Database): void {
   db.pragma('journal_mode = WAL')
@@ -509,6 +510,12 @@ export function initSchema(db: Database.Database): void {
   try { db.exec(`ALTER TABLE repo_stats_cache     ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
   try { db.exec(`ALTER TABLE repo_momentum_cache  ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
   try { db.exec(`ALTER TABLE repo_releases_cache  ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
+
+  // Phase 29 — host-prefix non-GitHub `repos.id` values so cross-host
+  // collisions on the single-column PK become impossible. Public github.com
+  // keeps the bare numeric id (preserves existing rows). See
+  // db-helpers.migrateRepoIdHostPrefix for the full rationale and FK cascade.
+  migrateRepoIdHostPrefix(db)
 
   // Post-migration indexes (reference columns added via ALTER TABLE)
   db.exec(`

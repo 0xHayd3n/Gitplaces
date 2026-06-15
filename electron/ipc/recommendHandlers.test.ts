@@ -23,9 +23,13 @@ vi.mock('../color-extractor', () => ({
   extractDominantColor: vi.fn().mockResolvedValue({ h: 220, s: 0.25, l: 0.18 }),
 }))
 
-vi.mock('../db-helpers', () => ({
-  cascadeRepoId: vi.fn(),
-}))
+vi.mock('../db-helpers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../db-helpers')>()
+  return {
+    ...actual,
+    cascadeRepoId: vi.fn(),
+  }
+})
 
 vi.mock('../../src/lib/classifyRepoType', () => ({
   classifyRepoBucket: vi.fn().mockReturnValue({ bucket: 'dev-tools', subType: 'cli' }),

@@ -20,7 +20,7 @@ import { repoRowToSavedRepo } from '../repoNormalize'
 import { classifyRepoBucket } from '../../src/lib/classifyRepoType'
 import { extractDominantColor } from '../color-extractor'
 import { poolAll } from '../concurrency'
-import { cascadeRepoId, readLastCommitCache, writeLastCommitCache, readCompareCache, writeCompareCache } from '../db-helpers'
+import { cascadeRepoId, readLastCommitCache, writeLastCommitCache, readCompareCache, writeCompareCache, repoRowId } from '../db-helpers'
 import { getRepoUserEvents } from '../services/repoUserEvents'
 import { getRepoStats, getRepoMomentum } from '../services/repoStats'
 import { checkIsFork } from '../services/updateService'
@@ -93,7 +93,7 @@ function upsertReposToDb(
 
   db.transaction(() => {
     for (const repo of items) {
-      const rid = String(repo.hostNativeId)
+      const rid = repoRowId(repo.hostId, repo.hostNativeId)
       cascadeRepoId(db, repo.owner, repo.name, rid)
       const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: repo.topics })
       upsert.run(
@@ -168,7 +168,7 @@ export function registerRepoHandlers(): void {
     }
 
     const classified = classifyRepoBucket({ name: repo.name, description: repo.description, topics: repo.topics })
-    const rid = String(repo.hostNativeId)
+    const rid = repoRowId(hostId, repo.hostNativeId)
     cascadeRepoId(db, owner, name, rid)
     db.prepare(`
       INSERT INTO repos (id, host_id, owner, name, description, language, topics, stars, forks, license,
@@ -495,7 +495,8 @@ export function registerRepoHandlers(): void {
 
     const r = bundle.repo
     const classified = classifyRepoBucket({ name: r.name, description: r.description, topics: r.topics ?? [] })
-    cascadeRepoId(db, owner, name, String(r.id))
+    const rid = repoRowId(HOST_ID_GITHUB, r.id)
+    cascadeRepoId(db, owner, name, rid)
     db.prepare(`
       INSERT INTO repos (id, host_id, owner, name, description, language, topics, stars, forks, license,
                          homepage, updated_at, pushed_at, created_at, saved_at, type, banner_svg,
@@ -526,7 +527,7 @@ export function registerRepoHandlers(): void {
         type_bucket    = excluded.type_bucket,
         type_sub       = excluded.type_sub
     `).run(
-      String(r.id), HOST_ID_GITHUB, owner, name, r.description, r.language,
+      rid, HOST_ID_GITHUB, owner, name, r.description, r.language,
       JSON.stringify(r.topics ?? []), r.stargazers_count, r.forks_count,
       r.license?.spdx_id ?? null, r.homepage, r.updated_at, r.pushed_at,
       r.created_at ?? null,

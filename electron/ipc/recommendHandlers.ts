@@ -11,7 +11,7 @@ import { buildUserProfile } from '../services/userProfile'
 import { computeCorpusStats } from '../services/corpusStats'
 import { planQueries, fetchCandidates, type CandidateRepo } from '../services/recommendationFetcher'
 import { getRecentClicks, pruneOldEvents } from '../services/engagementTracker'
-import { cascadeRepoId } from '../db-helpers'
+import { cascadeRepoId, repoRowId } from '../db-helpers'
 import type { RecommendationResponse, RecommendationItem } from '../../src/types/recommendation'
 import type { RepoRow } from '../db-row-types'
 import { repoRowToSavedRepo } from '../repoNormalize'
@@ -100,15 +100,7 @@ function upsertCandidates(
 
   db.transaction(() => {
     for (const repo of candidates) {
-      // PHASE 9 FOLLOW-UP: `repos.id` PK is the host's native numeric id as
-      // a string — two repos with the same numeric id across different hosts
-      // (e.g. GitLab #42 and Codeberg #42) collide on `ON CONFLICT(id)` and
-      // silently overwrite each other. Real-world collision probability is
-      // low (id ranges across hosts barely overlap) but it's a correctness
-      // hole. Phase 9 should migrate the PK to (id, host_id) composite or
-      // pre-compose `${hostId}:${hostNativeId}` here. Same comment applies
-      // to repoHandlers.ts upsertReposToDb + the repo:get handler.
-      const rid = String(repo.hostNativeId)
+      const rid = repoRowId(repo.hostId, repo.hostNativeId)
       cascadeRepoId(db, repo.owner, repo.name, rid)
       const classified = classifyRepoBucket({
         name: repo.name,
@@ -148,7 +140,7 @@ function readBackRows(
   db: Database.Database,
   candidates: Awaited<ReturnType<typeof fetchCandidates>>,
 ): Map<string, RepoRow> {
-  const ids = candidates.map(c => String(c.hostNativeId))
+  const ids = candidates.map(c => repoRowId(c.hostId, c.hostNativeId))
   if (ids.length === 0) return new Map()
   const placeholders = ids.map(() => '?').join(',')
   const rows = db.prepare(`SELECT * FROM repos WHERE id IN (${placeholders})`).all(...ids) as RepoRow[]
@@ -209,7 +201,7 @@ export async function getRecommendedHandler(
     const coldByIdMap = readBackRows(db, coldCandidates)
     const items: RecommendationItem[] = coldCandidates
       .map((repo): RecommendationItem | null => {
-        const row = coldByIdMap.get(String(repo.hostNativeId))
+        const row = coldByIdMap.get(repoRowId(repo.hostId, repo.hostNativeId))
         if (!row) return null
         return {
           repo: repoRowToSavedRepo(row), score: 0,
@@ -240,12 +232,13 @@ export async function getRecommendedHandler(
   const existingIds = new Set(userRepos.map((r) => String(r.id)))
   const githubUsernameRow = db.prepare("SELECT value FROM settings WHERE key = 'github_username'").get() as { value: string } | undefined
   const githubUsername = githubUsernameRow?.value?.toLowerCase() ?? null
-  candidates = candidates.filter((c) =>
-    !existingIds.has(String(c.hostNativeId)) &&
-    !excludeSet.has(String(c.hostNativeId)) &&
-    !profile.engagement.clickedRepoIds.has(String(c.hostNativeId)) &&
-    (!githubUsername || c.owner.toLowerCase() !== githubUsername)
-  )
+  candidates = candidates.filter((c) => {
+    const rid = repoRowId(c.hostId, c.hostNativeId)
+    return !existingIds.has(rid) &&
+           !excludeSet.has(rid) &&
+           !profile.engagement.clickedRepoIds.has(rid) &&
+           (!githubUsername || c.owner.toLowerCase() !== githubUsername)
+  })
 
   const ranked = rankCandidates(candidates, profile, corpus)
 
@@ -254,7 +247,7 @@ export async function getRecommendedHandler(
 
   const items: RecommendationItem[] = ranked
     .map((item): RecommendationItem | null => {
-      const row = byIdMap.get(String(item.repo.hostNativeId))
+      const row = byIdMap.get(repoRowId(item.repo.hostId, item.repo.hostNativeId))
       if (!row) return null
       return { ...item, repo: repoRowToSavedRepo(row) }
     })
@@ -273,7 +266,7 @@ export async function getRecommendedHandler(
       const coldByIdMap = readBackRows(db, coldCandidates)
       const fallbackItems: RecommendationItem[] = coldCandidates
         .map((repo): RecommendationItem | null => {
-          const row = coldByIdMap.get(String(repo.hostNativeId))
+          const row = coldByIdMap.get(repoRowId(repo.hostId, repo.hostNativeId))
           if (!row) return null
           return {
             repo: repoRowToSavedRepo(row), score: 0,

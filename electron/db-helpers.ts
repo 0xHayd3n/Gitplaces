@@ -2,6 +2,72 @@
 // Shared DB utilities used by both main.ts and IPC handlers.
 import type Database from 'better-sqlite3'
 import type { LastCommitInfo, CompareFile } from './providers/github'
+import { HOST_ID_GITHUB } from './providers/types'
+
+/**
+ * Compose the `repos.id` PK value for a row.
+ *
+ * Public github.com keeps the bare numeric id (preserves existing PK format
+ * across every pre-Phase-29 row). Every other host — GitLab, Gitea, GHE —
+ * prefixes the id with its `hostId` so disjoint id spaces can't collide on
+ * the single-column `repos.id` primary key. See the Phase 29 migration in
+ * `initSchema` for the matching backfill.
+ */
+export function repoRowId(hostId: string, hostNativeId: string | number): string {
+  const nativeIdStr = String(hostNativeId)
+  return hostId === HOST_ID_GITHUB ? nativeIdStr : `${hostId}:${nativeIdStr}`
+}
+
+/**
+ * Phase 29 — host-prefix migration for `repos.id`.
+ *
+ * For any non-GitHub row whose `repos.id` is a bare numeric id (no `:` or `/`),
+ * rewrite `repos.id` to `host_id || ':' || id` and cascade the same rewrite
+ * across every FK child table that references `repos(id)`. This closes the
+ * cross-host ON CONFLICT(id) collision hole that opened once the
+ * recommendation engine and the mixed-host Discover grid started returning
+ * non-GitHub candidates (commits `17b4a34` / `daabe5c`).
+ *
+ * Idempotent: the `id NOT LIKE '%:%'` guard skips already-prefixed rows on
+ * re-run. Synthetic `owner/name` rows (`id LIKE '%/%'`, created by
+ * `repo:star` for repos the user hasn't fetched yet) are left alone —
+ * `cascadeRepoId` promotes them when the real metadata arrives.
+ */
+export function migrateRepoIdHostPrefix(db: Database.Database): void {
+  db.pragma('defer_foreign_keys = ON')
+  const txn = db.transaction(() => {
+    const fkTables = [
+      'skills',
+      'collection_repos',
+      'sub_skills',
+      'last_commits',
+      'compare_diffs',
+      'repo_notes',
+    ]
+    for (const table of fkTables) {
+      db.prepare(`
+        UPDATE ${table} SET repo_id = (
+          SELECT host_id || ':' || repos.id
+          FROM repos
+          WHERE repos.id = ${table}.repo_id
+        )
+        WHERE repo_id IN (
+          SELECT id FROM repos
+          WHERE host_id != 'gh:api.github.com'
+            AND id NOT LIKE '%:%'
+            AND id NOT LIKE '%/%'
+        )
+      `).run()
+    }
+    db.prepare(`
+      UPDATE repos SET id = host_id || ':' || id
+      WHERE host_id != 'gh:api.github.com'
+        AND id NOT LIKE '%:%'
+        AND id NOT LIKE '%/%'
+    `).run()
+  })
+  txn()
+}
 
 /**
  * Cascade-update the repo primary key from a synthetic "owner/name" ID to the
