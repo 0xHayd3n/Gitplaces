@@ -70,6 +70,7 @@ import type { RepoActivityItem } from '../types/repoActivity'
 import FilesTab from '../components/FilesTab'
 import { useRepoNav } from '../contexts/RepoNav'
 import { HOST_ID_GITHUB } from '../lib/hostIds'
+import { useHostCapabilities } from '../hooks/useHostCapabilities'
 const StorybookExplorer = lazy(() => import('../components/StorybookExplorer'))
 const ComponentExplorer = lazy(() => import('../components/ComponentExplorer'))
 import { isComponentLibraryRepo } from '../utils/componentLibraryDetector'
@@ -542,6 +543,7 @@ function writeSessionCache<T>(map: Map<string, { value: T; ts: number }>, key: s
 export default function RepoDetail() {
   const { hostId: hostIdParam, owner, name } = useParams<{ hostId?: string; owner: string; name: string }>()
   const hostId = hostIdParam ? decodeURIComponent(hostIdParam) : HOST_ID_GITHUB
+  const hostCaps = useHostCapabilities(hostId)
   const navigate = useNavigate()
   const location = useLocation()
   const inLibrary = location.pathname.startsWith('/library/')
@@ -607,7 +609,14 @@ export default function RepoDetail() {
   // IPC until the user is actually there. Activities is the default tab so
   // most users still trigger this on first load; users who deep-link to
   // another tab don't pay for stats they never see.
-  const rawRepoStats = useRepoStats(hostId, owner, name, activeTab === 'activities')
+  // Stats sidebar pulls GitHub-only signals (vulnerabilities, code-scanning,
+  // momentum derived from received_events). Skip the IPC entirely for hosts
+  // that don't expose any of those; the sidebar handles the missing payload.
+  const statsEnabled = activeTab === 'activities' && (hostCaps == null
+    || hostCaps.vulnerabilityAlerts
+    || hostCaps.codeScanningAlerts
+    || hostCaps.events)
+  const rawRepoStats = useRepoStats(hostId, owner, name, statsEnabled)
   const repoStats = useMemo(() => {
     if (rawRepoStats === 'loading' || rawRepoStats === 'error') return rawRepoStats
     if (lastReleaseDate === null || rawRepoStats.health.daysSinceCommit === undefined) {
@@ -843,8 +852,14 @@ const [skillRow, setSkillRow] = useState<SkillRow | null>(null)
     // Phase 4H — bundled GraphQL fetch. One round-trip replaces the separate
     // getRepo + getReleases + isStarred REST calls. On failure we degrade
     // gracefully to the per-endpoint IPCs (which themselves still benefit from
-    // ETag and DB caches from Phases 2-3).
-    window.api.repo.fetchBundle(hostId, owner, name)
+    // ETag and DB caches from Phases 2-3). Phase 6 — skip the bundle entirely
+    // for hosts that don't expose it (GitLab/Gitea); the .then() handler
+    // already does the right thing on `bundle === null` (falls back to REST).
+    const bundlePromise: Promise<Awaited<ReturnType<typeof window.api.repo.fetchBundle>>> =
+      hostCaps?.graphqlBundle === false
+        ? Promise.resolve(null)
+        : window.api.repo.fetchBundle(hostId, owner, name)
+    bundlePromise
       .then((bundle) => {
         if (cancelled) return
         if (!bundle) {
