@@ -558,38 +558,40 @@ export default function Discover() {
     }
   }, [])
 
-  /** Map a (viewMode, langKey, filters, subTypeKw) tuple to a `UnifiedQuery`
-   *  when the inputs are simple enough to translate cleanly across all hosts.
-   *  Returns null when the inputs need GitHub-style filtering — `language:`
-   *  qualifier, `stars:` ranges, custom subtype topic combos — that don't
-   *  translate well to GitLab/Gitea. Callers fall back to GitHub-only search
-   *  in that case. */
+  /** Map a (viewMode, langKey, filters, subTypeKw) tuple to a `UnifiedQuery`.
+   *  Filters compose into the UnifiedQuery's `filters` field; the merger
+   *  encodes them per host (GitHub via query qualifiers, GitLab/Gitea via
+   *  REST params + a postFilter for fields they can't express natively). */
   function toUnifiedQuery(
     vm: ViewModeKey,
     langKey: string,
     filters: SearchFilters,
     subTypeKw?: string,
   ): import('../../electron/providers/discoverMerge').UnifiedQuery | null {
-    // Any cross-host-incompatible filter forces a GitHub-only fallback.
-    if (langKey) return null
-    if (filters.activity || filters.stars || filters.license) return null
+    const unifiedFilters: import('../../electron/providers/discoverMerge').UnifiedFilters = {}
+    if (langKey) unifiedFilters.language = langKey
+    if (filters.stars) unifiedFilters.minStars = filters.stars
+    if (filters.license) unifiedFilters.license = filters.license
+    if (filters.activity) unifiedFilters.activityWindow = filters.activity
+    const filtersPresent = Object.keys(unifiedFilters).length > 0
+    const withFilters = <Q extends import('../../electron/providers/discoverMerge').UnifiedQuery>(q: Q): Q =>
+      filtersPresent ? { ...q, filters: unifiedFilters } : q
 
-    // Sub-type filter: convert to a topic query when present (it's already
-    // expressed as `topic:xxx` for GitHub; we strip the prefix for the
-    // unified shape and let translateQuery re-emit it per host).
+    // Sub-type filter: convert to a topic query when present (strip the
+    // `topic:` qualifier prefix; translateQuery re-emits per-host).
     if (subTypeKw) {
       const topic = subTypeKw.replace(/^topic:/, '').trim()
       if (topic.length === 0) return null
-      return { kind: 'topic', topic }
+      return withFilters({ kind: 'topic', topic })
     }
 
     switch (vm) {
       case 'home':
-      case 'popular':       return { kind: 'popular' }
-      case 'agents':        return { kind: 'topic', topic: 'ai-agent' }
-      case 'hot-today':     return { kind: 'hot-today' }
-      case 'trending-week': return { kind: 'trending-week' }
-      case 'hidden-gems':   return { kind: 'hidden-gems' }
+      case 'popular':       return withFilters({ kind: 'popular' })
+      case 'agents':        return withFilters({ kind: 'topic', topic: 'ai-agent' })
+      case 'hot-today':     return withFilters({ kind: 'hot-today' })
+      case 'trending-week': return withFilters({ kind: 'trending-week' })
+      case 'hidden-gems':   return withFilters({ kind: 'hidden-gems' })
       case 'recommended':   return null  // handled by separate IPC
     }
     return null
