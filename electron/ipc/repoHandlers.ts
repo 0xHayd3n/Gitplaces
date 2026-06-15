@@ -638,8 +638,10 @@ export function registerRepoHandlers(): void {
     const info = db.prepare('UPDATE repos SET saved_at = ? WHERE owner = ? AND name = ?')
       .run(ts, owner, name)
     if (info.changes === 0) throw new Error(`saveRepo: row not found for ${owner}/${name}`)
-    const saved = db.prepare('SELECT language FROM repos WHERE id = ?').get(`${owner}/${name}`) as { language: string | null } | undefined
-    enqueueRepo({ repoId: `${owner}/${name}`, owner, name, language: saved?.language ?? null, priority: 'high' })
+    const saved = db.prepare('SELECT id, language FROM repos WHERE owner = ? AND name = ?')
+      .get(owner, name) as { id: string; language: string | null } | undefined
+    if (!saved) throw new Error(`saveRepo: row not found for ${owner}/${name}`)
+    enqueueRepo({ repoId: saved.id, owner, name, language: saved.language ?? null, priority: 'high' })
     setImmediate(async () => {
       let storedVersion: string | null = null
       try {
