@@ -79,6 +79,7 @@ export function removeHost(id: string): void {
 const DEFAULT_HOSTS: ReadonlyArray<Omit<HostInstance, 'addedAt'>> = [
   { id: HOST_ID_GITHUB, type: 'github', baseUrl: 'https://api.github.com', label: 'GitHub' },
   { id: 'gl:gitlab.com', type: 'gitlab', baseUrl: 'https://gitlab.com', label: 'GitLab.com' },
+  { id: 'gt:codeberg.org', type: 'gitea', baseUrl: 'https://codeberg.org', label: 'Codeberg' },
 ]
 
 export function seedDefaultHosts(): void {

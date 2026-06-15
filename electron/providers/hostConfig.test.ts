@@ -29,10 +29,10 @@ describe('hostConfig', () => {
     expect(listHosts()).toEqual([])
   })
 
-  it('seedDefaultHosts seeds GitHub and GitLab.com on first run', () => {
+  it('seedDefaultHosts seeds GitHub, GitLab.com, and Codeberg on first run', () => {
     seedDefaultHosts()
     const hosts = listHosts()
-    expect(hosts).toHaveLength(2)
+    expect(hosts).toHaveLength(3)
 
     const gh = hosts.find(h => h.id === HOST_ID_GITHUB)
     expect(gh).toBeDefined()
@@ -45,32 +45,40 @@ describe('hostConfig', () => {
     expect(gl!.type).toBe('gitlab')
     expect(gl!.baseUrl).toBe('https://gitlab.com')
     expect(gl!.label).toBe('GitLab.com')
+
+    const gt = hosts.find(h => h.id === 'gt:codeberg.org')
+    expect(gt).toBeDefined()
+    expect(gt!.type).toBe('gitea')
+    expect(gt!.baseUrl).toBe('https://codeberg.org')
+    expect(gt!.label).toBe('Codeberg')
   })
 
   it('seedDefaultHosts is idempotent across repeat calls', () => {
     seedDefaultHosts()
     seedDefaultHosts()
-    expect(listHosts()).toHaveLength(2)
+    expect(listHosts()).toHaveLength(3)
   })
 
-  it('seedDefaultHosts preserves a pre-existing GitHub entry but still adds GitLab', () => {
+  it('seedDefaultHosts preserves pre-existing entries but still adds missing defaults', () => {
     addHost({ type: 'github', baseUrl: 'https://api.github.com', label: 'GitHub (renamed)' })
     seedDefaultHosts()
     const hosts = listHosts()
-    expect(hosts).toHaveLength(2)
+    expect(hosts).toHaveLength(3)
     expect(hosts.find(h => h.id === HOST_ID_GITHUB)!.label).toBe('GitHub (renamed)')
     expect(hosts.find(h => h.id === 'gl:gitlab.com')).toBeDefined()
+    expect(hosts.find(h => h.id === 'gt:codeberg.org')).toBeDefined()
   })
 
   it('addHost adds a self-hosted instance with a computed id', () => {
     seedDefaultHosts()
-    addHost({ type: 'gitlab', baseUrl: 'https://gitlab.acme.com', label: 'Acme GitLab' })
+    addHost({ type: 'gitea', baseUrl: 'https://gitea.acme.com', label: 'Acme Gitea' })
     const hosts = listHosts()
-    expect(hosts).toHaveLength(3)
+    expect(hosts).toHaveLength(4)
     expect(hosts.map(h => h.id).sort()).toEqual([
       'gh:api.github.com',
-      'gl:gitlab.acme.com',
       'gl:gitlab.com',
+      'gt:codeberg.org',
+      'gt:gitea.acme.com',
     ])
   })
 
@@ -83,14 +91,15 @@ describe('hostConfig', () => {
 
   it('getHost returns null for unknown ids', () => {
     seedDefaultHosts()
-    expect(getHost('gt:codeberg.org')).toBeNull()
+    expect(getHost('gt:gitea.acme.com')).toBeNull()
+    expect(getHost('xx:nothing.example')).toBeNull()
   })
 
   it('removeHost removes the given instance', () => {
     seedDefaultHosts()
     addHost({ type: 'gitlab', baseUrl: 'https://gitlab.acme.com', label: 'Acme GitLab' })
     removeHost('gl:gitlab.acme.com')
-    expect(listHosts()).toHaveLength(2)
+    expect(listHosts()).toHaveLength(3)
     expect(getHost('gl:gitlab.acme.com')).toBeNull()
   })
 })
