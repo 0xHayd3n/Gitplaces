@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { vi, describe, it, expect, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 import { useHostCapabilities, _resetCapabilitiesCacheForTest } from './useHostCapabilities'
 
 const getCaps = vi.fn()
@@ -86,7 +86,8 @@ describe('useHostCapabilities', () => {
       trendingDiscovery: true, graphqlBundle: false, isVerifiedOrg: false,
     })
     // Simulate the main process broadcasting that this host's caps changed.
-    listeners.forEach(fn => fn({ hostId: 'gt:codeberg.org' }))
+    // Wrap in act() because the listener triggers a setState inside the hook.
+    act(() => { listeners.forEach(fn => fn({ hostId: 'gt:codeberg.org' })) })
 
     await waitFor(() => expect(a.result.current?.vulnerabilityAlerts).toBe(true))
     expect(getCaps).toHaveBeenCalledTimes(2)
@@ -110,7 +111,8 @@ describe('useHostCapabilities', () => {
     expect(getCaps).toHaveBeenCalledTimes(1)
 
     // Event fires for a different host — must NOT trigger a refetch.
-    listeners.forEach(fn => fn({ hostId: 'gt:codeberg.org' }))
+    // act() wrap matches the sibling case; harmless when no state changes.
+    act(() => { listeners.forEach(fn => fn({ hostId: 'gt:codeberg.org' })) })
     // Yield to the event loop so a hypothetical re-fetch would have started.
     await Promise.resolve()
     expect(getCaps).toHaveBeenCalledTimes(1)
