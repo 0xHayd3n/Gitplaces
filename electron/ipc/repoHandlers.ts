@@ -9,6 +9,7 @@ import { ipcMain, app } from 'electron'
 import { getDb } from '../db'
 import { getProvider, getAnyProvider, type AnyProvider } from '../providers/registry'
 import { getToken } from '../providers/tokenStore'
+import { HOST_ID_GITHUB } from '../providers/types'
 import {
   githubReleaseToRelease,
   githubRepoToRepo,
@@ -141,7 +142,11 @@ export function registerRepoHandlers(): void {
   // ── Read ────────────────────────────────────────────────────────
   ipcMain.handle('repo:get', async (_event, hostId: string, owner: string, name: string) => {
     const { provider, token } = resolveAny(hostId)
-    if (!token) return null
+    // GitHub aggressively rate-limits anonymous reads; the historical behaviour
+    // is to bail early and surface the null to the renderer (which then shows a
+    // login prompt). GitLab and Gitea serve public repos anonymously — let those
+    // hosts through so Codeberg browsing works before the user pastes a PAT.
+    if (!token && hostId === HOST_ID_GITHUB) return null
     const db = getDb(app.getPath('userData'))
 
     const fresh = db.prepare(
@@ -301,8 +306,13 @@ export function registerRepoHandlers(): void {
     ).get(owner, name) as { fetched_at: number; data: string } | undefined
     if (cached && Date.now() - cached.fetched_at < RELEASES_CACHE_TTL_MS) {
       try {
-        const parsed = JSON.parse(cached.data) as import('../providers/github').GitHubRelease[]
-        return parsed.map(githubReleaseToRelease)
+        const parsed = JSON.parse(cached.data) as unknown[]
+        // The cached blob may be raw `GitHubRelease[]` (snake_case) from GitHub
+        // OR canonical `Release[]` (camelCase) from GitLab/Gitea. Discriminate
+        // by checking for `tag_name` on the first row.
+        return Array.isArray(parsed) && parsed.length > 0 && parsed[0] && 'tag_name' in (parsed[0] as object)
+          ? (parsed as import('../providers/github').GitHubRelease[]).map(githubReleaseToRelease)
+          : parsed as import('../../src/types/repo').Release[]
       } catch { /* fall through to refetch */ }
     }
 
@@ -486,12 +496,13 @@ export function registerRepoHandlers(): void {
     const classified = classifyRepoBucket({ name: r.name, description: r.description, topics: r.topics ?? [] })
     cascadeRepoId(db, owner, name, String(r.id))
     db.prepare(`
-      INSERT INTO repos (id, owner, name, description, language, topics, stars, forks, license,
+      INSERT INTO repos (id, host_id, owner, name, description, language, topics, stars, forks, license,
                          homepage, updated_at, pushed_at, created_at, saved_at, type, banner_svg,
                          discovered_at, discover_query, watchers, size, open_issues, default_branch, avatar_url,
                          type_bucket, type_sub)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
+        host_id        = excluded.host_id,
         owner          = excluded.owner,
         name           = excluded.name,
         description    = excluded.description,
@@ -514,7 +525,7 @@ export function registerRepoHandlers(): void {
         type_bucket    = excluded.type_bucket,
         type_sub       = excluded.type_sub
     `).run(
-      String(r.id), owner, name, r.description, r.language,
+      String(r.id), HOST_ID_GITHUB, owner, name, r.description, r.language,
       JSON.stringify(r.topics ?? []), r.stargazers_count, r.forks_count,
       r.license?.spdx_id ?? null, r.homepage, r.updated_at, r.pushed_at,
       r.created_at ?? null,
@@ -628,6 +639,10 @@ export function registerRepoHandlers(): void {
     const saved = db.prepare('SELECT language FROM repos WHERE id = ?').get(`${owner}/${name}`) as { language: string | null } | undefined
     enqueueRepo({ repoId: `${owner}/${name}`, owner, name, language: saved?.language ?? null, priority: 'high' })
     setImmediate(async () => {
+      // PHASE 7 FOLLOW-UP: this stored_version probe is hard-wired to GitHub's
+      // /releases/latest endpoint. For Codeberg / GitLab / self-hosted hosts
+      // this fetch either 404s or hits an unrelated repo with the same slug —
+      // a Phase 7 task should route through `provider.getReleases` instead.
       const token = getToken(hostId) ?? null
       const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
       if (token) headers.Authorization = `Bearer ${token}`

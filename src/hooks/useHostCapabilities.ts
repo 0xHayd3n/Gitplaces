@@ -39,11 +39,17 @@ export function useHostCapabilities(hostId: string | null): ProviderCapabilities
     if (typeof ipc !== 'function') { setCaps(null); return }
 
     let cancelled = false
-    const existing = inflight.get(hostId)
-    const promise = existing ?? ipc(hostId)
-      .then(c => { cache.set(hostId, c); inflight.delete(hostId); return c })
-      .catch(() => { inflight.delete(hostId); return null })
-    inflight.set(hostId, promise)
+    let promise = inflight.get(hostId)
+    if (!promise) {
+      // Register the inflight entry BEFORE chaining `.then`/`.catch`. If we
+      // chained first and then set, a concurrent caller landing between the
+      // chain and the set would see no inflight entry, fire a duplicate IPC,
+      // and overwrite our entry on its own set.
+      promise = ipc(hostId)
+        .then(c => { cache.set(hostId, c); inflight.delete(hostId); return c })
+        .catch(() => { inflight.delete(hostId); return null })
+      inflight.set(hostId, promise)
+    }
     promise.then(c => { if (!cancelled) setCaps(c) })
     return () => { cancelled = true }
   }, [hostId])
