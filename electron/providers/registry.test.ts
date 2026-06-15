@@ -1,9 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from 'vitest'
 import { HOST_ID_GITHUB } from './types'
-import { getProvider, getAnyProvider, getDefaultProvider, _resetGitLabCacheForTest } from './registry'
+import { getProvider, getAnyProvider, getDefaultProvider, _resetGitLabCacheForTest, _resetGiteaCacheForTest } from './registry'
 import { GitHubProvider } from './github'
 import { GitLabProvider } from './gitlab'
+import { GiteaProvider } from './gitea'
 import { setHostConfigBackend, seedDefaultHosts, type HostConfigBackend } from './hostConfig'
 
 function makeMapBackend(): HostConfigBackend {
@@ -18,6 +19,7 @@ function makeMapBackend(): HostConfigBackend {
 describe('registry', () => {
   beforeEach(() => {
     _resetGitLabCacheForTest()
+    _resetGiteaCacheForTest()
     setHostConfigBackend(makeMapBackend())
     seedDefaultHosts()
   })
@@ -32,6 +34,7 @@ describe('registry', () => {
     // getProvider intentionally narrows so those paths reject non-GitHub hosts
     // up front rather than failing later with method-not-found.
     expect(getProvider('gl:gitlab.com')).toBeNull()
+    expect(getProvider('gt:codeberg.org')).toBeNull()
   })
 
   it('getAnyProvider returns a GitLab provider for gl:gitlab.com after seeding', () => {
@@ -51,6 +54,27 @@ describe('registry', () => {
     expect(a).toBe(b)
   })
 
+  it('getAnyProvider returns a Gitea provider for gt:codeberg.org after seeding', () => {
+    const p = getAnyProvider('gt:codeberg.org')
+    expect(p).toBeInstanceOf(GiteaProvider)
+    expect(p && p.baseUrl).toBe('https://codeberg.org')
+    expect(p && p.hostType).toBe('gitea')
+  })
+
+  it('getAnyProvider memoizes the Gitea instance across calls', () => {
+    const a = getAnyProvider('gt:codeberg.org')
+    const b = getAnyProvider('gt:codeberg.org')
+    expect(a).toBe(b)
+  })
+
+  it('GitLab and Gitea providers do not collide on memoization', () => {
+    const gl = getAnyProvider('gl:gitlab.com')
+    const gt = getAnyProvider('gt:codeberg.org')
+    expect(gl).toBeInstanceOf(GitLabProvider)
+    expect(gt).toBeInstanceOf(GiteaProvider)
+    expect(gl).not.toBe(gt)
+  })
+
   it('getProvider memoizes the GitHub instance across calls', () => {
     const a = getProvider(HOST_ID_GITHUB)
     const b = getProvider(HOST_ID_GITHUB)
@@ -58,9 +82,9 @@ describe('registry', () => {
   })
 
   it('returns null for unknown host ids', () => {
-    expect(getProvider('gt:codeberg.org')).toBeNull()
-    expect(getAnyProvider('gt:codeberg.org')).toBeNull()
+    expect(getAnyProvider('gt:gitea.acme.com')).toBeNull()   // not seeded
     expect(getAnyProvider('gl:gitlab.acme.com')).toBeNull()  // not seeded
+    expect(getAnyProvider('xx:nothing.example')).toBeNull()  // unknown prefix
   })
 
   it('getDefaultProvider returns the GitHub provider', () => {

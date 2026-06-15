@@ -2,33 +2,36 @@
 //
 // Maps a hostId to its concrete provider instance.
 //
-// Phase 1 added GitHub. Phase 4 widens the registry to also know about GitLab —
+// Phase 1 added GitHub. Phase 4 widened the registry to also know about GitLab —
 // both gitlab.com (seeded) and any self-hosted instance the user adds later via
-// the Connections pane (Phase 7). GitLab providers are constructed lazily from
-// `HostInstance.baseUrl` so the registry doesn't need a build-time list of
-// self-hosted hosts. Phase 5 will append Gitea the same way.
+// the Connections pane. Phase 5 appends Gitea the same way: gt:codeberg.org is
+// seeded on first launch, and any user-added gt: instance lazily resolves through
+// the same hostConfig lookup.
 //
 // Two accessors are exposed:
 //   - getProvider(hostId)     → GitHubProvider | null
 //     Legacy callers (electron/main.ts, electron/ipc/repoHandlers.ts) call
 //     GitHub-specific methods (getRepoTree, getProfileUser, getUserFollowing…)
-//     that don't exist on GitLab. This accessor returns null for non-GitHub
-//     hosts so those paths surface "Unknown host" rather than method-not-found
-//     at runtime. Phase 6 widens these paths when multi-host browsing lands.
+//     that don't exist on GitLab or Gitea. This accessor returns null for
+//     non-GitHub hosts so those paths surface "Unknown host" rather than
+//     method-not-found at runtime. Phase 6 widens these paths when multi-host
+//     browsing lands.
 //   - getAnyProvider(hostId)  → AnyProvider | null
 //     Host-management code (electron/ipc/hostHandlers.ts) treats every
 //     provider uniformly: getCurrentUser/startDeviceFlow/pollDeviceToken/
-//     capabilities all exist on both classes. This accessor returns whatever
+//     capabilities all exist on every class. This accessor returns whatever
 //     provider matches the hostId.
 
 import { HOST_ID_GITHUB } from './types'
 import { GitHubProvider, githubProvider } from './github'
 import { GitLabProvider } from './gitlab'
+import { GiteaProvider } from './gitea'
 import { getHost } from './hostConfig'
 
-export type AnyProvider = GitHubProvider | GitLabProvider
+export type AnyProvider = GitHubProvider | GitLabProvider | GiteaProvider
 
 const gitlabProviders = new Map<string, GitLabProvider>()
+const giteaProviders = new Map<string, GiteaProvider>()
 
 function resolveAny(hostId: string): AnyProvider | null {
   if (hostId === HOST_ID_GITHUB) return githubProvider
@@ -40,6 +43,16 @@ function resolveAny(hostId: string): AnyProvider | null {
     if (!host || host.type !== 'gitlab') return null
     const inst = new GitLabProvider(hostId, host.baseUrl)
     gitlabProviders.set(hostId, inst)
+    return inst
+  }
+
+  if (hostId.startsWith('gt:')) {
+    const cached = giteaProviders.get(hostId)
+    if (cached) return cached
+    const host = getHost(hostId)
+    if (!host || host.type !== 'gitea') return null
+    const inst = new GiteaProvider(hostId, host.baseUrl)
+    giteaProviders.set(hostId, inst)
     return inst
   }
 
@@ -67,4 +80,12 @@ export function getDefaultProvider(): GitHubProvider {
  */
 export function _resetGitLabCacheForTest(): void {
   gitlabProviders.clear()
+}
+
+/**
+ * Test-only: drop the lazy Gitea provider cache. See `_resetGitLabCacheForTest`
+ * for the same rationale.
+ */
+export function _resetGiteaCacheForTest(): void {
+  giteaProviders.clear()
 }
