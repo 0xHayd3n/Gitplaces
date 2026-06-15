@@ -173,7 +173,7 @@ describe('hosts:probe — Gitea', () => {
 describe('hosts:probe — kind-specific surfacing', () => {
   beforeEach(() => mockFetch.mockReset())
 
-  it('surfaces TLS handshake errors with the cert code', async () => {
+  it('surfaces TLS handshake errors with the friendly hint and cert code', async () => {
     mockFetch.mockImplementationOnce(() =>
       Promise.reject(Object.assign(new TypeError('fetch failed'), {
         cause: { code: 'CERT_HAS_EXPIRED' },
@@ -183,10 +183,11 @@ describe('hosts:probe — kind-specific surfacing', () => {
     const out = await probe({}, { type: 'gitlab', baseUrl: 'https://expired.example' }) as { ok: boolean; error: string }
     expect(out.ok).toBe(false)
     expect(out.error).toMatch(/TLS handshake failed/i)
+    expect(out.error).toMatch(/self-signed cert\? expired\?/i)
     expect(out.error).toMatch(/CERT_HAS_EXPIRED/)
   })
 
-  it('surfaces DNS / refused connections with "Could not reach"', async () => {
+  it('surfaces DNS / refused connections with "Could not reach" + "check the URL" hint', async () => {
     mockFetch.mockImplementationOnce(() =>
       Promise.reject(Object.assign(new TypeError('fetch failed'), {
         cause: { code: 'ENOTFOUND' },
@@ -196,6 +197,7 @@ describe('hosts:probe — kind-specific surfacing', () => {
     const out = await probe({}, { type: 'gitea', baseUrl: 'https://nope.example' }) as { ok: boolean; error: string }
     expect(out.ok).toBe(false)
     expect(out.error).toMatch(/could not reach https:\/\/nope\.example/i)
+    expect(out.error).toMatch(/check the URL/i)
     expect(out.error).toMatch(/ENOTFOUND/)
   })
 

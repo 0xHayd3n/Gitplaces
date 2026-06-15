@@ -125,13 +125,25 @@ function classifyFetchError(err: unknown, baseUrl: string): ServerVersionResult 
   const cause = (err as { cause?: { code?: string; message?: string } })?.cause
   const code = typeof cause?.code === 'string' ? cause.code : ''
   if (TLS_CODE_RE.test(code)) {
-    return { ok: false, errorKind: 'tls', error: `TLS handshake failed (${code})` }
+    return {
+      ok: false,
+      errorKind: 'tls',
+      error: `TLS handshake failed (self-signed cert? expired? — ${code})`,
+    }
   }
   if (NETWORK_CODE_RE.test(code)) {
-    return { ok: false, errorKind: 'network', error: `Could not reach ${baseUrl} (${code})` }
+    return {
+      ok: false,
+      errorKind: 'network',
+      error: `Could not reach ${baseUrl} — check the URL (${code})`,
+    }
   }
   const msg = (err as Error)?.message ?? String(err)
-  return { ok: false, errorKind: 'network', error: `Could not reach ${baseUrl} — ${msg}` }
+  return {
+    ok: false,
+    errorKind: 'network',
+    error: `Could not reach ${baseUrl} — check the URL (${msg})`,
+  }
 }
 
 export async function getServerVersion(baseUrl: string): Promise<ServerVersionResult> {
