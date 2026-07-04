@@ -100,7 +100,7 @@ interface ApiStoreSchema {
   'defaults.tagExtract'?: { provider: ProviderId; model: string; endpoint?: string }
 }
 
-const apiStore = new Store<ApiStoreSchema>({ encryptionKey: 'git-suite-api-key-v1' })
+const apiStore = new Store<ApiStoreSchema>({ encryptionKey: 'gitplaces-api-key-v1' })
 
 // ── API key (back-compat aliases) ───────────────────────────────
 export function getApiKey(): string | undefined {

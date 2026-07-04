@@ -237,7 +237,7 @@ export default function ConnectionsPanel() {
     <>
       <div className="connector-section-header">
         <p className="settings-hint" style={{ margin: 0, fontSize: 12.5, color: 'var(--t2)' }}>
-          Repository hosts Git Suite can browse and act on. Use a Personal Access Token for each.
+          Repository hosts Gitplaces can browse and act on. Use a Personal Access Token for each.
         </p>
       </div>
 

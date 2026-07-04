@@ -332,7 +332,7 @@ export function initSchema(db: Database.Database): void {
     ts          INTEGER NOT NULL
   )`)
 
-  // Repo notes (user's private per-repo notes, synced to gitsuite-skills)
+  // Repo notes (user's private per-repo notes, synced to gitplaces-skills)
   db.exec(`CREATE TABLE IF NOT EXISTS repo_notes (
     repo_id      TEXT PRIMARY KEY REFERENCES repos(id),
     notes        TEXT NOT NULL DEFAULT '',
@@ -494,7 +494,7 @@ export function initSchema(db: Database.Database): void {
   // Idempotent across re-runs (try/catch ignores "no such column" on second pass).
   try { db.exec(`ALTER TABLE agents DROP COLUMN body`) } catch {}
 
-  // Agents backup sync — per-file mirroring to the user's gitsuite-skills repo.
+  // Agents backup sync — per-file mirroring to the user's gitplaces-skills repo.
   // Tracked per-file (not per-agent) so adding/editing one file doesn't re-push
   // every file in the agent.
   try { db.exec(`ALTER TABLE agent_files ADD COLUMN backup_github_sha   TEXT`) } catch {}
@@ -535,7 +535,7 @@ let _db: Database.Database | null = null
 
 export function getDb(userData: string): Database.Database {
   if (!_db) {
-    _db = new Database(path.join(userData, 'gitsuite.db'))
+    _db = new Database(path.join(userData, 'gitplaces.db'))
     initSchema(_db)
   }
   return _db

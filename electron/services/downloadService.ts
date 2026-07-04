@@ -191,7 +191,7 @@ async function convertToDocx(html: string, defaultName: string): Promise<void> {
 async function convertToEpub(html: string, defaultName: string): Promise<void> {
   const { default: epub } = await import('epub-gen-memory')
   const epubBuffer = await epub(
-    { title: defaultName, author: 'Git Suite Export' },
+    { title: defaultName, author: 'Gitplaces Export' },
     [{ title: defaultName, content: html }],
   )
 

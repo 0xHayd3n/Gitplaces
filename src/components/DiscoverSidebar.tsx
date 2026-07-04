@@ -864,7 +864,7 @@ export default function DiscoverSidebar({
     <>
       {/* Icon rail */}
       <div ref={railRef} className="sidebar-rail">
-        <img src={logoSrc} alt="Git Suite" className="rail-logo" />
+        <img src={logoSrc} alt="Gitplaces" className="rail-logo" />
 
         <button
           className="rail-icon rail-icon-active"

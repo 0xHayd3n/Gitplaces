@@ -13,11 +13,11 @@ import * as os from 'os'
 export function getDataDir(): string {
   switch (process.platform) {
     case 'darwin':
-      return path.join(os.homedir(), 'Library', 'Application Support', 'git-suite')
+      return path.join(os.homedir(), 'Library', 'Application Support', 'gitplaces')
     case 'win32':
-      return path.join(process.env.APPDATA ?? os.homedir(), 'git-suite')
+      return path.join(process.env.APPDATA ?? os.homedir(), 'gitplaces')
     default:
-      return path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config'), 'git-suite')
+      return path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config'), 'gitplaces')
   }
 }
 
@@ -223,17 +223,17 @@ export function handleGetCollection(
 
 async function main(): Promise<void> {
   const dataDir = getDataDir()
-  const dbPath = path.join(dataDir, 'gitsuite.db')
+  const dbPath = path.join(dataDir, 'gitplaces.db')
 
   const dbExists = fs.existsSync(dbPath)
   if (!dbExists) {
-    process.stderr.write(`[git-suite-mcp] DB not found at ${dbPath}, starting in degraded mode\n`)
+    process.stderr.write(`[gitplaces-mcp] DB not found at ${dbPath}, starting in degraded mode\n`)
   }
 
   const db = dbExists ? new Database(dbPath, { readonly: true }) : null
 
   const server = new Server(
-    { name: 'git-suite', version: '1.0.0' },
+    { name: 'gitplaces', version: '1.0.0' },
     { capabilities: { tools: {} } }
   )
 
@@ -242,7 +242,7 @@ async function main(): Promise<void> {
       {
         name: 'list_skills',
         description:
-          'List all installed Git Suite skills that are currently active. Use this to understand what repositories the user has installed as skills.',
+          'List all installed Gitplaces skills that are currently active. Use this to understand what repositories the user has installed as skills.',
         inputSchema: { type: 'object', properties: {} },
       },
       {
@@ -304,7 +304,7 @@ async function main(): Promise<void> {
     const input = (args ?? {}) as Record<string, string>
 
     if (!db && name !== 'get_skill') {
-      return text('Git Suite database not found. Please open the Git Suite app first to initialize the database.')
+      return text('Gitplaces database not found. Please open the Gitplaces app first to initialize the database.')
     }
 
     switch (name) {
@@ -338,7 +338,7 @@ async function main(): Promise<void> {
 const scriptBasename = path.basename(process.argv[1] ?? '')
 if (scriptBasename === 'mcp-server.js' || scriptBasename === 'mcp-server.ts') {
   main().catch((err) => {
-    process.stderr.write(`[git-suite-mcp] Fatal: ${err}\n`)
+    process.stderr.write(`[gitplaces-mcp] Fatal: ${err}\n`)
     process.exit(1)
   })
 }

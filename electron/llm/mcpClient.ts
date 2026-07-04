@@ -34,7 +34,7 @@ export async function getMcpClient(): Promise<McpClientHandle> {
     })
 
     const client = new Client(
-      { name: 'git-suite-in-app-runner', version: '1.0.0' },
+      { name: 'gitplaces-in-app-runner', version: '1.0.0' },
       { capabilities: {} },
     )
 

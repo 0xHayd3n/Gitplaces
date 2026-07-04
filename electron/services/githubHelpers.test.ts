@@ -13,10 +13,10 @@ describe('createRepo', () => {
   it('POSTs to /user/repos and returns html_url', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ html_url: 'https://github.com/user/gitsuite-skills' })
+      json: async () => ({ html_url: 'https://github.com/user/gitplaces-skills' })
     })
-    const result = await createRepo('tok', 'gitsuite-skills')
-    expect(result.html_url).toBe('https://github.com/user/gitsuite-skills')
+    const result = await createRepo('tok', 'gitplaces-skills')
+    expect(result.html_url).toBe('https://github.com/user/gitplaces-skills')
     expect(mockFetch).toHaveBeenCalledWith(
       'https://api.github.com/user/repos',
       expect.objectContaining({ method: 'POST' })
@@ -25,7 +25,7 @@ describe('createRepo', () => {
 
   it('throws on non-ok response', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 422 })
-    await expect(createRepo('tok', 'gitsuite-skills')).rejects.toThrow('422')
+    await expect(createRepo('tok', 'gitplaces-skills')).rejects.toThrow('422')
   })
 })
 
@@ -35,7 +35,7 @@ describe('putFileContents', () => {
       ok: true,
       json: async () => ({ content: { sha: 'abc123' } })
     })
-    const result = await putFileContents('tok', 'user', 'gitsuite-skills', 'ms/vscode.skill.md', 'hello', 'update')
+    const result = await putFileContents('tok', 'user', 'gitplaces-skills', 'ms/vscode.skill.md', 'hello', 'update')
     expect(result.content.sha).toBe('abc123')
     const body = JSON.parse(mockFetch.mock.calls[0][1].body)
     expect(body.content).toBe(Buffer.from('hello').toString('base64'))

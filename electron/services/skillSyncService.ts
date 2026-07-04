@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3'
 import { getToken, getSyncEnabled, getSyncRepoOwner, setSyncEnabled, setSyncRepoOwner } from '../store'
 import { createRepo, putFileContents, getRepo } from '../providers/github'
 
-export const SKILLS_BACKUP_REPO = 'gitsuite-skills'
+export const SKILLS_BACKUP_REPO = 'gitplaces-skills'
 
 let _win: BrowserWindow | null = null
 let _db: Database.Database | null = null

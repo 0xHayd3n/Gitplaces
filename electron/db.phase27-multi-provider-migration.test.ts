@@ -7,7 +7,7 @@ import { getDb } from './db'
 
 describe('Phase 27 migration — multi-provider model columns', () => {
   it('adds model_provider column to agents with default "anthropic"', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitplaces-db-'))
     const db = getDb(dir)
     const cols = db.prepare("PRAGMA table_info('agents')").all() as { name: string; dflt_value: string | null; notnull: number }[]
     const col = cols.find(c => c.name === 'model_provider')
@@ -18,7 +18,7 @@ describe('Phase 27 migration — multi-provider model columns', () => {
   })
 
   it('adds model_endpoint_id column to agents as nullable', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitplaces-db-'))
     const db = getDb(dir)
     const cols = db.prepare("PRAGMA table_info('agents')").all() as { name: string; notnull: number }[]
     const col = cols.find(c => c.name === 'model_endpoint_id')
@@ -27,7 +27,7 @@ describe('Phase 27 migration — multi-provider model columns', () => {
   })
 
   it('backfills existing rows with model_provider="anthropic"', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitplaces-db-'))
     const db = getDb(dir)
     db.prepare(`
       INSERT INTO agents (id, name, handle, folder_id, created_at, updated_at, description, model)
@@ -39,7 +39,7 @@ describe('Phase 27 migration — multi-provider model columns', () => {
   })
 
   it('is idempotent — running getDb twice does not error', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitplaces-db-'))
     getDb(dir)
     expect(() => getDb(dir)).not.toThrow()
   })

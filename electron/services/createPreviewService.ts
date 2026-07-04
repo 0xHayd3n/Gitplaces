@@ -71,7 +71,7 @@ export function launchWidgetWindow(sessionId: string, localPath: string): Browse
     alwaysOnTop: true,
     frame: true,
     webPreferences: { nodeIntegration: false, contextIsolation: true },
-    title: 'Git Suite Widget',
+    title: 'Gitplaces Widget',
   })
   win.loadFile(path.join(localPath, 'index.html'))
   widgetWindows.set(sessionId, win)

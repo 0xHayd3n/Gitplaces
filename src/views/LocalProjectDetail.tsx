@@ -205,7 +205,7 @@ function LocalFilesTab({ folderPath }: { folderPath: string }) {
 // ── Main view ──────────────────────────────────────────────────────────
 type Tab = 'readme' | 'files'
 
-const META_FILE = '.git-suite.json'
+const META_FILE = '.gitplaces.json'
 
 export default function LocalProjectDetail() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -227,7 +227,7 @@ export default function LocalProjectDetail() {
   const bodyContentRef = useRef<HTMLDivElement>(null)
   const readmeBodyRef = useRef<HTMLDivElement>(null)
 
-  // Load persisted meta (description) from .git-suite.json
+  // Load persisted meta (description) from .gitplaces.json
   useEffect(() => {
     if (!currentPath) return
     try {

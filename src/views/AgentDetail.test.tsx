@@ -55,7 +55,7 @@ function makeApi() {
       }),
       mcp: {
         getConfigSnippet: vi.fn().mockResolvedValue(JSON.stringify({
-          mcpServers: { 'git-suite-agents': { command: 'node', args: ['/path/to/mcp-launcher.cjs', '/path/to/db'] } },
+          mcpServers: { 'gitplaces-agents': { command: 'node', args: ['/path/to/mcp-launcher.cjs', '/path/to/db'] } },
         }, null, 2)),
       },
       onChanged: vi.fn(),
@@ -122,7 +122,7 @@ describe('AgentDetail', () => {
     // Title (name) is the h2
     expect(screen.getByRole('heading', { level: 2, name: 'Copy editor' })).toBeTruthy()
     // Handle row shows the scope prefix and the local part
-    expect(screen.getByText('git-suite/')).toBeTruthy()
+    expect(screen.getByText('gitplaces/')).toBeTruthy()
     expect(screen.getByText('copy-editor')).toBeTruthy()
     // Swatch is now a button with aria-label "Edit appearance"
     expect(screen.getByRole('button', { name: /edit appearance/i })).toBeTruthy()
@@ -147,13 +147,13 @@ describe('AgentDetail', () => {
     expect(screen.getByText(/from superpowers v5\.1\.0/i)).toBeTruthy()
   })
 
-  it('handle copy icon copies @git-suite/<handle> to the clipboard', async () => {
+  it('handle copy icon copies @gitplaces/<handle> to the clipboard', async () => {
     setup()
     await waitForLoaded()
-    fireEvent.click(screen.getByRole('button', { name: /copy @git-suite\/copy-editor/i }))
+    fireEvent.click(screen.getByRole('button', { name: /copy @gitplaces\/copy-editor/i }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
     const text = (navigator.clipboard.writeText as any).mock.calls[0][0] as string
-    expect(text).toBe('@git-suite/copy-editor')
+    expect(text).toBe('@gitplaces/copy-editor')
   })
 
   it('shows the folder name as a meta chip', async () => {
@@ -620,7 +620,7 @@ describe('AgentDetail — MCP tab', () => {
     fireEvent.click(screen.getByRole('tab', { name: /^MCP$/ }))
     fireEvent.click(await screen.findByRole('button', { name: /copy mcp config/i }))
     await waitFor(() =>
-      expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(expect.stringContaining('git-suite-agents')),
+      expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(expect.stringContaining('gitplaces-agents')),
     )
   })
 })

@@ -64,7 +64,7 @@ describe('push', () => {
     startSkillSyncService(db, makeWin())
     await push('repo-1', 'ms', 'vscode.skill.md', 'content')
     expect(putFileContents).toHaveBeenCalledWith(
-      'tok', 'alice', 'gitsuite-skills', 'ms/vscode.skill.md', 'content',
+      'tok', 'alice', 'gitplaces-skills', 'ms/vscode.skill.md', 'content',
       expect.any(String), undefined
     )
   })
@@ -75,7 +75,7 @@ describe('push', () => {
     startSkillSyncService(db, makeWin())
     await push('repo-1', 'ms', 'vscode.skill.md', 'content')
     expect(putFileContents).toHaveBeenCalledWith(
-      'tok', 'alice', 'gitsuite-skills', 'ms/vscode.skill.md', 'content',
+      'tok', 'alice', 'gitplaces-skills', 'ms/vscode.skill.md', 'content',
       expect.any(String), 'cached'
     )
   })
@@ -108,11 +108,11 @@ describe('setupRepo', () => {
   })
 
   it('returns repoUrl when repo already exists', async () => {
-    vi.mocked(getRepo).mockResolvedValue({ html_url: 'https://github.com/alice/gitsuite-skills' } as Awaited<ReturnType<typeof getRepo>>)
+    vi.mocked(getRepo).mockResolvedValue({ html_url: 'https://github.com/alice/gitplaces-skills' } as Awaited<ReturnType<typeof getRepo>>)
     startSkillSyncService(makeDb(), makeWin())
     const result = await setupRepo('alice')
     expect(result.ok).toBe(true)
-    if (result.ok) expect(result.repoUrl).toContain('gitsuite-skills')
+    if (result.ok) expect(result.repoUrl).toContain('gitplaces-skills')
     expect(createRepo).not.toHaveBeenCalled()
     expect(vi.mocked(setSyncEnabled)).toHaveBeenCalledWith(true)
     expect(vi.mocked(setSyncRepoOwner)).toHaveBeenCalledWith('alice')
@@ -120,11 +120,11 @@ describe('setupRepo', () => {
 
   it('creates repo when getRepo throws (404)', async () => {
     vi.mocked(getRepo).mockRejectedValue(new Error('404'))
-    vi.mocked(createRepo).mockResolvedValue({ html_url: 'https://github.com/alice/gitsuite-skills' })
+    vi.mocked(createRepo).mockResolvedValue({ html_url: 'https://github.com/alice/gitplaces-skills' })
     startSkillSyncService(makeDb(), makeWin())
     const result = await setupRepo('alice')
     expect(result.ok).toBe(true)
-    expect(createRepo).toHaveBeenCalledWith('tok', 'gitsuite-skills')
+    expect(createRepo).toHaveBeenCalledWith('tok', 'gitplaces-skills')
     expect(vi.mocked(setSyncEnabled)).toHaveBeenCalledWith(true)
     expect(vi.mocked(setSyncRepoOwner)).toHaveBeenCalledWith('alice')
   })

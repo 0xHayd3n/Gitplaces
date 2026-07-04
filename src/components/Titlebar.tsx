@@ -17,7 +17,7 @@ export default function Titlebar() {
     <>
       <header className="titlebar">
         <div className="titlebar-left">
-          <img src={logoTransparent} alt="GitSuite" className="titlebar-logo" />
+          <img src={logoTransparent} alt="Gitplaces" className="titlebar-logo" />
         </div>
       </header>
       {createPortal(

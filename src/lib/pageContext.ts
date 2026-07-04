@@ -24,5 +24,5 @@ export function getPageContext(pathname: string): string {
   if (pathname === '/settings') {
     return 'Settings — application configuration including GitHub token, Claude API key, and preferences'
   }
-  return 'Git Suite'
+  return 'Gitplaces'
 }

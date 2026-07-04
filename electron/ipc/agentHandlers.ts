@@ -159,7 +159,7 @@ async function runSyncAndPersist(
     ...(changes.synced_subagent_at !== undefined && { synced_subagent_at: changes.synced_subagent_at }),
     ...(changes.synced_slash_command_at !== undefined && { synced_slash_command_at: changes.synced_slash_command_at }),
   }
-  // Fire-and-forget backup push to gitsuite-skills. Doesn't block the IPC
+  // Fire-and-forget backup push to gitplaces-skills. Doesn't block the IPC
   // reply — the user shouldn't wait for a network call. Bails silently if
   // sync isn't configured.
   void pushAgentBackup(row.id)
@@ -392,7 +392,7 @@ export function registerAgentHandlers(): void {
       syncWarning = synced.syncWarning
     } else if (result.conflictResolved !== 'skipped') {
       // Skill imports skip runSyncAndPersist (no ~/.claude/ surface) but still
-      // need to be backed up to gitsuite-skills like every other agent.
+      // need to be backed up to gitplaces-skills like every other agent.
       void pushAgentBackup(result.agentId)
     }
     broadcastChanged()
@@ -426,10 +426,10 @@ export function registerAgentHandlers(): void {
     const launcherPath = app.isPackaged
       ? path.join(process.resourcesPath, 'app.asar.unpacked', 'electron', 'mcp-launcher.cjs')
       : path.join(app.getAppPath(), 'electron', 'mcp-launcher.cjs')
-    const dbPath = path.join(app.getPath('userData'), 'gitsuite.db')
+    const dbPath = path.join(app.getPath('userData'), 'gitplaces.db')
     const snippet = {
       mcpServers: {
-        'git-suite-agents': {
+        'gitplaces-agents': {
           command: 'node',
           args: [launcherPath, dbPath],
         },

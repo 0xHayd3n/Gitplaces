@@ -14,7 +14,7 @@ export function startAgentsBackupSyncService(db: Database.Database, win: Browser
   _win = win
 }
 
-// Path layout in the gitsuite-skills repo: agents/{handle}/{filename}
+// Path layout in the gitplaces-skills repo: agents/{handle}/{filename}
 // Primary file (sort_order=0) is rendered with full frontmatter so the backup
 // is a complete, restorable copy. Secondary files are pushed raw.
 function backupPathFor(handle: string, filename: string): string {

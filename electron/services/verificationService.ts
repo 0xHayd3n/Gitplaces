@@ -123,7 +123,7 @@ export async function checkPypi(pkgName: string, owner: string): Promise<boolean
 export async function checkCrates(pkgName: string, owner: string): Promise<boolean> {
   try {
     const res = await fetch(`https://crates.io/api/v1/crates/${encodeURIComponent(pkgName)}`, {
-      headers: { 'User-Agent': 'git-suite-app/1.0' },
+      headers: { 'User-Agent': 'gitplaces-app/1.0' },
     })
     if (!res.ok) return false
     const data = await res.json() as { crate?: { repository?: string } }

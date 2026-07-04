@@ -60,7 +60,7 @@ export interface AgentFile {
   sort_order: number
   created_at: string
   updated_at: string
-  // Backup sync to gitsuite-skills (parallel to skills/notes sync)
+  // Backup sync to gitplaces-skills (parallel to skills/notes sync)
   backup_github_sha:  string | null
   backup_synced_at:   number | null
   backup_sync_status: 'pending' | 'synced' | 'failed' | null

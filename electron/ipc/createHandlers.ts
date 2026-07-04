@@ -210,7 +210,7 @@ export function registerCreateHandlers(): void {
     const repoData = await res.json() as { html_url: string; name: string }
 
     await gitInit(payload.localPath)
-    await gitCommitAll(payload.localPath, 'Initial commit via Git Suite Create')
+    await gitCommitAll(payload.localPath, 'Initial commit via Gitplaces Create')
     const pushUrl = buildPushUrl(token, user.username, repoData.name)
     await gitPush(payload.localPath, pushUrl)
 
@@ -229,7 +229,7 @@ export function registerCreateHandlers(): void {
     const user = getGitHubUser()
     if (!token || !user) throw new Error('Not authenticated')
     const repoName = payload.githubRepoUrl.split('/').pop()!
-    await gitCommitAll(payload.localPath, 'Update via Git Suite Create')
+    await gitCommitAll(payload.localPath, 'Update via Gitplaces Create')
     const pushUrl = buildPushUrl(token, user.username, repoName)
     await gitPush(payload.localPath, pushUrl)
     clearDirty(payload.sessionId)

@@ -597,10 +597,10 @@ export default function AIPanel() {
   ]
 
   const MCP_CARD_INFO: Record<McpTarget, { name: string; description: string; configFile: string; icon: ReactNode }> = {
-    claude:   { name: 'Claude Code MCP', description: "Let the Claude Code CLI call Git Suite's tools.", configFile: 'claude_desktop_config.json', icon: <IconClaude  width={20} height={20} style={{ color: 'var(--text)' }} /> },
-    opencode: { name: 'OpenCode MCP',    description: "Let the OpenCode CLI call Git Suite's tools.",    configFile: 'opencode.json',              icon: <OpenCodeIcon /> },
-    gemini:   { name: 'Gemini CLI MCP',  description: "Let the Gemini CLI call Git Suite's tools.",      configFile: 'settings.json',              icon: <IconGemini  width={20} height={20} style={{ color: 'var(--text)' }} /> },
-    codex:    { name: 'Codex CLI MCP',   description: "Let the Codex CLI call Git Suite's tools.",       configFile: 'config.toml',                icon: <IconOpenAI  width={20} height={20} style={{ color: 'var(--text)' }} /> },
+    claude:   { name: 'Claude Code MCP', description: "Let the Claude Code CLI call Gitplaces tools.", configFile: 'claude_desktop_config.json', icon: <IconClaude  width={20} height={20} style={{ color: 'var(--text)' }} /> },
+    opencode: { name: 'OpenCode MCP',    description: "Let the OpenCode CLI call Gitplaces tools.",    configFile: 'opencode.json',              icon: <OpenCodeIcon /> },
+    gemini:   { name: 'Gemini CLI MCP',  description: "Let the Gemini CLI call Gitplaces tools.",      configFile: 'settings.json',              icon: <IconGemini  width={20} height={20} style={{ color: 'var(--text)' }} /> },
+    codex:    { name: 'Codex CLI MCP',   description: "Let the Codex CLI call Gitplaces tools.",       configFile: 'config.toml',                icon: <IconOpenAI  width={20} height={20} style={{ color: 'var(--text)' }} /> },
   }
 
   const renderMcpCard = (target: McpTarget): ReactNode => {
@@ -745,7 +745,7 @@ export default function AIPanel() {
   return (
     <>
       <p className="ai-tab-desc">
-        Git Suite's built-in AI features — the chat overlay, skill generation, and tag extraction —
+        Gitplaces' built-in AI features — the chat overlay, skill generation, and tag extraction —
         can each use a different provider and model. The transports below can be mixed and matched
         (e.g. an API key for chat, a CLI subscription for skill generation).
       </p>
@@ -767,7 +767,7 @@ export default function AIPanel() {
       {activeAITab === 'api' && (
         <div className="ai-tab-panel" role="tabpanel">
           <p className="ai-tab-desc">
-            Git Suite makes HTTPS calls to each provider directly using your API key. You pay the
+            Gitplaces makes HTTPS calls to each provider directly using your API key. You pay the
             provider per token — no subscription needed. Best for fine-grained control over which
             model handles each feature.
           </p>
@@ -859,7 +859,7 @@ export default function AIPanel() {
       {activeAITab === 'cli' && (
         <div className="ai-tab-panel" role="tabpanel">
           <p className="ai-tab-desc">
-            Git Suite launches the CLI tool as a subprocess and communicates with it over stdio.
+            Gitplaces launches the CLI tool as a subprocess and communicates with it over stdio.
             Authentication and billing flow through your existing Claude.ai or OpenCode
             subscription rather than a per-token API key. Best if you're already paying for one
             of these tools.
@@ -1095,9 +1095,9 @@ export default function AIPanel() {
         <div className="ai-tab-panel" role="tabpanel">
           <p className="ai-tab-desc">
             The Model Context Protocol lets AI tools share capabilities with each other. Below, you
-            can expose Git Suite as an MCP server so a CLI agent — Claude Code, OpenCode, Gemini, or
+            can expose Gitplaces as an MCP server so a CLI agent — Claude Code, OpenCode, Gemini, or
             Codex — can call its tools, or register third-party MCP servers as additional tool
-            sources for Git Suite itself.
+            sources for Gitplaces itself.
           </p>
 
           {MCP_TARGETS.map(target => renderMcpCard(target))}
@@ -1106,7 +1106,7 @@ export default function AIPanel() {
             Custom MCP <span className="transport-chip beta" style={{ marginLeft: 6 }}>BETA</span>
           </div>
           <div className="section-block-body-desc">
-            Third-party MCP servers Git Suite can call as tool sources.
+            Third-party MCP servers Gitplaces can call as tool sources.
           </div>
 
         {customConnectors.map(c => (
@@ -1154,7 +1154,7 @@ export default function AIPanel() {
               <span className="connector-modal-beta">BETA</span>
             </div>
             <p className="connector-modal-desc">
-              Connect Git Suite to your data and tools via a remote MCP server.
+              Connect Gitplaces to your data and tools via a remote MCP server.
             </p>
             <div className="connector-modal-fields">
               <input className="settings-input connector-modal-input" type="text" placeholder="Name" value={newConnectorName} onChange={e => setNewConnectorName(e.target.value)} autoFocus />
@@ -1173,7 +1173,7 @@ export default function AIPanel() {
               </div>
             )}
             <p className="connector-modal-warning">
-              Only use connectors from developers you trust. Git Suite cannot verify that connectors will work as intended or that they won&rsquo;t change.
+              Only use connectors from developers you trust. Gitplaces cannot verify that connectors will work as intended or that they won&rsquo;t change.
             </p>
             <div className="connector-modal-actions">
               <button className="settings-btn settings-btn--ghost" onClick={resetAddForm}>Cancel</button>

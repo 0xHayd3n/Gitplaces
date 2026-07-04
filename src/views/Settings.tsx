@@ -241,7 +241,7 @@ export default function Settings() {
           <div className="settings-group-row settings-group-row--full">
             <div className="settings-group-row-label">Dark by design</div>
             <p className="settings-hint" style={{ marginTop: 4 }}>
-              Git Suite is a dark-only app. The palette is tuned for long sessions
+              Gitplaces is a dark-only app. The palette is tuned for long sessions
               reading code and READMEs; a light mode isn&rsquo;t planned.
             </p>
           </div>

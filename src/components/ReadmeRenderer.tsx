@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { Mail, Volume2, File, Globe } from 'lucide-react'
-import gitSuiteLogo from '../assets/logo-transparent.png'
+import gitplacesLogo from '../assets/logo-transparent.png'
 import { useNavigate } from 'react-router-dom'
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -1536,7 +1536,7 @@ function ReadmeRenderer({ content, repoOwner, repoName, branch = 'main', basePat
             }}
           >
             {children}
-            <img src={gitSuiteLogo} alt="" className="rm-gh-link-gitsuite-icon" />
+            <img src={gitplacesLogo} alt="" className="rm-gh-link-gitplaces-icon" />
           </a>
         )
       }

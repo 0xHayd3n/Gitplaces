@@ -72,7 +72,7 @@ function WelcomeScreen({ onConnect, onSkip }: { onConnect: () => void; onSkip: (
     <div className="onboarding-root" data-testid="onboarding-screen-0">
       <BackgroundSVG />
       <div className="onboarding-welcome-content">
-        <span className="onboarding-pill">Git Suite</span>
+        <span className="onboarding-pill">Gitplaces</span>
         <h1 className="onboarding-headline">
           Turn any GitHub repo into an{' '}
           <span className="onboarding-headline-accent">AI skill.</span>
@@ -149,7 +149,7 @@ function ConnectScreen({
         <p className="onboarding-step-label">Step 1 of 2</p>
         <h2 className="onboarding-card-heading">Connect GitHub</h2>
         <p className="onboarding-card-body">
-          Git Suite uses GitHub to let you browse repos and sync the ones you already know.
+          Gitplaces uses GitHub to let you browse repos and sync the ones you already know.
           It never writes to GitHub or accesses private repos.
         </p>
 
@@ -289,13 +289,13 @@ function DoneScreen() {
         <div className="onboarding-tip-box">
           <span className="onboarding-tip-label">HOW IT WORKS</span>
           <p className="onboarding-tip-text">
-            Find any repo → hit + Install → Git Suite generates a skill file and injects it
+            Find any repo → hit + Install → Gitplaces generates a skill file and injects it
             into Claude automatically. Your AI now knows that repo.
           </p>
         </div>
 
         <button className="onboarding-btn-open" onClick={handleOpen}>
-          Open Git Suite →
+          Open Gitplaces →
         </button>
       </div>
     </div>

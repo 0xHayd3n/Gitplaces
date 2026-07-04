@@ -39,7 +39,7 @@ function seedSkill(db: Database.Database, repoId: string, filename: string, acti
 let tmpDir: string
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gitsuite-mcp-test-'))
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gitplaces-mcp-test-'))
 })
 
 afterEach(() => {

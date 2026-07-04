@@ -342,8 +342,8 @@ describe('syncAgentToDisk', () => {
   })
 
   it('rename does NOT delete a hand-authored file at the old path when the surface was never synced', async () => {
-    // User hand-authored ~/.claude/agents/old-handle.md outside of Git-Suite.
-    // Surface has never been synced (syncedAt is null). A rename in Git-Suite
+    // User hand-authored ~/.claude/agents/old-handle.md outside of Gitplaces.
+    // Surface has never been synced (syncedAt is null). A rename in Gitplaces
     // must NOT delete that file — we don't own it.
     await fs.mkdir(path.join(tmpDir, 'agents'), { recursive: true })
     await fs.writeFile(subagentPath('old-handle'), 'hand-authored, not ours')

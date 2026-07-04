@@ -22,7 +22,7 @@ export function registerGhImgProtocol(): void {
 
     const token = getToken(HOST_ID_GITHUB)
     const headers: Record<string, string> = {
-      'User-Agent': 'GitSuite/1.0',
+      'User-Agent': 'Gitplaces/1.0',
     }
     if (token) headers['Authorization'] = `Bearer ${token}`
 

@@ -67,7 +67,7 @@ import {
   logoutCodex,
 } from './skill-gen/codex-cli'
 import {
-  buildGitSuiteEntry,
+  buildGitplacesEntry,
   readClaudeStatus,
   readOpenCodeStatus,
   readGeminiStatus,
@@ -142,7 +142,7 @@ export const COMMUNITY_COLLECTIONS = [
     id: 'community-python-api',
     name: 'Python API Stack',
     description: 'Full production Python API setup — FastAPI, Pydantic, SQLAlchemy, Alembic, HTTPX.',
-    owner: 'git-suite',
+    owner: 'gitplaces',
     repos: ['tiangolo/fastapi', 'pydantic/pydantic', 'sqlalchemy/sqlalchemy', 'sqlalchemy/alembic', 'encode/httpx'],
     color_start: '#3b82f6', color_end: '#6366f1',
   },
@@ -1354,7 +1354,7 @@ ipcMain.handle('mcp:getStatus', async (_event, target: McpTarget = 'claude') => 
 })
 
 ipcMain.handle('mcp:autoConfigure', async (_event, target: McpTarget = 'claude') => {
-  const entry = buildGitSuiteEntry(process.execPath, getMcpScriptPath())
+  const entry = buildGitplacesEntry(process.execPath, getMcpScriptPath())
   switch (target) {
     case 'opencode': return writeOpenCodeMcpConfig(entry)
     case 'gemini':   return writeGeminiMcpConfig(entry)
@@ -1365,7 +1365,7 @@ ipcMain.handle('mcp:autoConfigure', async (_event, target: McpTarget = 'claude')
 })
 
 ipcMain.handle('mcp:getConfigSnippet', async (_event, target: McpTarget = 'claude') => {
-  const entry = buildGitSuiteEntry(process.execPath, getMcpScriptPath())
+  const entry = buildGitplacesEntry(process.execPath, getMcpScriptPath())
   switch (target) {
     case 'opencode': return getOpenCodeMcpSnippet(entry)
     case 'gemini':   return getGeminiMcpSnippet(entry)

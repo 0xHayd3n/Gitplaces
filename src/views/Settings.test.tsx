@@ -44,7 +44,7 @@ function setupApi(opts: {
           configPath: opts.configPath ?? null,
         }),
         autoConfigure: vi.fn().mockResolvedValue({ success: true }),
-        getConfigSnippet: vi.fn().mockResolvedValue('{"mcpServers":{"git-suite":{}}}'),
+        getConfigSnippet: vi.fn().mockResolvedValue('{"mcpServers":{"gitplaces":{}}}'),
         testConnection: vi.fn().mockResolvedValue({ running: false, skillCount: 0 }),
       },
       opencode: {
@@ -222,7 +222,7 @@ describe('Settings — AI panel', () => {
   it('renders the AI section intro above the tabs', async () => {
     render(<Settings />)
     await waitFor(() => {
-      expect(screen.getByText(/Git Suite's built-in AI features/i)).toBeInTheDocument()
+      expect(screen.getByText(/Gitplaces' built-in AI features/i)).toBeInTheDocument()
     })
   })
 
@@ -297,10 +297,10 @@ describe('Settings — Connectors panel', () => {
 
   it('shows the AI tab by default, so Connectors panel only appears after click', async () => {
     render(<Settings />)
-    expect(screen.queryByText(/Connect external services Git Suite can read from/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Connect external services Gitplaces can read from/i)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Connectors$/ }))
     await waitFor(() => {
-      expect(screen.getByText(/Connect external services Git Suite can read from/i)).toBeInTheDocument()
+      expect(screen.getByText(/Connect external services Gitplaces can read from/i)).toBeInTheDocument()
     })
   })
 

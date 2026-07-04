@@ -57,7 +57,7 @@ describe('DiscoverTopNav', () => {
     expect(screen.getByRole('button', { name: /^home$/i })).toBeTruthy()
   })
 
-  it('does NOT render a GitSuite brand or a Filter button', () => {
+  it('does NOT render a Gitplaces brand or a Filter button', () => {
     render(<DiscoverTopNav {...baseProps} />)
     expect(document.querySelector('.dtn-brand')).toBeNull()
     expect(document.querySelector('.dtn-search-filter-btn')).toBeNull()

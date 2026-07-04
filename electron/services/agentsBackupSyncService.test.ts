@@ -14,7 +14,7 @@ vi.mock('../store', () => ({
 }))
 
 vi.mock('./skillSyncService', () => ({
-  SKILLS_BACKUP_REPO: 'gitsuite-skills',
+  SKILLS_BACKUP_REPO: 'gitplaces-skills',
 }))
 
 vi.mock('./agentFileSyncService', () => ({
@@ -139,7 +139,7 @@ describe('pushAgent', () => {
     await pushAgent('agent-1')
 
     expect(putFileContents).toHaveBeenCalledWith(
-      'tok', 'alice', 'gitsuite-skills',
+      'tok', 'alice', 'gitplaces-skills',
       'agents/agent-1/agent-1.md',
       '--- FRONTMATTER ---\nBODY',
       expect.any(String),
@@ -161,7 +161,7 @@ describe('pushAgent', () => {
     await pushAgent('agent-1')
 
     expect(putFileContents).toHaveBeenCalledWith(
-      'tok', 'alice', 'gitsuite-skills',
+      'tok', 'alice', 'gitplaces-skills',
       'agents/agent-1/agent-1.md', expect.any(String), expect.any(String), 'sha-1',
     )
   })
@@ -181,12 +181,12 @@ describe('pushAgent', () => {
     await pushAgent('agent-1')
 
     expect(putFileContents).toHaveBeenNthCalledWith(
-      1, 'tok', 'alice', 'gitsuite-skills',
+      1, 'tok', 'alice', 'gitplaces-skills',
       'agents/agent-1/agent-1.md', '--- FRONTMATTER ---\nPRIMARY',
       expect.any(String), undefined,
     )
     expect(putFileContents).toHaveBeenNthCalledWith(
-      2, 'tok', 'alice', 'gitsuite-skills',
+      2, 'tok', 'alice', 'gitplaces-skills',
       'agents/agent-1/notes.md', 'RAW SECONDARY',
       expect.any(String), undefined,
     )

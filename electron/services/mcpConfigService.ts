@@ -13,7 +13,7 @@ type McpEntry = {
   env: Record<string, string>
 }
 
-export function buildGitSuiteEntry(execPath: string, scriptPath: string): McpEntry {
+export function buildGitplacesEntry(execPath: string, scriptPath: string): McpEntry {
   return {
     command: execPath,
     args: [scriptPath],
@@ -60,10 +60,10 @@ export async function readClaudeStatus(): Promise<McpStatus> {
   try {
     const raw = await fs.readFile(configPath, 'utf8')
     const config = JSON.parse(raw) as { mcpServers?: Record<string, { command?: string }> }
-    if (!config.mcpServers || !('git-suite' in config.mcpServers)) {
+    if (!config.mcpServers || !('gitplaces' in config.mcpServers)) {
       return { configured: false, configPath }
     }
-    const entry = config.mcpServers['git-suite']
+    const entry = config.mcpServers['gitplaces']
     if (entry?.command) {
       try { await fs.access(entry.command) } catch { return { configured: false, configPath } }
     }
@@ -78,7 +78,7 @@ export async function readOpenCodeStatus(): Promise<McpStatus> {
   try {
     const raw = await fs.readFile(configPath, 'utf8')
     const config = JSON.parse(raw) as { mcp?: Record<string, unknown> }
-    if (!config.mcp || !('git-suite' in config.mcp)) {
+    if (!config.mcp || !('gitplaces' in config.mcp)) {
       return { configured: false, configPath }
     }
     return { configured: true, configPath }
@@ -92,10 +92,10 @@ export async function readGeminiStatus(): Promise<McpStatus> {
   try {
     const raw = await fs.readFile(configPath, 'utf8')
     const config = JSON.parse(raw) as { mcpServers?: Record<string, { command?: string }> }
-    if (!config.mcpServers || !('git-suite' in config.mcpServers)) {
+    if (!config.mcpServers || !('gitplaces' in config.mcpServers)) {
       return { configured: false, configPath }
     }
-    const entry = config.mcpServers['git-suite']
+    const entry = config.mcpServers['gitplaces']
     if (entry?.command) {
       try { await fs.access(entry.command) } catch { return { configured: false, configPath } }
     }
@@ -110,10 +110,10 @@ export async function readCodexStatus(): Promise<McpStatus> {
   try {
     const raw = await fs.readFile(configPath, 'utf8')
     const config = parseToml(raw) as { mcp_servers?: Record<string, { command?: string }> }
-    if (!config.mcp_servers || !('git-suite' in config.mcp_servers)) {
+    if (!config.mcp_servers || !('gitplaces' in config.mcp_servers)) {
       return { configured: false, configPath }
     }
-    const entry = config.mcp_servers['git-suite']
+    const entry = config.mcp_servers['gitplaces']
     if (entry?.command) {
       try { await fs.access(entry.command) } catch { return { configured: false, configPath } }
     }
@@ -140,7 +140,7 @@ export async function writeClaudeMcpConfig(entry: McpEntry): Promise<{ success: 
   try {
     const existing = await readJsonOrEmpty(configPath)
     const mcpServers = (existing.mcpServers ?? {}) as Record<string, unknown>
-    mcpServers['git-suite'] = entry
+    mcpServers['gitplaces'] = entry
     existing.mcpServers = mcpServers
     await fs.mkdir(path.dirname(configPath), { recursive: true })
     await fs.writeFile(configPath, JSON.stringify(existing, null, 2), 'utf8')
@@ -156,7 +156,7 @@ export async function writeOpenCodeMcpConfig(entry: McpEntry): Promise<{ success
     const existing = await readJsonOrEmpty(configPath)
     const mcp = (existing.mcp ?? {}) as Record<string, unknown>
     // OpenCode's local-server schema: { type: 'local', command: [bin, ...args], environment }
-    mcp['git-suite'] = {
+    mcp['gitplaces'] = {
       type: 'local',
       command: [entry.command, ...entry.args],
       environment: entry.env,
@@ -175,7 +175,7 @@ export async function writeGeminiMcpConfig(entry: McpEntry): Promise<{ success: 
   try {
     const existing = await readJsonOrEmpty(configPath)
     const mcpServers = (existing.mcpServers ?? {}) as Record<string, unknown>
-    mcpServers['git-suite'] = entry
+    mcpServers['gitplaces'] = entry
     existing.mcpServers = mcpServers
     await fs.mkdir(path.dirname(configPath), { recursive: true })
     await fs.writeFile(configPath, JSON.stringify(existing, null, 2), 'utf8')
@@ -195,7 +195,7 @@ export async function writeCodexMcpConfig(entry: McpEntry): Promise<{ success: b
       // file doesn't exist or invalid — start fresh
     }
     const mcpServers = (existing.mcp_servers ?? {}) as Record<string, unknown>
-    mcpServers['git-suite'] = {
+    mcpServers['gitplaces'] = {
       command: entry.command,
       args: entry.args,
       env: entry.env,
@@ -212,13 +212,13 @@ export async function writeCodexMcpConfig(entry: McpEntry): Promise<{ success: b
 // ── Snippets (for the manual-config display) ──────────────────────
 
 export function getClaudeMcpSnippet(entry: McpEntry): string {
-  return JSON.stringify({ mcpServers: { 'git-suite': entry } }, null, 2)
+  return JSON.stringify({ mcpServers: { 'gitplaces': entry } }, null, 2)
 }
 
 export function getOpenCodeMcpSnippet(entry: McpEntry): string {
   return JSON.stringify({
     mcp: {
-      'git-suite': {
+      'gitplaces': {
         type: 'local',
         command: [entry.command, ...entry.args],
         environment: entry.env,
@@ -228,13 +228,13 @@ export function getOpenCodeMcpSnippet(entry: McpEntry): string {
 }
 
 export function getGeminiMcpSnippet(entry: McpEntry): string {
-  return JSON.stringify({ mcpServers: { 'git-suite': entry } }, null, 2)
+  return JSON.stringify({ mcpServers: { 'gitplaces': entry } }, null, 2)
 }
 
 export function getCodexMcpSnippet(entry: McpEntry): string {
   return stringifyToml({
     mcp_servers: {
-      'git-suite': {
+      'gitplaces': {
         command: entry.command,
         args: entry.args,
         env: entry.env,

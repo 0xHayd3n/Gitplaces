@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// Standalone MCP server exposing Git Suite agents as resources.
+// Standalone MCP server exposing Gitplaces agents as resources.
 //
 // Usage: node mcp-launcher.cjs <db-path>
 //
 // MCP clients (Claude Code, Cursor) launch this as a child process. It opens
-// the SQLite DB read-only so it can coexist with a running Git Suite app.
+// the SQLite DB read-only so it can coexist with a running Gitplaces app.
 
 const Database = require('better-sqlite3')
 const core = require('./mcp-launcher-core.cjs')
@@ -22,7 +22,7 @@ const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio
 const { ListResourcesRequestSchema, ReadResourceRequestSchema } = require('@modelcontextprotocol/sdk/types.js')
 
 const server = new Server(
-  { name: 'git-suite-agents', version: '0.1.0' },
+  { name: 'gitplaces-agents', version: '0.1.0' },
   { capabilities: { resources: {} } },
 )
 

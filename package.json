@@ -1,7 +1,7 @@
 {
-  "name": "git-suite",
+  "name": "gitplaces",
   "version": "0.1.0",
-  "description": "Git Suite — GitHub repo skill manager",
+  "description": "Gitplaces — GitHub repo skill manager",
   "private": true,
   "main": "out/main/index.js",
   "scripts": {

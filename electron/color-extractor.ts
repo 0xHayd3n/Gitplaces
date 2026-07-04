@@ -15,7 +15,7 @@ function fetchBuffer(url: string, redirectsLeft = 5): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     if (redirectsLeft <= 0) { reject(new Error('Too many redirects')); return }
     const mod = url.startsWith('https') ? https : http
-    mod.get(url, { headers: { 'User-Agent': 'GitSuite/1.0' } }, res => {
+    mod.get(url, { headers: { 'User-Agent': 'Gitplaces/1.0' } }, res => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume()
         resolve(fetchBuffer(res.headers.location, redirectsLeft - 1))

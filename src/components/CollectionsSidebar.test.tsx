@@ -13,7 +13,7 @@ const mockCollections = [
   },
   {
     id: 'community-1', name: 'Python API', description: 'FastAPI etc',
-    owner: 'git-suite', active: 1, created_at: '2026-01-01T00:00:00.000Z',
+    owner: 'gitplaces', active: 1, created_at: '2026-01-01T00:00:00.000Z',
     color_start: '#10b981', color_end: '#059669',
     repo_count: 5, saved_count: 3,
   },

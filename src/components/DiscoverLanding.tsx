@@ -27,8 +27,8 @@ export default function DiscoverLanding({ query, onQueryChange, onSearch, onBrow
   return (
     <div className="discover-landing">
       <div className="discover-landing-brand">
-        <img src={logo} alt="Git Suite" className="discover-landing-logo" />
-        <span className="discover-landing-wordmark">Git Suite</span>
+        <img src={logo} alt="Gitplaces" className="discover-landing-logo" />
+        <span className="discover-landing-wordmark">Gitplaces</span>
       </div>
 
       <div className="discover-landing-search-wrap">

@@ -15,7 +15,7 @@ const mockCollections = [
   },
   {
     id: 'community-python-api', name: 'Python API Stack',
-    description: 'FastAPI and friends', owner: 'git-suite',
+    description: 'FastAPI and friends', owner: 'gitplaces',
     active: 1, created_at: '2026-01-01T00:00:00.000Z',
     color_start: '#3b82f6', color_end: '#6366f1',
     repo_count: 5, saved_count: 2,

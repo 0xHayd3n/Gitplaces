@@ -189,18 +189,18 @@ describe('Screen 2 — Done', () => {
     expect(screen.getByText('HOW IT WORKS')).toBeInTheDocument()
   })
 
-  it('Open Git Suite sets onboarding_complete and navigates to /discover', async () => {
+  it('Open Gitplaces sets onboarding_complete and navigates to /discover', async () => {
     await goToScreen2()
-    fireEvent.click(screen.getByText('Open Git Suite →'))
+    fireEvent.click(screen.getByText('Open Gitplaces →'))
     await waitFor(() => {
       expect(window.api.settings.set).toHaveBeenCalledWith('onboarding_complete', '1')
       expect(navigatedTo).toBe('/discover')
     })
   })
 
-  it('Open Git Suite fires getStarred in background', async () => {
+  it('Open Gitplaces fires getStarred in background', async () => {
     await goToScreen2()
-    fireEvent.click(screen.getByText('Open Git Suite →'))
+    fireEvent.click(screen.getByText('Open Gitplaces →'))
     await waitFor(() => {
       expect(window.api.repo.getMyStarred).toHaveBeenCalledWith('gh:api.github.com')
     })

@@ -13,8 +13,8 @@ export function cleanRepoUrl(username: string, repoName: string): string {
 
 export async function gitInit(localPath: string): Promise<void> {
   await execAsync('git init', { cwd: localPath })
-  await execAsync('git config user.email "gitsuite@local"', { cwd: localPath })
-  await execAsync('git config user.name "Git Suite"', { cwd: localPath })
+  await execAsync('git config user.email "gitplaces@local"', { cwd: localPath })
+  await execAsync('git config user.name "Gitplaces"', { cwd: localPath })
 }
 
 export async function gitCommitAll(localPath: string, message: string): Promise<void> {

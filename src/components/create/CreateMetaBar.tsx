@@ -22,7 +22,7 @@ export default function CreateMetaBar({ session, onNameChange, onRemoveRepo, onP
       const result = await (window.api.create as any).publishToGitHub({
         sessionId: session.id,
         repoName,
-        description: 'Built with Git Suite Create',
+        description: 'Built with Gitplaces Create',
         isPrivate: false,
         localPath: session.localPath!,
       }) as { githubRepoUrl: string }

@@ -7,7 +7,7 @@ import { getDb } from './db'
 
 describe('db migration — agent markdown section', () => {
   it('creates agent_folders table with expected columns', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitplaces-db-'))
     const db = getDb(dir)
     const cols = db.prepare("PRAGMA table_info('agent_folders')").all() as { name: string }[]
     const names = cols.map(c => c.name)
@@ -17,7 +17,7 @@ describe('db migration — agent markdown section', () => {
   })
 
   it('creates agents table with expected columns', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitplaces-db-'))
     const db = getDb(dir)
     const cols = db.prepare("PRAGMA table_info('agents')").all() as { name: string }[]
     const names = cols.map(c => c.name)
@@ -30,7 +30,7 @@ describe('db migration — agent markdown section', () => {
   })
 
   it('creates idx_agents_folder and idx_agents_updated indexes', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitplaces-db-'))
     const db = getDb(dir)
     const indexes = db.prepare("PRAGMA index_list('agents')").all() as { name: string }[]
     const names = indexes.map(i => i.name)
@@ -38,7 +38,7 @@ describe('db migration — agent markdown section', () => {
   })
 
   it('ON DELETE SET NULL: deleting a folder nulls out folder_id on its agents', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitplaces-db-'))
     const db = getDb(dir)
     db.prepare(`INSERT INTO agent_folders (id, name, created_at) VALUES ('f1', 'Writing', '2026-05-23T00:00:00Z')`).run()
     db.prepare(`
@@ -51,7 +51,7 @@ describe('db migration — agent markdown section', () => {
   })
 
   it('initialises cleanly on a pre-existing DB (idempotent)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitplaces-db-'))
     getDb(dir)
     const db = getDb(dir)
     const cols = db.prepare("PRAGMA table_info('agents')").all() as { name: string }[]

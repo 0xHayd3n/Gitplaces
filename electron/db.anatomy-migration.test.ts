@@ -6,7 +6,7 @@ import { getDb } from './db'
 
 describe('db migration — anatomy columns', () => {
   it('adds anatomy_* columns to skills', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitplaces-db-'))
     const db = getDb(dir)
     const cols = (db.prepare("PRAGMA table_info('skills')").all() as { name: string }[]).map(c => c.name)
     for (const c of ['anatomy_memory', 'anatomy_commit', 'anatomy_fingerprint', 'anatomy_source', 'anatomy_brief', 'anatomy_verify']) {
@@ -15,7 +15,7 @@ describe('db migration — anatomy columns', () => {
   })
 
   it('preserves existing skills rows (anatomy_source defaults null)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'git-suite-db-'))
+    const dir = mkdtempSync(join(tmpdir(), 'gitplaces-db-'))
     const db = getDb(dir)
     db.prepare(`INSERT INTO repos (id, owner, name, topics) VALUES ('r1','o','n','[]')`).run()
     db.prepare(`INSERT INTO skills (repo_id, filename, content, version, generated_at, active) VALUES ('r1','n.skill.md','','v1','now',1)`).run()
