@@ -242,6 +242,7 @@ function getCollectionColors(language: string | null): { color_start: string; co
 interface WindowStoreSchema {
   windowBounds: { x?: number; y?: number; width: number; height: number }
   windowMaximized: boolean
+  boundsMigrated: boolean
 }
 const windowStore = new Store<WindowStoreSchema>()
 let mainWindow: BrowserWindow | null = null
@@ -296,15 +297,21 @@ function createWindow(): void {
   const savedRaw = windowStore.get('windowBounds', DEFAULT_BOUNDS)
   const wasMaximized = windowStore.get('windowMaximized', true)
 
-  // Older versions shipped with minWidth: 1000. On ~1500px displays, Windows'
-  // half-screen snap clamped the window to 1000px wide and that stale
-  // "2/3 of the screen" width persisted into windowStore, re-applying on
-  // every restart and masquerading as a broken half-snap. If we see that
-  // exact width, treat it as a migration and fall back to defaults.
-  const saved =
-    savedRaw.width === 1000
-      ? { ...savedRaw, width: DEFAULT_BOUNDS.width, height: DEFAULT_BOUNDS.height }
-      : savedRaw
+  // One-time migration. Older versions shipped with minWidth: 1000, so on
+  // ~1500px displays Windows' half-screen snap clamped the window to 1000px
+  // wide and that stale "2/3 of the screen" width persisted into windowStore,
+  // re-applying on every restart and masquerading as a broken half-snap.
+  // Reset that width once — preserving the user's height and position — and
+  // record that we've done it, so a later *legitimate* 1000px resize isn't
+  // repeatedly clobbered (which a permanent width === 1000 check would do).
+  let saved = savedRaw
+  if (!windowStore.get('boundsMigrated', false)) {
+    if (savedRaw.width === 1000) {
+      saved = { ...savedRaw, width: DEFAULT_BOUNDS.width }
+      windowStore.set('windowBounds', saved)
+    }
+    windowStore.set('boundsMigrated', true)
+  }
 
   mainWindow = new BrowserWindow({
     ...saved,
@@ -320,8 +327,9 @@ function createWindow(): void {
     // frameless look while keeping the native frame for snap.
     // On macOS, `titleBarStyle: 'hidden'` without `frame: false` reveals the
     // traffic lights, which conflict with the app's custom controls — so
-    // keep the frameless setup on non-Windows platforms.
-    frame: process.platform !== 'win32' ? false : undefined,
+    // keep the frameless setup on non-Windows platforms. Windows keeps the
+    // native frame (frame: true) so Aero snap has a titlebar to hand off to.
+    frame: process.platform !== 'win32' ? false : true,
     titleBarStyle: 'hidden',
     // Windows: render the native min/max/close as a themed overlay in the
     // top-right corner. Keeps Aero snap (frame is preserved above) while
