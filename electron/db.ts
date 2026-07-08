@@ -5,6 +5,26 @@ import { slugifyName, dedupeHandle } from '../src/utils/agentSlug'
 import { hashHandleToColor } from '../src/utils/colorHarmony'
 import { migrateRepoIdHostPrefix } from './db-helpers'
 
+/**
+ * Runs an idempotent column migration (`ALTER TABLE … ADD/DROP COLUMN`).
+ *
+ * SQLite has no `IF NOT EXISTS` for columns, so re-running these on an
+ * already-migrated database throws `duplicate column name` (add) or
+ * `no such column` (drop). Those are expected on subsequent launches and are
+ * ignored. Any *other* error — a typo in the SQL, an unknown table, a bad
+ * default — indicates a real bug, so it is rethrown instead of being silently
+ * swallowed (the previous `catch {}` hid these entirely).
+ */
+function migrateColumn(db: Database.Database, sql: string): void {
+  try {
+    db.exec(sql)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (/duplicate column name|no such column/i.test(msg)) return
+    throw err
+  }
+}
+
 export function initSchema(db: Database.Database): void {
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
@@ -216,77 +236,77 @@ export function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS last_commits_by_tree ON last_commits (repo_id, tree_sha);
   `)
 
-  // Phase 3 migrations — idempotent via try/catch (SQLite has no ALTER TABLE ... IF NOT EXISTS)
-  try { db.exec(`ALTER TABLE repos ADD COLUMN discovered_at TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN discover_query TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN watchers INTEGER`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN size INTEGER`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN open_issues INTEGER`) } catch {}
+  // Phase 3 migrations — idempotent via migrateColumn (SQLite has no ALTER TABLE ... IF NOT EXISTS)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN discovered_at TEXT`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN discover_query TEXT`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN watchers INTEGER`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN size INTEGER`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN open_issues INTEGER`)
 
   // Phase 7 migration
-  try { db.exec(`ALTER TABLE repos ADD COLUMN starred_at TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN starred_at TEXT`)
 
   // Phase 9 migration
-  try { db.exec(`ALTER TABLE repos ADD COLUMN default_branch TEXT DEFAULT 'main'`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN default_branch TEXT DEFAULT 'main'`)
 
   // Phase 10 migration — avatar colour extraction
-  try { db.exec(`ALTER TABLE repos ADD COLUMN avatar_url   TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN banner_color TEXT`) } catch {} // JSON: {"h":220,"s":0.6,"l":0.18}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN avatar_url   TEXT`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN banner_color TEXT`) // JSON: {"h":220,"s":0.6,"l":0.18}
 
   // Phase 11 migration — verified org badge (NULL = unset/needs fetch; 0 = not verified; 1 = verified)
-  try { db.exec(`ALTER TABLE repos ADD COLUMN owner_is_verified INTEGER`) } catch {}
-  try { db.exec(`ALTER TABLE profile_cache ADD COLUMN is_verified INTEGER`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN owner_is_verified INTEGER`)
+  migrateColumn(db, `ALTER TABLE profile_cache ADD COLUMN is_verified INTEGER`)
 
   // Phase 12 migration — translation cache
-  try { db.exec(`ALTER TABLE repos ADD COLUMN translated_description TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN translated_description_lang TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN translated_readme TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN translated_readme_lang TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN detected_language TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN translated_description TEXT`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN translated_description_lang TEXT`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN translated_readme TEXT`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN translated_readme_lang TEXT`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN detected_language TEXT`)
 
   // Phase 13 migration — pushed_at (last code push, more meaningful than updated_at)
-  try { db.exec(`ALTER TABLE repos ADD COLUMN pushed_at TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN pushed_at TEXT`)
 
   // Phase 14 migration — Storybook detection cache
-  try { db.exec(`ALTER TABLE repos ADD COLUMN storybook_url TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN storybook_url TEXT`)
 
   // Phase 15 migration — repo verification system
-  try { db.exec(`ALTER TABLE repos ADD COLUMN verification_score    INTEGER DEFAULT NULL`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN verification_tier     TEXT    DEFAULT NULL`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN verification_signals  TEXT    DEFAULT NULL`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN verification_checked_at INTEGER DEFAULT NULL`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN verification_score    INTEGER DEFAULT NULL`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN verification_tier     TEXT    DEFAULT NULL`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN verification_signals  TEXT    DEFAULT NULL`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN verification_checked_at INTEGER DEFAULT NULL`)
 
   // Phase 16 migration — nested repo type system
-  try { db.exec(`ALTER TABLE repos ADD COLUMN type_bucket TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN type_sub    TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN type_bucket TEXT`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN type_sub    TEXT`)
 
   // Phase 17 migration — skill generation tier tracking
-  try { db.exec(`ALTER TABLE skills ADD COLUMN tier INTEGER DEFAULT 1`) } catch {}
+  migrateColumn(db, `ALTER TABLE skills ADD COLUMN tier INTEGER DEFAULT 1`)
 
   // Library MCP tools picker — subset of enabled MCP tools per skill
-  try { db.exec(`ALTER TABLE skills ADD COLUMN enabled_tools TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE skills ADD COLUMN enabled_tools TEXT`)
 
   // Phase 18 migration — OG image preview cache
-  try { db.exec(`ALTER TABLE repos ADD COLUMN og_image_url TEXT DEFAULT NULL`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN og_image_url TEXT DEFAULT NULL`)
 
   // Phase 19 migration — repo creation date for Rising view badges
-  try { db.exec(`ALTER TABLE repos ADD COLUMN created_at TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN created_at TEXT`)
 
   // Phase 22 migration — recently-unstarred tracking (powers the Unstarred filter)
-  try { db.exec(`ALTER TABLE repos ADD COLUMN unstarred_at TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN unstarred_at TEXT`)
 
   // Phase 23 migration — call-reduction caches:
   //   fetched_at         = epoch ms when /repos/{o}/{n} last refreshed (TTL skip in github:getRepo)
   //   starred_checked_at = epoch ms when /user/starred/{o}/{n} last verified (TTL skip in github:isStarred)
-  try { db.exec(`ALTER TABLE repos ADD COLUMN fetched_at INTEGER`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN starred_checked_at INTEGER`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN fetched_at INTEGER`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN starred_checked_at INTEGER`)
 
   // Phase 24 — Skill parity Phase 1: description + origin tracking + agent_files
-  try { db.exec(`ALTER TABLE agents ADD COLUMN description TEXT NOT NULL DEFAULT ''`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN origin_plugin TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN origin_path TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN origin_version TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN origin_imported_at TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN description TEXT NOT NULL DEFAULT ''`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN origin_plugin TEXT`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN origin_path TEXT`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN origin_version TEXT`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN origin_imported_at TEXT`)
 
   db.exec(`CREATE TABLE IF NOT EXISTS agent_files (
     id          TEXT PRIMARY KEY,
@@ -302,17 +322,17 @@ export function initSchema(db: Database.Database): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_files_agent ON agent_files(agent_id)`)
 
   // Phase 25 — Skill parity Phase 2: tools/model + subagent/slash-command surfaces
-  try { db.exec(`ALTER TABLE agents ADD COLUMN tools TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN model TEXT NOT NULL DEFAULT 'inherit'`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN is_subagent INTEGER NOT NULL DEFAULT 0`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN is_slash_command INTEGER NOT NULL DEFAULT 0`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN argument_hint TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN synced_subagent_at TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN synced_slash_command_at TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN tools TEXT`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN model TEXT NOT NULL DEFAULT 'inherit'`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN is_subagent INTEGER NOT NULL DEFAULT 0`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN is_slash_command INTEGER NOT NULL DEFAULT 0`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN argument_hint TEXT`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN synced_subagent_at TEXT`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN synced_slash_command_at TEXT`)
 
   // Phase 27 — Multi-provider agent support (see docs/superpowers/specs/2026-05-26-multi-provider-agents-design.md)
-  try { db.exec(`ALTER TABLE agents ADD COLUMN model_provider TEXT NOT NULL DEFAULT 'anthropic'`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN model_endpoint_id TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN model_provider TEXT NOT NULL DEFAULT 'anthropic'`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN model_endpoint_id TEXT`)
 
   // Phase 20 – AI chat history
   db.exec(`CREATE TABLE IF NOT EXISTS ai_chats (
@@ -343,47 +363,47 @@ export function initSchema(db: Database.Database): void {
   )`)
 
   // Skill GitHub sync columns
-  try { db.exec(`ALTER TABLE skills ADD COLUMN github_sha TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE skills ADD COLUMN synced_at INTEGER`) } catch {}
-  try { db.exec(`ALTER TABLE skills ADD COLUMN sync_status TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE sub_skills ADD COLUMN github_sha TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE sub_skills ADD COLUMN synced_at INTEGER`) } catch {}
-  try { db.exec(`ALTER TABLE sub_skills ADD COLUMN sync_status TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE skills ADD COLUMN github_sha TEXT`)
+  migrateColumn(db, `ALTER TABLE skills ADD COLUMN synced_at INTEGER`)
+  migrateColumn(db, `ALTER TABLE skills ADD COLUMN sync_status TEXT`)
+  migrateColumn(db, `ALTER TABLE sub_skills ADD COLUMN github_sha TEXT`)
+  migrateColumn(db, `ALTER TABLE sub_skills ADD COLUMN synced_at INTEGER`)
+  migrateColumn(db, `ALTER TABLE sub_skills ADD COLUMN sync_status TEXT`)
 
   // Anatomy engine columns (Phase 1) — raw .anatomy is stored in skills.content;
   // github_sha (added above) doubles as the anatomy commit pin.
-  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_memory      TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_commit      TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_fingerprint TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_source      TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_brief       TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE skills ADD COLUMN anatomy_memory      TEXT`)
+  migrateColumn(db, `ALTER TABLE skills ADD COLUMN anatomy_commit      TEXT`)
+  migrateColumn(db, `ALTER TABLE skills ADD COLUMN anatomy_fingerprint TEXT`)
+  migrateColumn(db, `ALTER TABLE skills ADD COLUMN anatomy_source      TEXT`)
+  migrateColumn(db, `ALTER TABLE skills ADD COLUMN anatomy_brief       TEXT`)
 
   // Phase 2 — rule-verification summary (JSON: { ok, errors[], warnings[], rules[] })
-  try { db.exec(`ALTER TABLE skills ADD COLUMN anatomy_verify TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE skills ADD COLUMN anatomy_verify TEXT`)
 
   // Phase 23 migration — update notifications
-  try { db.exec(`ALTER TABLE repos ADD COLUMN is_forked         INTEGER DEFAULT 0`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN update_available  INTEGER DEFAULT 0`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN update_checked_at INTEGER DEFAULT NULL`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN upstream_version  TEXT    DEFAULT NULL`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN stored_version    TEXT    DEFAULT NULL`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN archived_at       TEXT    DEFAULT NULL`) } catch {}
-  try { db.exec(`ALTER TABLE repos ADD COLUMN forked_at         TEXT    DEFAULT NULL`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN is_forked         INTEGER DEFAULT 0`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN update_available  INTEGER DEFAULT 0`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN update_checked_at INTEGER DEFAULT NULL`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN upstream_version  TEXT    DEFAULT NULL`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN stored_version    TEXT    DEFAULT NULL`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN archived_at       TEXT    DEFAULT NULL`)
+  migrateColumn(db, `ALTER TABLE repos ADD COLUMN forked_at         TEXT    DEFAULT NULL`)
 
   // Agents polish — folder emoji
-  try { db.exec(`ALTER TABLE agent_folders ADD COLUMN emoji TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE agent_folders ADD COLUMN emoji TEXT`)
 
   // Agents redesign — new columns on existing agents table.
   // Note: the UNIQUE constraint on `handle` is added in a later migration
   // step after backfill writes valid values into existing rows.
-  try { db.exec(`ALTER TABLE agents ADD COLUMN handle       TEXT NOT NULL DEFAULT ''`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN color_start  TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN color_end    TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN emoji        TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN pinned       INTEGER NOT NULL DEFAULT 0`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN pinned_at    TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN last_used_at TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agents ADD COLUMN presets_json TEXT NOT NULL DEFAULT '[]'`) } catch {}
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN handle       TEXT NOT NULL DEFAULT ''`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN color_start  TEXT`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN color_end    TEXT`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN emoji        TEXT`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN pinned       INTEGER NOT NULL DEFAULT 0`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN pinned_at    TEXT`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN last_used_at TEXT`)
+  migrateColumn(db, `ALTER TABLE agents ADD COLUMN presets_json TEXT NOT NULL DEFAULT '[]'`)
 
   // Agents redesign — edit-history snapshots table (writes wired up in Phase C)
   db.exec(`CREATE TABLE IF NOT EXISTS agent_revisions (
@@ -447,7 +467,13 @@ export function initSchema(db: Database.Database): void {
   // Partial index excludes empty-string handles so transient pre-backfill rows
   // (and test fixtures simulating pre-redesign state) can coexist without
   // tripping the constraint before backfill runs.
-  try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_handle ON agents(handle) WHERE handle <> ''`) } catch {}
+  try {
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_handle ON agents(handle) WHERE handle <> ''`)
+  } catch (err) {
+    // Expected only if pre-backfill duplicate handles still exist; log so the
+    // (rare) case where the uniqueness guarantee is missing is observable.
+    console.warn('[db] could not create unique handle index (duplicate handles?):', err)
+  }
 
   // Phase 26 — Body-as-file: backfill a primary agent_files row per agent.
   // Placed AFTER the handle-backfill block above so every agent has a valid
@@ -492,24 +518,24 @@ export function initSchema(db: Database.Database): void {
   }
   // Phase 26 (cont.) — drop agents.body once every agent has its primary file row.
   // Idempotent across re-runs (try/catch ignores "no such column" on second pass).
-  try { db.exec(`ALTER TABLE agents DROP COLUMN body`) } catch {}
+  migrateColumn(db, `ALTER TABLE agents DROP COLUMN body`)
 
   // Agents backup sync — per-file mirroring to the user's gitplaces-skills repo.
   // Tracked per-file (not per-agent) so adding/editing one file doesn't re-push
   // every file in the agent.
-  try { db.exec(`ALTER TABLE agent_files ADD COLUMN backup_github_sha   TEXT`) } catch {}
-  try { db.exec(`ALTER TABLE agent_files ADD COLUMN backup_synced_at    INTEGER`) } catch {}
-  try { db.exec(`ALTER TABLE agent_files ADD COLUMN backup_sync_status  TEXT`) } catch {}
+  migrateColumn(db, `ALTER TABLE agent_files ADD COLUMN backup_github_sha   TEXT`)
+  migrateColumn(db, `ALTER TABLE agent_files ADD COLUMN backup_synced_at    INTEGER`)
+  migrateColumn(db, `ALTER TABLE agent_files ADD COLUMN backup_sync_status  TEXT`)
 
   // Phase 28 — multi-host: tag repo-scoped rows with their host of origin.
   // Existing rows backfill to 'gh:api.github.com' via the DEFAULT clause.
   // See docs/superpowers/specs/2026-06-14-multi-host-repo-integration-design.md
-  try { db.exec(`ALTER TABLE repos                ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
-  try { db.exec(`ALTER TABLE profile_cache        ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
-  try { db.exec(`ALTER TABLE repo_security_cache  ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
-  try { db.exec(`ALTER TABLE repo_stats_cache     ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
-  try { db.exec(`ALTER TABLE repo_momentum_cache  ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
-  try { db.exec(`ALTER TABLE repo_releases_cache  ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`) } catch {}
+  migrateColumn(db, `ALTER TABLE repos                ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`)
+  migrateColumn(db, `ALTER TABLE profile_cache        ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`)
+  migrateColumn(db, `ALTER TABLE repo_security_cache  ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`)
+  migrateColumn(db, `ALTER TABLE repo_stats_cache     ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`)
+  migrateColumn(db, `ALTER TABLE repo_momentum_cache  ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`)
+  migrateColumn(db, `ALTER TABLE repo_releases_cache  ADD COLUMN host_id TEXT NOT NULL DEFAULT 'gh:api.github.com'`)
 
   // Phase 29 — host-prefix non-GitHub `repos.id` values so cross-host
   // collisions on the single-column PK become impossible. Public github.com
