@@ -272,7 +272,9 @@ async function processJob(job: EnrichmentJob): Promise<void> {
       _db?.prepare(
         'UPDATE repos SET verification_score = 0, verification_tier = NULL, verification_signals = NULL, verification_checked_at = ? WHERE id = ?'
       ).run(now, job.repoId)
-    } catch {}
+    } catch (dbErr) {
+      console.error('[verificationService] failed to persist failure state for', job.repoId, dbErr)
+    }
   }
 }
 

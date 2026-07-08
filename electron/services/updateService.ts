@@ -203,10 +203,23 @@ export async function checkAll(): Promise<void> {
       'SELECT id, owner, name, is_forked FROM repos WHERE update_available = 1'
     ).all() as { id: string; owner: string; name: string; is_forked: number }[]
     for (const r of toUpdate) {
-      if (r.is_forked) await applyForkSync(r.id).catch(() => {})
-      const hasSkill = _db!.prepare('SELECT 1 FROM skills WHERE repo_id = ?').get(r.id)
-      if (hasSkill) await applySkillRegen(r.id).catch(() => {})
-      if (r.is_forked || hasSkill) {
+      const hasSkill = !!_db!.prepare('SELECT 1 FROM skills WHERE repo_id = ?').get(r.id)
+      if (!r.is_forked && !hasSkill) continue
+      const failures: string[] = []
+
+      if (r.is_forked) {
+        const res = await applyForkSync(r.id).catch((err): { ok: boolean; error?: string } => ({ ok: false, error: String(err) }))
+        if (!res.ok) failures.push(res.error ?? 'fork sync failed')
+      }
+      if (hasSkill) {
+        const res = await applySkillRegen(r.id).catch((err): { ok: boolean; error?: string } => ({ ok: false, error: String(err) }))
+        if (!res.ok) failures.push(res.error ?? 'skill regen failed')
+      }
+
+      if (failures.length > 0) {
+        console.error(`[updateService] auto-update failed for ${r.owner}/${r.name}:`, failures.join('; '))
+        _win?.webContents.send('update:toast', { message: `Auto-update failed: ${r.owner}/${r.name}` })
+      } else {
         _win?.webContents.send('update:toast', { message: `Auto-updated: ${r.owner}/${r.name}` })
       }
     }

@@ -116,7 +116,7 @@ function upsertReposToDb(
       const color = await extractDominantColor(repo.ownerAvatarUrl)
       db.prepare('UPDATE repos SET banner_color = ? WHERE owner = ? AND name = ?')
         .run(JSON.stringify(color), repo.owner, repo.name)
-    })
+    }, 'repo:banner-color')
   })
 
   return items

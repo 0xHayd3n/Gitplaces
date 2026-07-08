@@ -278,7 +278,9 @@ export function parseAssistantMessage(content: string): AiChatMessage {
       if (typeof parsed.owner === 'string' && typeof parsed.name === 'string' && typeof parsed.description === 'string') {
         repoCards.push({ owner: parsed.owner, name: parsed.name, description: parsed.description, stars: Number(parsed.stars) || 0, language: String(parsed.language || '') })
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[ai-chat] skipping malformed ```repo``` block:', err)
+    }
   }
 
   const actionRegex = /```action\n([\s\S]*?)```/g
@@ -288,7 +290,9 @@ export function parseAssistantMessage(content: string): AiChatMessage {
       if (typeof parsed.action === 'string' && typeof parsed.owner === 'string' && typeof parsed.name === 'string') {
         actions.push({ action: parsed.action, owner: parsed.owner, name: parsed.name, result: parsed.result != null ? String(parsed.result) : undefined })
       }
-    } catch {}
+    } catch (err) {
+      console.warn('[ai-chat] skipping malformed ```action``` block:', err)
+    }
   }
 
   return {
