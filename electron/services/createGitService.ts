@@ -1,7 +1,14 @@
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 
-const execAsync = promisify(exec)
+// Use execFile (no shell) with argument arrays so user-influenced values
+// (commit messages, repo names, remote URLs) can never be interpreted by a
+// shell. String-interpolated `exec` here was a command-injection vector.
+const execFileAsync = promisify(execFile)
+
+async function git(cwd: string, args: string[]): Promise<void> {
+  await execFileAsync('git', args, { cwd })
+}
 
 export function buildPushUrl(token: string, username: string, repoName: string): string {
   return `https://${token}@github.com/${username}/${repoName}.git`
@@ -12,21 +19,21 @@ export function cleanRepoUrl(username: string, repoName: string): string {
 }
 
 export async function gitInit(localPath: string): Promise<void> {
-  await execAsync('git init', { cwd: localPath })
-  await execAsync('git config user.email "gitplaces@local"', { cwd: localPath })
-  await execAsync('git config user.name "Gitplaces"', { cwd: localPath })
+  await git(localPath, ['init'])
+  await git(localPath, ['config', 'user.email', 'gitplaces@local'])
+  await git(localPath, ['config', 'user.name', 'Gitplaces'])
 }
 
 export async function gitCommitAll(localPath: string, message: string): Promise<void> {
-  await execAsync('git add .', { cwd: localPath })
-  await execAsync(`git commit -m "${message.replace(/"/g, '\\"')}"`, { cwd: localPath })
+  await git(localPath, ['add', '.'])
+  await git(localPath, ['commit', '-m', message])
 }
 
 export async function gitPush(localPath: string, pushUrl: string): Promise<void> {
   try {
-    await execAsync(`git remote add origin ${pushUrl}`, { cwd: localPath })
+    await git(localPath, ['remote', 'add', 'origin', pushUrl])
   } catch {
-    await execAsync(`git remote set-url origin ${pushUrl}`, { cwd: localPath })
+    await git(localPath, ['remote', 'set-url', 'origin', pushUrl])
   }
-  await execAsync('git push -u origin HEAD', { cwd: localPath })
+  await git(localPath, ['push', '-u', 'origin', 'HEAD'])
 }
