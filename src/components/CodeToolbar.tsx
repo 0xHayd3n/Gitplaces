@@ -1,6 +1,7 @@
 // src/components/CodeToolbar.tsx
 import { useState, useCallback } from 'react'
 import { Clipboard, Check, WrapText, AlignLeft } from 'lucide-react'
+import { formatBytes } from '../utils/formatBytes'
 
 interface Props {
   language: string
@@ -9,12 +10,6 @@ interface Props {
   wordWrap: boolean
   onToggleWordWrap: () => void
   content?: string
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function formatLanguage(lang: string): string {
@@ -48,7 +43,7 @@ export default function CodeToolbar({ language, lineCount, fileSize, wordWrap, o
         <span className="code-toolbar__lang-badge">{formatLanguage(language)}</span>
         <span className="code-toolbar__meta">{lineCount} lines</span>
         <span className="code-toolbar__divider">·</span>
-        <span className="code-toolbar__meta">{formatSize(fileSize)}</span>
+        <span className="code-toolbar__meta">{formatBytes(fileSize)}</span>
       </div>
       <div className="code-toolbar__right">
         <button
@@ -71,4 +66,4 @@ export default function CodeToolbar({ language, lineCount, fileSize, wordWrap, o
   )
 }
 
-export { formatSize, formatLanguage }
+export { formatLanguage }

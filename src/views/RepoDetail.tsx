@@ -13,6 +13,7 @@ import { classifyRepoBucket } from '../lib/classifyRepoType'
 import { getSubTypeConfig, getBucketGradient, getBucketColor } from '../config/repoTypeConfig'
 import DitherBackground from '../components/DitherBackground'
 import { cameraIdxForRepo } from '../utils/repoCameraSeed'
+import { formatDate } from '../utils/dateHelpers'
 const ReadmeRenderer = lazy(() => import('../components/ReadmeRenderer'))
 import TocNav, { type TocItem } from '../components/TocNav'
 import NavBar from '../components/NavBar'
@@ -326,11 +327,6 @@ const LANGUAGE_NAMES: Record<string, string> = {
 }
 
 // ── Format helpers ─────────────────────────────────────────────────
-function formatDate(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
 function formatSize(kb: number | null): string {
   if (kb == null) return '—'
   if (kb >= 1024) return `${(kb / 1024).toFixed(1)} MB`

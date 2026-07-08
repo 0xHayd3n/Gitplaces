@@ -7,6 +7,7 @@ import SkillDepthBars from './SkillDepthBars'
 import AnatomyIndicators from './AnatomyIndicators'
 import { getLangConfig } from './BannerSVG'
 import { formatDate, daysSince } from '../utils/dateHelpers'
+import { charSizeKb } from '../utils/textStats'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
 import type { LibrarySavedRepo, SubSkillRow, AnatomyPayload } from '../types/repo'
 
@@ -44,7 +45,7 @@ export default function GenericDetail({
 
   const lang = row.language ?? ''
   const cfg = getLangConfig(lang)
-  const skillSizeKb = ((skillContent?.length ?? 0) / 1024).toFixed(1)
+  const skillSizeKb = charSizeKb(skillContent)
   const collectionsStr = collections.length > 0 ? collections.map(c => c.name).join(', ') : '\u2014'
   const { openProfile } = useProfileOverlay()
   const navigate = useNavigate()
