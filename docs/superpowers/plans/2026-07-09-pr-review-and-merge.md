@@ -12,7 +12,8 @@
 - Merge strategy: merge commits only (`gh pr merge --merge`).
 - Delete PR branches and stale `claude/*` local branches after successful merges.
 - Do not push unless explicitly asked.
-- `main` must pass `npm run typecheck` and `npm test` after the cleanup.
+- Typecheck command: `npx tsc --noEmit` (repo has no `npm run typecheck`).
+- Tests: `npm test`. Baseline currently has 30 pre-existing failures (see Task 0). Each PR must not introduce *new* failures beyond this baseline; PRs that claim to fix tests must reduce or eliminate the relevant failures.
 
 ---
 
@@ -29,7 +30,7 @@ Expected: `Switched to branch 'main'` and `git status --short` returns empty.
 
 - [ ] **Step 2: Run baseline typecheck**
 
-Run: `npm run typecheck`
+Run: `npx tsc --noEmit`
 
 Expected: exits `0` with no errors.
 
@@ -37,11 +38,15 @@ Expected: exits `0` with no errors.
 
 Run: `npm test`
 
-Expected: exits `0` (all tests pass).
+Expected: records the current baseline. As of this plan's creation, the baseline has 30 pre-existing failures:
+- `vendor/anatomy/anatomy-cli/tests/mcp-memory-tools.test.ts`: 21 failed (`process.chdir()` not supported in workers)
+- `vendor/anatomy/anatomy-cli/tests/pass2-config-loader.test.ts`: 3 failed (`process.chdir()` not supported in workers)
+- `src/components/ImportPluginDialog.test.tsx`: 1 failed
+- `src/components/ReadmeRenderer.test.tsx`: 5 failed
 
-- [ ] **Step 4: Commit baseline state (no changes)**
+- [ ] **Step 4: Record baseline**
 
-No commit needed; record baseline output for comparison.
+No commit needed; save the failure list for comparison in later tasks.
 
 ---
 
@@ -75,7 +80,7 @@ Expected: all git commands use `execFile` with argument arrays instead of shell 
 
 - [ ] **Step 4: Run typecheck**
 
-Run: `npm run typecheck`
+Run: `npx tsc --noEmit`
 
 Expected: exits `0`.
 
@@ -129,7 +134,7 @@ Expected: helpers extracted to a shared location; callers updated to import from
 
 - [ ] **Step 4: Run typecheck**
 
-Run: `npm run typecheck`
+Run: `npx tsc --noEmit`
 
 Expected: exits `0`.
 
@@ -183,7 +188,7 @@ Expected: tests are well-scoped and do not modify source behavior.
 
 - [ ] **Step 4: Run typecheck**
 
-Run: `npm run typecheck`
+Run: `npx tsc --noEmit`
 
 Expected: exits `0`.
 
@@ -237,7 +242,7 @@ Expected: no new silently swallowed errors; surfaces are intentional and safe.
 
 - [ ] **Step 4: Run typecheck**
 
-Run: `npm run typecheck`
+Run: `npx tsc --noEmit`
 
 Expected: exits `0`.
 
@@ -291,7 +296,7 @@ Expected: AbortSignal listeners are removed/cleaned; polling has timeouts/guards
 
 - [ ] **Step 4: Run typecheck**
 
-Run: `npm run typecheck`
+Run: `npx tsc --noEmit`
 
 Expected: exits `0`.
 
@@ -345,7 +350,7 @@ Expected: migration runs once; Windows window frame is explicitly set.
 
 - [ ] **Step 4: Run typecheck**
 
-Run: `npm run typecheck`
+Run: `npx tsc --noEmit`
 
 Expected: exits `0`.
 
@@ -430,7 +435,7 @@ Expected: `Switched to branch 'main'` and empty status.
 
 - [ ] **Step 2: Final typecheck**
 
-Run: `npm run typecheck`
+Run: `npx tsc --noEmit`
 
 Expected: exits `0`.
 
