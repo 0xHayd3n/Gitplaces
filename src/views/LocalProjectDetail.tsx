@@ -6,19 +6,13 @@ import DitherBackground from '../components/DitherBackground'
 const ReadmeRenderer = lazy(() => import('../components/ReadmeRenderer'))
 import TocNav, { type TocItem } from '../components/TocNav'
 import FileIcon from '../components/FileIcon'
+import { formatBytes } from '../utils/formatBytes'
 
 // ── Types ─────────────────────────────────────────────────────────────
 type DirEntry = { name: string; path: string; type: 'dir' | 'file'; size: number | null }
 
 // ── Helpers ───────────────────────────────────────────────────────────
 const README_CANDIDATES = ['README.md', 'readme.md', 'Readme.md', 'README.txt', 'README']
-
-function formatBytes(n: number | null): string {
-  if (n == null) return ''
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`
-}
 
 // ── LocalFilesTab ─────────────────────────────────────────────────────
 function LocalFilesTab({ folderPath }: { folderPath: string }) {

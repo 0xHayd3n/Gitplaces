@@ -7,6 +7,7 @@ import SkillDepthBars from './SkillDepthBars'
 import ComponentPreview from './ComponentPreview'
 import { getLangConfig } from './BannerSVG'
 import { formatDate, daysSince } from '../utils/dateHelpers'
+import { charSizeKb, countLines } from '../utils/textStats'
 import { parseComponents, type ComponentEntry } from '../utils/skillParse'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
 import type { LibrarySavedRepo, SubSkillRow } from '../types/repo'
@@ -53,9 +54,9 @@ export default function ComponentDetail({
   const isEnabled = (name: string) => enabledSet === null ? true : enabledSet.has(name)
   const enabledCount = enabledSet === null ? allComponents.length : enabledNames!.length
   const totalCount = allComponents.length
-  const skillSizeKb = ((skillContent?.length ?? 0) / 1024).toFixed(1)
+  const skillSizeKb = charSizeKb(skillContent)
   const collectionsStr = collections.length > 0 ? collections.map(c => c.name).join(', ') : '\u2014'
-  const skillLineCount = (skillContent ?? '').split('\n').length
+  const skillLineCount = countLines(skillContent)
 
   // Group by category
   const categories = Array.from(new Set(allComponents.map((c) => c.category)))

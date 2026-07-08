@@ -4,6 +4,7 @@ import FileIcon from '../FileIcon'
 import SvgThumb from '../SvgThumb'
 import type { VisibleRow, LastCommitInfo, GitFileStatus, Density } from '../../lib/fileTree/types'
 import { DENSITY_PX } from '../../lib/fileTree/types'
+import { formatBytes } from '../../utils/formatBytes'
 import './FileTreeRow.css'
 
 interface Props {
@@ -20,12 +21,6 @@ interface Props {
   onClick: (e: React.MouseEvent) => void
   onContextMenu: (e: React.MouseEvent) => void
   onSegmentClick?: (depth: number) => void
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function formatDateModified(iso: string): string {

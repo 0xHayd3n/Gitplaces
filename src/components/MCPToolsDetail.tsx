@@ -6,6 +6,7 @@ import DetailRow from './DetailRow'
 import SkillDepthBars from './SkillDepthBars'
 import { getLangConfig } from './BannerSVG'
 import { formatDate, daysSince } from '../utils/dateHelpers'
+import { charSizeKb, countLines } from '../utils/textStats'
 import { useProfileOverlay } from '../contexts/ProfileOverlay'
 import type { LibrarySavedRepo, SubSkillRow } from '../types/repo'
 import type { McpScanResult } from '../types/mcp'
@@ -60,9 +61,9 @@ export default function MCPToolsDetail({
 
   const filtered = tools.filter(t => t.name.toLowerCase().includes(toolSearch.toLowerCase()))
   const categories = Array.from(new Set(filtered.map(t => t.category ?? '(uncategorized)')))
-  const skillSizeKb = ((skillContent?.length ?? 0) / 1024).toFixed(1)
+  const skillSizeKb = charSizeKb(skillContent)
   const collectionsStr = collections.length > 0 ? collections.map(c => c.name).join(', ') : '\u2014'
-  const skillLineCount = (skillContent ?? '').split('\n').length
+  const skillLineCount = countLines(skillContent)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>

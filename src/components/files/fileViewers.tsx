@@ -1,5 +1,6 @@
 import { Image as ImageIcon, FileQuestion, Play } from 'lucide-react'
 import { VIDEO_MIME } from './fileTypes'
+import { formatBytes } from '../../utils/formatBytes'
 
 interface ImagePreviewProps {
   rawUrl: string
@@ -64,11 +65,6 @@ interface FileMetaViewProps {
   path: string
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 export function FileMetaView({ filename, size, owner, name, branch, path }: FileMetaViewProps) {
   const githubUrl = `https://github.com/${owner}/${name}/blob/${branch}/${path}`
@@ -76,7 +72,7 @@ export function FileMetaView({ filename, size, owner, name, branch, path }: File
     <div className="file-meta-view">
       <FileQuestion size={32} style={{ color: 'var(--t3)' }} />
       <h3 className="file-meta-view__name">{filename}</h3>
-      {size != null && <p className="file-meta-view__size">{formatSize(size)}</p>}
+      {size != null && <p className="file-meta-view__size">{formatBytes(size)}</p>}
       <a
         className="file-meta-view__link"
         href={githubUrl}
