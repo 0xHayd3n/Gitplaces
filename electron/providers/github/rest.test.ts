@@ -133,6 +133,21 @@ describe('pollDeviceToken', () => {
     mockFetch.mockResolvedValue(makeResponse({ error: 'expired_token' }))
     await expect(pollDeviceToken('dev-code', 0)).rejects.toThrow(/expired/)
   })
+
+  it('surfaces a clear error when the endpoint returns non-JSON', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: () => Promise.reject(new SyntaxError('Unexpected token < in JSON')),
+      headers: { get: () => null },
+    })
+    await expect(pollDeviceToken('dev-code', 0)).rejects.toThrow(/502/)
+  })
+
+  it('rejects immediately when the abort signal is already aborted', async () => {
+    await expect(pollDeviceToken('dev-code', 0, AbortSignal.abort())).rejects.toThrow(/cancelled/)
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
 })
 
 describe('getRepo', () => {

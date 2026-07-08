@@ -610,8 +610,9 @@ export async function pollDeviceToken(deviceCode: string, interval: number, sign
   while (true) {
     if (signal?.aborted) throw new Error('Authentication cancelled')
     await new Promise<void>((resolve, reject) => {
-      const t = setTimeout(resolve, delayMs)
-      signal?.addEventListener('abort', () => { clearTimeout(t); reject(new Error('Authentication cancelled')) }, { once: true })
+      const onAbort = () => { clearTimeout(t); reject(new Error('Authentication cancelled')) }
+      const t = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve() }, delayMs)
+      signal?.addEventListener('abort', onAbort, { once: true })
     })
 
     const res = await fetch('https://github.com/login/oauth/access_token', {
@@ -623,7 +624,16 @@ export async function pollDeviceToken(deviceCode: string, interval: number, sign
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
       }),
     })
-    const data = (await res.json()) as DeviceTokenResponse
+    // GitHub returns HTTP 200 with an `error` field for the normal
+    // pending / slow_down cases, so we don't gate on res.ok. But a transient
+    // 5xx or non-JSON (HTML) response would make res.json() throw a raw
+    // SyntaxError and kill the whole flow — surface it as a clear error instead.
+    let data: DeviceTokenResponse
+    try {
+      data = (await res.json()) as DeviceTokenResponse
+    } catch {
+      throw new Error(`Device flow polling failed: ${res.status}`)
+    }
 
     if (data.access_token) return data.access_token
 
